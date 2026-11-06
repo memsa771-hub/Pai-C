@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from app import pai_os_bridge as bridge
 from app.models import RouteDecision
 from app.os import models, ports
+from app.os.replan import choice_texts
 from app.os.api import build_router, current_student_ref, current_student_ref_for_write
 from app.os.knowledge.programmes import Programme, ProgrammeStore
 from tests.os.test_api import TEST_TERMS, agree
@@ -70,7 +71,8 @@ def test_builder_with_counsellor_on_writes_decision(world):
                                      {"programme_ref": "btu-artificial-intelligence", "rank": 2}]}
         r = os_api.post(f"{P}/plans/self", headers={"X-Test-Student": who.workspace_id}, json=body)
         assert r.status_code == 202, r.text
-        assert r.json() == {"state": "preparing", "decision_version": 2, "note": None}
+        assert r.json() == {"state": "preparing", "decision_version": 2,
+                            "note": choice_texts.note("preparing", svc_.settings)}
         assert count(svc_, "self_serve") == 0  # the builder made no plan of its own
         # the bridge delivered version 2 to the OS; the intake revises the Counsellor plan
         assert run_os(svc_) == [("revised", None)]
@@ -141,9 +143,11 @@ def test_builder_note_null_until_approved(world):
                     choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
-        r = os_api.post(f"{P}/plans/self", headers={"X-Test-Student": who.workspace_id}, json={
-            **START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1},
-                                 {"programme_ref": "btu-artificial-intelligence", "rank": 2}]})
+        texts = choice_texts._load(choice_texts.PATH)[1]
+        with patch.object(choice_texts, "_load", lambda path: (False, texts)):  # as if still unapproved
+            r = os_api.post(f"{P}/plans/self", headers={"X-Test-Student": who.workspace_id}, json={
+                **START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1},
+                                     {"programme_ref": "btu-artificial-intelligence", "rank": 2}]})
         assert r.status_code == 202 and r.json()["note"] is None
 
 

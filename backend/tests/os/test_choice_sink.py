@@ -4,6 +4,7 @@ student's choice to the host (ChoiceSink) instead of starting a self-serve plan.
 
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -45,6 +46,9 @@ class Host:
         self.calls.append(args)
         return self.answer
 
+
+# The owner approved these sentences in chat (2026-11-06), so the API returns them.
+SAID = yaml.safe_load(choice_texts.PATH.read_text(encoding="utf-8"))
 
 def build(engine, os_db, rehearsal=False) -> TestClient:
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true",
@@ -157,7 +161,7 @@ def test_open_self_serve_plan_means_adopt_first_same_and_other_identity(api):
     connect(host)  # the part is now on
     for body in (GERMANY, {**GERMANY, "intake": {"term": "winter", "year": 2028}}):
         r = api.post(f"{P}/plans/self", headers=me(), json=body)
-        assert r.status_code == 409 and r.json() == {"detail": "adopt_first", "note": None}, r.text
+        assert r.status_code == 409 and r.json() == {"detail": "adopt_first", "note": SAID["adopt_first"]}, r.text
     assert host.calls == [] and plans(api, "self_serve") == 1
 
 
@@ -186,7 +190,7 @@ def test_written_is_202_preparing_and_no_plan(api):
     host = Host({"outcome": "written", "decision_version": 4, "code": None})
     connect(host)
     r = post_start(api)
-    assert r.status_code == 202 and r.json() == {"state": "preparing", "decision_version": 4, "note": None}
+    assert r.status_code == 202 and r.json() == {"state": "preparing", "decision_version": 4, "note": SAID["preparing"]}
     assert plans(api) == 0
     assert host.calls == [("stu-1", "PK", "IE", "master", {"term": "winter", "year": 2027},
                            [{"programme_ref": "p1", "rank": 1}, {"programme_ref": "p2", "rank": 2}])]
@@ -204,7 +208,7 @@ def test_refused_is_409_with_the_code(api, code):
     module_on(api)
     connect(Host({"outcome": "refused", "decision_version": None, "code": code}))
     r = post_start(api)
-    assert r.status_code == 409 and r.json() == {"detail": code, "note": None}
+    assert r.status_code == 409 and r.json() == {"detail": code, "note": SAID[code]}
     assert plans(api) == 0
 
 
@@ -219,9 +223,13 @@ def test_validation_comes_before_the_host(api):
 
 
 def test_note_null_until_approved_then_only_in_rehearsal(engine, clean, os_db):
-    assert yaml.safe_load(choice_texts.PATH.read_text())["approved"] is False
+    assert yaml.safe_load(choice_texts.PATH.read_text())["approved"] is True  # approved in chat, 2026-11-06
+    unapproved = choice_texts._load(choice_texts.PATH)[1]
+    with patch.object(choice_texts, "_load", lambda path: (False, unapproved)):
+        for key in ("preparing", "choose_field_first", "too_many_places", "adopt_first"):
+            assert choice_texts.note(key, load_settings({"OS_DATABASE_URL": os_db})) is None
     for key in ("preparing", "choose_field_first", "too_many_places", "adopt_first"):
-        assert choice_texts.note(key, load_settings({"OS_DATABASE_URL": os_db})) is None
+        assert choice_texts.note(key, load_settings({"OS_DATABASE_URL": os_db})) == unapproved[key]
     api = build(engine, os_db, rehearsal=True)
     try:
         module_on(api)

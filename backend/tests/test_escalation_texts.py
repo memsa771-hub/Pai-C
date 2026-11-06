@@ -1,5 +1,5 @@
-"""P1-T6 Task 4 (R-11): the student sentences for an escalation pause. OWNER approval: stored approved:false, so they
-are returned only in rehearsal (CONNECT_CONSENT_DRAFT)."""
+"""P1-T6 Task 4 (R-11): the student sentences for an escalation pause. Approved by the owner in chat (2026-11-06); the gate
+still holds: an unapproved file is returned only in rehearsal (CONNECT_CONSENT_DRAFT)."""
 
 import re
 from unittest.mock import patch
@@ -15,22 +15,27 @@ FIVE = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "othe
 RAW = yaml.safe_load(texts.TEXTS_PATH.read_text(encoding="utf-8"))
 
 
-def test_file_is_stored_unapproved():
-    assert RAW["approved"] is False and RAW["version"]
+def test_file_is_approved_by_the_owner():
+    assert RAW["approved"] is True and RAW["version"]
+    with patch.object(config, "CONNECT_CONSENT_DRAFT", False):
+        assert texts.text("other") == RAW["reasons"]["other"].strip() and texts.action() == RAW["action"].strip()
+
+
+UNAPPROVED = {"approved": False}
 
 
 @pytest.mark.parametrize("reason", FIVE)
 def test_reason_text_null_until_approved(reason):
-    with patch.object(config, "CONNECT_CONSENT_DRAFT", False):
+    with patch.object(config, "CONNECT_CONSENT_DRAFT", False), patch.dict(texts._RAW, UNAPPROVED):
         assert texts.text(reason) is None
-    with patch.object(config, "CONNECT_CONSENT_DRAFT", True):
+    with patch.object(config, "CONNECT_CONSENT_DRAFT", True), patch.dict(texts._RAW, UNAPPROVED):
         assert texts.text(reason) == RAW["reasons"][reason].strip()
 
 
 def test_action_null_until_approved():
-    with patch.object(config, "CONNECT_CONSENT_DRAFT", False):
+    with patch.object(config, "CONNECT_CONSENT_DRAFT", False), patch.dict(texts._RAW, UNAPPROVED):
         assert texts.action() is None
-    with patch.object(config, "CONNECT_CONSENT_DRAFT", True):
+    with patch.object(config, "CONNECT_CONSENT_DRAFT", True), patch.dict(texts._RAW, UNAPPROVED):
         assert texts.action() == RAW["action"].strip()
 
 

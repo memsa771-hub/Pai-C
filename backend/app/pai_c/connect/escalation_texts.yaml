@@ -1,8 +1,8 @@
 # What the student reads when PAI OS has paused their plan and sent them back to choosing (R-11, row 6.12).
-# OWNER approval: stored approved:false. While it is false, escalation_texts.text() and .action() return None unless
+# Approved by the owner in chat (2026-11-06). If `approved` is set back to false, escalation_texts.text() and .action() return None unless
 # CONNECT_CONSENT_DRAFT is on (rehearsal). Plain English. No country, institution or date.
 version: "1"
-approved: false
+approved: true  # approved by the owner in chat, 2026-11-06
 
 # One sentence per reason code PAI OS sends. The plan stays paused until the student's choice changes.
 reasons:

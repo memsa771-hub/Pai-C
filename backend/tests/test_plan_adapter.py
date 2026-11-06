@@ -413,9 +413,18 @@ def test_a_consent_pause_has_no_reason_text():
 
 @pytest.mark.req("R-11")
 def test_reason_text_is_absent_until_approved_or_rehearsal():
-    with handoff(draft=False), plan_client(view_of(STEPS, state="paused", reason="other")) as (client, _, params, _f, _):
+    from app.pai_c.connect import escalation_texts
+    with handoff(draft=False), patch.dict(escalation_texts._RAW, {"approved": False}), \
+            plan_client(view_of(STEPS, state="paused", reason="other")) as (client, _, params, _f, _):
         plan = page(client, params)["plan"]
     assert "reason_text" not in plan and "reason_action" not in plan
+
+
+def test_approved_reason_text_is_shown_without_rehearsal():
+    """The owner approved the sentences in chat (2026-11-06): they show with the draft switch off."""
+    with handoff(draft=False), plan_client(view_of(STEPS, state="paused", reason="other")) as (client, _, params, _f, _):
+        plan = page(client, params)["plan"]
+    assert plan["reason_text"] and plan["reason_action"]
 
 
 @pytest.mark.req("R-11")

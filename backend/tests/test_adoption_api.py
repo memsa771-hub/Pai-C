@@ -107,8 +107,8 @@ def test_post_409_when_handoff_off(world):
 
 
 def test_adoption_text_null_until_approved(world):
-    assert adoption_texts._RAW["approved"] is False  # stored unapproved: the owner approves it
-    with pre_eng() as (client, student, params):
+    assert adoption_texts._RAW["approved"] is True  # approved by the owner in chat, 2026-11-06
+    with pre_eng() as (client, student, params), patch.dict(adoption_texts._RAW, {"approved": False}):
         assert offer(client, params)["text"] is None
         with patch.object(config, "CONNECT_CONSENT_DRAFT", True, create=True):  # rehearsal
             text = offer(client, params)["text"]

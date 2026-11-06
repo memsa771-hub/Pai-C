@@ -6,6 +6,7 @@ import json
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -261,17 +262,33 @@ def test_enabled_that_raises_reads_as_off(world):
     assert choice_requests.enabled() is False
 
 
+_TEXTS = choice_texts._load(choice_texts.PATH)[1]
+
+
+def _unapproved(path=choice_texts.PATH):
+    """The texts as they would load from a file still stored `approved: false`."""
+    return False, _TEXTS
+
+
 def test_status_note_hidden_until_approved(world):
     pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
     accept(world, pid)
-    [p] = world.client.get("/v1/os/inbox", headers=ME).json()["proposals"]
-    assert p["id"] == pid and p["status"] == "requested" and "status_note" not in p
-    assert "request_outcome" not in p and p["reasons"] == [WHY]
-    on = replace(world.svc.settings, rehearsal=True)
-    assert choice_texts.note("requested", on) == yaml.safe_load(choice_texts.PATH.read_text())["requested"]
-    assert yaml.safe_load(choice_texts.PATH.read_text())["approved"] is False
+    with patch.object(choice_texts, "_load", _unapproved):
+        [p] = world.client.get("/v1/os/inbox", headers=ME).json()["proposals"]
+        assert p["id"] == pid and p["status"] == "requested" and "status_note" not in p
+        assert "request_outcome" not in p and p["reasons"] == [WHY]
+        on = replace(world.svc.settings, rehearsal=True)
+        assert choice_texts.note("requested", on) == yaml.safe_load(choice_texts.PATH.read_text())["requested"]
+        assert choice_texts.note("requested", world.svc.settings) is None
     assert choice_texts.PATH.parent.name == "texts"
-    assert choice_texts.note("requested", world.svc.settings) is None
+
+
+def test_texts_are_approved_by_the_owner_and_shown(world):
+    assert yaml.safe_load(choice_texts.PATH.read_text())["approved"] is True  # approved in chat, 2026-11-06
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    accept(world, pid)
+    [p] = world.client.get("/v1/os/inbox", headers=ME).json()["proposals"]
+    assert p["status_note"] == yaml.safe_load(choice_texts.PATH.read_text())["requested"]
 
 
 def test_expired_request_with_outcome_is_listed(world):
