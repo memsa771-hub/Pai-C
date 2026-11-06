@@ -90,7 +90,7 @@ async function renderRoute(route: Route, tweak: { plan?: unknown; items?: unknow
     <I18nProvider><SidebarProvider><MyPlanProvider>
       <OsNavGroup stageId="B" />
       <OsNavGroup stageId="B" collapsed />
-      {plan.pages.map((p) => <OsHeader key={p.key} workspaceId="ws1" current={`os-${p.key}` as never} title={(p as { title: string }).title} />)}
+      {plan.pages.map((p) => <OsHeader key={p.key} workspaceId="ws1" current={`os-${p.key}` as never} title={(p as unknown as { title: string }).title} />)}
       <CommandMenu open onOpenChange={() => {}} onGo={() => {}} onAsk={() => {}} osOpen pages={plan.pages} />
       <OsPlanCard />
       <OsVaultStrip />

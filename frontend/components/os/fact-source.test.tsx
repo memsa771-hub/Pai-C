@@ -36,7 +36,7 @@ const prog = (facts: ReturnType<typeof fact>[]) => [{ ref: 'p1', name: 'MSc Exam
 const item = (over: Partial<OsInboxItem> = {}): OsInboxItem => ({
   id: 1, instance_key: 'k', title: 'Apply', kind: 'student', inbox_kind: 'act', programme_ref: 'p1', state: 'ready',
   blocked_reason: null, due_at: '2027-03-12T18:59:59Z', due_tz: 'UTC', provisional: false, estimated: false, slack_days: null,
-  critical: false, citations: [{ source: 'S1', url: 'https://a.example/x', note: null }], ...over,
+  critical: false, citations: [{ source: 'S1', url: 'https://a.example/x' }], ...over,
 });
 const pack = (over: Partial<OsPack> = {}): OsPack => ({
   programme_ref: 'p1', name: 'MSc Example', university: 'Uni Sample', status: 'ready', version: 1, approved: false,

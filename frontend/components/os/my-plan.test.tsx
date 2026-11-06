@@ -14,7 +14,7 @@ import { OsVaultStrip } from './vault-strip';
 import { NotInPlan } from './not-in-plan';
 import { CommandMenu } from '@/components/counselor/workspace/shell-parts';
 import { act } from '@testing-library/react';
-import { asMyPlan, inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
+import { asMyPlan, inPlan, pageNoun, pageTitle, type MyPlan } from '@/lib/os-my-plan';
 
 const config = vi.hoisted(() => ({ OS_UI_ENABLED: true, OS_REHEARSAL_UI: false }));
 const auth = vi.hoisted(() => ({ loading: false, user: { uid: 'u' } as object | null, idToken: 'tok' }));
@@ -117,7 +117,7 @@ describe('my plan on', () => {
   });
 
   it('the command menu has no my plan group before a choice, and the open rule follows the part', () => {
-    const on = (plan: typeof myPlanEmpty) => ({ on: true, plan, refresh() {} });
+    const on = (plan: MyPlan) => ({ on: true, plan, refresh() {} });
     expect(osMenuOpen(on(myPlanEmpty), 'B')).toBe(false);
     expect(osMenuOpen(on(myPlanPkBs), 'B')).toBe(true);
     expect(osMenuOpen({ on: false, plan: null, refresh() {} }, 'B')).toBe(false);
