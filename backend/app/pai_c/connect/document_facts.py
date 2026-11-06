@@ -93,10 +93,8 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     Returns `("written", candidate_ids)` or `("duplicate", candidate_ids)` (the key was delivered before), or
     `("refused", [code])` with code `no_workspace`, `no_mapping` or `file_not_yours`."""
     from app import models
-    from app.memory.candidates import MemoryCandidateService
-    from app.memory.handlers import JOB_RECONCILE
     from app.pai_c.connect.student_facts import _education_records
-    from app.pai_c.memory import vault_catalog
+    from app.pai_c.memory import MemoryCandidateService, reconcile_job_type, vault_catalog
     from app.runtime.task_runtime import enqueue
 
     key, ref = str(proposal.get("key") or ""), str(proposal.get("document_ref") or "")
@@ -144,7 +142,7 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     for code in sorted(tests):
         propose("test_attempt", {"test_type": catalog.label("tests", code), "overall_score": tests[code]})
     db.add(models.DocumentProposal(key=key, workspace_id=workspace_id, file_id=file_id, candidate_ids=ids))
-    enqueue(db, job_type=JOB_RECONCILE, workspace_id=workspace_id, payload={"candidate_ids": ids},
+    enqueue(db, job_type=reconcile_job_type(), workspace_id=workspace_id, payload={"candidate_ids": ids},
             idempotency_key=f"reconcile:os_document:{key}")
     _tell_context_line(db, workspace_id, file_id, ids)
     db.flush()
