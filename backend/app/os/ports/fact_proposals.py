@@ -4,17 +4,16 @@ the `counsellor` outbox channel, template `fact_proposal`, written in its own OS
 The host's glue reads the rows here and hands each to the Vault's sink; the Vault reconciler decides what is written.
 Never a name, a date of birth, a passport value or any field without `fact:`. IDs, keys and the confirmed numbers only.
 
-Gate (the worker never configures `document_files.enabled()`): the confirmation runs in the API, where the host
-configured the port, so `confirm_document` emits when the port is on or the document is linked to a host file (a link
-exists only because the part was on). `pending`, `mark` and `backfill` take no gate: the host's sweep calls them only
-while its part is on, and the OS holds no host flag. `notify(key)` is the post-commit nudge; the sweep is the backup."""
+Gate: the confirmation runs only in the API, where the host configured the port, so `confirm_document` emits only
+while `document_files.enabled()` holds. `pending`, `mark` and `backfill` take no gate: the host's sweep calls them only
+while its part is on, and the OS holds no host flag (the worker never configures `enabled()`). `notify(key)` is the post-commit nudge; the sweep is the backup."""
 
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 
 from pydantic import ValidationError
-from sqlalchemy import Connection, Text, exists, func, select, update
+from sqlalchemy import Connection, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models, ports
@@ -27,7 +26,9 @@ TEMPLATE = "fact_proposal"
 BACKFILL_INTAKE = ("planned", "revised", "replaced", "paused")  # a Counsellor decision that reached a plan
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _MAX_TEXT = 200
-OUTCOMES = {"written": "sent", "duplicate": "sent", "refused": "skipped", "invalid": "skipped"}
+OUTCOMES = {"written": "sent", "duplicate": "sent", "refused": "skipped", "invalid": "skipped",
+            "superseded": "skipped"}
+MAX_ATTEMPTS = 5  # failed deliveries before a row is set aside as `failed` (it must not starve newer rows)
 
 _on_proposal: Callable[[str], None] | None = None
 
@@ -84,14 +85,32 @@ def emit(conn: Connection, tenant_id: str, doc, facts: list[dict]) -> str | None
     return key if written is not None else None
 
 
+def _doc_of(key: str) -> str:
+    return key.split(":")[1] if key.count(":") >= 2 else key
+
+
 def pending(limit: int = 100) -> list[FactProposalV1]:
-    """Proposals waiting for the glue, oldest first. A row that is not a valid proposal is set aside (`skipped`)."""
+    """Proposals waiting for the glue, oldest first. Of several pending proposals for one document only the newest is
+    returned: the older ones are set aside as `superseded`, so the student is never asked to choose between their own
+    two confirmations. A row that is not a valid proposal is set aside too (`skipped`)."""
     svc = ports.services()
     O = models.outbox
+    where = (O.c.tenant_id == svc.settings.tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+             O.c.status == "pending")
     with svc.engine.connect() as conn:
-        rows = conn.execute(select(O.c.idempotency_key, O.c.payload).where(
-            O.c.tenant_id == svc.settings.tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
-            O.c.status == "pending").order_by(O.c.id).limit(limit)).all()
+        everyone = conn.execute(select(O.c.id, O.c.idempotency_key).where(*where).order_by(O.c.id)).all()
+    newest: dict[str, int] = {}
+    for row_id, key in everyone:
+        newest[_doc_of(key)] = row_id
+    for row_id, key in everyone:
+        if newest[_doc_of(key)] != row_id:
+            mark(key, "superseded")
+    keep = [i for i, k in everyone if newest[_doc_of(k)] == i][:limit]
+    if not keep:
+        return []
+    with svc.engine.connect() as conn:
+        rows = conn.execute(select(O.c.idempotency_key, O.c.payload).where(*where, O.c.id.in_(keep))
+                            .order_by(O.c.id)).all()
     out = []
     for key, payload in rows:
         try:
@@ -100,6 +119,28 @@ def pending(limit: int = 100) -> list[FactProposalV1]:
             log.error("fact proposal row is not valid")
             mark(key, "invalid")
     return out
+
+
+def record_failure(key: str) -> int:
+    """Counts one failed delivery. After MAX_ATTEMPTS the row is set to `failed` (payload.outcome `failed`) so it
+    stops being picked up. Returns the count."""
+    svc = ports.services()
+    O = models.outbox
+    with svc.engine.begin() as conn:
+        row = conn.execute(select(O.c.attempts, O.c.payload).where(
+            O.c.tenant_id == svc.settings.tenant_id, O.c.idempotency_key == key, O.c.channel == CHANNEL,
+            O.c.template == TEMPLATE, O.c.status == "pending").with_for_update()).first()
+        if row is None:
+            return 0
+        attempts = row.attempts + 1
+        values = {"attempts": attempts}
+        if attempts >= MAX_ATTEMPTS:
+            values.update(status="failed", payload={**row.payload, "outcome": "failed"})
+        conn.execute(update(O).where(O.c.tenant_id == svc.settings.tenant_id, O.c.idempotency_key == key)
+                     .values(**values))
+    if attempts >= MAX_ATTEMPTS:
+        log.error("fact proposal set aside after %d failed deliveries", attempts)
+    return attempts
 
 
 def mark(key: str, outcome: str) -> None:
@@ -144,13 +185,15 @@ def backfill(limit: int = 100) -> int:
     if not with_facts:
         return 0
     with svc.engine.connect() as conn:
-        ids = conn.execute(select(D.c.id).where(
+        due = conn.execute(select(D.c.id, D.c.confirmed_at).where(
             D.c.tenant_id == tenant, D.c.status == "confirmed", D.c.doc_type.in_(with_facts),
+            D.c.confirmed_at.is_not(None),
             exists().where(I.c.tenant_id == tenant, I.c.student_ref == D.c.student_ref,
-                           I.c.status.in_(BACKFILL_INTAKE)),
-            ~exists().where(O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
-                            O.c.idempotency_key.like(func.concat(f"{TEMPLATE}:", D.c.id.cast(Text), ":%")))
-        ).order_by(D.c.id)).scalars().all()
+                           I.c.status.in_(BACKFILL_INTAKE))).order_by(D.c.id)).all()
+        held = set(conn.execute(select(O.c.idempotency_key).where(
+            O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE)).scalars())
+    # the document's CURRENT key: a failed emit of a re-confirmation is recovered even when an older one is on file
+    ids = [doc_id for doc_id, at in due if key_of(doc_id, at) not in held]
     store, written = DocumentStore(svc.engine, tenant), 0
     for doc_id in ids:
         if written >= limit:

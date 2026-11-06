@@ -94,10 +94,12 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     """Writes the proposal's candidates and enqueues their reconciliation, in the caller's transaction (no commit).
 
     Returns `("written", candidate_ids)` or `("duplicate", candidate_ids)` (the key was delivered before), or
-    `("refused", [code])` with code `no_workspace`, `no_mapping` or `file_not_yours`."""
+    `("refused", [code])` with code `no_workspace`, `no_mapping`, `file_not_yours` or `file_gone`. Facts the Vault
+    already holds as a candidate from an earlier proposal for the same document (the student confirmed the same values
+    again) are left out; if nothing is left the answer is `duplicate`."""
     from app import models
-    from app.pai_c.connect.student_facts import _education_records
-    from app.pai_c.memory import MemoryCandidateService, vault_catalog
+    from app.pai_c.connect.student_facts import education_records
+    from app.pai_c.memory import MemoryCandidateService
     from app.runtime.task_runtime import enqueue
 
     key, ref = str(proposal.get("key") or ""), str(proposal.get("document_ref") or "")
@@ -110,8 +112,10 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     file_id, filename = None, None
     if not ref.startswith(_OS_ONLY):
         record = db.get(models.FileRecord, ref)
-        if record is None or str(record.workspace_id) != workspace_id or record.status != "active":
+        if record is None or str(record.workspace_id) != workspace_id:
             return "refused", ["file_not_yours"]
+        if record.status != "active":
+            return "refused", ["file_gone"]  # trashed or deleted since the student confirmed
         file_id, filename = record.id, record.filename
     doc_type = str(proposal.get("doc_type") or "")
     authority = _data()["authority"].get(doc_type)
@@ -126,14 +130,17 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
                 **({"os_document_id": int(match.group(1))} if match else {}),
                 **({"authority": authority, "file_id": file_id, "filename": filename} if file_id else {})}
     candidates, ids = MemoryCandidateService(db), []
+    earlier = _earlier_values(db, workspace_id, match)
 
     def propose(key_, value, entities=None):
+        if (key_, _flat(value)) in earlier:  # the same confirmed values again: no second set of candidates
+            return
         candidate = candidates.propose(workspace_id, "student_record", key=key_, proposed_value=value,
                                        entities=entities, confidence=0.95, source_type="document",
                                        input_channel="document", evidence=dict(evidence))
         ids.append(candidate.id)
 
-    records = _education_records(db, workspace_id) if education else []
+    records = education_records(db, workspace_id) if education else []
     for family in sorted(education):
         existing = _record_id(records, family)
         if existing:
@@ -141,15 +148,40 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
         else:
             propose("education", {"qualification_name": _data()["new_record_code"][family],
                                   "result": education[family]})
-    catalog = vault_catalog()
     for code in sorted(tests):
-        propose("test_attempt", {"test_type": catalog.label("tests", code), "overall_score": tests[code]})
+        propose("test_attempt", {"test_type": code, "overall_score": tests[code]})
     db.add(models.DocumentProposal(key=key, workspace_id=workspace_id, file_id=file_id, candidate_ids=ids))
+    if not ids:  # every fact was already proposed from this document
+        db.flush()
+        return "duplicate", []
     enqueue(db, job_type=JOB_RECONCILE, workspace_id=workspace_id, payload={"candidate_ids": ids},
             idempotency_key=f"reconcile:os_document:{key}")
     _tell_context_line(db, workspace_id, file_id, ids)
     db.flush()
     return "written", ids
+
+
+def _earlier_values(db, workspace_id: str, match) -> list:
+    """`(candidate key, proposed value)` of every candidate an earlier proposal for the same OS document made."""
+    from app import models
+
+    if match is None:
+        return []
+    rows = db.scalars(select(models.DocumentProposal).where(
+        models.DocumentProposal.workspace_id == workspace_id,
+        models.DocumentProposal.key.like(f"fact_proposal:{int(match.group(1))}:%"))).all()
+    ids = [i for row in rows for i in (row.candidate_ids or [])]
+    if not ids:
+        return []
+    found = db.scalars(select(models.MemoryCandidate).where(models.MemoryCandidate.id.in_(ids))).all()
+    return [(c.key, _flat((c.proposed_value or {}).get("value"))) for c in found]
+
+
+def _flat(value, path: str = "") -> tuple:
+    """A value as sorted `(path, text)` pairs, so a number the Vault stored as text still equals the number sent."""
+    if isinstance(value, dict):
+        return tuple(sorted(p for k, v in value.items() for p in _flat(v, f"{path}.{k}")))
+    return ((path, str(value)),)
 
 
 def _workspace(db, student_ref: str) -> str | None:
@@ -177,4 +209,5 @@ def _tell_context_line(db, workspace_id: str, file_id: str | None, ids: list[str
     if artifact is None:
         return
     summary = dict(artifact.extraction_summary or {})
-    artifact.extraction_summary = {**summary, "candidate_ids": [*summary.get("candidate_ids", []), *ids]}
+    known = list(summary.get("candidate_ids", []))
+    artifact.extraction_summary = {**summary, "candidate_ids": [*known, *[i for i in ids if i not in known]]}

@@ -42,7 +42,7 @@ def _num(value):
     return int(number) if number.is_integer() else number
 
 
-def _education_records(db, workspace_id: str) -> list[dict]:
+def education_records(db, workspace_id: str) -> list[dict]:
     from app.pai_c.memory import MemoryService
 
     return list(MemoryService(db).profile(workspace_id).records.get("education", []))
@@ -63,7 +63,7 @@ def eligible_levels(records: list[dict]) -> list[str] | None:
 
 
 def student_eligible_levels(db, workspace_id: str) -> list[str] | None:
-    return eligible_levels(_education_records(db, workspace_id))
+    return eligible_levels(education_records(db, workspace_id))
 
 
 class _Facts:

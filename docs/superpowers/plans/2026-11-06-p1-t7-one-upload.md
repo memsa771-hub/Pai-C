@@ -136,7 +136,7 @@
   - The model uses `extra="forbid"` and `frozen=True`.
 - **D-y9, delivery and idempotence.**
   - `confirm_document` (`confirm.py:30`) then emits in one OS transaction. The emit happens only when `document_files.enabled()` holds and the type has at least one `fact:` field with a non-empty confirmed value.
-    - The row: channel `counsellor`, template `fact_proposal`, recipient `student_ref`, key `fact_proposal:{doc_id}:{confirmed_at.isoformat()}`, `on_conflict_do_nothing(uq_os_outbox_key)`.
+    - The row: channel `counsellor`, template `fact_proposal`, recipient `student_ref`, key `fact_proposal:{doc_id}:{confirmed_at in epoch microseconds}` (not `isoformat()`: its capital T and plus sign break the key pattern `^[a-z0-9_:.-]+$`; the stored `confirmed_at` is still what makes the key), `on_conflict_do_nothing(uq_os_outbox_key)`.
   - After the route returns, `notify(key)` calls the host hook. Errors are swallowed and the class name is logged.
   - The sweep is the backup. It delivers the pending rows. It also runs `backfill()`, which emits for every `confirmed` document of a Counsellor-mode student that has fact fields and no row yet; this covers a crash between the confirm and the emit, and documents confirmed before the part was on.
   - The Counsellor side records each delivered key in a new table `pai_document_proposals`: `key` unique, `workspace_id`, `file_id NULL`, `candidate_ids JSON`, `created_at`. A repeat delivery answers `duplicate` and proposes nothing.

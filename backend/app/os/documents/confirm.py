@@ -65,9 +65,8 @@ def _propose_facts(engine: Engine, tenant_id: str, types: Mapping[str, DocumentT
     failure here is logged by class name and never fails it: the sweep's backfill writes the row later."""
     from app.os.ports import document_files, fact_proposals  # late: the ports import the stores
 
-    # The worker never configures `enabled()`, so the gate is also "linked to a host file" (a link exists only while
-    # the part was on). Off and unlinked, nothing is written.
-    if not (document_files.enabled() or doc.file_ref is not None):
+    # Confirmation runs only in the API, where the host configures `enabled()`: with the part off nothing is written.
+    if not document_files.enabled():
         return None
     try:
         facts = fact_proposals.facts_of(doc, types, values)

@@ -139,8 +139,9 @@ def test_file_of_another_workspace_is_refused(student):
         db.flush()
         theirs = add_file(db, str(other.id))
         trashed = add_file(db, student.workspace_id, status="deleted")
-        for ref in (theirs, trashed, str(uuid.uuid4())):
+        for ref in (theirs, str(uuid.uuid4())):
             assert document_facts.apply(db, proposal(student, ref, key=f"k:{ref}")) == ("refused", ["file_not_yours"])
+        assert document_facts.apply(db, proposal(student, trashed, key="k:trashed")) == ("refused", ["file_gone"])
         assert db.scalars(select(MemoryCandidate)).all() == [] and db.scalars(select(DocumentProposal)).all() == []
 
 
@@ -234,3 +235,57 @@ def test_the_context_line_reflects_the_proposal(student):
         db.expire_all()
         assert learned_summary(db, db.scalar(select(DocumentArtifact))) == {"learned": {"education": 1},
                                                                            "needs_review": 0}
+
+
+def test_same_values_confirmed_again_make_no_second_set(student):
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        first = document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:1"))
+        db.commit()
+        again = document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:2"))
+        db.commit()
+        assert first[0] == "written" and again == ("duplicate", [])
+        assert len(db.scalars(select(MemoryCandidate)).all()) == 1
+        assert len(db.scalars(select(DocumentProposal)).all()) == 2  # the new key is recorded: a repeat is a duplicate
+        assert document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:2")) == ("duplicate", [])
+        # a changed value is a new candidate; an unchanged test score is not
+        changed = document_facts.apply(db, proposal(student, file_id, [
+            {"key": "education.intermediate.marks_obtained", "value": 910},
+            {"key": "education.intermediate.marks_total", "value": 1100}], key="fact_proposal:7:3"))
+        assert changed[0] == "written" and len(changed[1]) == 1
+        t1 = document_facts.apply(db, proposal(student, file_id, [{"key": "test.ielts.score", "value": 6.5}],
+                                               key="fact_proposal:8:1", doc_type="ielts_trf"))
+        t2 = document_facts.apply(db, proposal(student, file_id, [{"key": "test.ielts.score", "value": 6.5}],
+                                               key="fact_proposal:8:2", doc_type="ielts_trf"))
+        assert t1[0] == "written" and t2 == ("duplicate", [])
+
+
+def test_a_conflicting_value_becomes_needs_review_not_an_overwrite(student):
+    from app.models import ProfileIssue
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        document_candidate(db, ws, add_file(db, ws), {"marks_obtained": 900, "marks_total": 1100})
+        outcome, ids = document_facts.apply(db, proposal(student, add_file(db, ws), [
+            {"key": "education.intermediate.marks_obtained", "value": 800}]))
+        db.commit()
+        (result,) = reconcile_all(db, ids)
+        assert outcome == "written" and not result.accepted and result.outcome == "needs_review"
+        assert db.get(MemoryCandidate, ids[0]).status == "needs_review"
+        assert len(db.scalars(select(ProfileIssue)).all()) == 1
+        (row,) = education(db, ws)
+        assert row["result"]["marks_obtained"] == 900  # the Vault value stands until the student chooses
+
+
+def test_the_context_line_counts_each_candidate_once(student):
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        db.add(DocumentArtifact(workspace_id=ws, file_id=file_id, status="ready", document_type="pdf",
+                                classification="hssc_certificate", extractor_version="os_document"))
+        db.commit()
+        _, ids = document_facts.apply(db, proposal(student, file_id))
+        document_facts._tell_context_line(db, ws, file_id, ids)  # the same ids told twice
+        db.commit()
+        assert db.scalar(select(DocumentArtifact)).extraction_summary["candidate_ids"] == ids

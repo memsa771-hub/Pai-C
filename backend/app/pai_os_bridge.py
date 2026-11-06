@@ -233,6 +233,10 @@ def deliver_fact_proposals(db) -> dict:
             db.rollback()
             log.error("PAI OS fact proposal could not be delivered: %s", type(exc).__name__)
             got["failed"] += 1
+            try:  # after MAX_ATTEMPTS the row is set aside, so it cannot starve the newer ones
+                os_fact_proposals.record_failure(proposal.key)
+            except Exception as inner:  # noqa: BLE001
+                log.error("PAI OS fact proposal failure could not be counted: %s", type(inner).__name__)
     return got
 
 

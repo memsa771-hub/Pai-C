@@ -184,13 +184,13 @@ def test_confirm_failure_to_emit_never_fails_the_confirmation(world, monkeypatch
     assert got.json()["status"] == "confirmed" and world.rows() == []
 
 
-def test_typed_document_gates_on_the_link_when_the_port_reads_off(world):
-    """The worker never configures `enabled()`: a linked document still proposes."""
+def test_typed_document_with_the_part_off_writes_no_row(world):
+    """Confirm runs in the API, where `enabled()` is configured: with it off a linked document proposes nothing."""
     doc_id = world.typed()
     world.read(doc_id)
-    ports.configure(world.svc, document_files=bridge.document_file_bytes)  # `enabled` unconfigured, as in the worker
+    ports.configure(world.svc, document_files=bridge.document_file_bytes)  # `enabled` unconfigured
     world.confirm(doc_id)
-    assert len(world.rows()) == 1
+    assert world.rows() == []
 
 
 # --- delivery --------------------------------------------------------------------------------------------------
@@ -340,3 +340,84 @@ def test_a_confirmed_typed_document_ends_as_a_shown_fact_in_the_vault(world):
         file_id = db.scalar(select(FileRecord.id))
     assert row["evidence_level"] == "shown" and row["evidence"]["file_id"] == file_id
     assert row["result"] == {"marks_obtained": 900, "marks_total": 1100}
+
+
+# --- review round: current key, superseded, attempts -------------------------------------------------------------
+
+
+def test_backfill_recovers_a_failed_emit_of_a_reconfirmation(world, monkeypatch):
+    doc_id = world.typed()
+    world.read(doc_id)
+    world.intake()
+    world.confirm(doc_id)
+    assert delivered(world)["written"] == 1
+    with monkeypatch.context() as m:
+        m.setattr(fact_proposals, "emit", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("killed")))
+        world.confirm(doc_id, values={**HSSC, "marks_obtained": 910})
+    assert len(world.rows()) == 1  # the new confirmation has no row, an older one is on file
+    assert fact_proposals.backfill() == 1 and fact_proposals.backfill() == 0
+    assert delivered(world)["written"] == 1
+    values = sorted(str(c.proposed_value["value"]["result"].get("marks_obtained")) for c in world.candidates())
+    assert values == ["900", "910"]
+
+
+def test_only_the_newest_proposal_of_a_document_is_delivered(world):
+    doc_id = world.typed()
+    world.read(doc_id)
+    world.confirm(doc_id)
+    world.confirm(doc_id, values={**HSSC, "marks_obtained": 905})
+    world.confirm(doc_id, values={**HSSC, "marks_obtained": 910})
+    assert len(world.rows()) == 3
+    assert delivered(world) == {"written": 1, "duplicate": 0, "refused": 0, "failed": 0}
+    first, second, third = world.rows()
+    assert [r.status for r in (first, second, third)] == ["skipped", "skipped", "sent"]
+    assert first.payload["outcome"] == second.payload["outcome"] == "superseded"
+    (candidate,) = world.candidates()
+    assert candidate.proposed_value["value"]["result"]["marks_obtained"] == 910
+
+
+def test_reconfirming_the_same_values_makes_one_set_of_candidates(world):
+    doc_id = world.typed()
+    world.read(doc_id)
+    world.confirm(doc_id)
+    assert delivered(world)["written"] == 1
+    world.confirm(doc_id)  # a new confirmation, the same values
+    assert len(world.rows()) == 2
+    assert delivered(world)["duplicate"] == 1
+    assert len(world.candidates()) == 1
+
+
+def test_a_row_that_keeps_failing_is_set_aside_after_five_tries(world, monkeypatch):
+    doc_id = world.typed()
+    world.read(doc_id)
+    world.confirm(doc_id)
+    from app.pai_c.connect import document_facts
+
+    monkeypatch.setattr(document_facts, "apply", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    for n in range(1, 5):
+        assert delivered(world)["failed"] == 1
+        (row,) = world.rows()
+        assert row.status == "pending" and row.attempts == n
+    assert delivered(world)["failed"] == 1
+    (row,) = world.rows()
+    assert row.status == "failed" and row.payload["outcome"] == "failed"
+    assert delivered(world)["failed"] == 0 and fact_proposals.pending() == []  # it no longer blocks anything
+
+
+def test_backfill_of_an_os_only_document_is_stated(world):
+    doc_id = world.os_only()
+    world.read(doc_id)
+    world.intake()
+    with world.svc.engine.begin() as conn:
+        conn.execute(update(models.documents).where(models.documents.c.id == doc_id).values(
+            status="confirmed", confirmed_at=func.now()))
+        for name, v in HSSC.items():
+            conn.execute(update(models.document_fields).where(
+                models.document_fields.c.document_id == doc_id, models.document_fields.c.field == name
+            ).values(value_confirmed=v))
+    assert fact_proposals.backfill() == 1
+    (row,) = world.rows()
+    assert row.payload["document_ref"] == f"os:{doc_id}"
+    assert delivered(world)["written"] == 1
+    (candidate,) = world.candidates()
+    assert "file_id" not in candidate.evidence and "authority" not in candidate.evidence
