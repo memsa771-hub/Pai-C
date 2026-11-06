@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.os import models, ports
+from app.os import models
 from app.os.kernel.states import PLAN_OPEN
 from app.os.playbooks.loader import PlaybookError, select_playbook
 from app.os.plan_view import build_plan_view
@@ -86,6 +86,8 @@ def _knowledge_sources(svc: Any, route_key: str, refs: list[str], year: int | No
     facts = list(svc.knowledge.route_facts(route_key, route_fields, year).values())
     facts += list(svc.knowledge.programme_facts(refs, programme_fields, year).values())
     for f in facts:
+        if not f.url.strip():  # an unconfirmed fact may have no source yet: nothing to date
+            continue
         _note(found, f.url, f.checked_at.date(), f.confirmed)
 
 
@@ -100,8 +102,11 @@ def _playbook_sources(book: Any, found: dict) -> None:
 def build_my_plan(svc: Any, student_ref: str) -> dict:
     chosen = _counsellor(svc, student_ref)
     source = "counsellor"
-    if chosen is None:
-        chosen, source = _self_serve(svc, student_ref), "self_serve"
+    if chosen is None or chosen["state"] in ("stopped", "finished"):
+        # a Counsellor plan that is over gives way to the student's open plan of their own; alone, it is shown
+        own = _self_serve(svc, student_ref)
+        if own is not None and (chosen is None or own["plan_id"] != chosen["plan_id"]):  # not the adopted plan itself
+            chosen, source = own, "self_serve"
     if chosen is None:
         return _empty()
     book = _book(svc, chosen)

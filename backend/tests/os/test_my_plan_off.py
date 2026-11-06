@@ -1,6 +1,7 @@
 """P1-T9 Task 2: with My plan off nothing changes. The route answers like a route that does not exist, and turning the
 part on adds nothing to any existing answer (spec section 4: flags off, bytes the same)."""
 
+import json
 import time
 
 import pytest
@@ -8,8 +9,9 @@ from sqlalchemy import select
 
 from app.os import models
 from app.os.ports import my_plan as my_plan_port
-from tests.os.test_api_packs import api as packs_api  # noqa: F401 - the real DBOS-backed pack app
-from tests.os.test_golden import TEST_STUDENT
+from tests.os.test_api_visa import ME
+from tests.os.test_api_visa import api as visa_api  # noqa: F401 - the real DBOS-backed pack and visa app
+from tests.os.test_visa_run import ready_visa
 from tests.os.test_my_plan_api import P, counsellor_plan, make_api, me, self_plan
 
 pytestmark = pytest.mark.req("R-53")
@@ -62,23 +64,34 @@ def test_existing_responses_unchanged_with_my_plan_on(off):
     assert before == after
 
 
-def test_pack_and_visa_bytes_unchanged_with_my_plan_on(packs_api):
-    api, headers = packs_api, {"X-Test-Student": TEST_STUDENT.student_ref}
-    my_plan_port.configure(None)
-    before = {p: stable(api, p, headers) for p in ("/packs", "/visa")}
+def manifests(api) -> list:
+    av = models.artifact_versions
     with api.engine.connect() as conn:
-        stored = conn.execute(select(models.artifact_versions.c.artifact_id, models.artifact_versions.c.number,
-                                  models.artifact_versions.c.sha256).order_by(models.artifact_versions.c.id)).all()
-    my_plan_port.configure(lambda: True)
-    after = {p: stable(api, p, headers) for p in ("/packs", "/visa")}
-    with api.engine.connect() as conn:
-        stored_after = conn.execute(select(models.artifact_versions.c.artifact_id, models.artifact_versions.c.number,
-                                  models.artifact_versions.c.sha256).order_by(models.artifact_versions.c.id)).all()
-    import json
-    for k in before:
-        if before[k] != after[k]:
-            a, b = json.loads(before[k][1]), json.loads(after[k][1])
-            print("DIFF", k, [(x.get("programme_ref"), x.get("status")) for x in a["programmes"]], [(x.get("programme_ref"), x.get("status")) for x in b["programmes"]])
-    assert before == after
-    assert stored == stored_after  # the stored manifest bytes the approvals bind to
+        return conn.execute(select(av.c.artifact_id, av.c.number, av.c.sha256).order_by(av.c.id)).all()
+
+
+def test_pack_and_visa_bytes_unchanged_with_my_plan_on(visa_api):
+    """A real visa file (the student's visa choice and documents are in place) and the pack list: their bytes and the
+    stored manifest SHA-256s the approvals bind to are the same with the part on."""
+    api = visa_api
+    ready_visa(api.ctx)
     my_plan_port.configure(None)
+    try:
+        before = {p: stable(api, p, ME) for p in ("/packs", "/visa")}
+        stored = manifests(api)
+        assert stored, "no manifest was stored: the proof would compare nothing"
+        visa = json.loads(before["/visa"][1])
+        assert visa["programme_ref"] and visa["checklist"] and visa["files"]
+        my_plan_port.configure(lambda: True)
+        after = {p: stable(api, p, ME) for p in ("/packs", "/visa")}
+        assert before == after
+        assert manifests(api) == stored
+    finally:
+        my_plan_port.configure(None)
+
+
+def test_plan_404_without_the_student_header_while_off(off):
+    """The gate runs before the sign-in check: off, an unauthenticated call gets the plain 404 too."""
+    ref = off.get(f"{P}/no-such-route")
+    got = off.get(f"{P}/plan")
+    assert (got.status_code, got.json()) == (ref.status_code, ref.json()) == (404, {"detail": "Not Found"})

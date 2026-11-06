@@ -8,7 +8,8 @@ import pytest
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 
-from app.os import ports
+from app.os import models, ports
+from app.os.replan.store import OverrideStore
 from app.os.ports import my_plan as my_plan_port
 from app.os.adapters.counsellor.store import IntakeStore
 from app.os.api import build_router, current_student_ref, current_student_ref_for_write, make_services
@@ -149,3 +150,63 @@ def test_other_students_plan_never_shown(api):
     assert get(api, "stu-1") == EMPTY
     assert get(api, "stu-2")["route_key"] == "germany_master"
     assert get(api, "stu-3")["route_key"] == "pakistan_bs"
+
+
+def stop(api, student, plan_id, n=2):
+    """The Counsellor withdrew the choice: its plan is stopped."""
+    store = IntakeStore(api.svc.engine, "pai")
+    store.add({"decision_id": f"d-{student}-{n}", "student_ref": student, "journey_id": "j-1",
+               "chosen_at": AT.isoformat(), "decision_version": n, "status": "withdrawn"}, "1" * 64)
+    store.finish(store.get(f"d-{student}-{n}").id, "withdrawn", None, plan_id)
+
+
+def test_stopped_counsellor_plan_gives_way_to_an_open_self_serve_plan(api):
+    old = counsellor_plan(api, "stu-1")
+    stop(api, "stu-1", old)
+    assert get(api)["state"] == "stopped"
+    own = self_plan(api, "stu-1", "PK", "PK", "bachelor")
+    got = get(api)
+    assert (got["source"], got["plan_id"], got["route_key"], got["abroad"]) == ("self_serve", own, "pakistan_bs", False)
+
+
+def test_stopped_counsellor_plan_alone_is_shown_stopped(api):
+    old = counsellor_plan(api, "stu-1")
+    stop(api, "stu-1", old)
+    got = get(api)
+    assert (got["state"], got["source"], got["plan_id"], got["route_key"]) == ("stopped", "counsellor", old,
+                                                                            "germany_master")
+    assert got["pages"]
+
+
+def test_adopted_plan_keeps_its_id_and_becomes_counsellor(api):
+    own = api.svc.plans.start_plan(contract("stu-1", "PK", "DE", "master", "self_serve", ("ovgu-eeit",))).plan_id
+    assert (get(api)["source"], get(api)["plan_id"]) == ("self_serve", own)
+    store = IntakeStore(api.svc.engine, "pai")  # the Counsellor adopts it: its decision points at the same plan
+    store.add({"decision_id": "d-adopt", "student_ref": "stu-1", "journey_id": "j-1", "chosen_at": AT.isoformat(),
+               "decision_version": 2, "status": "chosen", "authorized_at": AT.isoformat()}, "2" * 64)
+    store.finish(store.get("d-adopt").id, "planned", None, own)
+    got = get(api)
+    assert (got["source"], got["plan_id"], got["route_key"]) == ("counsellor", own, "germany_master")
+
+
+def test_a_fact_with_no_url_gives_no_source(api):
+    self_plan(api, "stu-1", "PK", "IE", "master")
+    day = datetime(2027, 1, 5, tzinfo=timezone.utc)
+    api.svc.knowledge.upsert("programme", "p1", "english_requirement", Fact("v", "", "", day, 2027, "unconfirmed"),
+                             "manual")
+    fact(api, "programme", "p1", "deadline_close", "https://uni.example/real", day)
+    assert set(get(api)["sources"]) == {"https://uni.example/real"}
+
+
+def test_a_dropped_place_has_no_sources(api):
+    plan_id = self_plan(api, "stu-1", "PK", "IE", "master", refs=("p1", "p2"))
+    day = datetime(2027, 1, 5, tzinfo=timezone.utc)
+    fact(api, "programme", "p1", "deadline_close", "https://uni.example/kept", day)
+    fact(api, "programme", "p2", "deadline_close", "https://uni.example/dropped", day)
+    with api.svc.engine.begin() as conn:
+        pid = conn.execute(models.proposals.insert().values(
+            tenant_id="pai", plan_id=plan_id, source="rules", status="accepted").returning(models.proposals.c.id)
+        ).scalar_one()
+    api.svc.replan.overrides.add(plan_id, pid, "cancel_programme", "p2", {}) if hasattr(api.svc, "replan") else \
+        OverrideStore(api.svc.engine, "pai").add(plan_id, pid, "cancel_programme", "p2", {})
+    assert set(get(api)["sources"]) == {"https://uni.example/kept"}
