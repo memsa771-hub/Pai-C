@@ -1,6 +1,7 @@
 """Playbook schema: a versioned route template, validated at load time (spec §4.1)."""
 
 import re
+from datetime import date
 from string import Formatter
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -138,6 +139,26 @@ class Route(_Model):
     level: str
 
 
+PAGE_KEYS = ("start", "inbox", "documents", "programmes", "statements", "pack", "visa")  # the OS's own pages
+
+
+class Page(_Model):
+    """One page of the student's plan on this route: the OS page `key` (route `os-<key>`), its menu `label`, its
+    heading `title` and, on `pack`/`visa`, the `noun` the page uses for what it builds (R-52)."""
+    key: Literal["start", "inbox", "documents", "programmes", "statements", "pack", "visa"]
+    label: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    noun: str | None = None
+
+
+class SourceCheck(_Model):
+    """The day a playbook source (`S<n>`) was last read against its page (R-54)."""
+    checked: date
+
+
+_SOURCE_ID = re.compile(r"S\d+")
+
+
 class Playbook(_Model):
     key: str
     version: int = Field(ge=1)
@@ -149,6 +170,10 @@ class Playbook(_Model):
     tasks: list[TaskTemplate]
     eligibility: EligibilityRules | None = None  # Slice 4: the route's eligibility checks (S4-D2)
     self_serve: SelfServe | None = None  # Slice 4: what the route builder completes (S4-D9)
+    # Display data (P1-T9). Never in the playbook file itself: the loader joins it from `pages/<key>.v<n>.yaml`
+    # so a file a running plan pins stays as it was (invariant 10). Compile ignores both.
+    pages: list[Page] | None = None  # None: not declared
+    sources: dict[str, SourceCheck] = {}
 
     @field_validator("intake_terms")
     @classmethod
@@ -194,7 +219,29 @@ class Playbook(_Model):
                                          f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
+        self._check_pages()
+        self._check_sources()
         return self
+
+    def _check_pages(self) -> None:
+        keys = [p.key for p in self.pages or []]
+        dupes = sorted({k for k in keys if keys.count(k) > 1})
+        if dupes:
+            raise ValueError(f"duplicate page key {dupes}")
+        if "visa" in keys and self.route.destination == self.route.origin:
+            raise ValueError("a visa page needs a route that leaves the country (destination differs from origin)")
+        for p in self.pages or []:
+            if p.noun is not None and p.key not in ("pack", "visa"):
+                raise ValueError(f"page '{p.key}' cannot have a noun (only pack and visa)")
+
+    def _check_sources(self) -> None:
+        if not self.sources:
+            return
+        cited = {c.source for t in self.tasks for c in t.citations} | \
+                {c.source for k in self.constants.values() for c in k.citations}
+        missing = sorted(s for s in cited if _SOURCE_ID.fullmatch(s) and s not in self.sources)
+        if missing:
+            raise ValueError(f"source {missing} is cited but has no checked date in 'sources'")
 
     def task(self, template_key: str) -> TaskTemplate:
         return next(t for t in self.tasks if t.template_key == template_key)
