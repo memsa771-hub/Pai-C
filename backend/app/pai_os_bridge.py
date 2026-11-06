@@ -32,7 +32,7 @@ from app.os.ports import choice_requests as os_choice_requests
 from app.os.ports import escalation as os_escalation
 from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
-from app.os.ports import plan_source, student_facts as os_student_facts
+from app.os.ports import document_files as os_document_files, plan_source, student_facts as os_student_facts
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
 from app.pai_c.connect.flags import part_on
@@ -444,6 +444,85 @@ def student_facts(student_ref: str) -> dict | None:
 
     with new_session() as db:
         return builder.build(db, workspace_id)
+
+
+def documents_enabled() -> bool:
+    """True when the one upload entry point is on: the CONNECT_ONE_UPLOAD part (P1-T7, R-01). The OS reads it through
+    `mount_os(documents_enabled=)`; it cannot read host flags itself."""
+    return part_on("CONNECT_ONE_UPLOAD")
+
+
+def document_file_bytes(student_ref: str, file_ref: str) -> bytes:
+    """The bytes of the student's stored file `file_ref`, for the OS reader (P1-T7, D-y6; `mount_os(document_files=)`
+    and the worker's OS_DOCUMENT_FILES). The file must exist, belong to the workspace `student_ref` and be active (not
+    trashed or deleted); anything else is `KeyError`, so another student's bytes are never returned. Opens its own
+    session: PAI OS calls it on its worker thread. A storage failure raises; the port turns it into KeyError."""
+    from app.database import new_session
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref) or record.status != "active":
+            raise KeyError(file_ref)
+        storage_key = record.storage_key
+    return get_file_store().read(storage_key)
+
+
+def register_os_document(student_ref: str, doc_type: str, file_ref: str, filename: str, data: bytes) -> dict:
+    """Makes the stored file an OS document of `doc_type` (P1-T7, R-01): `{"id", "status"}`, or `{"refused": code}`
+    (`not_on`, `unknown_type`, `consent_needed`, `terms_not_set`, `not_readable`, `duplicate`). `not_on` too when PAI
+    OS is not mounted. Any other failure is raised."""
+    try:
+        return os_document_files.register(str(student_ref), doc_type, str(file_ref), filename, data)
+    except ports.OsUnavailable:
+        return {"refused": "not_on"}
+    except os_document_files.Refused as refused:
+        return {"refused": refused.code}
+
+
+def forget_os_document(workspace_id: str, file_id: str) -> bool:
+    """Deletes the OS document linked to a Counsellor file the student trashed or deleted (P1-T7, D-y7). False when
+    there is none and when PAI OS is not mounted. Raises on any other failure (the caller logs it by class name)."""
+    try:
+        return os_document_files.forget(str(workspace_id), str(file_id))
+    except ports.OsUnavailable:
+        return False
+
+
+def document_types() -> list[dict]:
+    """The document types a student can name on upload, `{key, label}` sorted by key (P1-T7, D-y5). `[]` when PAI OS is
+    not mounted, and on any failure (logged)."""
+    try:
+        types = ports.services().document_types
+        return [{"key": k, "label": types[k].label} for k in sorted(types)]
+    except ports.OsUnavailable:
+        return []
+    except Exception:
+        log.exception("document types could not be read; treated as none")
+        return []
+
+
+def on_os_document_deleted(student_ref: str, file_ref: str) -> None:
+    """The OS deleted a linked document: purge the Counsellor file the way `purge_trash` does (P1-T7, D-y7): its bytes,
+    its document state, the unindex job and the record. Idempotent: a file that is already gone is a no-op. A failure
+    is raised before the record is deleted, so the OS delete stays `deleted` and the file record stays. Opens its own
+    session: PAI OS calls it on its request thread."""
+    from app.database import new_session
+    from app.documents.service import DocumentArtifactService
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+    from app.routers.files import _enqueue_document_unindex
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref):
+            return
+        get_file_store().delete(record.storage_key)  # a missing object is a no-op in both stores
+        DocumentArtifactService(db).purge_for_files(str(student_ref), [record.id])
+        _enqueue_document_unindex(db, str(student_ref), [record.id])
+        db.delete(record)
+        db.commit()
 
 
 def counsellor_module_on() -> bool:

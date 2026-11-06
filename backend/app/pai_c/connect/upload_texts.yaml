@@ -1,0 +1,12 @@
+# P1-T7 (D-y15): student sentences for the one upload entry point. Approved by the owner (chat, 2026-11-05: "just
+# update it directly"). Copy lives here, never in code. `type_label` / `type_none` are for the upload screens (T9).
+version: 1
+approved: true
+texts:
+  type_label: "What is this document?"
+  type_none: "Something else"
+  registered: "Saved. PAI will read it and ask you to check what it found."
+  consent_needed: "Saved. To let PAI read it, first agree to the pilot terms on your study documents page."
+  duplicate: "Saved. This file is already in your study documents."
+  unknown_type: "Saved. PAI cannot read this kind of document yet."
+  not_readable: "Saved. PAI can read PDF, JPEG, PNG or WebP files only."
