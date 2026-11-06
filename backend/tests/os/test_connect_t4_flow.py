@@ -191,4 +191,37 @@ def test_flags_off_a_fact_change_escalation_is_never_sent(os_world):
     assert os_escalation.pending_counsellor_escalations() == []
     with os_world.engine.connect() as conn:
         row = conn.execute(select(models.outbox).where(models.outbox.c.idempotency_key == f"escalation:{case_id}")).one()
-    assert row.status == "skipped" and row.payload["delivery"] == {"status": "refused", "reason": "handoff_off"}
+    assert row.status == "skipped" and row.payload["delivery"] == {"status": "dropped", "reason": "handoff_off"}
+    with os_world.engine.connect() as conn:  # the case is as before the row existed: no "refused by the Counsellor"
+        case = conn.execute(select(models.support_cases).where(models.support_cases.c.id == case_id)).one()
+    assert case.counsellor_status is None and case.counsellor_reason is None and case.status == "open"
+
+
+@pytest.mark.req("R-11")
+def test_a_failing_event_lookup_skips_that_row_and_the_sweep_goes_on(os_world):
+    """One escalation whose event type cannot be read waits for the next sweep; the others are still handled."""
+    from unittest.mock import MagicMock
+
+    from app.os.ports import escalation as os_escalation
+
+    row = pytest.importorskip("types").SimpleNamespace
+    items = [row(key="escalation:1", student_ref="a", journey_id="j", reason="other", note="n", decision_version=None),
+             row(key="escalation:2", student_ref="b", journey_id="j", reason="other", note="n", decision_version=None)]
+    calls = []
+
+    def lookup(key):
+        calls.append(key)
+        if key == "escalation:1":
+            raise RuntimeError("db down")
+        return "student_fact_changed"
+
+    ports.configure(os_world.svc)
+    with patch.object(config, "CONNECT_HANDOFF", False, create=True), \
+            patch.object(config, "PAI_OS_SERVICE_TOKEN", "local-test-token"), \
+            patch.object(os_escalation, "pending_counsellor_escalations", lambda limit=100: items), \
+            patch.object(os_escalation, "event_type_of", lookup), \
+            patch.object(os_escalation, "drop_counsellor_escalation", MagicMock()) as drop, \
+            patch("app.routers.escalations.escalate", MagicMock()) as endpoint:
+        got = bridge._deliver(MagicMock())
+    assert calls == ["escalation:1", "escalation:2"] and got == {"sent": 0, "refused": 1, "waiting": 1}
+    drop.assert_called_once_with("escalation:2", "handoff_off") and endpoint.assert_not_called()

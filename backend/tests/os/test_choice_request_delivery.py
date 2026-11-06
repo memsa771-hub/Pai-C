@@ -380,3 +380,24 @@ def test_mark_delivery_settles_on_a_later_applied_version(world):
         intake_at(f, 3, "revised", f.plan_id())
         choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
         assert f.proposal(pid).status == "accepted"
+
+
+def test_mark_delivery_expires_when_a_later_version_was_refused_and_n_plus_1_went_stale(world):
+    """n+1 went stale at intake (n+2 was already stored), n+2 was refused, and the mark arrives after both."""
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 2, "stale", None)
+        intake_at(f, 3, "refused", None)
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        p = f.proposal(pid)
+        assert p.status == "expired" and p.request_outcome == "written"
+
+
+def test_mark_delivery_ignores_a_pending_later_row(world):
+    with flow(world) as f:
+        pid = f.propose()
+        f.r.accept(f.ref, pid)
+        intake_at(f, 3, "pending", None)
+        choice_requests.mark_delivery(choice_requests.key_of(pid), "written", 2)
+        assert f.proposal(pid).status == "requested"

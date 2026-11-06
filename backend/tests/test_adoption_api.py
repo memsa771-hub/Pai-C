@@ -46,7 +46,7 @@ def world(os_stub):  # noqa: F811
         return got["recorded"]
 
     with flag(True), patch.object(config, "CONNECT_MY_PLAN", True, create=True), \
-            patch.object(bridge, "self_serve_plan", lambda ws: got["plan"]), \
+            patch.object(bridge, "self_serve_plan", lambda ws, journey_id=None: got["plan"]), \
             patch.object(bridge, "request_adoption", request):
         yield got
 
@@ -163,7 +163,7 @@ def test_bridge_asks_nothing_about_a_plan_while_the_os_module_is_off(monkeypatch
     from app.os.ports import plan_query, plan_source
 
     asked = []
-    monkeypatch.setattr(plan_query, "self_serve_plan", lambda ref: asked.append(ref) or plan())
+    monkeypatch.setattr(plan_query, "self_serve_plan", lambda ref, journey_id=None: asked.append(ref) or plan())
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: False)
     assert bridge.self_serve_plan("ws-1") is None and asked == []
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True)

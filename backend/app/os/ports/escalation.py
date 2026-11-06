@@ -72,3 +72,23 @@ def mark_counsellor_delivery(key: str, status: Literal["sent", "refused"], reaso
                          .values(counsellor_status=status))
     if key.startswith("escalation:intake:"):
         IntakeStore(svc.engine, tenant).set_counsellor_status(key.removeprefix("escalation:intake:"), status)
+
+
+def drop_counsellor_escalation(key: str, reason: str = "handoff_off") -> None:
+    """The glue will not send this escalation (the host part that carries it is off): the outbox row is `skipped` with
+    the reason, and the support case goes back to as it was before the row existed (`counsellor_status` and
+    `counsellor_reason` NULL, only while still `pending`), in ONE transaction. The student never reads a refusal
+    that nobody made."""
+    if not key.startswith("escalation:") or key.startswith("escalation:intake:"):
+        return
+    svc = ports.services()
+    tenant, O, C = svc.settings.tenant_id, models.outbox, models.support_cases
+    delivery = {"delivery": {"status": "dropped", "reason": reason[:500]}}
+    with svc.engine.begin() as conn:
+        conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == _CHANNEL, O.c.template == "escalation",
+                                     O.c.idempotency_key == key)
+                     .values(status="skipped", sent_at=func.now(), attempts=O.c.attempts + 1,
+                             payload=O.c.payload.op("||")(delivery)))
+        conn.execute(update(C).where(C.c.tenant_id == tenant, C.c.id == int(key.split(":")[1]),
+                                     C.c.counsellor_status == "pending")
+                     .values(counsellor_status=None, counsellor_reason=None))

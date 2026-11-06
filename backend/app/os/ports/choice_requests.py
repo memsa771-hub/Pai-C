@@ -79,12 +79,18 @@ def _applied_version(conn: Connection, tenant_id: str, plan_id: int) -> int | No
 
 
 def _refused(conn: Connection, tenant_id: str, plan_id: int, version: int) -> bool:
-    """Whether the student's intake refused exactly this version (a refusal may have no plan)."""
+    """Whether the request can never be applied: the student's intake refused exactly this version, or the newest
+    processed intake row at or above it is a refusal (n+1 went stale because n+2 was stored, and n+2 was refused).
+    A refusal may have no plan, so rows are found by student."""
     P, I = models.plans, models.counsellor_intake
     student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
-    return student is not None and conn.execute(select(I.c.id).where(
-        I.c.tenant_id == tenant_id, I.c.student_ref == student, I.c.decision_version == version,
-        I.c.status == "refused").limit(1)).first() is not None
+    if student is None:
+        return False
+    rows = conn.execute(select(I.c.decision_version, I.c.status).where(
+        I.c.tenant_id == tenant_id, I.c.student_ref == student, I.c.decision_version >= version,
+        I.c.status != "pending").order_by(I.c.decision_version.desc())).all()
+    exact = any(r.decision_version == version and r.status == "refused" for r in rows)
+    return exact or (bool(rows) and rows[0].status == "refused")
 
 
 def check_places(programmes: Sequence[ProgrammeChoice]) -> None:

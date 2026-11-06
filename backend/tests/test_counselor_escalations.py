@@ -286,11 +286,14 @@ async def test_choice_request_with_new_places_after_escalation_returns_to_chosen
     async with confirmed_student() as (client, student, db, journey_id):
         await _escalated(client, student, db, journey_id)
         with patch("app.pai_os_bridge.route_supported", return_value=True), \
-                patch("app.pai_c.connect.outbox.part_on", return_value=True):
+                patch("app.pai_c.connect.outbox.part_on", return_value=True), \
+                patch.object(JourneyService, "set_counselor_stage", autospec=True,
+                             side_effect=JourneyService.set_counselor_stage) as moved:
             assert RouteDecisionService(db).apply_choice_request(
                 student.workspace_id, _request([{"programme_ref": "uni-a:cs", "rank": 1}])) == ("written", 2)
         db.commit()
         assert stage(db, journey_id) == "CHOSEN"
+        assert moved.call_args.kwargs["actor"] == "system:os_choice_request"
 
 
 @pytest.mark.asyncio
@@ -313,13 +316,16 @@ async def test_builder_write_after_escalation_returns_to_chosen():
     async with confirmed_student() as (client, student, db, journey_id):
         await _escalated(client, student, db, journey_id)
         with patch("app.pai_os_bridge.route_supported", return_value=True), \
-                patch("app.pai_c.connect.outbox.part_on", return_value=True):
+                patch("app.pai_c.connect.outbox.part_on", return_value=True), \
+                patch.object(JourneyService, "set_counselor_stage", autospec=True,
+                             side_effect=JourneyService.set_counselor_stage) as moved:
             got = RouteDecisionService(db).request_from_builder(
                 student.workspace_id, "PK", "GB", "bachelor", {"term": "autumn", "year": 2027},
                 [{"programme_ref": "uni-c:cs", "rank": 1}])
         db.commit()
         assert got == ("written", 2, None)
         assert stage(db, journey_id) == "CHOSEN"
+        assert moved.call_args.kwargs["actor"] == "system:os_builder"
 
 
 @pytest.mark.asyncio

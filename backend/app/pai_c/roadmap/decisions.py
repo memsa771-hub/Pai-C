@@ -336,15 +336,15 @@ class RouteDecisionService:
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new)
-        self._after_os_write(workspace_id)
+        self._after_os_write(workspace_id, "system:os_choice_request")
         return "written", new.decision_version
 
-    def _after_os_write(self, workspace_id: str) -> None:
+    def _after_os_write(self, workspace_id: str, actor: str) -> None:
         """A choice the OS wrote after an escalation (D-x9): a journey held at PROPOSED follows the active decision
         to CHOSEN at once; `_escalated` still holds it for a consent copy or the same choice. No commit."""
         journey = self._journey(workspace_id)
         if journey is not None and journey.current_stage == "PROPOSED":
-            self.follow_active(workspace_id, actor="system:os_choice_request")
+            self.follow_active(workspace_id, actor=actor)
 
     MAX_PLACES = 5  # decision_record.v2 holds at most five places
 
@@ -379,10 +379,10 @@ class RouteDecisionService:
                                                           RouteDecision.request_key == key))
         if done is not None:
             return "unchanged", done.decision_version, None
-        return self._write_from(active, key, origin, destination, level, wanted, want_intake)
+        return self._write_from(active, key, origin, destination, level, wanted, want_intake, "system:os_builder")
 
     def _write_from(self, active: RouteDecision, key: str, origin: str, destination: str, level: str,
-                    wanted: list[dict], want_intake: dict) -> tuple[str, "int | None", "str | None"]:
+                    wanted: list[dict], want_intake: dict, actor: str) -> tuple[str, "int | None", "str | None"]:
         """The next version after `active`, copying everything but the route, places and intake from it (D-x4). The
         old row leaves the partial unique index before the new one enters. No commit."""
         values = {name: getattr(active, name) for name in self._COPIED}
@@ -397,7 +397,7 @@ class RouteDecisionService:
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new)
-        self._after_os_write(active.workspace_id)
+        self._after_os_write(active.workspace_id, actor)
         return "written", new.decision_version, None
 
     def adoption_state(self, workspace_id: str, plan: dict, *, lock: bool = False) -> str:
@@ -446,7 +446,8 @@ class RouteDecisionService:
         wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1}
                   for i, p in enumerate(sorted(plan["programmes"], key=lambda p: p["rank"]))]
         _, version, _ = self._write_from(active, key, plan["origin"], plan["destination"], plan["level"], wanted,
-                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]})
+                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]},
+                                         "system:os_adoption")
         return "written", version
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,

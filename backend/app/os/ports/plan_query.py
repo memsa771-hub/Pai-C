@@ -55,11 +55,12 @@ def routes() -> list[dict]:
              "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
 
 
-def self_serve_plan(student_ref: str) -> dict | None:
+def self_serve_plan(student_ref: str, journey_id: str | None = None) -> dict | None:
     """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
     origin, destination, level, intake, programmes, contract_sha256, open_plans, identity_taken}` (`open_plans`: how many open self-serve
-    plans the student has; the offer is made only for one; `identity_taken`: a Counsellor plan of the student, open or
-    closed, already holds `{journey}:{destination}:{level}`, so this plan could not take that identity), programmes as
+    plans the student has; the offer is made only for one; `identity_taken`: a Counsellor plan, open or closed, already
+    holds `{journey_id}:{destination}:{level}` for the student's active `journey_id`, so this plan could not take that
+    identity; never true without a `journey_id`), programmes as
     `{programme_ref, rank}` in order: the live places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
     None when there is none."""
     svc = ports.services()
@@ -77,8 +78,8 @@ def self_serve_plan(student_ref: str) -> dict | None:
             P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "counsellor")
         ).scalars().all()
     contract = row.contract
-    route = [contract["destination_country"], contract["level"]]
-    taken = any(ref.rsplit(":", 2)[1:] == route for ref in held)  # `{journey_id}:{destination}:{level}` (S8-D8)
+    wanted = f"{journey_id}:{contract['destination_country']}:{contract['level']}"  # S8-D8, as intake reads it
+    taken = journey_id is not None and wanted in held
     cancelled = OverrideStore(svc.engine, svc.settings.tenant_id).cancelled(row.id)
     live = [p for p in sorted(contract["programmes"], key=lambda p: p["rank"]) if p["programme_ref"] not in cancelled]
     intake = contract.get("target_intake")

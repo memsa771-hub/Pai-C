@@ -123,8 +123,9 @@ def request_choice(student_ref: str, origin: str, destination: str, level: str, 
     return {"outcome": outcome, "decision_version": version, "code": code}
 
 
-def self_serve_plan(workspace_id: str) -> dict | None:
+def self_serve_plan(workspace_id: str, journey_id: str | None = None) -> dict | None:
     """The student's open self-serve plan as `plan_query.self_serve_plan` gives it (P1-T6, R-08), for the adoption offer.
+    `journey_id` is the student's active journey: without it the plan never reads as `identity_taken`.
     None when there is none, when the `counsellor` module is off, when PAI OS is not mounted and on any failure (logged by
     type only)."""
     if not counsellor_module_on():
@@ -132,7 +133,7 @@ def self_serve_plan(workspace_id: str) -> dict | None:
     try:
         from app.os.ports import plan_query
 
-        return plan_query.self_serve_plan(str(workspace_id))
+        return plan_query.self_serve_plan(str(workspace_id), journey_id)
     except ports.OsUnavailable:
         return None
     except Exception as exc:  # noqa: BLE001
@@ -280,12 +281,20 @@ def _deliver(db) -> dict:
             got["waiting"] += 1  # not configured: tried again on the next sweep
             continue
         handoff = part_on("CONNECT_HANDOFF")
-        if not handoff and _is_fact_change(e):
-            # A fact change is a route problem only for the hand-off (R-22); without it the Counsellor was never told
-            # and still is not: no endpoint call, the row is closed so it does not wait for ever.
-            os_escalation.mark_counsellor_delivery(e.key, "refused", "handoff_off")
-            got["refused"] += 1
-            continue
+        if not handoff:
+            try:
+                fact_change = _is_fact_change(e)
+                if fact_change:
+                    # A fact change is a route problem only for the hand-off (R-22); without it the Counsellor was
+                    # never told and still is not: no endpoint call; the row is dropped, the case left as it was.
+                    os_escalation.drop_counsellor_escalation(e.key, "handoff_off")
+            except Exception as exc:  # noqa: BLE001  (one bad row never ends the sweep; class name only)
+                log.error("PAI OS escalation could not be checked for the hand-off: %s", type(exc).__name__)
+                got["waiting"] += 1
+                continue
+            if fact_change:
+                got["refused"] += 1
+                continue
         try:
             if handoff:  # the five reasons go as they are, with the decision version they belong to
                 body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id, reason_type=e.reason,
