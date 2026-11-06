@@ -972,6 +972,22 @@
       "no_plan": "That plan is no longer there.",
       "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
       "other": "Your plan could not be kept. Please try again."
+    },
+    "myPlan": {
+      "empty": "Your plan will appear here once you choose a path.",
+      "emptyLink": "Go to your journey",
+      "notInPlan": "This page is not part of your plan.",
+      "notInPlanLink": "Go to your plan",
+      "levels": {
+        "verified": "Verified",
+        "confirmed": "Confirmed",
+        "not_confirmed": "Not confirmed",
+        "estimated": "Estimated"
+      },
+      "checked": "Checked {date}",
+      "checkedUnknown": "Date checked not recorded",
+      "source": "Source",
+      "dateSource": "Where this date comes from"
     }
   }
 }

@@ -13,6 +13,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { OS_PAGES, OsNavGroup, osOpenAt, type OsPage } from "@/components/os/os-nav-group";
+import { MyPlanProvider, useMyPlan } from "@/components/os/my-plan-context";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
@@ -37,6 +38,11 @@ const COLLAPSE_KEY = "pai.sidebar.collapsed";
 /** `children`: a PAI OS page (app/[workspaceId]/(os)), shown in this shell's main area so the study abroad plan and
  * the counsellor are one app: one rail, one header, one tab bar. Without it the shell shows its own views. */
 export function CounselorShell({ children }: { children?: React.ReactNode } = {}) {
+  return <MyPlanProvider><CounselorShellBody>{children}</CounselorShellBody></MyPlanProvider>;
+}
+
+function CounselorShellBody({ children }: { children?: React.ReactNode }) {
+  const myPlan = useMyPlan();  // P1-T9: with My plan on, the plan is open at every stage and lists the route's pages
   const { viewMode, openView } = useLayout();
   const router = useRouter();
   const pathname = usePathname();
@@ -316,7 +322,8 @@ export function CounselorShell({ children }: { children?: React.ReactNode } = {}
           </nav>
         </LayoutGroup>
         </div>
-        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={osOpenAt(stage?.id)} />
+        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={myPlan.on ? myPlan.plan!.pages.length > 0 : osOpenAt(stage?.id)}
+          pages={myPlan.on ? myPlan.plan!.pages : undefined} />
       </div>
     </SidebarProvider>
     </MotionConfig>

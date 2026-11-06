@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 import { ChangesList } from '@/components/os/changes-list';
 import { InboxList } from '@/components/os/inbox-list';
 import { PausedBanner, ProposalCard } from '@/components/os/proposal-card';
@@ -20,6 +23,7 @@ import { goToSignIn } from '@/lib/auth-redirects';
 /** PAI OS student inbox: /<workspace>/os-inbox. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsInboxPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
   const { user, idToken, loading } = usePaiAuth();
   const [items, setItems] = useState<OsInboxItem[] | null>(null);
   const [notes, setNotes] = useState<OsNote[]>([]);
@@ -150,9 +154,11 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
 
   if (!OS_UI_ENABLED) notFound();
 
+  if (on && !inPlan(plan, 'inbox')) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <OsHeader workspaceId={workspaceId} current="os-inbox" title="Your next steps" />
+      <OsHeader workspaceId={workspaceId} current="os-inbox" title={pageTitle(plan, 'inbox', 'Your next steps')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {info && <p role="status" className="mb-3 break-words text-sm text-muted-foreground">{info}</p>}
       {changes?.changes_paused && <PausedBanner />}

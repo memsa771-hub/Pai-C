@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowRight, Plane } from 'lucide-react';
+import { ArrowRight, ListChecks, Plane } from 'lucide-react';
+import copy from '@/components/counselor/workspace/copy.json';
+import { useMyPlan } from '@/components/os/my-plan-context';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { formatDue, isNotice, isWaiting, type OsInboxItem } from '@/lib/os-inbox';
@@ -21,6 +23,7 @@ export function OsPlanCard() {
 function OsPlanCardShown() {
   const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;  // null outside a workspace route
   const t = useT();
+  const { on, plan } = useMyPlan();
   const [items, setItems] = useState<OsInboxItem[] | null>(null);
   useEffect(() => {
     let active = true;
@@ -35,14 +38,26 @@ function OsPlanCardShown() {
   }, []);
   const open = (items ?? []).filter((i) => !isWaiting(i) && !isNotice(i));
   const offer = <AdoptionOffer adoption={adoption} />;
+  const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
+  const Icon = on ? ListChecks : Plane;  // D-z10: a plane only belongs to a route that leaves the country
+  if (on && workspaceId && plan?.state === 'empty' && !adoptionShows(adoption)) {  // R-53: visible before a choice
+    return (
+      <section aria-label={name} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+          <Icon aria-hidden className="size-4 text-primary" />{name}
+        </p>
+        <p className="mt-2 text-sm">{copy.connect.myPlan.empty}</p>
+      </section>
+    );
+  }
   if (!items || !workspaceId || (items.length === 0)) return adoptionShows(adoption) ? offer : null;
   const next = [...open].sort((a, b) => (a.due_at ?? '9').localeCompare(b.due_at ?? '9'))[0];
   return (
     <>
     {offer}
-    <section aria-label={t('nav.studyAbroadPlan')} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
+    <section aria-label={name} className="mb-6 rounded-[22px] bg-card p-5 shadow-card ring-1 ring-border/70">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-        <Plane aria-hidden className="size-4 text-primary" />{t('nav.studyAbroadPlan')}
+        <Icon aria-hidden className="size-4 text-primary" />{name}
       </p>
       <p className="mt-2 text-sm">
         {open.length === 0 ? 'Nothing waits on you right now.' : `${open.length} ${open.length === 1 ? 'step waits' : 'steps wait'} on you.`}

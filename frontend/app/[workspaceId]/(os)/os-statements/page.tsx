@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 import { StatementEditor } from '@/components/os/statement-editor';
 import { StatementInterview } from '@/components/os/statement-interview';
 import { StatementProgrammes } from '@/components/os/statement-programmes';
@@ -35,6 +38,7 @@ function reason(e: unknown, fallback: string): string {
 /** PAI OS statements: /<workspace>/os-statements. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsStatementsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
   const { user, idToken, loading } = usePaiAuth();
   const [interview, setInterview] = useState<OsInterview | null>(null);
   const [statements, setStatements] = useState<OsStatement[] | null>(null);
@@ -83,9 +87,11 @@ export default function OsStatementsPage({ params }: { params: Promise<{ workspa
     act(() => workspaceApi.draftOsStatement(kind, programmeRef), 'Could not start the draft. Please try again.');
   const open = statements?.find((s) => s.id === openId);
 
+  if (on && !inPlan(plan, 'statements')) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <OsHeader workspaceId={workspaceId} current="os-statements" title={open ? 'Your draft' : 'Your statement and CV'} />
+      <OsHeader workspaceId={workspaceId} current="os-statements" title={open ? 'Your draft' : pageTitle(plan, 'statements', 'Your statement and CV')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {interview === null || statements === null ? (
         <p className="text-sm text-muted-foreground">{error ? '' : 'Loading…'}</p>

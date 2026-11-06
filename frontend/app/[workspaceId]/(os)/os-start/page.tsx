@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound, useRouter } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 import { ConsentCard } from '@/components/os/consent-card';
 import { RouteBuilder } from '@/components/os/route-builder';
 import { workspaceApi } from '@/lib/api';
@@ -26,6 +29,7 @@ const TERM = 'winter'; // the intake term; routes do not list their terms yet (S
 /** PAI OS self-serve start: /<workspace>/os-start. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsStartPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
   const router = useRouter();
   const { user, idToken, loading } = usePaiAuth();
   const [routes, setRoutes] = useState<OsRoute[]>([]);
@@ -132,9 +136,11 @@ export default function OsStartPage({ params }: { params: Promise<{ workspaceId:
 
   if (!OS_UI_ENABLED) notFound();
 
+  if (on && !inPlan(plan, 'start')) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <OsHeader workspaceId={workspaceId} current="os-start" title="Start your plan" />
+      <OsHeader workspaceId={workspaceId} current="os-start" title={pageTitle(plan, 'start', 'Start your plan')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {consent === null ? (
         !error && <p className="text-sm text-muted-foreground">Loading…</p>

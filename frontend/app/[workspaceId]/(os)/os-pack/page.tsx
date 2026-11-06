@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 import { PackList, PackView } from '@/components/os/pack';
 import { PackDetails } from '@/components/os/pack-details';
 import { Button } from '@/components/ui/button';
@@ -40,6 +43,7 @@ function save(blob: Blob, filename: string) {
 /** PAI OS application packs: /<workspace>/os-pack. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsPackPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
   const { user, idToken, loading } = usePaiAuth();
   const [packs, setPacks] = useState<OsPack[] | null>(null);
   const [openRef, setOpenRef] = useState<string | null>(null);
@@ -91,9 +95,11 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
 
   const open = packs?.find((p) => p.programme_ref === openRef);
 
+  if (on && !inPlan(plan, 'pack')) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <OsHeader workspaceId={workspaceId} current="os-pack" title={open ? programmeTitle(open) : 'Your application packs'} />
+      <OsHeader workspaceId={workspaceId} current="os-pack" title={open ? programmeTitle(open) : pageTitle(plan, 'pack', 'Your application packs')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {packs === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -106,7 +112,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
                      }, 'Could not save your details. Please try again.')} />
       ) : open ? (
         <>
-          <PackView pack={open} busy={busy}
+          <PackView pack={open} busy={busy} noun={pageNoun(plan, 'pack', 'pack')}
                     profileDegree={profileDegreeField(profile)} profileHref={`/${workspaceId}?view=profile`}
                     onTick={(key, ticked) => act(() => workspaceApi.updateOsPackItems(open.programme_ref,
                       ticked ? { tick: [key] } : { untick: [key] }), 'Could not save. Please try again.')}

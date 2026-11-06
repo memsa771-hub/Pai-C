@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FileText, Flag, GraduationCap, Inbox, Package, PenLine, Plane, type LucideIcon } from 'lucide-react';
+import copy from '@/components/counselor/workspace/copy.json';
+import { useMyPlan } from '@/components/os/my-plan-context';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { OS_FROM_STAGE, OS_REHEARSAL_UI, OS_UI_ENABLED } from '@/lib/config';
 import { useT } from '@/lib/i18n';
@@ -21,7 +23,7 @@ export const OS_PAGES = [
 
 export type OsPage = (typeof OS_PAGES)[number][0];
 
-const ICONS: Record<OsPage, LucideIcon> = {
+export const ICONS: Record<OsPage, LucideIcon> = {
   'os-start': Flag, 'os-inbox': Inbox, 'os-documents': FileText, 'os-programmes': GraduationCap,
   'os-statements': PenLine, 'os-pack': Package, 'os-visa': Plane,
 };
@@ -45,21 +47,35 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
 }) {
   const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;  // null outside a workspace route
   const t = useT();
-  if (!workspaceId || !osOpenAt(stageId)) return null;
+  const { on, plan } = useMyPlan();
+  // With My plan on (P1-T9) the group is always there and lists the route's own pages; off, today's group.
+  if (!workspaceId || !(on ? OS_UI_ENABLED : osOpenAt(stageId))) return null;
+  const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
+  const pages: { page: OsPage; label: string }[] = on
+    ? plan!.pages.map((p) => ({ page: `os-${p.key}` as OsPage, label: p.label }))
+    : OS_PAGES.map(([page, key]) => ({ page, label: t(key) }));
   return (
-    <div role="group" aria-label={t('nav.studyAbroadPlan')} className="pt-4">
+    <div role="group" aria-label={name} className="pt-4">
       {!collapsed && (
         <p className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {t('nav.studyAbroadPlan')}
+          {name}
+        </p>
+      )}
+      {on && pages.length === 0 && !collapsed && (
+        <p className="px-4 text-sm text-muted-foreground">
+          {copy.connect.myPlan.empty}{' '}
+          <Link href={`/${workspaceId}?view=journey`} onClick={() => onNavigate?.()} className="font-semibold text-primary hover:underline">
+            {copy.connect.myPlan.emptyLink}
+          </Link>
         </p>
       )}
       <ul className="space-y-1">
-        {OS_PAGES.map(([page, key]) => {
-          const Icon = ICONS[page];
+        {pages.map(({ page, label }) => {
+          const Icon = ICONS[page] ?? Flag;
           const here = page === current;
           const link = (
             <Link href={`/${workspaceId}/${page}`} onClick={() => onNavigate?.()} aria-current={here ? 'page' : undefined}
-              aria-label={collapsed ? t(key) : undefined}
+              aria-label={collapsed ? label : undefined}
               className={cn(
                 'relative flex h-10 w-full items-center gap-3 rounded-full text-sm font-semibold transition-colors duration-200',
                 collapsed ? 'justify-center' : 'px-4',
@@ -67,13 +83,13 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}>
               <Icon aria-hidden className="size-[18px] shrink-0" strokeWidth={here ? 2.2 : 1.9} />
-              {!collapsed && <span className="truncate">{t(key)}</span>}
+              {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
           return (
             <li key={page}>
               {collapsed ? (
-                <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">{t(key)}</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">{label}</TooltipContent></Tooltip>
               ) : link}
             </li>
           );
