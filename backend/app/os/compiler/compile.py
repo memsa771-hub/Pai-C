@@ -91,6 +91,9 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
                 target.add(name)
         if t.anchor:  # an anchor on a chosen programme reads that programme's fact (Slice 9 Task 11, F1)
             (programme if t.anchor.programme else target).add(t.anchor.fact)
+    for ask in playbook.asks.values():  # P1-T8: the calendar fact of a result still to come (R-20)
+        if ask.expected:
+            route.add(ask.expected.fact)
     return route, programme
 
 

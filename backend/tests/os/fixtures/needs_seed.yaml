@@ -1,0 +1,21 @@
+# Test Knowledge for the P1-T8 needs playbooks. Fictional: no real institution, date or rule.
+# `matric_result_date` is the test calendar fact for R-20 (the result of a fictional exam is out on this day).
+intake_year: 2027
+route_key: pakistan_inter
+
+route:
+  matric_result_date:
+    value: {date: "2027-04-30", tz: Asia/Karachi}
+    quote: "Test calendar: the fictional matric result is announced on 30 April 2027."
+    url: "https://calendar.example/matric"
+    checked_at: 2026-10-17
+    status: confirmed
+
+programmes:
+  ie-p1:
+    english_requirement:
+      value: {ielts: 6.5}
+      quote: "Test requirement: an overall IELTS score of 6.5."
+      url: "https://uni.example/ie-p1"
+      checked_at: 2026-10-17
+      status: confirmed

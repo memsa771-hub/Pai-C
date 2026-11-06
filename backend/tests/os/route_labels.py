@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
+from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir, newest_plain
 
 HERE = Path(__file__).resolve().parent
 WORDS_FILE = HERE / "fixtures" / "route_labels.yaml"
@@ -104,10 +104,11 @@ def _citations(book, task) -> list[dict]:
 
 def build_fixture() -> list[dict]:
     books = load_playbook_dir(HERE / "playbooks") | load_playbook_dir(PLAYBOOK_DIR)
+    newest = newest_plain(books.values())  # what a student sees with the flags off: a needs (v2) playbook is not chosen
     words = load_words()
     out = []
     for route_key in ROUTES:
-        book = max((b for (k, _), b in books.items() if k == route_key), key=lambda b: b.version)
+        book = newest[route_key]
         items, steps = [], []
         for n, task in enumerate(book.tasks, start=1):
             steps.append({"title": task.title, "owner": "student" if task.kind == "student" else "pai"})

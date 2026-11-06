@@ -1,0 +1,43 @@
+# Fake local route, version 2 (P1-T8): version 1 plus the student's data needs. Fictional, for tests only.
+# Fake local route (spec D5): entry test, merit-list round, no visa.
+key: pakistan_bs
+version: 2
+route: {origin: PK, destination: PK, level: bachelor}
+default_timezone: Asia/Karachi
+intake_terms: [winter]
+# Slice 4: a merit aggregate, the third generic method (spec S4-D2). No language check on this route.
+eligibility:
+  grade:
+    - method: weighted_aggregate
+      requirement: merit_closing
+      part: aggregate
+      better: higher
+      weights: {hssc_certificate.marks_obtained: 0.5, entry_test.score: 0.5}
+      totals: {hssc_certificate.marks_obtained: hssc_certificate.marks_total}
+  test: {requirement: entry_test_required, list_key: any_of}
+asks:
+  education.intermediate.marks_obtained:
+    stated: Tell us your intermediate marks
+    which_is_right: Which intermediate marks are right?
+  hssc_certificate:
+    shown: Upload your intermediate certificate
+tasks:
+  - template_key: entry_test
+    task_type: student.act
+    title: Sit the entry test
+    kind: student
+    inbox_kind: act
+    duration_days: 1
+    needs:
+      - {fact: education.intermediate.marks_obtained, evidence: stated}
+  - template_key: merit_list
+    task_type: student.choose
+    title: Choose from the merit-list offers
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: entry_test}]
+    anchor: {fact: merit_list_date}
+    duration_days: 2
+    needs:
+      - {document: hssc_certificate, evidence: shown}

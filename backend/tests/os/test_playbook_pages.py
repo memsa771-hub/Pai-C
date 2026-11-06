@@ -34,7 +34,8 @@ def book(**over) -> dict:
 @pytest.mark.req("R-51")
 def test_every_playbook_declares_its_pages():
     books = {**SHIPPED, **FAKES}
-    assert len(books) == 4
+    assert len(books) == 5  # P1-T8 ships germany_master v2 beside v1 (its sidecar is a copy of v1's)
+    assert ("germany_master", 2) in books
     for ident, b in books.items():
         assert b.pages is not None, ident
 

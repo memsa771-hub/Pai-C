@@ -98,11 +98,13 @@ class PlanService:
             return stored.programme_ref
         return preselect(self.engine, self.kernel.tenant_id, plan_id, among=live)
 
-    def start_plan(self, contract: RouteContract | RouteContractV2) -> PlanRef:
-        """A new plan uses the newest playbook for its route; an existing plan keeps its pinned version."""
+    def start_plan(self, contract: RouteContract | RouteContractV2, *, with_needs: bool = False) -> PlanRef:
+        """A new plan uses the newest playbook for its route; an existing plan keeps its pinned version.
+        `with_needs`: the student's needs gate is on, so a playbook that declares `needs` may be chosen (P1-T8)."""
         existing = self._existing_plan(contract)
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
-            self.playbooks, contract.origin_country, contract.destination_country, contract.level))
+            self.playbooks, contract.origin_country, contract.destination_country, contract.level,
+            with_needs=with_needs))
         return self.kernel.create_plan(contract, self.compile(contract, playbook))
 
     def _contract(self, plan_id: int) -> tuple[RouteContract | RouteContractV2, str]:
@@ -143,14 +145,15 @@ class PlanService:
                 continue
         raise StaleDraft(f"plan {plan_id} kept changing during the programme change")
 
-    def check_newer(self, plan_id: int) -> bool:
+    def check_newer(self, plan_id: int, *, with_needs: bool = False) -> bool:
         """Records a `playbook_newer` replan event (Slice 7) when a newer playbook exists for the plan's route.
         True when one was recorded now."""
         from app.os.replan import events  # imported here: replan imports the service
 
         contract, _ = self._contract(plan_id)
         pinned = self._pinned(plan_id)
-        newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
+        newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
+                                 with_needs=with_needs)
         if newest.key != pinned.key or newest.version <= pinned.version:
             return False
         with self.engine.begin() as conn:
@@ -158,11 +161,12 @@ class PlanService:
                                  {"playbook": newest.key, "version": newest.version, "from": pinned.version},
                                  f"{newest.key}@{newest.version}") is not None
 
-    def upgrade(self, plan_id: int, version: int | None = None) -> int:
+    def upgrade(self, plan_id: int, version: int | None = None, *, with_needs: bool = False) -> int:
         """Moves a running plan to the newest playbook for its route (parent §4.3), or to `version` (the one the
         student accepted, Slice 7: never a newer one they did not see)."""
         contract, sha = self._contract(plan_id)
-        newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level)
+        newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
+                                 with_needs=with_needs)
         if version is not None:
             newest = self.playbooks[(newest.key, version)]
         return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest, plan_id), based_on=sha)

@@ -1,0 +1,46 @@
+# Fake local route, version 2 (P1-T8): version 1 plus the student's data needs. Fictional, for tests only.
+# Fake local route (P1 spec §3.8, R-41): fictional, for tests only.
+key: pakistan_inter
+version: 2
+route: {origin: PK, destination: PK, level: intermediate}
+default_timezone: Asia/Karachi
+intake_terms: [winter]
+eligibility:
+  grade:
+    - method: weighted_aggregate
+      requirement: merit_closing
+      part: aggregate
+      better: higher
+      weights: {ssc_certificate.marks_obtained: 1.0}
+      totals: {ssc_certificate.marks_obtained: ssc_certificate.marks_total}
+# The route's words for each request; titles are test data.
+asks:
+  education.matric.marks_obtained:
+    stated: Tell us your matric marks
+    shown: Upload your matric certificate to show your marks
+    which_is_right: Which matric marks are right?
+    expected: {fact: matric_result_date, title: Matric result expected}
+  education.matric.marks_total:
+    stated: Tell us the total marks of your matric
+    which_is_right: Which matric total is right?
+tasks:
+  - template_key: admission_form
+    task_type: student.act
+    title: Submit the admission form
+    kind: student
+    inbox_kind: act
+    duration_days: 1
+    needs:
+      - {fact: education.matric.marks_obtained, evidence: stated}
+      - {fact: education.matric.marks_total, evidence: stated}
+  - template_key: merit_list
+    task_type: student.choose
+    title: Choose from the merit-list offers
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: admission_form}]
+    anchor: {fact: merit_list_date}
+    duration_days: 2
+    needs:
+      - {fact: education.matric.marks_obtained, evidence: shown}

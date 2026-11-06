@@ -11,6 +11,7 @@ from app.os.contracts.plan_view import PlanViewV1
 from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
 from app.os.contracts.route_contract import IntakeRef
 from app.os.kernel.states import PLAN_OPEN
+from app.os.playbooks import newest_plain
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.replan.store import OverrideStore
 from app.os.plan_view import build_plan_view
@@ -32,10 +33,10 @@ def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
     """The route's active programmes. `facts_confirmed`: every programme fact the route's newest playbook needs is
     confirmed for that intake year. An unknown route has no programmes."""
     svc = ports.services()
-    books = [b for (key, _), b in svc.plans.playbooks.items() if key == route_key]
-    if not books:
+    book = newest_plain(svc.plans.playbooks.values()).get(route_key)
+    if book is None:
         return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[])
-    _, fields = needed_fields(max(books, key=lambda b: b.version))
+    _, fields = needed_fields(book)
     programmes = ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
     facts = svc.knowledge.programme_facts([p.ref for p in programmes], sorted(fields), intake.year)
     return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[
@@ -47,10 +48,7 @@ def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
 def routes() -> list[dict]:
     """The routes the loaded playbooks serve (the newest version of each key), for the Counsellor's choice screen:
     `{key, origin, destination, level, intake_terms}`, ordered by key. Raises OsUnavailable when PAI OS is not mounted."""
-    newest: dict[str, object] = {}
-    for (key, _), book in ports.services().plans.playbooks.items():
-        if key not in newest or book.version > newest[key].version:
-            newest[key] = book
+    newest = newest_plain(ports.services().plans.playbooks.values())
     return [{"key": k, "origin": b.route.origin, "destination": b.route.destination, "level": b.route.level,
              "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
 

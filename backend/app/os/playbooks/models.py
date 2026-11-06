@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.os.contracts.student_facts import FACT_KEY
 from app.os.eligibility.rules import EligibilityRules, SelfServe
 
 
@@ -94,6 +95,53 @@ class LeadTime(_Model):
         return self
 
 
+EVIDENCE_LEVELS = ("stated", "shown", "confirmed")
+REQUEST_TEMPLATES = ("provide", "which_is_right", "result_expected")  # template keys of the compiler's request steps
+Evidence = Literal["stated", "shown", "confirmed"]
+
+
+class Need(_Model):
+    """What a step needs before it can run (R-17, R-18): a student fact (a StudentFacts key) or a document (a document
+    type), held at least at `evidence`. A document is never merely `stated`, and no reviewer confirms one in P1, so a
+    document need is `shown` (checked by the playbook)."""
+    fact: str | None = Field(None, pattern=FACT_KEY)
+    document: str | None = Field(None, pattern=r"^[a-z_][a-z0-9_]*$")
+    evidence: Evidence
+
+    @model_validator(mode="after")
+    def _one_ref(self) -> "Need":
+        if (self.fact is None) == (self.document is None):
+            raise ValueError("a need names exactly one of 'fact' or 'document'")
+        return self
+
+    @property
+    def ref(self) -> str:
+        return self.fact or self.document or ""
+
+    @property
+    def kind(self) -> Literal["fact", "document"]:
+        return "fact" if self.fact is not None else "document"
+
+
+class Expected(_Model):
+    """`fact`: a route Knowledge fact holding the date the result comes out (the calendar); `title`: the step shown
+    until then (R-20)."""
+    fact: str
+    title: str = Field(min_length=1)
+
+
+class Ask(_Model):
+    """The route's words for one request, keyed in `Playbook.asks` by the fact key or the document type: the title of
+    the provide step per evidence level (`stated`, `shown`, `confirmed`), of the which-is-right step, and the
+    provide step's own duration. `expected`: the result-expected step, on a fact only."""
+    stated: str | None = None
+    shown: str | None = None
+    confirmed: str | None = None
+    which_is_right: str | None = None
+    duration_days: int = Field(1, ge=0)
+    expected: Expected | None = None
+
+
 class TaskTemplate(_Model):
     template_key: str
     task_type: str
@@ -111,6 +159,7 @@ class TaskTemplate(_Model):
     protected: bool = False
     citations: list[Citation] = []
     citation_from_fact: str | None = None
+    needs: list[Need] = []  # P1-T8: the facts and documents this step needs, each at an evidence level (R-18)
 
     @model_validator(mode="after")
     def _inbox_kind_matches_kind(self) -> "TaskTemplate":
@@ -174,8 +223,14 @@ class Playbook(_Model):
     self_serve: SelfServe | None = None  # Slice 4: what the route builder completes (S4-D9)
     # Display data (P1-T9). Never in the playbook file itself: the loader joins it from `pages/<key>.v<n>.yaml`
     # so a file a running plan pins stays as it was (invariant 10). Compile ignores both.
+    asks: dict[str, Ask] = {}  # P1-T8: the route's words for each request, by fact key or document type
     pages: list[Page] | None = None  # None: not declared
     sources: dict[str, SourceCheck] = {}
+
+    @property
+    def declares_needs(self) -> bool:
+        """A v2 playbook: some step needs a student fact or document. Chosen only while the student's needs gate is on."""
+        return any(t.needs for t in self.tasks)
 
     @field_validator("intake_terms")
     @classmethod
@@ -221,9 +276,34 @@ class Playbook(_Model):
                                          f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
+        self._check_needs()
         self._check_pages()
         self._check_sources()
         return self
+
+    def _check_needs(self) -> None:
+        reserved = sorted(t.template_key for t in self.tasks if t.template_key in REQUEST_TEMPLATES)
+        if reserved:
+            raise ValueError(f"template_key {reserved} is reserved for the steps PAI adds for a missing fact")
+        documents = {n.document for t in self.tasks for n in t.needs if n.document}
+        for t in self.tasks:
+            for need in t.needs:
+                ask = self.asks.get(need.ref)
+                if ask is None:
+                    raise ValueError(f"{t.template_key} needs {need.ref} but it has no entry in 'asks'")
+                if need.kind == "document" and need.evidence != "shown":
+                    raise ValueError(f"a document need must be 'shown' ({t.template_key}: {need.ref}): a paper is "
+                                     f"never merely stated, and no reviewer confirms a document")
+                if getattr(ask, need.evidence) is None:
+                    raise ValueError(f"{t.template_key} needs {need.ref} '{need.evidence}' but its 'asks' entry has "
+                                     f"no '{need.evidence}' title")
+                if need.kind == "fact" and not ask.which_is_right:
+                    raise ValueError(f"the 'asks' entry of {need.ref} needs a which_is_right title (two sources may "
+                                     f"disagree)")
+        for ref, ask in self.asks.items():
+            if ask.expected is not None and ref in documents:
+                raise ValueError(f"'asks' entry {ref}: 'expected' (a result still to come) belongs on a fact, not a "
+                                 f"document")
 
     def _check_pages(self) -> None:
         keys = [p.key for p in self.pages or []]

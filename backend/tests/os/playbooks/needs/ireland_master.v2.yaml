@@ -1,0 +1,51 @@
+# Fake local route, version 2 (P1-T8): version 1 plus the student's data needs. Fictional, for tests only.
+# Fake route (spec D5): proves a second destination runs with no code change.
+key: ireland_master
+version: 2
+route: {origin: PK, destination: IE, level: master}
+default_timezone: Europe/Dublin
+intake_terms: [winter]
+# Slice 4: a different grade method on another destination, same code (spec S4-D2).
+eligibility:
+  grade:
+    - {method: threshold, requirement: grade_requirement, part: percent_min, better: higher, scales: [percent]}
+  language:
+    - {language: english, requirement: english_requirement, level_key: cefr, scores: {ielts: ielts_trf.overall}}
+  grade_scales:
+    percent: {best: 100, provisional_min_pass: 40, value: transcript.percentage}
+asks:
+  transcript:
+    shown: Upload your transcript
+  test.ielts.score:
+    shown: Upload your English test report
+    which_is_right: Which English test score is right?
+tasks:
+  - template_key: apply
+    task_type: student.act
+    title: Apply to the programme
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    anchor: {fact: deadline_close}
+    duration_days: 3
+    needs:
+      - {document: transcript, evidence: shown}
+  # Only places that ask for an English score need this: a need on some places only (R-22, the drop or swap rung).
+  - template_key: english_proof
+    task_type: student.act
+    title: Show your English test score for this programme
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    condition: {fact: english_requirement, present: true}
+    duration_days: 2
+    needs:
+      - {fact: test.ielts.score, evidence: shown}
+
+  - template_key: visa
+    task_type: student.act
+    title: Apply for the student visa
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: apply}]
+    duration_days: 10
