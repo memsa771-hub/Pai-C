@@ -535,7 +535,9 @@ visa_choices = Table(
 
 # --- Slice 7: replanning (spec 2026-10-23 S7 §3, os_0012) ---------------------------------------------------
 
-PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused")
+PROPOSAL_STATUSES = ("applied", "pending", "accepted", "declined", "expired", "refused", "requested")  # P1-T6: requested
+PROPOSAL_SOURCES = ("rules", "supervisor", "student")  # student: the builder's own swap and remove (P1-T6)
+REQUEST_OUTCOMES = ("written", "duplicate", "stale", "refused")
 OVERRIDE_OPS = ("skip", "cancel", "cancel_programme", "add", "reprioritise")
 # Slice 8 (spec S8-D10, S8-D12)
 INTAKE_STATUSES = ("pending", "planned", "revised", "replaced", "refused", "stale", "withdrawn", "unsupported",
@@ -566,9 +568,25 @@ proposals = Table(
     Column("expires_at", DateTime(timezone=True)),
     _created(),
     Column("answered_at", DateTime(timezone=True)),
-    _in("source", ("rules", "supervisor"), "ck_os_proposals_source"),
+    Column("base_decision_version", Integer),  # P1-T6 (os_0021): the decision version it was made against; NULL before
+    Column("requested_version", Integer),  # the version n+1 the Counsellor wrote for the request
+    Column("request_outcome", Text),  # the Counsellor's answer: written | duplicate | stale | refused
+    _in("source", PROPOSAL_SOURCES, "ck_os_proposals_source"),
     _in("status", PROPOSAL_STATUSES, "ck_os_proposals_status"),
+    _in("request_outcome", REQUEST_OUTCOMES, "ck_os_proposals_request_outcome"),  # NULL passes a CHECK: no answer yet
     Index("ix_os_proposals_plan", "plan_id"),
+)
+
+# P1-T6 (os_0021): the student's agreement to adopt an open self-serve plan as the Counsellor's plan (R-08, D-x6)
+plan_adoptions = Table(
+    "os_plan_adoptions", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    _plan_fk(),
+    Column("contract_sha256", Text, nullable=False),
+    Column("requested_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("adopted_at", DateTime(timezone=True)),
+    UniqueConstraint("tenant_id", "plan_id", name="uq_os_plan_adoptions_plan"),
 )
 
 plan_overrides = Table(

@@ -329,3 +329,21 @@ def test_an_expiry_never_overwrites_an_answered_proposal(world):
     assert world.replanner.proposals.expire_if_pending(first.proposal_id) is False
     after = world.replanner.proposals.get(first.proposal_id)
     assert (after.status, after.revision) == ("accepted", before.revision)
+
+
+@pytest.mark.req("R-07")
+def test_a_removal_already_requested_from_the_counsellor_is_held_too(world):
+    """A removal the student accepted is `requested` while the Counsellor decides: it still holds the programme, so a
+    new fact change offers no second "remove it" card."""
+    plan_id = start(world)
+    assert send(world, plan_id, 1, 1000).status == "applied"
+    first = send(world, plan_id, 2, 800)
+    assert first.status == "pending" and world.replanner.below(plan_id) == ()  # held while pending
+    with world.engine.begin() as conn:
+        conn.execute(models.proposals.update().where(models.proposals.c.id == first.proposal_id)
+                     .values(status="requested"))
+    assert world.replanner.below(plan_id) == ()  # and while requested
+    with world.engine.begin() as conn:
+        conn.execute(models.proposals.update().where(models.proposals.c.id == first.proposal_id)
+                     .values(status="expired"))
+    assert world.replanner.below(plan_id) == ("p-hard",)  # an ended request holds nothing

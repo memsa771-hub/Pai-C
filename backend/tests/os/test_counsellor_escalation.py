@@ -10,6 +10,7 @@ from app.os import models, ports
 from app.os.adapters.counsellor.escalation import load_notes, reason_for
 from app.os.adapters.counsellor.store import IntakeStore
 from app.os.api.services import make_services
+from app.os.contracts.escalation_v2 import EscalationV2
 from app.os.outbox import Outbox
 from app.os.outbox.senders import LogSender
 from app.os.ports.escalation import mark_counsellor_delivery, pending_counsellor_escalations
@@ -71,10 +72,55 @@ def test_route_problem_reasons(svc, type_, reason, expected):
     cid = escalate(svc, type_, reason)
     (row,) = sent(svc)
     assert (row["key"], row["schema"], row["case_id"], row["reason"]) == (
-        f"escalation:{cid}", "pai.escalation.v1", cid, expected)
+        f"escalation:{cid}", "pai.escalation.v2", cid, expected)  # P1-T6: v2 on the channel
     assert (row["journey_id"], row["student_ref"], row["note"]) == ("j-1", "ws-1", load_notes()[expected])
     case = SupportStore(svc.engine, "pai").get(cid)
     assert (case.counsellor_status, case.counsellor_reason, case.status) == ("pending", expected, "open")
+
+
+def intake_row(svc, plan_id: int, version: int | None, n: int) -> None:
+    with svc.engine.begin() as conn:
+        conn.execute(insert(models.counsellor_intake).values(
+            tenant_id="pai", decision_id=f"d-{plan_id}-{n}", student_ref="ws-1", journey_id="j-1", export={},
+            export_sha256="0" * 64, chosen_at="2027-01-10T09:00:00+05:00", status="planned", plan_id=plan_id,
+            decision_version=version))
+
+
+@pytest.mark.req("R-11")
+def test_counsellor_payload_is_escalation_v2(svc):
+    p = plan(svc)
+    intake_row(svc, p, 2, 1)
+    intake_row(svc, p, 4, 2)
+    intake_row(svc, p, 3, 3)
+    with svc.engine.begin() as conn:
+        other = conn.execute(insert(models.plans).values(
+            tenant_id="pai", source="counsellor", external_ref="j-9:DE:master", student_ref="ws-9", contract={},
+            contract_sha256="0" * 64).returning(models.plans.c.id)).scalar_one()
+    intake_row(svc, other, 9, 4)  # another plan's version never counts
+    cid = svc.escalations.escalate(p, [event(svc, p, "escalate")], SUPERVISOR)
+    (row,) = sent(svc)
+    assert (row["schema"], row["key"], row["decision_version"]) == ("pai.escalation.v2", f"escalation:{cid}", 4)
+    assert (row["reason"], row["note"]) == ("blocking_gap", load_notes()["blocking_gap"])
+    assert EscalationV2.model_validate(row | {"key": row["key"]}).decision_version == 4
+
+
+@pytest.mark.req("R-11")
+def test_payload_without_an_applied_version_has_none(svc):
+    escalate(svc, "escalate", SUPERVISOR)
+    (row,) = sent(svc)
+    assert row["schema"] == "pai.escalation.v2" and row["decision_version"] is None
+
+
+@pytest.mark.req("R-11")
+def test_intake_refusal_carries_the_intakes_version(svc):
+    from app.os.adapters.counsellor.escalation import intake_refused
+
+    store = IntakeStore(svc.engine, "pai")
+    store.add({"decision_id": "d-7", "journey_id": "j-1", "student_ref": "ws-1", "decision_version": 5,
+               "chosen_at": "2027-01-10T09:00:00+05:00"}, "0" * 64)
+    intake_refused(svc.engine, "pai", store.get("d-7"))
+    (row,) = sent(svc)
+    assert (row["schema"], row["decision_version"]) == ("pai.escalation.v2", store.get("d-7").decision_version)
 
 
 def test_route_invalid_is_not_eligible():
@@ -196,3 +242,29 @@ def test_an_os_event_key_never_updates_a_support_case(svc):
     case = SupportStore(svc.engine, "pai").get(cid)
     assert case.counsellor_status != "sent"
     assert [e.key for e in pending_counsellor_escalations()] == [f"escalation:{cid}"]
+
+
+@pytest.mark.req("R-11")
+def test_student_fact_changed_reaches_counsellor(svc):
+    """P1-T6 Task 4 (ruling 11): the R-22 `Escalate(fact_all_below)` arrives as a `student_fact_changed` event and is
+    sent as `not_eligible`; it used to map to nothing and never reached the Counsellor."""
+    assert reason_for("student_fact_changed", REASONS["fact_all_below"]) == "not_eligible"
+    cid = escalate(svc, "student_fact_changed", REASONS["fact_all_below"])
+    (row,) = sent(svc)
+    assert (row["reason"], row["case_id"]) == ("not_eligible", cid)
+    (pending,) = pending_counsellor_escalations()
+    assert pending.reason == "not_eligible" and pending.key == f"escalation:{cid}"
+    assert SupportStore(svc.engine, "pai").get(cid).counsellor_status == "pending"
+
+
+@pytest.mark.req("R-22")
+def test_no_places_reason_is_a_route_problem_sent_by_its_event(svc):
+    """A change that would leave no place (NO_PLACES_REASON) is not a system problem: the triggering event decides, so
+    a fact change reaches the Counsellor as not_eligible and a rejection as all_rejected."""
+    from app.os.replan.apply import NO_PLACES_REASON
+
+    assert reason_for("student_fact_changed", NO_PLACES_REASON) == "not_eligible"
+    assert reason_for("admission_rejected", NO_PLACES_REASON) == "all_rejected"
+    escalate(svc, "student_fact_changed", NO_PLACES_REASON)
+    (row,) = sent(svc)
+    assert row["reason"] == "not_eligible"

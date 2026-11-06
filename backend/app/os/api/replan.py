@@ -2,17 +2,20 @@
 admin support inbox. The student sees only their own plan's proposals; accepting re-checks the plan first."""
 
 from collections.abc import Callable
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.os.kernel.states import PLAN_OPEN
-from app.os import models
+from app.os import clock, models
 from app.os.api import self_serve
 from app.os.api.deps import current_student_ref, current_student_ref_for_write
 from app.os.api.services import Services
 from app.os.outbox import Outbox
+from app.os.ports import choice_requests
+from app.os.replan import choice_texts
 from app.os.replan.apply import ProposalStale, Replanner
 from app.os.replan.config import load_replan_configs
 from app.os.replan.store import Proposal, ProposalStore, SupportStore
@@ -39,14 +42,27 @@ def case_fields(c) -> dict:
             "counsellor_reason": c.counsellor_reason}
 
 
-def proposal_out(p: Proposal) -> dict:
-    return {"id": p.id, "plan_id": p.plan_id, "status": p.status, "big": p.big, "source": p.source, "ops": p.ops,
-            "reasons": [o["reason"] for o in p.ops], "revision": p.revision, "expires_at": p.expires_at,
-            "created_at": p.created_at, "answered_at": p.answered_at}
+EXPIRED_SHOWN = timedelta(days=7)  # an expired request stays in the student's list this long
+
+
+def proposal_out(p: Proposal, settings=None) -> dict:
+    """`status_note` (P1-T6) is the fixed sentence for a request, left out while its file is not approved."""
+    key = "requested" if p.status == "requested" else "expired" if p.status == "expired" and p.request_outcome else None
+    out = {"id": p.id, "plan_id": p.plan_id, "status": p.status, "big": p.big, "source": p.source, "ops": p.ops,
+           "reasons": [] if p.source == "student" else [o["reason"] for o in p.ops], "revision": p.revision,
+           "expires_at": p.expires_at, "created_at": p.created_at, "answered_at": p.answered_at}
+    note = choice_texts.note(key, settings) if key and settings is not None else None
+    if note is not None:  # only when set: a proposal without a request has exactly today's keys
+        out["status_note"] = note
+    if p.request_outcome is not None:
+        out["request_outcome"] = p.request_outcome
+    return out
 
 
 def student_proposals(svc: Services, student: str) -> list[dict]:
-    return [proposal_out(p) for p in ProposalStore(svc.engine, svc.settings.tenant_id).pending_for(student)]
+    store = ProposalStore(svc.engine, svc.settings.tenant_id)
+    found = [*store.pending_for(student), *store.requested_for(student, clock.now() - EXPIRED_SHOWN)]
+    return [proposal_out(p, svc.settings) for p in sorted(found, key=lambda p: p.id)]
 
 
 def changes_paused(svc: Services, student: str) -> bool:
@@ -76,10 +92,10 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
             G = models.programmes
             names = dict(conn.execute(select(G.c.ref, G.c.name).where(
                 G.c.tenant_id == svc.settings.tenant_id, G.c.ref.in_(refs))).all()) if refs else {}
-        return {"changes": [{**proposal_out(p), "proposal_id": p.id, "at": p.answered_at or p.created_at}
+        return {"changes": [{**proposal_out(p, svc.settings), "proposal_id": p.id, "at": p.answered_at or p.created_at}
                             for p in found if p.status in ("applied", "accepted") and p.ops
                             and p.revision is not None],  # a proposal that changed nothing is no entry (minor #7)
-                "pending": [proposal_out(p) for p in found if p.status == "pending"],
+                "pending": [proposal_out(p, svc.settings) for p in found if p.status == "pending"],
                 "changes_paused": paused, "plan_id": plan_id, "names": names}
 
     @router.get("/plans/{plan_id}/changes")
@@ -107,7 +123,14 @@ def add_replan_routes(router: APIRouter, services: Callable[[], Services], requi
             raise HTTPException(status_code=404, detail="suggestion not found") from None
         except ProposalStale as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
-        return {"status": "accepted" if accept else "declined", "revision": revision}
+        status = "accepted" if accept else "declined"
+        if accept:  # a choice change on a Counsellor plan is requested, not accepted (R-07)
+            after = ProposalStore(svc.engine, svc.settings.tenant_id).get(proposal_id)
+            if after is not None and after.status in ("requested", "refused"):
+                status = after.status
+                if status == "requested":
+                    choice_requests.notify(choice_requests.key_of(proposal_id))  # the plan lock is released
+        return {"status": status, "revision": revision}
 
     @router.post("/proposals/{proposal_id}/accept")
     def accept(proposal_id: int, student: str = Depends(current_student_ref_for_write),

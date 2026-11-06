@@ -62,6 +62,9 @@ export type RoutePlan = {
   decision_version?: number | null;
   proposals_waiting?: number;
   changes?: unknown[];
+  /** P1-T6: the fixed sentence for a paused plan and the one button label that goes with it; absent unless sent. */
+  reason_text?: string | null;
+  reason_action?: string | null;
 };
 
 /** A dated calendar event behind the estimate; month null is "date not confirmed". */

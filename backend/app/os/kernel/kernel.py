@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from sqlalchemy import Connection, Engine, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from app.os import models
 from app.os import clock as shared_clock
@@ -24,6 +25,7 @@ from app.os.ports import os_events
 from app.os.replan import events as replan_events
 from app.os.kernel.states import (
     PLAN_CLOSED,
+    PLAN_OPEN,
     SATISFIES_DEPENDENCY,
     TERMINAL,
     IllegalTransition,
@@ -40,7 +42,12 @@ _EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", 
                 "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
 _STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
 _QUIET = "os_event_quiet"  # conn.info flag: set while a new plan is first promoted
+_MUTE = "os_event_mute"  # conn.info flag: the event is recorded but the student is told nothing
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
+
+
+class PlanIdentityTaken(RuntimeError):
+    """Another plan already holds the (tenant, source, external_ref) an adoption would take (uq_os_plans_identity)."""
 
 
 class StaleDraft(RuntimeError):
@@ -141,6 +148,33 @@ class Kernel:
                 "contract": contract.model_dump(mode="json"), "contract_sha256": contract_sha256(contract),
                 "student_ref": contract.student_ref})
 
+    def adopt_plan(self, plan_id: int, external_ref: str, contract: RouteContract | RouteContractV2,
+                   based_on: str) -> bool:
+        """Turns an open self-serve plan into the Counsellor's plan in place (R-08): source `counsellor`, the decision's
+        external_ref and contract, in one transaction under the plan lock. No revision and no task change: the plan the
+        student has been working on stays as it is. One `plan_adopted` event. `based_on` is the contract_sha256 the
+        student agreed to. False, and nothing changes, when the plan is not open, not `self_serve`, or its contract is no
+        longer `based_on`. PlanIdentityTaken when another plan already holds the new identity."""
+        if external_ref != contract.external_ref:
+            raise ValueError("adopt_plan: external_ref must be the contract's own")
+        try:
+            with self.engine.begin() as conn:
+                self._lock_plan(conn, plan_id)
+                status, source, sha = conn.execute(select(P.c.status, P.c.source, P.c.contract_sha256).where(
+                    P.c.id == plan_id)).one()
+                if source != "self_serve" or status not in PLAN_OPEN or sha != based_on:
+                    return False
+                conn.execute(update(P).where(P.c.id == plan_id).values(
+                    source="counsellor", external_ref=external_ref, contract=contract.model_dump(mode="json"),
+                    contract_sha256=contract_sha256(contract), updated_at=self.clock()))
+                self._event(conn, plan_id, None, "plan_adopted", {"source": "counsellor"})
+                return True
+        except IntegrityError as exc:
+            name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if name == "uq_os_plans_identity" or (name is None and "uq_os_plans_identity" in str(exc)):
+                raise PlanIdentityTaken(f"plan {plan_id}") from None
+            raise
+
     def upgrade_playbook(self, plan_id: int, draft: PlanDraft, based_on: str | None = None) -> int:
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)
@@ -199,6 +233,27 @@ class Kernel:
                 return False
             conn.execute(update(P).where(P.c.id == plan_id).values(status="paused", updated_at=self.clock()))
             self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            return True
+
+    def set_pause_reason(self, plan_id: int, reason: str) -> bool:
+        """A plan that is already paused gets a new reason code (a `plan_paused` event; the status stays). It is how
+        an escalation takes the place of a missing consent. False, and nothing changes, when the plan is not paused or
+        already carries this reason."""
+        E = models.events
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() != "paused":
+                return False
+            newest = conn.execute(select(E.c.payload).where(
+                E.c.tenant_id == self.tenant_id, E.c.plan_id == plan_id, E.c.type == "plan_paused")
+                .order_by(E.c.id.desc()).limit(1)).scalar()
+            if (newest or {}).get("reason") == reason:
+                return False
+            conn.info[_MUTE] = True  # the plan is already paused and the student was told: a new reason is no new notice
+            try:
+                self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            finally:
+                conn.info.pop(_MUTE, None)
             return True
 
     def resume_plan(self, plan_id: int) -> bool:
@@ -354,6 +409,8 @@ class Kernel:
         """The one choke point for `os_event.v1` (R-45): the same transaction writes the notice for the Counsellor,
         keyed on this event's id so a repeat is skipped. A hidden step (the "plan updated" notice) is never announced."""
         kind = _EVENT_KINDS.get(type_)
+        if conn.info.get(_MUTE):
+            return
         if type_ == "task_state":
             kind = _STEP_KINDS.get(payload.get("to"))
         if kind is None or plan_id is None:

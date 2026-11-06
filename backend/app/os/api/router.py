@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
+from fastapi.responses import JSONResponse
 
 from datetime import date
 
@@ -92,6 +93,8 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
+from app.os.ports import choice_requests
+from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
@@ -302,19 +305,30 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
         except builder.PlanExists as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        except builder.ChoiceRefused as e:  # the Counsellor is on and would not take the choice (R-09)
+            return JSONResponse(status_code=409, content={"detail": e.code, "note": choice_texts.note(e.code, svc.settings)})
+        except builder.CounsellorUnavailable:
+            return JSONResponse(status_code=503, content={"detail": "counsellor_unavailable"})
         except (builder.NotAllowed, PlaybookError, CompileError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        if isinstance(ref, builder.Preparing):  # no plan yet: it comes from the intake of the decision version
+            note = choice_texts.note("preparing", svc.settings) if ref.state == "preparing" else None
+            return JSONResponse(status_code=202, content={"state": ref.state, "decision_version": ref.decision_version,
+                                                          "note": note})
         if not ref.created:
             response.status_code = 200
         return self_serve.self_plan_out(svc.plans, ref.plan_id)
 
-    def _change(svc: Services, plan_id: int, do) -> dict:
+    def _change(svc: Services, plan_id: int, do):
         try:
-            do()
+            done = do()
         except builder.NotYourPlan:
             raise HTTPException(status_code=404, detail="plan not found") from None
         except builder.NotAllowed as e:  # includes SwapLimit
             raise HTTPException(status_code=409, detail=str(e)) from None
+        if isinstance(done, tuple) and done[0] == "requested":  # a Counsellor plan: the change goes to the Counsellor
+            choice_requests.notify(choice_requests.key_of(done[1]))  # the transaction is committed
+            return JSONResponse(status_code=202, content={"state": "requested", "proposal_id": done[1]})
         return self_serve.self_plan_out(svc.plans, plan_id)
 
     @router.post("/plans/{plan_id}/swap", response_model=SelfPlanOut)

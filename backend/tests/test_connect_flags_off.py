@@ -183,3 +183,87 @@ def test_flags_off_an_os_supported_row_ticks_locally_and_asks_nothing_of_the_os(
     assert ticked["steps_done"] == ["apply"] == page["steps_done"]
     assert set(ticked) == CHOOSE_KEYS and set(page) == CHOOSE_KEYS
     assert touched.mock_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-07")
+async def test_t6_sweep_and_roadmap_unchanged(monkeypatch):
+    """P1-T6 Task 3: with the hand-off off the sweep delivers no choice request and reports the same counts as before
+    this task (the dict below was captured from the code before it), the pending request rows are not read, and the
+    /v1/roadmap bodies equal the captured fixture."""
+    import json
+    from pathlib import Path
+
+    from app.os.ports import choice_requests
+    from tests.roadmap_snapshots import walk
+
+    touched = MagicMock()
+    touched.pending.return_value = []
+    monkeypatch.setattr(ports, "services", touched.services)
+    monkeypatch.setattr(choice_requests, "pending", touched.choice_pending)
+    monkeypatch.setattr(choice_requests, "mark_delivery", touched.mark_delivery)
+    monkeypatch.setattr(plan_source, "submit_decision", touched.submit_decision)
+    monkeypatch.setattr(os_escalation, "pending_counsellor_escalations", touched.pending)
+    async with confirmed_student() as (client, student, db, _j):
+        with_routes(student, db)
+        choose(client, student, "electrical_engineering")
+        got = bridge.sweep_once(db)
+        assert got == {"submitted": 0, "failed": 0, "sent": 0, "refused": 0, "waiting": 0}
+        assert bridge.deliver_choice_requests(db) == {"written": 0, "duplicate": 0, "stale": 0, "refused": 0,
+                                                      "failed": 0, "skipped": 0}
+        assert touched.choice_pending.mock_calls == [] and touched.mark_delivery.mock_calls == []
+        assert touched.submit_decision.mock_calls == [] and outbox_count(db) == 0
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
+    walked = walk()
+    assert json.dumps(walked, sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+@pytest.mark.req("R-11")
+def test_t6_roadmap_paused_unchanged():
+    """P1-T6 Task 4: with the plan-view flag on and the hand-off off, a paused plan's body carries no `reason_text`,
+    even in rehearsal and with an escalation reason code."""
+    from unittest.mock import patch
+
+    from tests.test_plan_adapter import STEPS, page, plan_client, view_of
+
+    for reason in ("not_eligible", "other", "consent_missing"):
+        with patch.object(config, "CONNECT_HANDOFF", False, create=True), \
+                patch.object(config, "CONNECT_CONSENT_DRAFT", True), \
+                plan_client(view_of(STEPS, state="paused", reason=reason)) as (client, _, params, _f, _):
+            plan = page(client, params)["plan"]
+        assert set(plan) == {"state", "state_reason", "revision", "decision_version", "proposals_waiting", "changes"}
+        assert plan["state_reason"] == reason
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-08")
+async def test_t6_no_adoption_route_effect(monkeypatch):
+    """P1-T6 Task 6: with the hand-off or My plan part off, the adoption offer is `{offer: false}` and the agreement is
+    refused with today's hand-off message, and PAI OS is asked nothing; the roadmap bodies equal the captured fixture."""
+    import json
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from tests.roadmap_snapshots import walk
+
+    touched = MagicMock()
+    monkeypatch.setattr(bridge, "self_serve_plan", touched.self_serve_plan)
+    monkeypatch.setattr(bridge, "request_adoption", touched.request_adoption)
+    monkeypatch.setattr(plan_source, "request_adoption", touched.port_request_adoption)
+    async with confirmed_student() as (client, student, db, _j):
+        with_routes(student, db)
+        choose(client, student, "electrical_engineering")
+        params = {"network": student.workspace_id}
+        with patch.object(config, "CONNECT_MY_PLAN", True, create=True):  # My plan on, hand-off off
+            got = client.get("/v1/roadmap/adoption", params=params, headers=TOKEN)
+            assert got.status_code == 200 and got.json()["data"] == {"offer": False}
+        for handoff in (False, True):  # hand-off on but My plan off: no offer either
+            with patch.object(config, "CONNECT_HANDOFF", handoff, create=True), \
+                    patch.object(config, "CONNECT_MY_PLAN", False, create=True):
+                assert client.get("/v1/roadmap/adoption", params=params, headers=TOKEN).json()["data"] == {
+                    "offer": False}
+        posted = client.post("/v1/roadmap/adoption", params=params, headers=TOKEN, json={"plan_id": 1})
+        assert posted.status_code == 409 and posted.json() == {"detail": "The connection to PAI OS is not on"}
+        assert touched.mock_calls == [] and outbox_count(db) == 0
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
+    assert json.dumps(walk(), sort_keys=True) == json.dumps(expected, sort_keys=True)

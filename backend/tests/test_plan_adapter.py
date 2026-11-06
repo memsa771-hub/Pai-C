@@ -378,3 +378,56 @@ def test_a_tick_whose_reread_fails_answers_with_the_step_done():
         assert fake.completed == [(student.workspace_id, 1)]
         assert "gather@1" in answer["steps_done"]
         assert next(s for s in answer["steps"] if s["key"] == "gather@1")["status"] == "done"
+
+
+# ---- P1-T6 Task 4 (R-11): a plan paused by an escalation carries the student's sentence ----
+from app.pai_c.connect import escalation_texts  # noqa: E402
+
+REASONS_FIVE = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
+
+
+@contextmanager
+def handoff(on=True, draft=True):
+    with patch.object(config, "CONNECT_HANDOFF", on, create=True), \
+            patch.object(config, "CONNECT_CONSENT_DRAFT", draft), \
+            patch.object(bridge, "counsellor_module_on", lambda: True):
+        yield
+
+
+@pytest.mark.req("R-11")
+@pytest.mark.parametrize("reason", REASONS_FIVE)
+def test_adapter_adds_reason_text_only_for_escalation_pause(reason):
+    with handoff(), plan_client(view_of(STEPS, state="paused", reason=reason)) as (client, _, params, _f, _):
+        plan = page(client, params)["plan"]
+        expected = (escalation_texts.text(reason), escalation_texts.action())
+    assert (plan["reason_text"], plan["reason_action"]) == expected and all(expected)
+    assert plan["state"] == "paused" and plan["state_reason"] == reason
+
+
+@pytest.mark.req("R-11")
+def test_a_consent_pause_has_no_reason_text():
+    with handoff(), plan_client(view_of(STEPS, state="paused", reason="consent_missing")) as (client, _, params, _f, _):
+        plan = page(client, params)["plan"]
+    assert "reason_text" not in plan and "reason_action" not in plan and plan["state_reason"] == "consent_missing"
+
+
+@pytest.mark.req("R-11")
+def test_reason_text_is_absent_until_approved_or_rehearsal():
+    from app.pai_c.connect import escalation_texts
+    with handoff(draft=False), patch.dict(escalation_texts._RAW, {"approved": False}), \
+            plan_client(view_of(STEPS, state="paused", reason="other")) as (client, _, params, _f, _):
+        plan = page(client, params)["plan"]
+    assert "reason_text" not in plan and "reason_action" not in plan
+
+
+def test_approved_reason_text_is_shown_without_rehearsal():
+    """The owner approved the sentences in chat (2026-11-06): they show with the draft switch off."""
+    with handoff(draft=False), plan_client(view_of(STEPS, state="paused", reason="other")) as (client, _, params, _f, _):
+        plan = page(client, params)["plan"]
+    assert plan["reason_text"] and plan["reason_action"]
+
+
+@pytest.mark.req("R-11")
+def test_an_active_plan_with_a_reason_code_has_no_text():
+    with handoff(), plan_client(view_of(STEPS, state="active", reason=None)) as (client, _, params, _f, _):
+        assert "reason_text" not in page(client, params)["plan"]
