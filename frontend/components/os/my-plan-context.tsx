@@ -14,8 +14,8 @@ export interface MyPlanState {
   /** Asks again (after a choice, an adoption or a start). Does nothing outside the provider. */
   refresh: () => void;
   /** Whether the stage is open for the start page (`osOpenAt`): the shell tells it; the builder stays reachable before a choice. */
-  startOpen: boolean;
-  setStartOpen: (open: boolean) => void;
+  startOpen?: boolean;
+  setStartOpen?: (open: boolean) => void;
 }
 
 const OFF: MyPlanState = { on: false, plan: null, refresh: () => {}, startOpen: false, setStartOpen: () => {} };

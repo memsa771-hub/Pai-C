@@ -58,7 +58,7 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
   const journey = useJourney();
   const stageId = journey.progress?.stage?.id;
   const { setStartOpen } = myPlan;
-  useEffect(() => { setStartOpen(osOpenAt(stageId)); }, [stageId, setStartOpen]);  // the builder page, before a choice
+  useEffect(() => { setStartOpen?.(osOpenAt(stageId)); }, [stageId, setStartOpen]);  // the builder page, before a choice
   useEffect(() => {
     if (currentSessionId !== "pai-counselor")
       setCurrentSessionId("pai-counselor");
