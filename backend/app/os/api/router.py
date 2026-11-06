@@ -79,10 +79,11 @@ from dataclasses import asdict
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
-from app.os.consent import ConsentStore, current_terms
+from app.os.consent import ConsentStore, current_terms, gate
 from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
+from app.os.documents import connect_texts
 from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
@@ -93,7 +94,7 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
-from app.os.ports import choice_requests
+from app.os.ports import choice_requests, document_files
 from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -117,9 +118,7 @@ def refusal(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": code, "message": message})
 
 
-def _accepts(svc: Services, terms) -> bool:
-    """Placeholder terms can be agreed to, and count, only in rehearsal mode (Slice 9a spec §3.2)."""
-    return not terms.placeholder or svc.settings.rehearsal
+_accepts = gate.accepts  # placeholder terms count only in rehearsal mode (Slice 9a spec §3.2)
 
 
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
@@ -137,11 +136,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                           svc: Services = Depends(services)) -> str:
         """A dependency, so it runs before the body is validated and before any write or enqueue. Only a new start
         and an upload are refused: the inbox and changes to a running plan keep working (Review Focus 3)."""
-        terms = current_terms(svc.terms_dir)
-        if not _accepts(svc, terms):  # a placeholder row made in a rehearsal never counts outside it
-            raise refusal("terms_not_set", "the pilot terms are not written yet")
-        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version):
-            raise refusal("consent_needed", "Please agree to the pilot terms first.")
+        code = gate.upload_refusal(svc, student)
+        if code is not None:
+            raise refusal(code, gate.MESSAGES[code])
         return student
 
     @router.get("/consent", response_model=ConsentOut)
@@ -375,6 +372,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
                         student: str = Depends(consented_student),
                         svc: Services = Depends(services)) -> dict:
+        if document_files.enabled():  # P1-T7: the one upload is POST /v1/files; checked before the body is read
+            raise HTTPException(status_code=409, detail=connect_texts.text("use_documents_page"))
         t = svc.document_types.get(doc_type)
         if t is None:
             raise HTTPException(status_code=422, detail=f"unknown document type: {doc_type}")

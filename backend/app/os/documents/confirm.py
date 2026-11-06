@@ -6,6 +6,7 @@ Profile keys: the cross-check keys (`full_name`, `father_name`, `date_of_birth`)
 open finding covers them, and every other confirmed field as `<doc_type>.<field>`. An empty value is not set.
 """
 
+import logging
 from collections.abc import Mapping
 
 from sqlalchemy import Engine, delete
@@ -15,6 +16,8 @@ from app.os.documents.checks import cross_values
 from app.os.documents.run import compare_documents, forget_document
 from app.os.documents.store import Document, DocumentStore, FindingStore, ProfileStore
 from app.os.documents.types import DocumentType
+
+log = logging.getLogger("app.os.documents.confirm")
 
 CONFIRMABLE = ("read", "needs_student", "confirmed")
 
@@ -70,10 +73,12 @@ def resolve_finding(engine: Engine, tenant_id: str, finding: dict, value) -> dic
 
 
 def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], variants: list[set[str]],
-                    doc: Document, *, client) -> None:
+                    doc: Document, *, client, notify_host: bool = True) -> None:
     """The file and fields go, and so do the profile values taken from them and the document's DBOS workflows
     (their step outputs hold the values read); the row stays as `deleted`. The student's findings are checked
-    again without it."""
+    again without it. A document linked to a host file (P1-T7) also tells the host, last: the host purges the file.
+    The host's answer never undoes the delete (a failed purge is retried by the student); `notify_host=False` is for
+    a delete that came from the host."""
     DocumentStore(engine, tenant_id).delete(doc.id)
     forget_document(client, tenant_id, doc.id)
     from app.os.packs.store import PackFileStore  # imported here: packs read documents, not the other way round
@@ -83,3 +88,10 @@ def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, Document
     with engine.begin() as conn:
         conn.execute(delete(P).where(P.c.tenant_id == tenant_id, P.c.source_document_id == doc.id))
     compare_documents(engine, tenant_id, doc.student_ref, types, variants)
+    if notify_host and doc.file_ref is not None:
+        from app.os.ports import document_files  # late: that module imports this one
+
+        try:
+            document_files.on_deleted(doc.student_ref, doc.file_ref)
+        except Exception as e:  # class name only: no ids, no values
+            log.error("document file purge failed (%s)", type(e).__name__)

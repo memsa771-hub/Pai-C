@@ -37,6 +37,7 @@ class Document:
     read_at: datetime | None
     confirmed_at: datetime | None
     deleted_at: datetime | None
+    file_ref: str | None = None  # P1-T7: the Counsellor file that holds the bytes (no os_document_files row)
 
 
 def _doc(row) -> Document:
@@ -72,6 +73,31 @@ class DocumentStore:
             raise
         return doc_id
 
+    def create_ref(self, student_ref: str, doc_type: str, type_version: int, filename: str, content_type: str,
+                   data: bytes, file_ref: str) -> int:
+        """A document whose bytes live in the host's file store (P1-T7): the row keeps the SHA-256 and size of `data`
+        and the `file_ref`, and no `os_document_files` row. The same file twice for a student, or one file ref twice,
+        is a `DuplicateDocument`."""
+        sha = hashlib.sha256(data).hexdigest()
+        try:
+            with self.engine.begin() as conn:
+                return conn.execute(insert(D).values(
+                    tenant_id=self.tenant_id, student_ref=student_ref, doc_type=doc_type, type_version=type_version,
+                    filename=filename, content_type=content_type, size=len(data), sha256=sha, file_ref=file_ref,
+                ).returning(D.c.id)).scalar_one()
+        except IntegrityError as e:
+            if "uq_os_documents_sha" in str(e.orig) or "uq_os_documents_file_ref" in str(e.orig):
+                raise DuplicateDocument("this file is already uploaded") from None
+            raise
+
+    def find_by_file_ref(self, student_ref: str, file_ref: str) -> Document | None:
+        """The student's live document linked to `file_ref` (None for another student's)."""
+        with self.engine.connect() as conn:
+            row = conn.execute(select(D).where(
+                D.c.tenant_id == self.tenant_id, D.c.student_ref == student_ref, D.c.file_ref == file_ref,
+                D.c.status != "deleted")).first()
+        return None if row is None else _doc(row)
+
     def get(self, doc_id: int) -> Document | None:
         with self.engine.connect() as conn:
             row = conn.execute(select(D).where(self._mine(doc_id))).first()
@@ -85,6 +111,17 @@ class DocumentStore:
         return [_doc(r) for r in rows]
 
     def file_bytes(self, doc_id: int) -> bytes:
+        """The one place bytes are read. A document with a `file_ref` reads through the DocumentFiles port with its
+        own student (`KeyError` without an adapter, or when the host cannot give the file); any other reads
+        `os_document_files` as it always did."""
+        with self.engine.connect() as conn:
+            link = conn.execute(select(D.c.student_ref, D.c.file_ref).where(self._mine(doc_id))).first()
+        if link is None:
+            raise KeyError(doc_id)  # another tenant's document, or none
+        if link.file_ref is not None:
+            from app.os.ports import document_files  # late: that module imports this store
+
+            return bytes(document_files.read(link.student_ref, link.file_ref))
         with self.engine.connect() as conn:
             data = conn.execute(select(B.c.data).where(B.c.document_id == doc_id, B.c.tenant_id == self.tenant_id)
                                 ).scalar()
