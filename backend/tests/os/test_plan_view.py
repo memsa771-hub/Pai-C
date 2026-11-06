@@ -377,3 +377,54 @@ def test_intermediate_plan_builds_a_view(svc):
         assert (v.route.route_key, v.route.level) == ("pakistan_inter", "intermediate")
     finally:
         ports.configure(None)
+
+
+# --- P1-T7 Task 4 (D-y14, R-16): documents_needed from the route's pack checklist -----------------------------------
+
+
+class _PackSvc(_Svc):
+    def __init__(self, engine, pack_configs):
+        super().__init__(engine)
+        self.pack_configs = pack_configs
+
+
+def test_documents_needed_from_pack_checklist(engine, clean):
+    from app.os.documents.store import DocumentStore
+    from app.os.packs.config import load_pack_configs
+    from app.os.ports import document_files
+    from test_api_documents import TRANSCRIPT, TYPES, simulate_read
+
+    configs = load_pack_configs()
+    p = plan(engine)
+    decision(engine, "planned", p)
+    wanted = [i.ref for i in configs["germany_master"].checklist if i.kind == "document"]
+    assert "transcript" in wanted and "ielts_trf" in wanted
+    store = DocumentStore(engine, "pai")
+
+    def need():
+        v = build_plan_view(_PackSvc(engine, configs), STUDENT)
+        assert PlanViewV1.model_validate(v.model_dump(mode="json", by_alias=True)) == v
+        return {n.doc_type: n.status for n in v.documents_needed}
+
+    try:
+        assert need() == {}  # the port is off: today's empty list
+        document_files.configure(enabled=lambda: True)
+        assert need() == {ref: "missing" for ref in wanted}
+        assert [n.doc_type for n in build_plan_view(_PackSvc(engine, configs), STUDENT).documents_needed] == wanted
+        d = store.create(STUDENT, "transcript", TYPES["transcript"].version, "t.pdf", "application/pdf", b"%PDF-1 a")
+        assert need()["transcript"] == "uploaded"
+        for status in ("reading", "read", "needs_student"):
+            store.set_status(d, status)
+            assert need()["transcript"] == "uploaded"
+        store.set_status(d, "failed")
+        assert need()["transcript"] == "missing"
+        simulate_read(engine, d, "transcript", TRANSCRIPT)
+        store.confirm(d, {f.name: TRANSCRIPT.get(f.name) for f in TYPES["transcript"].fields})
+        assert need()["transcript"] == "confirmed" and need()["ielts_trf"] == "missing"
+        store.delete(d)
+        assert need()["transcript"] == "missing"  # a deleted document is not a document
+        # a route with no pack config, and a service without any
+        assert build_plan_view(_PackSvc(engine, {}), STUDENT).documents_needed == []
+        assert build_plan_view(_Svc(engine), STUDENT).documents_needed == []
+    finally:
+        document_files.configure()

@@ -228,6 +228,18 @@ class DocumentsOut(BaseModel):
     doc_types: list[DocTypeOut]  # the configured types, for the upload choice (labels come from the YAML)
 
 
+class VaultFieldOut(BaseModel):
+    field: str
+    outcome: Literal["same", "differs", "new", "not_compared"]
+
+
+class VaultCheckOut(BaseModel):
+    """A document's fields compared live with the Vault (P1-T7, D-y11). Nothing of the Vault is kept or returned."""
+
+    fields: list[VaultFieldOut]
+    note: str | None
+
+
 class ConfirmDocumentIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     fields: dict[str, Any]

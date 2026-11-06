@@ -34,6 +34,7 @@ from app.os.api.schemas import (
     ConsentOut,
     CompleteOut,
     ConfirmDocumentIn,
+    VaultCheckOut,
     ConfirmIn,
     ConfirmOut,
     DocumentOut,
@@ -84,6 +85,7 @@ from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
 from app.os.documents import connect_texts
+from app.os.documents.vault_check import compare as vault_compare
 from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
@@ -94,7 +96,7 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
-from app.os.ports import choice_requests, document_files, fact_proposals
+from app.os.ports import choice_requests, document_files, fact_proposals, student_facts
 from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -397,6 +399,23 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.get("/documents", response_model=DocumentsOut)
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return documents_out(svc.engine, svc.settings.tenant_id, student, svc.document_types)
+
+    @router.get("/documents/{doc_id}/vault-check", response_model=VaultCheckOut)
+    def vault_check(doc_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """Every field with a Vault key compared with the Vault, live (P1-T7, D-y11, R-16). Nothing is stored. Without
+        the one upload or without the host's answer there is nothing to compare with: 404 (no standalone fallback)."""
+        doc = own_document(svc, doc_id, student)
+        t = svc.document_types.get(doc.doc_type)
+        tenant = svc.settings.tenant_id
+        facts = (student_facts.host_facts(student, engine=svc.engine, tenant_id=tenant)
+                 if document_files.enabled() and t is not None else None)
+        if facts is None:
+            raise HTTPException(status_code=404, detail="nothing to compare with")
+        values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                  for f in DocumentStore(svc.engine, tenant).fields(doc_id)}
+        fields = vault_compare(t, values, facts)
+        differs = any(f["outcome"] == "differs" for f in fields)
+        return {"fields": fields, "note": connect_texts.text("vault_differs") if differs else None}
 
     @router.post("/documents/{doc_id}/confirm", response_model=DocumentOut)
     def confirm_doc(doc_id: int, body: ConfirmDocumentIn, student: str = Depends(current_student_ref_for_write),

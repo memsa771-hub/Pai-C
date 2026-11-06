@@ -9,11 +9,13 @@ from typing import Any
 from sqlalchemy import Connection, func, select
 
 from app.os import models
-from app.os.contracts.plan_view import (ConsentState, PlanChange, PlanRoute, PlanStep, PlanViewV1)
+from app.os.contracts.plan_view import (ConsentState, DocumentNeed, PlanChange, PlanRoute, PlanStep, PlanViewV1)
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX
 from app.os.kernel.states import PLAN_CLOSED
 from app.os.playbooks.loader import PlaybookError, select_playbook
+from app.os.ports import document_files
 
+D = models.documents
 P, T, E, R, PR, EV, I, PIN = (models.plans, models.tasks, models.task_edges, models.plan_revisions, models.proposals,
                               models.events, models.counsellor_intake, models.playbook_pins)
 _CODE = re.compile(r"^[a-z_]+$")
@@ -83,6 +85,28 @@ def _changes(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanChange]
     return out
 
 
+_UPLOADED = ("uploaded", "reading", "read", "needs_student")  # a file is there and the student has not confirmed it
+
+
+def _documents_needed(svc: Any, student_ref: str, route_key: str) -> list[DocumentNeed]:
+    """The documents of the route's pack checklist, each missing, uploaded or confirmed (P1-T7, D-y14, R-16). Only
+    while the one upload is on; a route with no pack config, or a service without any, gives none."""
+    if not document_files.enabled():
+        return []
+    cfg = (getattr(svc, "pack_configs", None) or {}).get(route_key)
+    if cfg is None:
+        return []
+    have: dict[str, str] = {}
+    with svc.engine.connect() as conn:
+        rows = conn.execute(select(D.c.doc_type, D.c.status).where(
+            D.c.tenant_id == svc.settings.tenant_id, D.c.student_ref == student_ref, D.c.status != "deleted")).all()
+    for doc_type, status in rows:
+        if status == "confirmed" or (status in _UPLOADED and have.get(doc_type) != "confirmed"):
+            have[doc_type] = "confirmed" if status == "confirmed" else "uploaded"
+    refs = list(dict.fromkeys(i.ref for i in cfg.checklist if i.kind == "document"))
+    return [DocumentNeed(doc_type=ref, status=have.get(ref, "missing")) for ref in refs]
+
+
 def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
     tenant_id = svc.settings.tenant_id
     with svc.engine.connect() as conn:
@@ -137,5 +161,5 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
         revision=plan.current_revision,
         route=PlanRoute(route_key=pin, origin_country=origin, destination_country=destination, level=level,
                         target_intake=intake),
-        pages=[], consent=_consent(decision.export or {}), steps=steps, requests=[], documents_needed=[],
-        changes=changes, proposals_waiting=waiting)
+        pages=[], consent=_consent(decision.export or {}), steps=steps, requests=[],
+        documents_needed=_documents_needed(svc, student_ref, pin), changes=changes, proposals_waiting=waiting)

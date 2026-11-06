@@ -350,3 +350,47 @@ def test_red_flag_search_is_clean():
 def test_the_fact_keys_live_in_yaml_only():
     for path in APP_OS.rglob("*.py"):
         assert not re.search(r"""["']education\.""", path.read_text(encoding="utf-8")), path
+
+
+# --- P1-T7 Task 4: with ONE_UPLOAD on too, the interim overlay is replaced by the per-field rule (D-y12) ---------------
+
+
+@pytest.fixture
+def one_upload_on():
+    from app.os.ports import document_files
+
+    document_files.configure(enabled=lambda: True)
+    yield
+    document_files.configure()
+
+
+def test_both_on_a_vault_value_wins_and_only_fields_without_a_vault_key_come_from_the_stored_values(mounted, one_upload_on):
+    seed(mounted)
+    vault_on(mounted, test__ielts__score=7.5, education__intermediate__marks_total=1100)
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert got["ielts_trf.overall"] == 7.5 and got["hssc_certificate.marks_total"] == 1100
+    assert "hssc_certificate.marks_obtained" not in got
+    assert "transcript.cgpa" not in got and "transcript.percentage" not in got  # a `fact:` field is the Vault's alone
+    assert got["min_passing_grade_letter.min_pass"] == "C"  # no Vault type: still the stored value
+    assert set(got) == {"ielts_trf.overall", "hssc_certificate.marks_total", "min_passing_grade_letter.min_pass"}
+
+
+def test_both_on_vault_cgpa_without_a_scale_never_mixes_with_an_os_document(mounted, one_upload_on):
+    own(mounted, transcript__cgpa=3.9, transcript__cgpa_scale=5.0, transcript__percentage=40)
+    vault_on(mounted, education__bachelor__gpa=3.2)
+    assert profile_of(plans_of(mounted), "stu-1") == {"transcript.cgpa": 3.2}
+
+
+def test_both_on_an_unknown_vault_fact_stays_needs_input_over_an_os_document(mounted, one_upload_on):
+    own(mounted, hssc_certificate__marks_obtained=990, hssc_certificate__marks_total=1100, entry_test__score=80)
+    vault_on(mounted, education__intermediate__marks_obtained=(None, "unknown"))
+    got = profile_of(plans_of(mounted), "stu-1")
+    assert not any(k.startswith("hssc_certificate.") for k in got) and got["entry_test.score"] == 80
+    assert grade_of(got, "pk_bs").status == "needs_input"
+
+
+def test_both_on_a_field_without_a_vault_key_still_comes_from_the_stored_values(mounted, one_upload_on):
+    own(mounted, min_passing_grade_letter__min_pass="C", entry_test__score=80)
+    vault_on(mounted, test__ielts__score=7.0)
+    assert profile_of(plans_of(mounted), "stu-1") == {"min_passing_grade_letter.min_pass": "C", "entry_test.score": 80,
+                                                      "ielts_trf.overall": 7.0}
