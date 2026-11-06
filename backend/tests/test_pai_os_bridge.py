@@ -246,7 +246,7 @@ def test_a_failed_pause_does_not_undo_the_delivery(student, os_stub, active_deci
     def boom(*_a):
         raise RuntimeError("os down")
     monkeypatch.setattr(plan_source, "pause_for_escalation", boom, raising=False)
-    os_stub["pending"] = [escalation_v2(student, journey_id, "other")]
+    os_stub["pending"] = [escalation_v2(student, journey_id, "other", 3)]
     with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), patch.object(config, "CONNECT_HANDOFF", True), \
             patch.object(bridge, "counsellor_module_on", lambda: True), student.factory() as db:
         got = bridge.sweep_once(db)
@@ -264,3 +264,18 @@ def test_flags_off_no_pause_call(student, os_stub, paused, reason, sent_as):
     assert got["sent"] == 1 and paused == []
     with student.factory() as db:
         assert db.get(StudentJourney, journey_id).decisions[-1]["reason_type"] == sent_as
+
+
+@pytest.mark.req("R-11")
+def test_a_plan_that_was_not_paused_is_logged_not_retried(student, os_stub, active_decision, monkeypatch, caplog):
+    journey_id = journey_at(student, "CHOSEN")
+    calls = []
+    monkeypatch.setattr(plan_source, "pause_for_escalation", lambda *a: calls.append(a) or False, raising=False)
+    os_stub["pending"] = [escalation_v2(student, journey_id, "other", 3)]
+    with patch.object(config, "PAI_OS_SERVICE_TOKEN", TOKEN), patch.object(config, "CONNECT_HANDOFF", True), \
+            patch.object(bridge, "counsellor_module_on", lambda: True), student.factory() as db, \
+            caplog.at_level("WARNING", logger="app.pai_os_bridge"):
+        got = bridge.sweep_once(db)
+    assert got["sent"] == 1 and len(calls) == 1 and os_stub["marked"] == [("escalation:7", "sent", None)]
+    assert any("was not paused" in r.getMessage() and "other" in r.getMessage() for r in caplog.records)
+    assert student.workspace_id not in caplog.text

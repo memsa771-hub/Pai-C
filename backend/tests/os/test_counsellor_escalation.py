@@ -255,3 +255,16 @@ def test_student_fact_changed_reaches_counsellor(svc):
     (pending,) = pending_counsellor_escalations()
     assert pending.reason == "not_eligible" and pending.key == f"escalation:{cid}"
     assert SupportStore(svc.engine, "pai").get(cid).counsellor_status == "pending"
+
+
+@pytest.mark.req("R-22")
+def test_no_places_reason_is_a_route_problem_sent_by_its_event(svc):
+    """A change that would leave no place (NO_PLACES_REASON) is not a system problem: the triggering event decides, so
+    a fact change reaches the Counsellor as not_eligible and a rejection as all_rejected."""
+    from app.os.replan.apply import NO_PLACES_REASON
+
+    assert reason_for("student_fact_changed", NO_PLACES_REASON) == "not_eligible"
+    assert reason_for("admission_rejected", NO_PLACES_REASON) == "all_rejected"
+    escalate(svc, "student_fact_changed", NO_PLACES_REASON)
+    (row,) = sent(svc)
+    assert row["reason"] == "not_eligible"

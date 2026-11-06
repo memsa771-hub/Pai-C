@@ -201,6 +201,23 @@ class Kernel:
             self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
             return True
 
+    def set_pause_reason(self, plan_id: int, reason: str) -> bool:
+        """A plan that is already paused gets a new reason code (a `plan_paused` event; the status stays). It is how
+        an escalation takes the place of a missing consent. False, and nothing changes, when the plan is not paused or
+        already carries this reason."""
+        E = models.events
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() != "paused":
+                return False
+            newest = conn.execute(select(E.c.payload).where(
+                E.c.tenant_id == self.tenant_id, E.c.plan_id == plan_id, E.c.type == "plan_paused")
+                .order_by(E.c.id.desc()).limit(1)).scalar()
+            if (newest or {}).get("reason") == reason:
+                return False
+            self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            return True
+
     def resume_plan(self, plan_id: int) -> bool:
         """Resumes a paused plan as active (the deadline engine marks it at risk again if it is) and promotes what
         became ready meanwhile. False, and nothing changes, when the plan is not paused."""

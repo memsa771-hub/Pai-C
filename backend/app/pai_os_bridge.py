@@ -242,12 +242,15 @@ def _deliver(db) -> dict:
 
 def _pause_after_escalation(e) -> None:
     """D-x7: the Counsellor took the escalation, so the student's plan pauses with the reason. A failure here never
-    undoes the delivery (the Counsellor has the escalation); the plan is then paused by the next student-facing read
-    of the reason only, so it is logged."""
+    undoes the delivery (the Counsellor has the escalation), and the pause is not retried: the row is marked sent, so
+    a plan that was not paused stays as it is. Both a failure and a plan not paused are logged."""
     try:
-        plan_source.pause_for_escalation(e.student_ref, e.decision_version, e.reason)
+        paused = plan_source.pause_for_escalation(e.student_ref, e.decision_version, e.reason)
     except Exception as exc:  # noqa: BLE001  (class name only, no student data)
         log.error("PAI OS plan could not be paused after an escalation: %s", type(exc).__name__)
+        return
+    if not paused:
+        log.warning("PAI OS plan was not paused after an escalation (%s): no open plan took it", e.reason)
 
 
 OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"

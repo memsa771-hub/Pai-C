@@ -86,6 +86,14 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
             "live_status": card["status"] if card else "unknown"}
 
 
+def choice_of(row: RouteDecision) -> tuple:
+    """What the student chose, apart from consent: route, places in order, intake."""
+    intake = row.intake or None
+    return (row.origin_country, row.destination_country, row.level,
+            tuple((p["programme_ref"], p["rank"]) for p in sorted(row.places or [], key=lambda p: p["rank"])),
+            None if intake is None else (intake.get("term"), intake.get("year")))
+
+
 class RouteDecisionService:
     def __init__(self, db):
         self.db = db
@@ -120,15 +128,20 @@ class RouteDecisionService:
         if journey is not None and row is not None and not self._escalated(journey, row):
             self._enter_chosen(journey, row, actor)
 
-    @staticmethod
-    def _escalated(journey: StudentJourney, row: RouteDecision) -> bool:
-        """PAI OS sent the student back to choosing (D-x9): the newest route entry is an escalation made for this
-        decision (a version, never an older legacy entry without one). Only a new choice moves the stage on."""
+    def _escalated(self, journey: StudentJourney, row: RouteDecision) -> bool:
+        """PAI OS sent the student back to choosing (D-x9): the newest route entry is an escalation with a decision
+        version (a legacy entry has none), made for this decision or for an earlier version of the same choice. A
+        new choice, or a choice request that changed the places, ends it."""
         newest = next((d for d in reversed(journey.decisions or [])
                        if str(d.get("kind", "")).startswith("route_")), None)
-        return (newest is not None and newest["kind"] == "route_escalation"
-                and newest.get("decision_version") is not None
-                and newest["decision_version"] >= row.decision_version)
+        if newest is None or newest["kind"] != "route_escalation" or newest.get("decision_version") is None:
+            return False
+        version = newest["decision_version"]
+        if version >= row.decision_version:
+            return True
+        then = self.db.scalar(select(RouteDecision).where(
+            RouteDecision.workspace_id == row.workspace_id, RouteDecision.decision_version == version))
+        return then is not None and choice_of(then) == choice_of(row)
 
     def _record_choice(self, workspace_id: str, row: RouteDecision, previous: RouteDecision | None) -> None:
         """The choice syncs the stage (journey_sync, reason "chosen"): it is

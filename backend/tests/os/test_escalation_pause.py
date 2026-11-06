@@ -45,14 +45,6 @@ def test_plan_paused_with_reason_code(svc):  # noqa: F811
     assert (got.state, got.state_reason) == ("paused", "not_eligible")
 
 
-def test_pause_names_a_version_that_is_not_the_plans_newest_does_nothing(svc):  # noqa: F811
-    first = apply(svc, 1)
-    apply(svc, 2, programmes=NEW_PLACES)
-    assert plan_source.pause_for_escalation(STUDENT, 1, "all_rejected") is False
-    assert plan_row(svc, first.plan_id).status == "active"
-    assert plan_source.pause_for_escalation(STUDENT, 2, "all_rejected") is True
-
-
 def test_no_plan_no_pause(svc):  # noqa: F811
     assert plan_source.pause_for_escalation(STUDENT, None, "other") is False
 
@@ -116,4 +108,33 @@ def test_withdrawn_consent_over_an_escalation_pause_stays_until_the_choice_chang
     apply(svc, 2, **NO_STUDENT)  # already paused: the escalation reason stays
     assert view(svc).state_reason == "all_rejected"
     apply(svc, 3)  # consent back, same choice
+    assert plan_row(svc, first.plan_id).status == "paused"
+
+
+def test_consent_pause_then_escalation_keeps_until_choice_changes(svc):  # noqa: F811
+    first = apply(svc, 1)
+    apply(svc, 2, **NO_STUDENT)  # the consent was withdrawn: paused as consent_missing
+    assert view(svc).state_reason == "consent_missing"
+    assert plan_source.pause_for_escalation(STUDENT, 2, "all_rejected") is True  # the escalation takes the reason
+    assert (plan_row(svc, first.plan_id).status, view(svc).state_reason) == ("paused", "all_rejected")
+    assert plan_source.pause_for_escalation(STUDENT, 2, "all_rejected") is False  # a repeat changes nothing
+    apply(svc, 3, **NO_STUDENT)  # consent withdrawn again: the escalation reason is not replaced
+    assert view(svc).state_reason == "all_rejected"
+    apply(svc, 4)  # consent back, same choice: still paused
+    assert (plan_row(svc, first.plan_id).status, view(svc).state_reason) == ("paused", "all_rejected")
+    apply(svc, 5, programmes=NEW_PLACES)  # a changed choice
+    assert plan_row(svc, first.plan_id).status == "active"
+
+
+def test_escalation_for_a_newer_version_than_the_plan_has_does_nothing(svc):  # noqa: F811
+    first = apply(svc, 1)
+    assert plan_source.pause_for_escalation(STUDENT, 2, "other") is False
+    assert plan_row(svc, first.plan_id).status == "active"
+
+
+def test_escalation_for_an_older_version_pauses_the_plan(svc):  # noqa: F811
+    """The Counsellor vouched that the choice is unchanged since that version, so a newer consent copy is no obstacle."""
+    first = apply(svc, 1)
+    apply(svc, 2)  # a consent copy
+    assert plan_source.pause_for_escalation(STUDENT, 1, "other") is True
     assert plan_row(svc, first.plan_id).status == "paused"

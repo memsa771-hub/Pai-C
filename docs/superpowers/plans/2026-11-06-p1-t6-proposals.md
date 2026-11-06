@@ -114,6 +114,7 @@
   - It always appends `{"kind":"route_escalation", reason_type, details, previous_stage, decision_version, at}`.
   - `follow_active` (`decisions.py:116`, called from `journey_sync.py:57`) does not move PROPOSED → CHOSEN while the newest route entry is a `route_escalation` whose `decision_version` ≥ the active row's version. Legacy entries have no `decision_version`, so legacy flows are unchanged.
   - The decision is not withdrawn.
+  - **Correction (Task 4 review).** The literal "version ≥ the active row's version" assumed that versions advance only on a choice. A consent copy also writes a version, which would lift the guard and bounce the stage. The guard holds CHOSEN back while the newest route entry is an escalation with a non-null `decision_version` and either that version ≥ the active version, or the row at that version has the same choice (route, places in order, intake) as the active row. A written choice request with new places ends it. The endpoint also answers 409 for an escalation whose version is above the active one or whose choice differs from the active choice.
 - **D-x10, the 202 answers.** These are new response shapes. With the module or the part off, the routes return exactly today's status codes and bodies.
   - `POST /v1/os/plans/self` on the connected path returns 202 `{state:"preparing", decision_version}`.
   - Builder swap and remove on a Counsellor plan return 202 `{state:"requested", proposal_id}`.

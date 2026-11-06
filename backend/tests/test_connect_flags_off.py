@@ -218,12 +218,10 @@ async def test_t6_sweep_and_roadmap_unchanged(monkeypatch):
     assert json.dumps(walked, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
 
-
 @pytest.mark.req("R-11")
 def test_t6_roadmap_paused_unchanged():
     """P1-T6 Task 4: with the plan-view flag on and the hand-off off, a paused plan's body carries no `reason_text`,
     even in rehearsal and with an escalation reason code."""
-    from contextlib import contextmanager  # noqa: F401
     from unittest.mock import patch
 
     from tests.test_plan_adapter import STEPS, page, plan_client, view_of

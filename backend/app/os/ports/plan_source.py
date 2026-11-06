@@ -11,8 +11,8 @@ from sqlalchemy import select
 from app.os import models, ports
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.escalation import applied_version
-from app.os.kernel.states import PLAN_OPEN
 from app.os.adapters.counsellor.store import IntakeStore, SweepStore
+from app.os.kernel.states import PLAN_OPEN
 from app.os.playbooks import PlaybookError, select_playbook
 
 _NEEDED = ("decision_id", "journey_id", "student_ref", "chosen_at")
@@ -81,8 +81,10 @@ def set_sweep_mark(mark: dict) -> None:
 
 def pause_for_escalation(student_ref: str, decision_version: int | None, reason: str) -> bool:
     """The host sent an escalation to the Counsellor (D-x7): the student's open Counsellor plan is paused with the
-    reason code. When a version is given, only the plan whose newest applied version is that one is paused (an older
-    escalation never pauses a plan that has moved on). False when there is no such plan or it is not active."""
+    reason code. When a version is given, only a plan that has applied that version or a newer one is paused (the
+    Counsellor refuses an escalation for a choice that was since changed; a plan that has not reached the version
+    yet is not the one it is about). A plan already paused for a missing consent takes the escalation reason, which
+    a later consent never replaces. False when there is no such plan or it is closed."""
     svc = ports.services()
     tenant = svc.settings.tenant_id
     P = models.plans
@@ -91,6 +93,7 @@ def pause_for_escalation(student_ref: str, decision_version: int | None, reason:
             P.c.tenant_id == tenant, P.c.student_ref == student_ref, P.c.source == manifest.NAME,
             P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc())).scalars().all()
     for plan_id in ids:
-        if decision_version is None or applied_version(svc.engine, tenant, plan_id) == decision_version:
-            return svc.kernel.pause_plan(plan_id, reason)
+        held = applied_version(svc.engine, tenant, plan_id)
+        if decision_version is None or (held is not None and held >= decision_version):
+            return svc.kernel.pause_plan(plan_id, reason) or svc.kernel.set_pause_reason(plan_id, reason)
     return False
