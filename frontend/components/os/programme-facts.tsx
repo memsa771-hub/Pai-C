@@ -11,6 +11,9 @@ import {
   type OsFact,
   type OsProgramme,
 } from '@/lib/os-programmes';
+import { factLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { useMyPlan } from './my-plan-context';
 
 /** The student's programme facts (Slice 2 spec §4.9): mobile-first (360 px), every value with its status and
  * source, the quote on tap, and an "Ask the university" draft for facts that are not checked. */
@@ -42,14 +45,20 @@ export function ProgrammeFacts({ programmes }: { programmes: OsProgramme[] }) {
 
 function FactRow({ programme, fact }: { programme: OsProgramme; fact: OsFact }) {
   const checked = fact.status === 'confirmed';
+  const { on } = useMyPlan();
   return (
     <div className="min-w-0">
       <dt className="text-xs font-medium text-muted-foreground">{fieldLabel(fact.field)}</dt>
       <dd className="mt-0.5 min-w-0 break-words text-sm">
         <span>{formatFactValue(fact.value)}</span>
-        <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${checked ? 'bg-muted' : 'bg-amber-100 text-amber-900'}`}>
-          {statusLabel(fact.status)}
-        </span>
+        {!on && (
+          <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${checked ? 'bg-muted' : 'bg-amber-100 text-amber-900'}`}>
+            {statusLabel(fact.status)}
+          </span>
+        )}
+        {on ? (
+          <p className="mt-1"><FactSource level={factLevel(fact.status)} url={fact.source_url} date={fact.checked_at} /></p>
+        ) : (
         <p className="mt-1 text-xs text-muted-foreground">
           {checked && <span className="mr-2">{checkedLabel(fact.checked_at)}</span>}
           {fact.source_url && (
@@ -60,6 +69,7 @@ function FactRow({ programme, fact }: { programme: OsProgramme; fact: OsFact }) 
             </a>
           )}
         </p>
+        )}
         {fact.conflict_note && <p className="mt-1 break-words text-xs text-amber-900">{fact.conflict_note}</p>}
         {fact.quote && (
           <details className="mt-1 text-xs">
