@@ -31,7 +31,7 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.ports import document_files, recipients, student_facts
+from app.os.ports import document_files, fact_questions, recipients, student_facts
 from app.os.rehearsal.store import install_clock
 from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
@@ -200,6 +200,7 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     recipients.configure(recipients.from_settings(settings))  # Slice 9b: before the deliver job is made; may refuse
     student_facts.configure(student_facts.from_settings(settings))  # P1-T4: the host's StudentFacts adapter, if any
+    fact_questions.configure(conflicts=fact_questions.from_settings(settings))  # P1-T8: and its open Vault conflicts
     host_files = document_files.from_settings(settings)  # P1-T7: the host's file reader, if any
     if host_files is not None:  # unset leaves the port as it is: a worker with its own bytes needs none
         document_files.configure(read=host_files)
@@ -276,8 +277,9 @@ def main(argv: list[str] | None = None) -> int:
         recipients.from_settings(settings)
         student_facts.from_settings(settings)  # P1-T4: so does an OS_STUDENT_FACTS that cannot be loaded
         document_files.from_settings(settings)  # P1-T7: and an OS_DOCUMENT_FILES
+        fact_questions.from_settings(settings)  # P1-T8: and an OS_STUDENT_FACTS without its OS_FACT_CONFLICTS (D-w1)
     except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError,
-            document_files.DocumentFilesSourceError) as e:
+            document_files.DocumentFilesSourceError, fact_questions.FactQuestionsSourceError) as e:
         print(str(e), file=sys.stderr)
         return 2
     parent = int(os.environ["OS_PARENT_PID"]) if os.environ.get("OS_PARENT_PID") else None

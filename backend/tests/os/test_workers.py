@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import func, insert, select
 
 from app.os import models
@@ -140,3 +141,53 @@ def test_overdue_reminder_escalates(engine, clean):
         types = set(conn.execute(select(models.events.c.type)).scalars())
         keys = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
     assert "escalate" in types and any(":esc:" in k for k in keys)
+
+
+# --- P1-T8 (D-w1): the worker and the API must read the same needs gate --------------------------------------------
+
+@pytest.mark.req("R-17")
+def test_worker_refuses_student_facts_without_fact_conflicts(os_db, monkeypatch, capsys):
+    from app.os.runner import worker
+
+    monkeypatch.setenv("OS_DATABASE_URL", os_db)
+    monkeypatch.setenv("OS_WORKER_ID", "w-test")
+    monkeypatch.setenv("OS_STUDENT_FACTS", "json:dumps")
+    monkeypatch.delenv("OS_FACT_CONFLICTS", raising=False)
+    assert worker.main([]) == 2
+    err = capsys.readouterr().err
+    assert "OS_FACT_CONFLICTS" in err and "json:dumps" not in err
+
+
+@pytest.mark.req("R-17")
+def test_worker_refuses_a_bad_os_fact_conflicts(os_db, monkeypatch, capsys):
+    from app.os.runner import worker
+
+    monkeypatch.setenv("OS_DATABASE_URL", os_db)
+    monkeypatch.setenv("OS_WORKER_ID", "w-test")
+    monkeypatch.setenv("OS_FACT_CONFLICTS", "no.such.module:thing")
+    assert worker.main([]) == 2
+    assert "OS_FACT_CONFLICTS" in capsys.readouterr().err
+
+
+def test_fact_questions_port_reads_key_to_ref_and_is_empty_when_unconfigured():
+    import json
+
+    from app.os import ports
+    from app.os.ports import fact_questions
+    from app.os.settings import load_settings
+
+    fact_questions.configure()
+    assert fact_questions.conflicts("stu-1") == {}
+    fact_questions.configure(conflicts=lambda ref: {"conflicts": [{"ref": "profile_issue:3", "key": "a.b"}]})
+    assert fact_questions.conflicts("stu-1") == {"a.b": "profile_issue:3"}
+    fact_questions.configure(conflicts=lambda ref: None)
+    assert fact_questions.conflicts("stu-1") == {}
+    ports.configure(None)  # one reset for every port
+    assert fact_questions.conflicts("stu-1") == {}
+    assert fact_questions.load("json:dumps") is json.dumps
+    for spec in ("", "nocolon", "no.such.module:thing", "os:sep"):
+        with pytest.raises(fact_questions.FactQuestionsSourceError, match="OS_FACT_CONFLICTS"):
+            fact_questions.load(spec)
+    assert fact_questions.from_settings(load_settings({"DATABASE_URL": "x"})) is None
+    with pytest.raises(fact_questions.FactQuestionsSourceError, match="OS_FACT_CONFLICTS"):
+        fact_questions.from_settings(load_settings({"DATABASE_URL": "x", "OS_STUDENT_FACTS": "json:dumps"}))

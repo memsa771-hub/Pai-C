@@ -105,6 +105,7 @@ from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
 from app.os.playbooks import PlaybookError
+from app.os.requests.refresh import refresh
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
 log = logging.getLogger(__name__)
@@ -442,6 +443,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
+        refresh(svc, student, "document_changed")  # P1-T8: a confirmed document may answer a request
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
         out = document_out(store, store.get(doc_id), findings, svc.document_types)
@@ -462,6 +464,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: the resolved value may change eligibility
+        refresh(svc, student, "document_changed")  # P1-T8: a resolved mismatch unblocks the steps it paused
         return finding_out(resolved)
 
     @router.delete("/documents/{doc_id}", status_code=204)
@@ -470,6 +473,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         doc = own_document(svc, doc_id, student)
         delete_document(svc.engine, svc.settings.tenant_id, svc.document_types, svc.name_variants, doc,
                         client=svc.dbos_client())
+        refresh(svc, student, "document_changed")  # P1-T8: a deleted document is asked for again
         return Response(status_code=204)
 
     @router.get("/profile", response_model=ProfileOut)

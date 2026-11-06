@@ -534,6 +534,13 @@ def student_facts(student_ref: str) -> dict | None:
         return builder.build(db, workspace_id)
 
 
+def fact_conflicts(student_ref: str) -> dict | None:
+    """The student's open Vault conflicts, for PAI OS (P1-T8, D-w12; `OS_FACT_CONFLICTS` in the worker). None for now:
+    the Counsellor side that builds the list (`fact_conflicts.v1`) comes with Task 4, and until then the OS sees no
+    conflicts. The worker needs the name whenever it has `OS_STUDENT_FACTS`, so the API and the worker agree."""
+    return None
+
+
 def documents_enabled() -> bool:
     """True when the one upload entry point is on: the CONNECT_ONE_UPLOAD part (P1-T7, R-01). The OS reads it through
     `mount_os(documents_enabled=)`; it cannot read host flags itself."""

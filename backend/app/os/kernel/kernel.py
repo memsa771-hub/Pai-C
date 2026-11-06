@@ -23,6 +23,7 @@ from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
 from app.os.ports import os_events
 from app.os.replan import events as replan_events
+from app.os.requests import keys as request_keys
 from app.os.kernel.states import (
     PLAN_CLOSED,
     PLAN_OPEN,
@@ -522,11 +523,16 @@ class Kernel:
             conn.execute(update(T).where(T.c.id == ids.pop(key)).values(instance_key=f"{key}{DONE_MARK}{number}"))
         for key in d.added:
             ids[key] = self._insert_task(conn, plan_id, new[key], draft.playbook_version)
+        answered = set(draft.answered)
         for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
             # Renamed so the key is free: if the task comes back later it is a fresh task (review C2).
-            self._transition(conn, row, S.CANCELLED, cause=cause,
-                             instance_key=f"{key}{CANCELLED_MARK}{number}")
+            if key in answered and row.state == S.WAITING_STUDENT:  # P1-T8: the student gave what it asked for
+                self._transition(conn, row, S.DONE, cause="request_answered",
+                                 instance_key=f"{key}{DONE_MARK}{number}")
+            else:
+                self._transition(conn, row, S.CANCELLED, cause=cause,
+                                 instance_key=f"{key}{CANCELLED_MARK}{number}")
             del ids[key]
         for key, token in d.tokens.items():  # report each started/protected difference only once (C1)
             conn.execute(update(T).where(T.c.id == ids[key]).values(skipped_draft=token))
@@ -536,6 +542,12 @@ class Kernel:
             conn.execute(update(T).where(T.c.id == row.id).values(**values, updated_at=self.clock()))
             if new[key].blocked_reason and row.state == S.READY:
                 row = conn.execute(select(T).where(T.c.id == row.id)).one()
+                self._transition(conn, row, S.BLOCKED, cause=cause)
+            elif row.state == S.WAITING_STUDENT and row.kind == "student" and new[key].blocked_reason \
+                    and new[key].blocked_reason.partition(":")[0] in request_keys.BLOCK_CODES:
+                # P1-T8: an open inbox item whose data went missing or doubtful is blocked, not left asking (only
+                # these codes: any other keeps the rule above, so a plan without needs is revised as before)
+                row = self._transition(conn, row, S.READY, cause=cause)
                 self._transition(conn, row, S.BLOCKED, cause=cause)
         live = {k: v for k, v in ids.items() if k in new}
         self._rebuild_edges(conn, plan_id, draft.tasks, live)
