@@ -1,7 +1,9 @@
-# Version 2 (P1-T8): the same route as version 1; only the student's data needs differ. The manual
-# "upload your SSC and HSSC certificates" step is replaced by document needs on the two application steps (approved
-# by the owner, 2026-11-06); PAI asks for a missing document itself and blocks the step until it is shown. No date,
-# fee, rule or source is added. A plan pinned to version 1 moves here only through the upgrade proposal.
+# Version 2 (P1-T8): the same route as version 1, with document needs and asks added. It adds `asks` and `needs`
+# (SSC and HSSC certificates, needed by the two application steps) and removes version 1's manual
+# `school_certificates` step, which the needs replace (approved by the owner, 2026-11-06). PAI asks for a missing
+# document itself and blocks the step until it is shown. The ask titles and their S1 source are version 1's
+# `school_certificates` step. No date, fee, rule or source is added. A plan pinned to version 1 moves here only
+# through the upgrade proposal.
 # Germany master's route for Pakistani bachelor's graduates, winter semester intakes.
 # Source walkthrough: docs/os/spikes/spike5-germany-playbook.md (Spike 5 part 1). Citation `source` values
 # are that document's source IDs (S1-S18). Durations without an official figure are planning estimates
@@ -88,18 +90,19 @@ constants:
     citations:
       - {source: S11, url: "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"}
 
-# The route's words for each request (P1-T8): what the student is asked to upload. Wording from version 1's
-# school_certificates and grading_system_doc steps.
+# The route's words for each request (P1-T8): what the student is asked to upload. Titles and the S1 citation are
+# from version 1's school_certificates step. No transcript ask: no version 1 citation says the applications need one.
 asks:
   ssc_certificate:
     shown: Upload your SSC certificate with subjects and grades
     duration_days: 2
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
   hssc_certificate:
     shown: Upload your HSSC certificate with subjects and grades
     duration_days: 2
-  transcript:
-    shown: Upload your final transcript
-    duration_days: 2
+    citations:
+      - {source: S1, url: "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"}
 
 tasks:
   # ---- Phase A: documents --------------------------------------------------------------------
@@ -194,7 +197,6 @@ tasks:
     needs:
       - {document: ssc_certificate, evidence: shown}
       - {document: hssc_certificate, evidence: shown}
-      - {document: transcript, evidence: shown}
     depends_on:
       - {key: hec_attestation}
       - {key: min_passing_grade_letter}
@@ -220,7 +222,6 @@ tasks:
     needs:
       - {document: ssc_certificate, evidence: shown}
       - {document: hssc_certificate, evidence: shown}
-      - {document: transcript, evidence: shown}
     depends_on:
       - {key: uni_assist_apply}
       - {key: application_documents}

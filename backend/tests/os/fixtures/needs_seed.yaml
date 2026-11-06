@@ -12,6 +12,9 @@ route:
     status: confirmed
 
 programmes:
+  # ie-p1 is a programme of the fictional Ireland route, not of pakistan_inter. The file's route_key above covers
+  # only the `route:` facts; programme facts are keyed by the programme ref alone, so this one sits in the same
+  # file because one seed loads both test facts (english_requirement is read by the Ireland v2 needs test).
   ie-p1:
     english_requirement:
       value: {ielts: 6.5}

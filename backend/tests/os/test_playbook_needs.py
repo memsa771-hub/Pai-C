@@ -147,10 +147,13 @@ def test_germany_v2_documents_are_needs_of_the_applications():
     assert "school_certificates" not in {t.template_key for t in v2.tasks}
     for key in ("uni_assist_apply", "direct_apply"):
         got = {(n.document, n.evidence) for n in v2.task(key).needs}
-        assert got == {("ssc_certificate", "shown"), ("hssc_certificate", "shown"), ("transcript", "shown")}
+        assert got == {("ssc_certificate", "shown"), ("hssc_certificate", "shown")}
     assert v2.asks["ssc_certificate"].shown == "Upload your SSC certificate with subjects and grades"
     assert v2.asks["hssc_certificate"].shown == "Upload your HSSC certificate with subjects and grades"
-    assert v2.asks["transcript"].shown == "Upload your final transcript"
+    assert set(v2.asks) == {"ssc_certificate", "hssc_certificate"}
+    for key in ("ssc_certificate", "hssc_certificate"):  # R-17: no new source; the S1 citation is version 1's
+        assert [(c.source, str(c.url)) for c in v2.asks[key].citations] == [
+            ("S1", "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/")]
 
 
 def test_germany_v2_sidecar_is_a_byte_copy_of_v1():
@@ -225,7 +228,7 @@ def test_newest_plain_takes_the_highest_plain_version(tmp_path):
 def test_routes_bytes_unchanged_with_v2_loaded(engine, clean, os_db):
     from tests.os.test_api_self_serve import P, build_api, me
 
-    api = build_api(engine, os_db)
+    api = build_api(engine, os_db, extra_books=load_playbook_dir(NEEDS_DIR))
     got = api.get(f"{P}/routes", headers=me()).content
     assert got == (HERE / "fixtures" / "routes_before_needs.json").read_bytes()
 
@@ -248,3 +251,59 @@ def test_needs_seed_loads(engine, clean):
     fact = kb.route_facts("pakistan_inter", ["matric_result_date"], 2027)["matric_result_date"]
     assert fact.value["date"] and fact.url
     assert kb.programme_facts(["ie-p1"], ["english_requirement"], 2027)[("ie-p1", "english_requirement")].value
+
+
+# ---- review fixes: asks need a source, no unused ask, no repeated need --------------------------------
+
+def test_ask_used_by_a_need_needs_a_citation_when_citations_are_required(tmp_path):
+    d = _ie_needs()
+    d["require_citations"] = True
+    for t in d["tasks"]:
+        t["citations"] = [{"source": "S1", "url": "https://source.example/a"}]
+    with pytest.raises(PlaybookError, match="asks.*needs a citation"):
+        _load(tmp_path, d)
+    d["asks"]["education.matric.marks_obtained"]["citations"] = [{"source": "S1", "url": "https://source.example/a"}]
+    assert _load(tmp_path, d).asks["education.matric.marks_obtained"].citations[0].source == "S1"
+
+
+def test_ask_without_a_citation_is_fine_when_citations_are_not_required(tmp_path):
+    assert _load(tmp_path, _ie_needs()).declares_needs
+
+
+def test_ask_that_no_need_uses_is_refused(tmp_path):
+    d = _ie_needs()
+    d["asks"]["education.matric.marks_total"] = {"stated": "Tell us the total", "which_is_right": "Which total?"}
+    with pytest.raises(PlaybookError, match="not needed by any step"):
+        _load(tmp_path, d)
+
+
+def test_same_need_twice_in_one_step_is_refused(tmp_path):
+    d = _ie_needs()
+    d["tasks"][0]["needs"].append({"fact": "education.matric.marks_obtained", "evidence": "stated"})
+    with pytest.raises(PlaybookError, match="more than once"):
+        _load(tmp_path, d)
+
+
+# ---- upgrade never goes back --------------------------------------------------------------------
+
+def test_upgrade_with_the_gate_off_keeps_a_v2_plan_on_v2(engine, clean):
+    from sqlalchemy import func, select
+
+    from app.os import models
+    from app.os.service import NothingNewer
+    from tests.os.test_golden import TEST_STUDENT
+    from tests.os.test_replan_events import service
+
+    def revisions(plan_id: int) -> int:
+        with engine.connect() as conn:
+            return conn.execute(select(func.count()).select_from(models.plan_revisions).where(
+                models.plan_revisions.c.plan_id == plan_id)).scalar_one()
+
+    svc = service(engine)
+    plan_id = svc.start_plan(TEST_STUDENT, with_needs=True).plan_id
+    assert svc._pinned(plan_id).version == 2
+    before = revisions(plan_id)
+    with pytest.raises(NothingNewer, match="nothing newer"):
+        svc.upgrade(plan_id)  # the default gate (off) selects v1, which is older than the pin
+    assert svc._pinned(plan_id).version == 2
+    assert revisions(plan_id) == before

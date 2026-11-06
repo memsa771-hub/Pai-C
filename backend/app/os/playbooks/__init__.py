@@ -24,6 +24,6 @@ from app.os.playbooks.models import (
 
 __all__ = [
     "PAGE_KEYS", "PLAYBOOK_DIR", "REQUEST_TEMPLATES", "Anchor", "Ask", "Citation", "Condition", "Constant",
-    "Dependency", "Expected", "LeadTime", "Need", "Page", "Playbook", "PlaybookError", "Route", "SourceCheck", "TaskTemplate", "load_playbook", "load_playbook_dir",
-    "newest_plain", "select_playbook",
+    "Dependency", "Expected", "LeadTime", "Need", "Page", "Playbook", "PlaybookError", "Route", "SourceCheck",
+    "TaskTemplate", "load_playbook", "load_playbook_dir", "newest_plain", "select_playbook",
 ]

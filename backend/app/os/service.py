@@ -17,6 +17,10 @@ from app.os.runner import Registry, default_registry
 from app.os.settings import OsSettings
 
 
+class NothingNewer(ValueError):
+    """An upgrade to "the newest" playbook found none newer than the one the plan is pinned to."""
+
+
 class PlanService:
     def __init__(self, engine: Engine, settings: OsSettings, kernel: Kernel, knowledge: KnowledgePort,
                  playbooks: Mapping[tuple[str, int], Playbook], today: Callable[[], date],
@@ -169,6 +173,10 @@ class PlanService:
                                  with_needs=with_needs)
         if version is not None:
             newest = self.playbooks[(newest.key, version)]
+        else:  # the newest the gate lets through may be older than the pin (a v2 plan, the gate off): never go back
+            pinned = self._pinned(plan_id)
+            if newest.key == pinned.key and newest.version <= pinned.version:
+                raise NothingNewer(f"plan {plan_id} already uses {pinned.key}@{pinned.version}: nothing newer")
         return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest, plan_id), based_on=sha)
 
     def anchor_fields(self) -> set[str]:

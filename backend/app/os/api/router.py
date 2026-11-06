@@ -84,6 +84,7 @@ from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
 from app.os.consent import ConsentStore, current_terms, gate
 from app.os.compiler import CompileError
+from app.os.service import NothingNewer
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
 from app.os.documents import connect_texts
@@ -186,6 +187,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             return {"revision": svc.plans.upgrade(plan_id)}
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
+        except NothingNewer as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
 
     def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
         """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
