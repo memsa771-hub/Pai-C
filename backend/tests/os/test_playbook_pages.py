@@ -86,6 +86,8 @@ def test_germany_sources_dated_from_the_walkthrough():
     """spike5-germany-playbook.md section 5: 'Checked 2026-10-17' for S1..S18."""
     assert set(GERMANY.sources) == {f"S{n}" for n in range(1, 19)}
     assert all(s.checked == date(2026, 10, 17) for s in GERMANY.sources.values())
+    # spike5 section 6: the reviewer did not tick S8, S13, S14, S17 and S18; they are not shown as confirmed.
+    assert {k for k, s in GERMANY.sources.items() if not s.confirmed} == {"S8", "S13", "S14", "S17", "S18"}
     cited = {c.source for t in GERMANY.tasks for c in t.citations} | \
             {c.source for k in GERMANY.constants.values() for c in k.citations}
     assert cited and cited <= set(GERMANY.sources)

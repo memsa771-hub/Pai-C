@@ -152,8 +152,10 @@ class Page(_Model):
 
 
 class SourceCheck(_Model):
-    """The day a playbook source (`S<n>`) was last read against its page (R-54)."""
+    """The day a playbook source (`S<n>`) was last read against its page (R-54), and whether the reviewer of that
+    reading confirmed it. An unconfirmed source is shown as "not confirmed", never as checked and settled."""
     checked: date
+    confirmed: bool = True
 
 
 _SOURCE_ID = re.compile(r"S\d+")
