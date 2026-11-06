@@ -7,8 +7,9 @@ import json
 from typing import Literal
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.os import models, ports
+from app.os import clock, models, ports
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.escalation import applied_version
 from app.os.adapters.counsellor.store import IntakeStore, SweepStore
@@ -97,3 +98,27 @@ def pause_for_escalation(student_ref: str, decision_version: int | None, reason:
         if decision_version is None or (held is not None and held >= decision_version):
             return svc.kernel.pause_plan(plan_id, reason) or svc.kernel.set_pause_reason(plan_id, reason)
     return False
+
+
+def request_adoption(student_ref: str, plan_id: int) -> Literal["recorded", "not_found", "module_off"]:
+    """The student agreed to adopt their open self-serve plan as the Counsellor's plan (P1-T6, R-08, D-x6). The intent
+    is one row per plan, keyed on the plan's contract as it is now; asking again renews it (idempotent). Intake adopts
+    the plan only while the plan is still that contract and the Counsellor's decision is the same choice. `not_found`
+    when the plan is not this student's, not open or not self-serve."""
+    svc = ports.services()
+    tenant = svc.settings.tenant_id
+    if not manifest.is_enabled(svc.engine, tenant):
+        return "module_off"
+    P = models.plans
+    with svc.engine.begin() as conn:
+        sha = conn.execute(select(P.c.contract_sha256).where(
+            P.c.id == plan_id, P.c.tenant_id == tenant, P.c.student_ref == student_ref, P.c.source == "self_serve",
+            P.c.status.in_(PLAN_OPEN)).with_for_update()).scalar()
+        if sha is None:
+            return "not_found"
+        A = models.plan_adoptions
+        stmt = pg_insert(A).values(tenant_id=tenant, student_ref=student_ref, plan_id=plan_id, contract_sha256=sha,
+                                   requested_at=clock.now())
+        conn.execute(stmt.on_conflict_do_update(constraint="uq_os_plan_adoptions_plan", set_={
+            "contract_sha256": sha, "requested_at": clock.now(), "adopted_at": None}))
+    return "recorded"

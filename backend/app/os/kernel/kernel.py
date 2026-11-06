@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from sqlalchemy import Connection, Engine, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from app.os import models
 from app.os import clock as shared_clock
@@ -24,6 +25,7 @@ from app.os.ports import os_events
 from app.os.replan import events as replan_events
 from app.os.kernel.states import (
     PLAN_CLOSED,
+    PLAN_OPEN,
     SATISFIES_DEPENDENCY,
     TERMINAL,
     IllegalTransition,
@@ -40,7 +42,12 @@ _EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", 
                 "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
 _STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
 _QUIET = "os_event_quiet"  # conn.info flag: set while a new plan is first promoted
+_MUTE = "os_event_mute"  # conn.info flag: the event is recorded but the student is told nothing
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
+
+
+class PlanIdentityTaken(RuntimeError):
+    """Another plan already holds the (tenant, source, external_ref) an adoption would take (uq_os_plans_identity)."""
 
 
 class StaleDraft(RuntimeError):
@@ -141,6 +148,27 @@ class Kernel:
                 "contract": contract.model_dump(mode="json"), "contract_sha256": contract_sha256(contract),
                 "student_ref": contract.student_ref})
 
+    def adopt_plan(self, plan_id: int, external_ref: str, contract: RouteContract | RouteContractV2) -> bool:
+        """Turns an open self-serve plan into the Counsellor's plan in place (R-08): source `counsellor`, the decision's
+        external_ref and contract, in one transaction under the plan lock. No revision and no task change: the plan the
+        student has been working on stays as it is. One `plan_adopted` event. False, and nothing changes, when the plan
+        is not open or not `self_serve`. PlanIdentityTaken when another plan already holds the new identity."""
+        try:
+            with self.engine.begin() as conn:
+                self._lock_plan(conn, plan_id)
+                status, source = conn.execute(select(P.c.status, P.c.source).where(P.c.id == plan_id)).one()
+                if source != "self_serve" or status not in PLAN_OPEN:
+                    return False
+                conn.execute(update(P).where(P.c.id == plan_id).values(
+                    source=contract.source, external_ref=external_ref, contract=contract.model_dump(mode="json"),
+                    contract_sha256=contract_sha256(contract), updated_at=self.clock()))
+                self._event(conn, plan_id, None, "plan_adopted", {"source": contract.source})
+                return True
+        except IntegrityError as exc:
+            if "uq_os_plans_identity" in str(exc.orig) or "uq_os_plans_identity" in str(exc):
+                raise PlanIdentityTaken(f"plan {plan_id}") from None
+            raise
+
     def upgrade_playbook(self, plan_id: int, draft: PlanDraft, based_on: str | None = None) -> int:
         with self.engine.begin() as conn:
             self._lock_plan(conn, plan_id)
@@ -215,7 +243,11 @@ class Kernel:
                 .order_by(E.c.id.desc()).limit(1)).scalar()
             if (newest or {}).get("reason") == reason:
                 return False
-            self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            conn.info[_MUTE] = True  # the plan is already paused and the student was told: a new reason is no new notice
+            try:
+                self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            finally:
+                conn.info.pop(_MUTE, None)
             return True
 
     def resume_plan(self, plan_id: int) -> bool:
@@ -371,6 +403,8 @@ class Kernel:
         """The one choke point for `os_event.v1` (R-45): the same transaction writes the notice for the Counsellor,
         keyed on this event's id so a repeat is skipped. A hidden step (the "plan updated" notice) is never announced."""
         kind = _EVENT_KINDS.get(type_)
+        if conn.info.get(_MUTE):
+            return
         if type_ == "task_state":
             kind = _STEP_KINDS.get(payload.get("to"))
         if kind is None or plan_id is None:

@@ -1,0 +1,11 @@
+# What the student reads when they can keep a plan they built themselves as their PAI plan (R-08, row 6.16).
+# OWNER approval: stored approved:false. While it is false, adoption_texts.texts() returns None unless
+# CONNECT_CONSENT_DRAFT is on (rehearsal). Plain English. No country, institution or date.
+version: "1"
+approved: false
+
+offer: "You built a plan yourself. You can keep it as your PAI plan, with the same steps and the same places."
+agree: "Keep my plan"
+choose_field_first: "To keep your plan, first choose your field in PAI."
+too_many_places: "Your plan has more places than PAI can hold. Remove some places, then keep your plan."
+linking: "Your plan is being linked to your PAI choice. This takes a moment."

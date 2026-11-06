@@ -378,19 +378,64 @@ class RouteDecisionService:
                                                           RouteDecision.request_key == key))
         if done is not None:
             return "unchanged", done.decision_version, None
+        return self._write_from(active, key, origin, destination, level, wanted, want_intake)
+
+    def _write_from(self, active: RouteDecision, key: str, origin: str, destination: str, level: str,
+                    wanted: list[dict], want_intake: dict) -> tuple[str, "int | None", "str | None"]:
+        """The next version after `active`, copying everything but the route, places and intake from it (D-x4). The
+        old row leaves the partial unique index before the new one enters. No commit."""
         values = {name: getattr(active, name) for name in self._COPIED}
         same_path = (active.destination_country, active.level) == (destination, level)
         values.update(origin_country=origin, destination_country=destination, level=level, places=wanted,
                       intake=want_intake, path_ref=values["path_ref"] if same_path else None,
                       os_supported=pai_os_bridge.route_supported(origin, destination, level))
         active.withdrawn_at = datetime.now(timezone.utc)
-        self.db.flush()  # the old row leaves the partial unique index before the new one enters
-        new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+        self.db.flush()
+        new = RouteDecision(workspace_id=active.workspace_id, decision_version=self._next_version(active.workspace_id),
                             status="chosen", request_key=key, **values)
         self.db.add(new)
         self.db.flush()
         outbox.record(self.db, new)
         return "written", new.decision_version, None
+
+    def adoption_state(self, workspace_id: str, plan: dict, *, lock: bool = False) -> str:
+        """Whether the student can keep their self-serve plan now: `ready`, `no_journey`, `choose_field_first` or
+        `too_many_places`. With `lock` it takes the workspace lock first, so the answer holds until the caller commits."""
+        if lock:
+            self._lock(workspace_id)
+        if self._journey(workspace_id) is None:
+            return "no_journey"
+        if self.active(workspace_id) is None:
+            return "choose_field_first"
+        return "too_many_places" if len(plan["programmes"]) > self.MAX_PLACES else "ready"
+
+    def adopt(self, workspace_id: str, plan: dict) -> tuple[str, "int | str | None"]:
+        """The student agreed to keep their open self-serve plan (`plan` as `plan_query.self_serve_plan` gives it,
+        R-08): the next decision version holds the plan's route, places and intake, with the student's field and consent
+        copied from the active row (D-x4; a consent is copied, never invented). Returns `("written", n+1)`,
+        `("duplicate", version)` for the same plan and contract (its key is on a row), or `("refused", code)`:
+        `no_journey`, `choose_field_first` (no active decision) or `too_many_places` (more than a decision holds). The
+        key is `adopt:{plan_id}:{contract_sha256}`. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        if self._journey(workspace_id) is None:
+            return "refused", "no_journey"
+        active = self.active(workspace_id)
+        if active is None:
+            return "refused", "choose_field_first"
+        if len(plan["programmes"]) > self.MAX_PLACES:
+            return "refused", "too_many_places"
+        if not plan.get("intake"):
+            return "refused", "no_intake"
+        key = f"adopt:{plan['plan_id']}:{plan['contract_sha256']}"
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "duplicate", done.decision_version
+        wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1}
+                  for i, p in enumerate(sorted(plan["programmes"], key=lambda p: p["rank"]))]
+        _, version, _ = self._write_from(active, key, plan["origin"], plan["destination"], plan["level"], wanted,
+                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]})
+        return "written", version
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,
                  is_human=None) -> dict:

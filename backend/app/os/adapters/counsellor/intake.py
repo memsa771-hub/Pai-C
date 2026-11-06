@@ -6,9 +6,9 @@ a refusal. Every plan change goes through the kernel (invariant 1). `process` ca
 from dataclasses import dataclass
 
 from pydantic import ValidationError
-from sqlalchemy import and_, insert, select
+from sqlalchemy import and_, insert, select, update
 
-from app.os import models
+from app.os import clock, models
 from app.os.adapters.counsellor.escalation import REASON_CODES, intake_refused
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.compiler import CompileError
@@ -16,7 +16,7 @@ from app.os.contracts.decision_record import DecisionRecordV1
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
-from app.os.kernel import StaleDraft
+from app.os.kernel import PlanIdentityTaken, StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
@@ -183,6 +183,66 @@ def _consent_missing(decision: DecisionRecordV2) -> bool:
     return decision.authorized_at is None or (decision.guardian_required and decision.guardian_authorized_at is None)
 
 
+def _contract_of(decision: DecisionRecordV2) -> RouteContract | RouteContractV2:
+    """The contract a v2 decision plans with: only the intermediate level needs the v2 contract (D-u)."""
+    return decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
+
+
+def _adoptable(svc, decision: DecisionRecordV2, contract: RouteContract | RouteContractV2):
+    """The open self-serve plan this decision adopts (R-08, D-x6), or None. All four must hold: the student asked for
+    it (an intent row, not yet used); the plan is still the contract they agreed to (same SHA); the decision's route,
+    places in order and intake equal the plan's; and no plan holds the Counsellor identity already."""
+    A = models.plan_adoptions
+    tenant = svc.kernel.tenant_id
+    with svc.engine.connect() as conn:
+        for plan in _plans_of(svc, decision.student_ref, "self_serve"):
+            if plan.status not in PLAN_OPEN:
+                continue
+            intent = conn.execute(select(A.c.contract_sha256).where(
+                A.c.tenant_id == tenant, A.c.plan_id == plan.id, A.c.adopted_at.is_(None))).scalar()
+            if intent is None:
+                continue
+            stored, sha = svc.plans._contract(plan.id)
+            if sha != intent or _choice_of(stored) != _choice_of(contract):
+                continue
+            taken = conn.execute(select(P.c.id).where(
+                P.c.tenant_id == tenant, P.c.source == SOURCE, P.c.external_ref == contract.external_ref).limit(1)).first()
+            return "taken" if taken is not None else plan.id
+    return None
+
+
+def _adopt(svc, intake: Intake, decision: DecisionRecordV2) -> IntakeResult | None:
+    """The student agreed to adopt their self-serve plan and the Counsellor's decision is the same choice: the plan
+    becomes the Counsellor's in place (kernel.adopt_plan: no rebuild, no task change), then the normal path below finds
+    it as `same`. A refusal here is the one intake gave before adoption existed: `self_serve_plan_open`. None when
+    nothing applies (the normal path decides, as before)."""
+    try:
+        book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
+                               decision.level)
+    except PlaybookError:
+        return None
+    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
+    if any(p.programme_ref not in known for p in decision.programmes):
+        return None
+    contract = _contract_of(decision)
+    found = _adoptable(svc, decision, contract)
+    if found is None:
+        return None
+    own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
+    if found == "taken":
+        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", own[-1].id if own else None)
+    try:
+        adopted = svc.kernel.adopt_plan(found, contract.external_ref, contract)
+    except PlanIdentityTaken:
+        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", found)
+    if adopted:
+        A = models.plan_adoptions
+        with svc.engine.begin() as conn:
+            conn.execute(update(A).where(A.c.tenant_id == svc.kernel.tenant_id, A.c.plan_id == found,
+                                         A.c.adopted_at.is_(None)).values(adopted_at=clock.now()))
+    return None
+
+
 def _hold_or_pause(svc, decision: DecisionRecordV2) -> IntakeResult:
     """A consent is missing (P1-D11): an open plan on this route is paused (no reminders, no promotion) and a
     decision with no plan yet is held. Neither is escalated: the Counsellor already asks the student or guardian.
@@ -214,6 +274,9 @@ def process(svc, intake: Intake) -> IntakeResult:
         except ValidationError:
             return _refuse(svc, intake, "invalid_export")
     if isinstance(decision, DecisionRecordV2):
+        adoption = _adopt(svc, intake, decision)  # first, so a missing consent then pauses the adopted plan (6c)
+        if adoption is not None:
+            return adoption
         if _consent_missing(decision):
             return _hold_or_pause(svc, decision)
     elif decision.authorized_at is None:

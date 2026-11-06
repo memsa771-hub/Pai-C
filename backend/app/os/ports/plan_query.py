@@ -2,12 +2,15 @@
 HTTP endpoint. They answer even while the `counsellor` module is off (for tests)."""
 
 
-from app.os import clock, ports
+from sqlalchemy import select
+
+from app.os import clock, models, ports
 from app.os.compiler.compile import needed_fields
 from app.os.contracts.plan_summary import PlanSummaryV1
 from app.os.contracts.plan_view import PlanViewV1
 from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
 from app.os.contracts.route_contract import IntakeRef
+from app.os.kernel.states import PLAN_OPEN
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.plan_view import build_plan_view
 from app.os.summary import build_summary
@@ -49,3 +52,27 @@ def routes() -> list[dict]:
             newest[key] = book
     return [{"key": k, "origin": b.route.origin, "destination": b.route.destination, "level": b.route.level,
              "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
+
+
+def self_serve_plan(student_ref: str) -> dict | None:
+    """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
+    origin, destination, level, intake, programmes, contract_sha256}`, programmes as `{programme_ref, rank}` in order.
+    None when there is none."""
+    svc = ports.services()
+    P = models.plans
+    with svc.engine.connect() as conn:
+        row = conn.execute(select(P.c.id, P.c.contract, P.c.contract_sha256).where(
+            P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "self_serve",
+            P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc()).limit(1)).first()
+        if row is None:
+            return None
+        route_key = conn.execute(select(models.playbook_pins.c.playbook_key).where(
+            models.playbook_pins.c.plan_id == row.id)).scalar()
+    contract = row.contract
+    intake = contract.get("target_intake")
+    return {"plan_id": row.id, "route_key": route_key, "origin": contract["origin_country"],
+            "destination": contract["destination_country"], "level": contract["level"],
+            "intake": None if intake is None else {"term": intake["term"], "year": intake["year"]},
+            "programmes": [{"programme_ref": p["programme_ref"], "rank": p["rank"]}
+                           for p in sorted(contract["programmes"], key=lambda p: p["rank"])],
+            "contract_sha256": row.contract_sha256}

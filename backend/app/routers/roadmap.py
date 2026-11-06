@@ -16,7 +16,7 @@ from app import pai_os_bridge
 from app.api.response import success_response
 from app.database import get_db
 from app.models import GuardianConsent
-from app.pai_c.connect import age, consent, flags, guardian, places
+from app.pai_c.connect import adoption_texts, age, consent, flags, guardian, places
 from app.pai_c.connect.choice import ChoiceDetails
 from app.services.email import mask_email
 from app.pai_c.roadmap.decisions import RouteDecisionError, RouteDecisionService
@@ -60,6 +60,10 @@ class ChooseAction(BaseModel):
 
 class ResendAction(BaseModel):
     guardian_email: str | None = Field(default=None, max_length=254)
+
+
+class AdoptAction(BaseModel):
+    plan_id: int = Field(ge=1)
 
 
 class StepAction(BaseModel):
@@ -268,6 +272,64 @@ def offered_places(destination: str = Query(...), level: str = Query(...), term:
         _refuse("Destination, level, term or year is not valid")
     return success_response({"handoff": True, "places": places.places_for(
         db, str(workspace.id), destination, level, term, year)})
+
+
+@router.get("/adoption")
+def adoption_offer(network: str = Query(...), db=Depends(get_db), x_workspace_token: str | None = Header(None),
+                   authorization: str | None = Header(None)):
+    """Whether the student can keep a plan they built themselves as their PAI plan (R-08). `{offer: false}` unless the
+    hand-off and My plan parts are on, the student has a journey and an open self-serve plan. The sentences are None
+    until the owner approves them."""
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    none = success_response({"offer": False})
+    if not (_handoff_on() and flags.part_on("CONNECT_MY_PLAN")):
+        return none
+    workspace_id = str(workspace.id)
+    plan = pai_os_bridge.self_serve_plan(workspace_id)
+    if plan is None:
+        return none
+    state = RouteDecisionService(db).adoption_state(workspace_id, plan)
+    if state == "no_journey":
+        return none
+    return success_response({"offer": True, "state": state, "text": adoption_texts.texts(),
+                             "plan": {"plan_id": plan["plan_id"], "route_key": plan["route_key"],
+                                      "places": len(plan["programmes"])}})
+
+
+@router.post("/adoption")
+def adopt_plan(body: AdoptAction, network: str = Query(...), db=Depends(get_db),
+               x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    """The student agrees to keep their self-serve plan (R-08). Under the workspace lock: the state is checked again,
+    PAI OS records the agreement, then the next decision version is written and delivered. A repeat before PAI OS has
+    adopted the plan answers with the same version."""
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    _need_handoff()
+    workspace_id = str(workspace.id)
+    service = RouteDecisionService(db)
+    plan = pai_os_bridge.self_serve_plan(workspace_id)
+    if plan is None or plan["plan_id"] != body.plan_id:
+        _refuse("no_plan", 409)
+    state = service.adoption_state(workspace_id, plan, lock=True)
+    if state != "ready":
+        db.rollback()
+        _refuse(state, 409)
+    try:
+        recorded = pai_os_bridge.request_adoption(workspace_id, plan["plan_id"])
+    except Exception as exc:  # noqa: BLE001  nothing is written without PAI OS having the agreement
+        db.rollback()
+        log.error("PAI OS could not take the adoption: %s", type(exc).__name__)
+        _refuse("unavailable", 503)
+    if recorded != "recorded":
+        db.rollback()
+        _refuse("no_plan" if recorded == "not_found" else "unavailable", 409 if recorded == "not_found" else 503)
+
+    def act() -> dict:
+        outcome, detail = service.adopt(workspace_id, plan)
+        if outcome == "refused":
+            raise RouteDecisionError(detail, 409)
+        return {"state": "linking", "decision_version": detail}
+
+    return _write(act, db, workspace_id)
 
 
 def _request_guardian(db, workspace_id: str, email: str) -> bool:

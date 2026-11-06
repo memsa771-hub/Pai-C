@@ -123,6 +123,30 @@ def request_choice(student_ref: str, origin: str, destination: str, level: str, 
     return {"outcome": outcome, "decision_version": version, "code": code}
 
 
+def self_serve_plan(workspace_id: str) -> dict | None:
+    """The student's open self-serve plan as `plan_query.self_serve_plan` gives it (P1-T6, R-08), for the adoption offer.
+    None when there is none, when PAI OS is not mounted and on any failure (logged by type only)."""
+    try:
+        from app.os.ports import plan_query
+
+        return plan_query.self_serve_plan(str(workspace_id))
+    except ports.OsUnavailable:
+        return None
+    except Exception as exc:  # noqa: BLE001
+        log.error("the self-serve plan could not be read: %s", type(exc).__name__)
+        return None
+
+
+def request_adoption(workspace_id: str, plan_id: int) -> str:
+    """Records the student's agreement to adopt their self-serve plan on the OS side (P1-T6, R-08): "recorded",
+    "not_found" or "module_off". "module_off" too when PAI OS is not mounted. Raises on any other failure, so the caller
+    writes no decision for an agreement the OS did not take."""
+    try:
+        return plan_source.request_adoption(str(workspace_id), plan_id)
+    except ports.OsUnavailable:
+        return "module_off"
+
+
 def _deliver_choice_request(db, request) -> str:
     """Hands one choice request to the decision service and marks the answer on the OS side. The app transaction
     commits first, then the new version goes to the OS, then the OS is told (a crash in between repeats harmlessly:

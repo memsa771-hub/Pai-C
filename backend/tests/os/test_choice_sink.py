@@ -145,7 +145,8 @@ def test_part_off_gate_builder_standalone_and_host_not_asked(api):
     standalone_ok(post_start(api, body=GERMANY), api)
     assert host.calls == []
     again = api.post(f"{P}/plans/self", headers=me(), json={**GERMANY, "intake": {"term": "winter", "year": 2028}})
-    assert again.status_code in (201, 422, 409) and host.calls == []  # as today, whatever it is
+    # as today: the part is off, so the other intake is a second standalone plan of its own (201), not adopt_first
+    assert again.status_code == 201 and plans(api, "self_serve") == 2 and host.calls == []
 
 
 def test_open_self_serve_plan_means_adopt_first_same_and_other_identity(api):
