@@ -5,7 +5,7 @@ through a compile and a kernel revision."""
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Engine, func, insert, select, update
+from sqlalchemy import Connection, Engine, func, insert, select, update
 
 from app.os import clock, models
 from app.os.kernel.states import PLAN_OPEN
@@ -30,6 +30,9 @@ class Proposal:
     answered_at: datetime | None
     based_on: str | None = None  # the plan's contract SHA-256 and revision when proposed
     base_revision: int | None = None
+    base_decision_version: int | None = None  # P1-T6: the decision version it was made against; None before os_0021
+    requested_version: int | None = None  # the version n+1 the Counsellor wrote for the request
+    request_outcome: str | None = None  # written | duplicate | stale | refused
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,8 @@ class SupportCase:
 
 def _proposal(r) -> Proposal:
     return Proposal(r.id, r.plan_id, r.event_ids, r.source, r.ops, r.refused, r.big, r.status, r.revision,
-                    r.expires_at, r.created_at, r.answered_at, r.based_on, r.base_revision)
+                    r.expires_at, r.created_at, r.answered_at, r.based_on, r.base_revision, r.base_decision_version,
+                    r.requested_version, r.request_outcome)
 
 
 def _case(r) -> SupportCase:
@@ -71,12 +75,13 @@ class ProposalStore:
 
     def create(self, plan_id: int, event_ids: list[int], source: str, ops: list[dict], refused: list[dict],
                big: bool, expires_at: datetime | None, status: str = "pending", based_on: str | None = None,
-               base_revision: int | None = None) -> int:
+               base_revision: int | None = None, base_decision_version: int | None = None) -> int:
         with self.engine.begin() as conn:
             proposal_id = conn.execute(insert(PR).values(
                 tenant_id=self.tenant_id, plan_id=plan_id, event_ids=event_ids, source=source, ops=ops,
                 refused=refused, big=big, status=status, expires_at=expires_at, based_on=based_on,
-                base_revision=base_revision).returning(PR.c.id)).scalar_one()
+                base_revision=base_revision, base_decision_version=base_decision_version).returning(PR.c.id)
+            ).scalar_one()
             if status == "pending":  # a suggestion waits for the student: tell the Counsellor in this transaction
                 os_events.emit(conn, self.tenant_id, plan_id, "proposal_waiting", proposal_id, clock.now())
             return proposal_id
@@ -108,7 +113,7 @@ class ProposalStore:
 
     def set_status(self, proposal_id: int, status: str, revision: int | None = None) -> None:
         values = {"status": status, "revision": revision}
-        if status in ("accepted", "declined", "expired"):
+        if status in ("accepted", "declined", "expired", "requested"):
             values["answered_at"] = func.now()
         with self.engine.begin() as conn:
             conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id).values(**values))
@@ -119,6 +124,49 @@ class ProposalStore:
             done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
                                                  PR.c.status == "pending").values(status="expired",
                                                                                   answered_at=func.now()))
+        return done.rowcount == 1
+
+    def request(self, conn: Connection, proposal_id: int, revision: int | None) -> bool:
+        """pending → requested on the CALLER's connection, so the status and the choice_request row it goes with
+        commit together or not at all (R-07). `revision` is the one the other ops of the proposal made, if any.
+        True if it changed."""
+        done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                                             PR.c.status == "pending")
+                            .values(status="requested", revision=revision, answered_at=func.now()))
+        return done.rowcount == 1
+
+    def settle_requested(self, plan_id: int, applied_version: int, revision: int | None,
+                         conn: Connection | None = None) -> int:
+        """requested → accepted for this plan's requests whose version is now applied (D-x3). Idempotent: only a
+        `requested` row moves, so a second call changes nothing. Keeps an earlier revision when `revision` is None.
+        Returns how many proposals moved."""
+        q = update(PR).where(
+            PR.c.tenant_id == self.tenant_id, PR.c.plan_id == plan_id, PR.c.status == "requested",
+            PR.c.requested_version.is_not(None), PR.c.requested_version <= applied_version
+        ).values(status="accepted", revision=func.coalesce(revision, PR.c.revision), answered_at=func.now())
+        if conn is not None:
+            return conn.execute(q).rowcount
+        with self.engine.begin() as own:
+            return own.execute(q).rowcount
+
+    def expire_requested(self, proposal_id: int, outcome: str) -> bool:
+        """requested → expired, recording the Counsellor's answer (`stale`, `refused`) or the reason it ended.
+        True if it changed."""
+        with self.engine.begin() as conn:
+            done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                                                 PR.c.status == "requested")
+                                .values(status="expired", request_outcome=outcome, answered_at=func.now()))
+        return done.rowcount == 1
+
+    def set_requested_version(self, proposal_id: int, version: int, outcome: str) -> bool:
+        """The Counsellor wrote (or already had) `version` for this request: `written` or `duplicate`. The proposal
+        stays `requested` until the OS applies that version. True if it changed."""
+        if outcome not in ("written", "duplicate"):
+            raise ValueError(f"{outcome!r} does not write a version: stale and refused expire the proposal")
+        with self.engine.begin() as conn:
+            done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
+                                                 PR.c.status == "requested")
+                                .values(requested_version=version, request_outcome=outcome))
         return done.rowcount == 1
 
 

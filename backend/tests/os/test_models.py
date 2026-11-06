@@ -48,6 +48,8 @@ def test_os_tables_present():
         "os_consents",
         # P1-T4 (os_0020)
         "os_vault_events",
+        # P1-T6 (os_0021)
+        "os_plan_adoptions",
     }
 
 

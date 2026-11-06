@@ -7,7 +7,7 @@ from typing import Literal, Protocol
 from sqlalchemy import func, select, update
 
 from app.os import models, ports
-from app.os.contracts.escalation import EscalationV1
+from app.os.contracts.escalation_v2 import EscalationV2
 
 _CHANNEL = "counsellor"  # adapters.counsellor.escalation.CHANNEL (not imported: the replan code imports this port)
 
@@ -18,7 +18,7 @@ class EscalationSink(Protocol):
         ...
 
 
-def pending_counsellor_escalations(limit: int = 100) -> list[EscalationV1]:
+def pending_counsellor_escalations(limit: int = 100) -> list[EscalationV2]:
     """Escalations waiting for the glue to hand them to the Counsellor, oldest first."""
     svc = ports.services()
     O = models.outbox
@@ -27,7 +27,14 @@ def pending_counsellor_escalations(limit: int = 100) -> list[EscalationV1]:
             O.c.tenant_id == svc.settings.tenant_id, O.c.channel == _CHANNEL, O.c.template == "escalation",
             O.c.status == "pending")  # not the `os_event` rows that share this channel (R-45)
             .order_by(O.c.id).limit(limit)).scalars().all()
-    return [EscalationV1.model_validate(p) for p in rows]
+    return [_v2(p) for p in rows]
+
+
+def _v2(payload: dict) -> EscalationV2:
+    """A row stored before P1-T6 is an EscalationV1: it is read as v2 with no decision version."""
+    if payload.get("schema") == "pai.escalation.v1":
+        payload = {**payload, "schema": "pai.escalation.v2", "decision_version": None}
+    return EscalationV2.model_validate(payload)
 
 
 def mark_counsellor_delivery(key: str, status: Literal["sent", "refused"], reason: str | None = None) -> None:

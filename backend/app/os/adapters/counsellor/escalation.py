@@ -1,5 +1,5 @@
 """The Counsellor escalation adapter (Slice 8 spec §2.5, S8-D12). After the standalone support case, a route problem
-on a Counsellor plan is also written to the outbox (channel `counsellor`, key `escalation:{case_id}`, an EscalationV1
+on a Counsellor plan is also written to the outbox (channel `counsellor`, key `escalation:{case_id}`, an EscalationV2
 payload) for the host's glue to deliver. Only while the module is on; system problems stay in the support inbox.
 The note is a fixed sentence per reason from notes.yaml, never student, document or Supervisor text."""
 
@@ -7,13 +7,13 @@ from functools import cache
 from pathlib import Path
 
 import yaml
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, func, select, update
 
 from app.os import clock, models
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.adapters.standalone.escalation import CompositeSink, StandaloneSink
-from app.os.contracts.escalation import EscalationV1
+from app.os.contracts.escalation_v2 import EscalationV2
 from app.os.outbox import Outbox
 from app.os.replan import events
 from app.os.replan.apply import BROKEN_REASON, LIMIT_REASON, REFUSED_REASON
@@ -60,9 +60,18 @@ def journey_of(external_ref: str) -> str:
 
 
 def _payload(key: str, case_id: int | None, journey_id: str, student_ref: str, reason: str,
-             notes: dict[str, str]) -> dict:
-    return EscalationV1(key=key, case_id=case_id, journey_id=journey_id, student_ref=student_ref, reason=reason,
-                        note=notes[reason], raised_at=clock.now()).model_dump(mode="json", by_alias=True)
+             notes: dict[str, str], decision_version: int | None) -> dict:
+    return EscalationV2(key=key, case_id=case_id, journey_id=journey_id, student_ref=student_ref,
+                        decision_version=decision_version, reason=reason, note=notes[reason],
+                        raised_at=clock.now()).model_dump(mode="json", by_alias=True)
+
+
+def applied_version(engine: Engine, tenant_id: str, plan_id: int) -> int | None:
+    """The plan's newest applied decision version: the same query as `ports.os_events.emit`."""
+    I = models.counsellor_intake
+    with engine.connect() as conn:
+        return conn.execute(select(func.max(I.c.decision_version)).where(
+            I.c.tenant_id == tenant_id, I.c.plan_id == plan_id)).scalar()
 
 
 class CounsellorSink:
@@ -87,7 +96,8 @@ class CounsellorSink:
             return 0
         key = f"escalation:{case.id}"
         self.outbox.add(key, CHANNEL, plan.student_ref, "escalation",
-                        _payload(key, case.id, journey_of(plan.external_ref), plan.student_ref, code, self.notes))
+                        _payload(key, case.id, journey_of(plan.external_ref), plan.student_ref, code, self.notes,
+                          applied_version(self.engine, self.tenant_id, plan_id)))
         C = models.support_cases
         with self.engine.begin() as conn:  # also on a repeat: the outbox row is the one written first
             conn.execute(update(C).where(C.c.tenant_id == self.tenant_id, C.c.id == case.id,
@@ -106,6 +116,7 @@ def intake_refused(engine: Engine, tenant_id: str, intake: Intake) -> None:
     """A refused decision of S8-D10's first four has no plan and no case: it is sent by journey as `other`."""
     key = f"escalation:intake:{intake.decision_id}"
     Outbox(engine, tenant_id).add(key, CHANNEL, intake.student_ref, "escalation",
-                                  _payload(key, None, intake.journey_id, intake.student_ref, "other", load_notes()))
+                                  _payload(key, None, intake.journey_id, intake.student_ref, "other", load_notes(),
+                                           intake.decision_version))
     if intake.counsellor_status is None:
         IntakeStore(engine, tenant_id).set_counsellor_status(intake.decision_id, "pending")
