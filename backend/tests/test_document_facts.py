@@ -289,3 +289,93 @@ def test_the_context_line_counts_each_candidate_once(student):
         document_facts._tell_context_line(db, ws, file_id, ids)  # the same ids told twice
         db.commit()
         assert db.scalar(select(DocumentArtifact)).extraction_summary["candidate_ids"] == ids
+
+
+def second_confirmation(db, student, file_id, value, key="fact_proposal:7:2"):
+    outcome, ids = document_facts.apply(db, proposal(student, file_id, [
+        {"key": "education.intermediate.marks_obtained", "value": value},
+        {"key": "education.intermediate.marks_total", "value": 1100}], key=key))
+    db.commit()
+    return outcome, ids, reconcile_all(db, ids)
+
+
+def test_correcting_the_same_document_replaces_the_value(student):
+    """900 confirmed and delivered; the student fixes the same document to 910: a correction, not a conflict card."""
+    from app.models import ProfileIssue
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        _, ids = document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:1"))
+        db.commit()
+        reconcile_all(db, ids)
+        assert education(db, ws)[0]["result"]["marks_obtained"] == 900
+        outcome, ids2, (result,) = second_confirmation(db, student, file_id, 910)
+        assert outcome == "written" and result.accepted
+        assert db.scalars(select(ProfileIssue)).all() == []
+        (row,) = education(db, ws)
+        assert row["result"] == {"marks_obtained": 910, "marks_total": 1100}
+        # a third correction works the same way (the record still names this document)
+        _, _, (again,) = second_confirmation(db, student, file_id, 915, key="fact_proposal:7:3")
+        assert again.accepted and education(db, ws)[0]["result"]["marks_obtained"] == 915
+        assert db.scalars(select(ProfileIssue)).all() == []
+
+
+def test_correcting_a_test_score_of_the_same_document(student):
+    from app.models import ProfileIssue
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        _, ids = document_facts.apply(db, proposal(student, file_id, [{"key": "test.ielts.score", "value": 6.5}],
+                                                   key="fact_proposal:8:1", doc_type="ielts_trf"))
+        db.commit()
+        reconcile_all(db, ids)
+        _, ids2 = document_facts.apply(db, proposal(student, file_id, [{"key": "test.ielts.score", "value": 7}],
+                                                    key="fact_proposal:8:2", doc_type="ielts_trf"))
+        db.commit()
+        (result,) = reconcile_all(db, ids2)
+        assert result.accepted and db.scalars(select(ProfileIssue)).all() == []
+        (row,) = MemoryService(db).profile(ws).records["test_attempt"]
+        assert float(row["overall_score"]) == 7.0
+
+
+def test_a_value_from_another_source_is_still_a_conflict(student):
+    """The record's value came from another document (or the student's own words): no silent correction."""
+    from app.models import ProfileIssue
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        document_candidate(db, ws, add_file(db, ws), {"marks_obtained": 900, "marks_total": 1100})  # another document
+        _, _, (result,) = second_confirmation(db, student, add_file(db, ws), 910)
+        assert result.outcome == "needs_review" and len(db.scalars(select(ProfileIssue)).all()) == 1
+        assert education(db, ws)[0]["result"]["marks_obtained"] == 900
+    with StudentSession() as other, other.factory() as db:
+        ws = other.workspace_id
+        stated(db, ws, result={"marks_obtained": 850, "marks_total": 1100})  # the student's own statement
+        file_id = add_file(db, ws)
+        outcome, ids = document_facts.apply(db, proposal(other, file_id, key="fact_proposal:9:1"))
+        db.commit()
+        (result,) = reconcile_all(db, ids)
+        assert outcome == "written" and result.outcome == "needs_review"
+        assert education(db, ws)[0]["result"]["marks_obtained"] == 850
+
+
+def test_a_later_value_from_another_source_ends_the_correction_right(student):
+    """After another document changed the record, this document's next confirmation is a conflict again."""
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        _, ids = document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:1"))
+        db.commit()
+        reconcile_all(db, ids)
+        (row,) = education(db, ws)
+        # the student states a different value in their own words: the record now belongs to that statement
+        candidate = MemoryCandidateService(db).propose(
+            ws, "student_record", key="education", proposed_value={"result": {"marks_obtained": 880}},
+            entities={"record_id": row["id"]}, confidence=0.9, source_type="user_explicit",
+            allow_user_explicit=True, input_channel="profile", evidence={"quote": "q", "capture": "details"})
+        assert MemoryReconciler(db).reconcile(candidate).accepted
+        db.commit()
+        _, _, (result,) = second_confirmation(db, student, file_id, 910)
+        assert result.outcome == "needs_review"

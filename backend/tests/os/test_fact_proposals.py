@@ -421,3 +421,26 @@ def test_backfill_of_an_os_only_document_is_stated(world):
     assert delivered(world)["written"] == 1
     (candidate,) = world.candidates()
     assert "file_id" not in candidate.evidence and "authority" not in candidate.evidence
+
+
+def test_a_corrected_confirmation_replaces_the_value_without_a_conflict_card(world):
+    from app.memory.reconciler import MemoryReconciler
+    from app.models import ProfileIssue
+    from app.pai_c.memory import MemoryService
+
+    doc_id = world.typed()
+    world.read(doc_id)
+    world.confirm(doc_id)
+    delivered(world)
+    with world.who.factory() as db:
+        for c in db.scalars(select(MemoryCandidate)).all():
+            assert MemoryReconciler(db).reconcile(c).accepted
+        db.commit()
+    world.confirm(doc_id, values={**HSSC, "marks_obtained": 910})
+    assert delivered(world)["written"] == 1
+    with world.who.factory() as db:
+        for c in db.scalars(select(MemoryCandidate).where(MemoryCandidate.status == "pending")).all():
+            assert MemoryReconciler(db).reconcile(c).accepted
+        db.commit()
+        (row,) = MemoryService(db).profile(world.id).records["education"]
+        assert row["result"]["marks_obtained"] == 910 and db.scalars(select(ProfileIssue)).all() == []

@@ -99,7 +99,7 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     again) are left out; if nothing is left the answer is `duplicate`."""
     from app import models
     from app.pai_c.connect.student_facts import education_records
-    from app.pai_c.memory import MemoryCandidateService
+    from app.pai_c.memory import MemoryCandidateService, MemoryService
     from app.runtime.task_runtime import enqueue
 
     key, ref = str(proposal.get("key") or ""), str(proposal.get("document_ref") or "")
@@ -132,24 +132,44 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     candidates, ids = MemoryCandidateService(db), []
     earlier = _earlier_values(db, workspace_id, match)
 
-    def propose(key_, value, entities=None):
+    def propose(key_, value, entities=None, correction=False):
         if (key_, _flat(value)) in earlier:  # the same confirmed values again: no second set of candidates
             return
-        candidate = candidates.propose(workspace_id, "student_record", key=key_, proposed_value=value,
-                                       entities=entities, confidence=0.95, source_type="document",
-                                       input_channel="document", evidence=dict(evidence))
+        if correction:
+            # The Vault's value came from this same document: the student is correcting their own earlier
+            # confirmation. It goes through the reconciler's correction path (the student's explicit edit replaces
+            # the value and keeps the old reading visible), never as a conflict between two of their confirmations.
+            candidate = candidates.propose(
+                workspace_id, "student_record", key=key_, proposed_value=value, entities=entities, confidence=0.95,
+                source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+                evidence={**evidence, "capture": "os_document_correction"})
+        else:
+            candidate = candidates.propose(workspace_id, "student_record", key=key_, proposed_value=value,
+                                           entities=entities, confidence=0.95, source_type="document",
+                                           input_channel="document", evidence=dict(evidence))
         ids.append(candidate.id)
 
+    def own(row) -> bool:
+        """True when the record's current evidence came from this same OS document."""
+        return bool(match and row and (row.get("evidence") or {}).get("os_document_id") == int(match.group(1)))
+
     records = education_records(db, workspace_id) if education else []
+    from app.pai_c.connect.student_facts import chosen_education
+
+    chosen = chosen_education(records)
     for family in sorted(education):
         existing = _record_id(records, family)
         if existing:
-            propose("education", {"result": education[family]}, {"record_id": existing})
+            propose("education", {"result": education[family]}, {"record_id": existing},
+                    correction=own(chosen.get(family)))
         else:
             propose("education", {"qualification_name": _data()["new_record_code"][family],
                                   "result": education[family]})
+    attempts = list(MemoryService(db).profile(workspace_id).records.get("test_attempt", [])) if tests else []
     for code in sorted(tests):
-        propose("test_attempt", {"test_type": code, "overall_score": tests[code]})
+        mine = next((r for r in attempts if own(r) and _test_code(r.get("test_type")) == code), None)
+        propose("test_attempt", {"test_type": code, "overall_score": tests[code]},
+                {"record_id": mine["id"]} if mine else None, correction=mine is not None)
     db.add(models.DocumentProposal(key=key, workspace_id=workspace_id, file_id=file_id, candidate_ids=ids))
     if not ids:  # every fact was already proposed from this document
         db.flush()
@@ -159,6 +179,13 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     _tell_context_line(db, workspace_id, file_id, ids)
     db.flush()
     return "written", ids
+
+
+def _test_code(text) -> str | None:
+    from app.pai_c.memory import vault_catalog
+
+    text = str(text or "").strip()
+    return vault_catalog().choice_code("tests", text) or re.sub(r"[^a-z0-9]+", "_", text.casefold()).strip("_") or None
 
 
 def _earlier_values(db, workspace_id: str, match) -> list:
