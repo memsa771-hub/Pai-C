@@ -10,12 +10,12 @@ backup). An unconfigured port reads as off, and then every path takes today's be
 
 import logging
 from collections.abc import Callable, Sequence
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import Connection, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.os import models, ports
+from app.os import clock, models, ports
 from app.os.contracts.choice_request import ChoiceRequestV1
 from app.os.contracts.route_contract import ProgrammeChoice
 
@@ -71,7 +71,7 @@ def decision_version_of(conn: Connection, tenant_id: str, plan_id: int) -> int |
 def check_places(programmes: Sequence[ProgrammeChoice]) -> None:
     """Raises ValueError (a pydantic ValidationError) when the places cannot be sent: too many, or ranks not 1..n."""
     ChoiceRequestV1(key="check", student_ref="check", journey_id="check", proposal_id=0, based_on_version=1,
-                    programmes=list(programmes), requested_at=datetime.now(timezone.utc))
+                    programmes=list(programmes), requested_at=clock.now())
 
 
 def emit(conn: Connection, tenant_id: str, plan_id: int, proposal_id: int, base_version: int,
