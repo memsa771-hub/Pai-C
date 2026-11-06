@@ -14,6 +14,9 @@ import {
   type OsSuggestion,
 } from '@/lib/os-self-serve';
 import { sourceHost } from '@/lib/os-inbox';
+import { factLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { useMyPlan } from './my-plan-context';
 
 interface EligibilityCardProps {
   card: OsCard;
@@ -23,6 +26,7 @@ interface EligibilityCardProps {
 
 /** One programme's eligibility card (Slice 4 spec §5): a line per check, an estimate that never blocks. */
 export function EligibilityCard({ card, suggestions = [], onSwap }: EligibilityCardProps) {
+  const { on } = useMyPlan();
   const provisional = card.lines.some((l) => l.provisional);
   return (
     <div className="flex flex-col gap-2 rounded-2xl border bg-card p-4 shadow-card text-sm">
@@ -35,7 +39,9 @@ export function EligibilityCard({ card, suggestions = [], onSwap }: EligibilityC
               {l.provisional && <span className="rounded bg-muted px-1.5 py-0.5 text-xs">provisional</span>}
             </div>
             <p className="break-words text-muted-foreground">{lineText(l)}</p>
-            {l.sources.map((s) => (
+            {l.sources.map((s) => on ? (
+              <FactSource key={s.url + s.field} level={factLevel(s.status)} url={s.url} />
+            ) : (
               <a key={s.url + s.field} href={s.url} target="_blank" rel="noopener noreferrer"
                  className="inline-flex flex-wrap items-center gap-1 break-words text-xs text-primary underline-offset-2 hover:underline">
                 source: {sourceHost(s.url)} · {statusLabel(s.status)}

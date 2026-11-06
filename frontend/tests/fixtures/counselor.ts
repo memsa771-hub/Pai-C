@@ -429,3 +429,21 @@ export const mirrorEmpty: MirrorCard = {
   text: null,
   ready: false,
 };
+
+// My plan (P1-T9). Fictional route data in the shape of GET /v1/os/plan. Germany's pages are today's words.
+const pg = (key: string, label: string, title: string, noun: string | null = null) => ({ key, label, title, noun });
+export const myPlanGermany = {
+  state: 'active', source: 'self_serve', plan_id: 1, route_key: 'germany_master', abroad: true,
+  pages: [pg('start', 'Start', 'Start your plan'), pg('inbox', 'Inbox', 'Your next steps'),
+    pg('documents', 'Documents', 'Your documents'), pg('programmes', 'Programmes', 'Your programmes'),
+    pg('statements', 'Statements', 'Your statement and CV'), pg('pack', 'Pack', 'Your application packs', 'pack'),
+    pg('visa', 'Visa', 'Your visa file', 'visa file')],
+  sources: {},
+};
+export const myPlanPkBs = {
+  state: 'active', source: 'self_serve', plan_id: 2, route_key: 'pakistan_bs', abroad: false,
+  pages: [pg('inbox', 'Inbox', 'Your next steps'), pg('documents', 'Documents', 'Your documents'),
+    pg('programmes', 'Places', 'Your places')],
+  sources: {},
+};
+export const myPlanEmpty = { state: 'empty', source: null, plan_id: null, route_key: null, abroad: null, pages: [], sources: {} };

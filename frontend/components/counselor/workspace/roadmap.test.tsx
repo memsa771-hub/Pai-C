@@ -10,6 +10,7 @@ import { chosenRoute, choiceOptionsOff, choiceOptionsOn, offeredPlaces, osPlanRo
 import { I18nProvider } from "@/lib/i18n";
 import copy from "./copy.json";
 
+vi.mock("next/navigation", async (original) => ({ ...(await original<typeof import("next/navigation")>()), useParams: () => ({ workspaceId: "ws1" }) }));
 vi.mock("@/lib/api", () => ({
   workspaceApi: {
     getRoadmapPage: vi.fn(),
@@ -601,4 +602,23 @@ it("PlanBanner shows reason_text with no button when there is no reason_action, 
   render(<Roadmap onNavigate={vi.fn()} />);
   expect(await screen.findByText(copy.roadmap.plan.paused)).toBeTruthy();
   expect(within(document.querySelector("[data-plan-state]") as HTMLElement).queryByRole("button")).toBeNull();
+});
+
+// req: R-54
+it("with My plan on, a dated OS step shows its level and links to the inbox; a firm date shows no level", async () => {
+  const { MyPlanContext } = await import("@/components/os/my-plan-context");
+  const steps = osPlanRoute.steps.map((s) => s.key === "collect-transcripts" ? { ...s, estimated: true } : s);
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ steps }));
+  const plan = { state: "active", source: null, plan_id: 1, route_key: "r", abroad: true, pages: [], sources: {} };
+  render(<MyPlanContext.Provider value={{ on: true, plan, refresh: () => {} }}><Roadmap onNavigate={vi.fn()} /></MyPlanContext.Provider>);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.getAllByText(copy.connect.myPlan.levels.estimated).length).toBe(1);
+  expect(screen.queryByText(copy.connect.myPlan.levels.not_confirmed)).toBeNull();
+  const link = screen.getByRole("link", { name: copy.connect.myPlan.dateSource });
+  expect(link.getAttribute("href")).toBe("/ws1/os-inbox");
+  cleanup();
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.queryByText(copy.connect.myPlan.levels.estimated)).toBeNull();
+  expect(screen.queryByRole("link", { name: copy.connect.myPlan.dateSource })).toBeNull();
 });

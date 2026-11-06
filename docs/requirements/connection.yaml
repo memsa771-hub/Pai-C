@@ -75,12 +75,12 @@ requirements:
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
   R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
-  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: false}
-  R-51: {title: "Each route declares its plan pages", phases: [P1], built: false}
-  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: false}
-  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: false}
-  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: false}
-  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: false}
+  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
+  R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}
+  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: true}
+  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: true}
+  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: true}
+  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: true}
   R-56: {title: "Every phase: spec, plan, build, gate, handoff, sign-off", phases: [P5], built: false}
   R-57: {title: "Requirement traceability check in CI", phases: [P0], built: true}
   R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: true}

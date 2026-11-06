@@ -232,11 +232,32 @@ def test_consent_comes_from_the_intake_export(engine, clean, export, expected):
     assert (c.student, c.guardian) == expected
 
 
-def test_pages_requests_and_documents_are_empty(engine, clean):
+@pytest.mark.req("R-51")
+def test_pages_come_from_the_playbook_requests_and_documents_are_empty(engine, clean):
+    """Changed on purpose (D-z6): `pages` was always []; it is now the pinned playbook version's page keys."""
     p = plan(engine)
+    with engine.begin() as conn:
+        conn.execute(insert(models.playbook_pins).values(tenant_id="pai", plan_id=p, playbook_key="germany_master",
+                                                         version=1))
     decision(engine, "planned", p)
     v = view(engine)
-    assert (v.pages, v.requests, v.documents_needed) == ([], [], [])
+    assert v.pages == ["start", "inbox", "documents", "programmes", "statements", "pack", "visa"]
+    assert (v.requests, v.documents_needed) == ([], [])
+
+
+def test_pages_follow_the_pinned_version_and_are_empty_without_a_playbook(engine, clean):
+    p = plan(engine)
+    with engine.begin() as conn:
+        conn.execute(insert(models.playbook_pins).values(tenant_id="pai", plan_id=p, playbook_key="germany_master",
+                                                         version=7))
+    decision(engine, "planned", p)
+    assert view(engine).pages == []  # that version is not loaded: nothing is invented
+
+
+@pytest.mark.req("R-51")
+def test_empty_view_has_no_pages(engine, clean):
+    v = view(engine)
+    assert (v.state, v.pages) == ("empty", [])
 
 
 def test_real_flow_through_the_port(svc):
