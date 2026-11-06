@@ -130,6 +130,7 @@ class ProposalStore:
         """pending → requested on the CALLER's connection, so the status and the choice_request row it goes with
         commit together or not at all (R-07). `revision` is the one the other ops of the proposal made, if any.
         True if it changed."""
+        # answered_at on a `requested` row is the time the student answered (accepted), not when the Counsellor did
         done = conn.execute(update(PR).where(PR.c.tenant_id == self.tenant_id, PR.c.id == proposal_id,
                                              PR.c.status == "pending")
                             .values(status="requested", revision=revision, answered_at=func.now()))

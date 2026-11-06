@@ -7,6 +7,10 @@ Revision ID: os_0021
 Revises: os_0020
 Create Date: 2026-11-06
 
+Downgrade: a `requested` proposal becomes `expired` (the old status list has no `requested`). A proposal with
+source `student` cannot be kept under the old source check and deleting it would cascade into os_plan_overrides, so
+the downgrade raises RuntimeError and changes nothing while any exists.
+
 Self-contained on purpose: it does not import app.os, so later model changes cannot rewrite history.
 """
 
@@ -40,7 +44,7 @@ def upgrade() -> None:
     op.add_column(P, sa.Column("requested_version", sa.Integer), schema=S)  # the n+1 the Counsellor wrote
     op.add_column(P, sa.Column("request_outcome", sa.Text), schema=S)
     op.create_check_constraint("ck_os_proposals_request_outcome", P,
-                               f"request_outcome IS NULL OR {_in('request_outcome', OUTCOMES)}", schema=S)
+                               _in("request_outcome", OUTCOMES), schema=S)  # NULL passes a CHECK: no answer yet
     op.create_table(
         "os_plan_adoptions",
         sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
@@ -56,14 +60,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    kept = op.get_bind().execute(sa.text(f"SELECT count(*) FROM {S}.{P} WHERE source = 'student'")).scalar()
+    if kept:
+        raise RuntimeError(f"os_0021 downgrade refused: {kept} proposal(s) have source 'student'; deleting them would "
+                           "also delete their plan overrides. Resolve them by hand first.")
     op.drop_table("os_plan_adoptions", schema=S)
     op.drop_constraint("ck_os_proposals_request_outcome", P, schema=S, type_="check")
     op.drop_column(P, "request_outcome", schema=S)
     op.drop_column(P, "requested_version", schema=S)
     op.drop_column(P, "base_decision_version", schema=S)
-    # rows that use the new values cannot satisfy the old checks: a downgrade drops them first
-    op.execute(f"UPDATE {S}.{P} SET status = 'expired' WHERE status = 'requested'")
-    op.execute(f"DELETE FROM {S}.{P} WHERE source = 'student'")
+    op.execute(f"UPDATE {S}.{P} SET status = 'expired' WHERE status = 'requested'")  # the old checks have no `requested`
     op.drop_constraint("ck_os_proposals_source", P, schema=S, type_="check")
     op.create_check_constraint("ck_os_proposals_source", P, _in("source", OLD_SOURCES), schema=S)
     op.drop_constraint("ck_os_proposals_status", P, schema=S, type_="check")

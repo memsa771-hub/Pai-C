@@ -573,8 +573,7 @@ proposals = Table(
     Column("request_outcome", Text),  # the Counsellor's answer: written | duplicate | stale | refused
     _in("source", PROPOSAL_SOURCES, "ck_os_proposals_source"),
     _in("status", PROPOSAL_STATUSES, "ck_os_proposals_status"),
-    CheckConstraint(f"request_outcome IS NULL OR request_outcome IN ({', '.join(repr(v) for v in REQUEST_OUTCOMES)})",
-                    name="ck_os_proposals_request_outcome"),
+    _in("request_outcome", REQUEST_OUTCOMES, "ck_os_proposals_request_outcome"),  # NULL passes a CHECK: no answer yet
     Index("ix_os_proposals_plan", "plan_id"),
 )
 
