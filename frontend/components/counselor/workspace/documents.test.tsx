@@ -60,6 +60,17 @@ describe("documents view", () => {
     expect(enqueueUploads).toHaveBeenCalledWith(expect.any(Array), "", "passport");
   });
 
+  it("resets the type after a file is queued, so a second file is not typed by accident", async () => {
+    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue(ON);
+    const { container } = view();
+    await screen.findByText(TEXT.type_label);
+    fireEvent.change(container.querySelector("select")!, { target: { value: "passport" } });
+    pick(container);
+    expect((container.querySelector("select") as HTMLSelectElement).value).toBe("");
+    pick(container);
+    expect(enqueueUploads).toHaveBeenLastCalledWith(expect.any(Array), "", undefined);
+  });
+
   it("something else sends no doc_type", async () => {
     vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue(ON);
     const { container } = view();

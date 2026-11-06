@@ -139,14 +139,22 @@ export type UploadOptions =
   | {
       one_upload: true;
       doc_types: OsDocType[];
-      text: Record<'type_label' | 'type_none' | 'registered' | 'consent_needed' | 'duplicate' | 'unknown_type'
-        | 'not_readable' | 'not_now', string>;
+      text: Record<(typeof UPLOAD_TEXT_KEYS)[number], string>;
     };
 
 /** What an upload with a type answers (the `os_document` key of POST /v1/files, D-y2): registered, or refused. */
 export type OsDocumentResult =
   | { id: number; status: string; note: string }
   | { refused: string; note: string };
+
+/** The server's note for an upload with a type, on success and on refusal alike (D-y2). */
+export function documentNote(r: OsDocumentResult | undefined | null): string | null {
+  return r && typeof r.note === 'string' && r.note ? r.note : null;
+}
+
+/** The sentences an "on" answer must carry; a partial answer is read as off. */
+export const UPLOAD_TEXT_KEYS = ['type_label', 'type_none', 'registered', 'consent_needed', 'duplicate',
+  'unknown_type', 'not_readable', 'not_now'] as const;
 
 export function refusedNote(r: OsDocumentResult | undefined | null): string | null {
   return r && 'refused' in r ? r.note : null;

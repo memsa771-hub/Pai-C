@@ -8,7 +8,8 @@ import { workspaceApi } from "@/lib/api";
 import OsDocumentsPage from "../../app/[workspaceId]/(os)/os-documents/page";
 
 vi.mock("@/lib/config", () => ({ OS_UI_ENABLED: true, OS_REHEARSAL_UI: false, OS_FROM_STAGE: "H" }));
-vi.mock("@/lib/pai-auth-context", () => ({ usePaiAuth: () => ({ loading: false, user: { uid: "u" }, idToken: "t" }) }));
+const AUTH = { loading: false, user: { uid: "u" }, idToken: "t" };  // one object: a new user each render would refire the page's load effect
+vi.mock("@/lib/pai-auth-context", () => ({ usePaiAuth: () => AUTH }));
 vi.mock("next/navigation", () => ({ useParams: () => ({ workspaceId: "ws1" }), useRouter: () => ({ push: vi.fn() }),
   usePathname: () => "/ws1/os-documents", notFound: vi.fn() }));
 vi.mock("@/components/os/os-header", () => ({ OsHeader: () => null }));
@@ -74,5 +75,70 @@ describe("os documents page", () => {
     const { container } = render(<I18nProvider><Suspense fallback={null}><OsDocumentsPage params={params} /></Suspense></I18nProvider>);
     await pick(container);
     expect(await screen.findByText(/Pilot terms text/)).toBeTruthy();
+  });
+
+  it("a registered document shows the server's note", async () => {
+    const note = "Saved. PAI is reading it.";
+    vi.mocked(workspaceApi.uploadFile).mockResolvedValue({ os_document: { id: 1, status: "uploaded", note } } as never);
+    const { container } = setup(true);
+    await pick(container);
+    expect((await screen.findByRole("status")).textContent).toBe(note);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  const conflict = (detail: unknown) => Object.assign(new Error(`API 409: ${String(detail)}`), { status: 409, detail });
+
+  it("a 409 with a sentence refetches the options and retries through the one endpoint", async () => {
+    vi.mocked(workspaceApi.uploadOsDocument).mockRejectedValue(conflict("Upload your documents from the Documents page."));
+    vi.mocked(workspaceApi.uploadFile).mockResolvedValue({ os_document: { id: 1, status: "uploaded", note: "Saved." } } as never);
+    vi.mocked(workspaceApi.getOsDocuments).mockResolvedValue({ documents: [], findings: [], doc_types: [{ key: "passport", label: "Passport" }] });
+    vi.mocked(workspaceApi.getOsConsent).mockResolvedValue({ ...TERMS, agreed: true } as never);
+    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValueOnce({ one_upload: false })
+      .mockResolvedValue({ one_upload: true, doc_types: [{ key: "passport", label: "Passport" }], text: TEXT });
+    const { container } = render(<I18nProvider><Suspense fallback={null}><OsDocumentsPage params={params} /></Suspense></I18nProvider>);
+    await pick(container);
+    await waitFor(() => expect(workspaceApi.uploadFile).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(workspaceApi.uploadFile).mock.calls[0][2]).toEqual({ docType: "passport" });
+    expect(workspaceApi.getUploadOptions).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/Pilot terms text/)).toBeNull();
+    expect((await screen.findByRole("status")).textContent).toBe("Saved.");
+  });
+
+  it("if the retry also fails it shows the plain error, with no consent card", async () => {
+    vi.mocked(workspaceApi.uploadOsDocument).mockRejectedValue(conflict("Upload your documents from the Documents page."));
+    vi.mocked(workspaceApi.uploadFile).mockRejectedValue(new Error("API 500: broke"));
+    vi.mocked(workspaceApi.getOsDocuments).mockResolvedValue({ documents: [], findings: [], doc_types: [{ key: "passport", label: "Passport" }] });
+    vi.mocked(workspaceApi.getOsConsent).mockResolvedValue({ ...TERMS, agreed: false } as never);
+    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValueOnce({ one_upload: false })
+      .mockResolvedValue({ one_upload: true, doc_types: [{ key: "passport", label: "Passport" }], text: TEXT });
+    const { container } = render(<I18nProvider><Suspense fallback={null}><OsDocumentsPage params={params} /></Suspense></I18nProvider>);
+    await pick(container);
+    await waitFor(() => expect(workspaceApi.uploadFile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(workspaceApi.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("a 409 with a consent object shows the consent card and does not retry", async () => {
+    vi.mocked(workspaceApi.uploadOsDocument).mockRejectedValue(conflict({ code: "consent_needed", message: "agree first" }));
+    vi.mocked(workspaceApi.getOsDocuments).mockResolvedValue({ documents: [], findings: [], doc_types: [{ key: "passport", label: "Passport" }] });
+    vi.mocked(workspaceApi.getOsConsent).mockResolvedValueOnce({ ...TERMS, agreed: true } as never)
+      .mockResolvedValue({ ...TERMS, agreed: false } as never);
+    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue({ one_upload: false });
+    const { container } = render(<I18nProvider><Suspense fallback={null}><OsDocumentsPage params={params} /></Suspense></I18nProvider>);
+    await pick(container);
+    expect(await screen.findByText(/Pilot terms text/)).toBeTruthy();
+    expect(workspaceApi.uploadFile).not.toHaveBeenCalled();
+    expect(workspaceApi.getUploadOptions).toHaveBeenCalledTimes(1);
+  });
+
+  it("a partial options answer reads as off", async () => {
+    vi.mocked(workspaceApi.getOsDocuments).mockResolvedValue({ documents: [], findings: [], doc_types: [] });
+    vi.mocked(workspaceApi.getOsConsent).mockResolvedValue({ ...TERMS, agreed: true } as never);
+    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue({ one_upload: true, doc_types: [], text: { type_label: "a" } } as never);
+    vi.mocked(workspaceApi.uploadOsDocument).mockResolvedValue({} as never);
+    const { container } = render(<I18nProvider><Suspense fallback={null}><OsDocumentsPage params={params} /></Suspense></I18nProvider>);
+    await pick(container);
+    await waitFor(() => expect(workspaceApi.uploadOsDocument).toHaveBeenCalled());
+    expect(workspaceApi.uploadFile).not.toHaveBeenCalled();
   });
 });

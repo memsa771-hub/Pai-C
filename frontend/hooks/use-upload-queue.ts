@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
-import { refusedNote } from '@/lib/os-documents';
+import { documentNote } from '@/lib/os-documents';
 
 /**
  * A file on its way up, as the grid draws it.
@@ -107,8 +107,8 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
               onProgress: (fraction) => patch(id, { progress: fraction }),
               docType: typesRef.current.get(id),
             });
-            // The file is saved, but not made a study document: say why, in the server's words.
-            const note = refusedNote(saved?.os_document);
+            // The server's own words about the study document, whether it was made or refused.
+            const note = documentNote(saved?.os_document);
             if (note) toast.message(note);
             // Held at 'done' rather than removed: the real row isn't listed
             // until the refetch below, and the tile shouldn't blink out

@@ -18,7 +18,8 @@ const doc: OsDocument = {
     { field: "scale", value_read: "4", check: "ok", reasons: [], value_confirmed: null },
   ],
 };
-const on = () => vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue({ one_upload: true, doc_types: [], text: TEXT });
+const ON = { one_upload: true as const, doc_types: [], text: TEXT };
+const on = () => {};
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("confirm screen vault check", () => {
@@ -26,7 +27,7 @@ describe("confirm screen vault check", () => {
     on();
     vi.mocked(workspaceApi.getOsVaultCheck).mockResolvedValue({
       fields: [{ field: "cgpa", outcome: "differs" }, { field: "scale", outcome: "same" }], note: NOTE });
-    render(<DocumentConfirm document={doc} onConfirm={() => {}} />);
+    render(<DocumentConfirm document={doc} onConfirm={() => {}} options={ON} />);
     await screen.findByText(NOTE);
     expect(screen.getAllByText(NOTE)).toHaveLength(1);
     expect(screen.getByTestId("differs-cgpa")).toBeTruthy();
@@ -37,7 +38,7 @@ describe("confirm screen vault check", () => {
   it("a 404 vault-check shows nothing", async () => {
     on();
     vi.mocked(workspaceApi.getOsVaultCheck).mockRejectedValue(new Error("API 404: nothing to compare with"));
-    const { container } = render(<DocumentConfirm document={doc} onConfirm={() => {}} />);
+    const { container } = render(<DocumentConfirm document={doc} onConfirm={() => {}} options={ON} />);
     await waitFor(() => expect(workspaceApi.getOsVaultCheck).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(container.querySelector("[data-testid^=differs-]")).toBeNull();
@@ -45,10 +46,16 @@ describe("confirm screen vault check", () => {
   });
 
   it("with one_upload off it asks for nothing", async () => {
-    vi.mocked(workspaceApi.getUploadOptions).mockResolvedValue({ one_upload: false });
     render(<DocumentConfirm document={doc} onConfirm={() => {}} />);
-    await waitFor(() => expect(workspaceApi.getUploadOptions).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(workspaceApi.getOsVaultCheck).not.toHaveBeenCalled();
+  });
+
+  it("never fetches the options itself, and links the marker to its input", async () => {
+    vi.mocked(workspaceApi.getOsVaultCheck).mockResolvedValue({ fields: [{ field: "cgpa", outcome: "differs" }], note: NOTE });
+    render(<DocumentConfirm document={doc} onConfirm={() => {}} options={ON} />);
+    const marker = await screen.findByTestId("differs-cgpa");
+    expect(workspaceApi.getUploadOptions).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Cgpa", { exact: false }).getAttribute("aria-describedby")).toContain(marker.id);
   });
 });

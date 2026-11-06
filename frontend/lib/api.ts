@@ -248,7 +248,7 @@ class WorkspaceApi {
       try {
         detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
       } catch { /* not JSON: keep the text */ }
-      throw new Error(`API ${res.status}: ${detail}`);
+      throw Object.assign(new Error(`API ${res.status}: ${detail}`), { status: res.status, detail });
     }
     return (await res.json()) as import('./os-documents').OsDocument;
   }

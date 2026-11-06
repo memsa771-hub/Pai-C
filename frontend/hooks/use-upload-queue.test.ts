@@ -37,6 +37,14 @@ describe('upload queue', () => {
     await waitFor(() => expect(toast.message).toHaveBeenCalledWith('Saved. PAI cannot read this kind of document yet.'));
   });
 
+  it('shows the server note when the document was registered too', async () => {
+    vi.mocked(workspaceApi.uploadFile).mockResolvedValue(
+      { os_document: { id: 3, status: 'uploaded', note: 'Saved. PAI is reading it.' } } as never);
+    const { result } = renderHook(() => useUploadQueue(async () => {}));
+    act(() => result.current.enqueueUploads([file()], '', 'passport'));
+    await waitFor(() => expect(toast.message).toHaveBeenCalledWith('Saved. PAI is reading it.'));
+  });
+
   it('a plain upload shows no note', async () => {
     vi.mocked(workspaceApi.uploadFile).mockResolvedValue({ id: 'f' } as never);
     const { result } = renderHook(() => useUploadQueue(async () => {}));

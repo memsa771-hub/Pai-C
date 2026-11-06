@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import type { OsConsent } from '@/lib/os-consent';
-import { typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
-import { useUploadOptions } from '@/hooks/use-upload-options';
+import { documentNote, refusedNote, typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
+import { useUploadOptionsState } from '@/hooks/use-upload-options';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
 
@@ -44,6 +44,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState<OsConsent | null>(null);
   const [refused, setRefused] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);  // the server's note when a document was registered
 
   // Slice 9a: uploading needs consent to the current pilot terms; the card shows until the student agrees.
   const loadConsent = useCallback(() => workspaceApi.getOsConsent().then(
@@ -69,7 +70,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   }, [outOfPlan, loading, user, idToken, workspaceId, load, loadConsent]);
 
   // P1-T7: on, every upload goes to the one endpoint. Declared after the effect that configures the client.
-  const options = useUploadOptions(OS_UI_ENABLED && !outOfPlan && !loading && !!user);
+  const { options, refresh: refreshOptions } = useUploadOptionsState(OS_UI_ENABLED && !outOfPlan && !loading && !!user);
 
   const waiting = data?.documents.some((d) => d.status === 'uploaded' || d.status === 'reading') ?? false;
   useEffect(() => {
@@ -92,22 +93,47 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     }
   }
 
+  /** The one endpoint: the file is saved, then registered or refused; the server's note is shown either way. */
+  async function uploadOne(file: File, docType: string) {
+    const saved = await workspaceApi.uploadFile(file, undefined, { docType });
+    await load();  // load() clears the error line, so the note is set after it
+    const got = saved.os_document;
+    if (got && refusedNote(got) !== null) {  // the file is saved; the server's note says why it is not a study document
+      const now = 'refused' in got && got.refused === 'consent_needed' ? await loadConsent() : null;
+      if (now && !now.agreed) { setRefused(true); setError(null); } else setError(got.note);
+    } else {
+      setNotice(documentNote(got));
+    }
+  }
+
   async function upload(file: File, docType: string) {
     setBusy(true);
+    setNotice(null);
     try {
       if (options.one_upload) {
-        const saved = await workspaceApi.uploadFile(file, undefined, { docType });
-        await load();  // load() clears the error line, so the note is set after it
-        const got = saved.os_document;
-        if (got && 'refused' in got) {  // the file is saved; the server's note says why it is not a study document
-          const now = got.refused === 'consent_needed' ? await loadConsent() : null;
-          if (now && !now.agreed) { setRefused(true); setError(null); } else setError(got.note);
-        }
+        await uploadOne(file, docType);
       } else {
         await workspaceApi.uploadOsDocument(file, docType);
         await load();
       }
     } catch (e) {
+      const status = (e as { status?: number } | null)?.status;
+      const detail = (e as { detail?: unknown } | null)?.detail;
+      if (status === 409 && typeof detail === 'string' && !options.one_upload) {
+        // A sentence, not a consent object: either the server has the one upload on (this page was loaded before
+        // it was) or the file is a duplicate. Ask again, and retry through the one endpoint only if it is on.
+        const fresh = await refreshOptions();
+        if (fresh.one_upload) {
+          try {
+            await uploadOne(file, docType);
+          } catch (e2) {
+            setError(reason(e2, 'Could not upload. Please try again.'));
+          }
+        } else {
+          setError(reason(e, 'Could not upload. Please try again.'));
+        }
+        return;
+      }
       const now = await loadConsent();
       if (now && !now.agreed) {  // refused for missing consent (the terms may have changed): the card asks
         setRefused(true);
@@ -129,6 +155,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
       <OsHeader workspaceId={workspaceId} current="os-documents"
                 title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : pageTitle(plan, 'documents', 'Your documents')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="mb-3 break-words text-sm">{notice}</p>}
       {consent && !consent.agreed && !open && (
         <div className="mb-4">
           <ConsentCard consent={consent} refused={refused} onAgreed={loadConsent} onChanged={loadConsent} />
@@ -138,7 +165,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : open ? (
         <>
-          <DocumentConfirm key={open.id} document={open} busy={busy} onBack={() => setOpenId(null)}
+          <DocumentConfirm key={open.id} document={open} busy={busy} options={options} onBack={() => setOpenId(null)}
                            onConfirm={(values) => act(async () => {
                              await workspaceApi.confirmOsDocument(open.id, values);
                              setOpenId(null);

@@ -28,7 +28,7 @@ export function DocumentsView({ list, preview }: { list: React.ReactNode; previe
         <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
           <h1 className="font-display text-[1.85rem] leading-[1.15] sm:text-[2.25rem]">{copy.documentsTitle}</h1>
           <input ref={input} type="file" multiple hidden accept={`image/*,${DOCUMENT_ACCEPT}`}
-            onChange={(e) => { if (e.target.files?.length) enqueueUploads(Array.from(e.target.files), currentFilePath || "", docType || undefined); e.target.value = ""; }} />
+            onChange={(e) => { if (e.target.files?.length) { enqueueUploads(Array.from(e.target.files), currentFilePath || "", docType || undefined); setDocType(""); } e.target.value = ""; }} />
           {options.one_upload && (
             <label className="flex min-w-0 items-center gap-2 text-sm">
               <span className="text-muted-foreground">{options.text.type_label}</span>
