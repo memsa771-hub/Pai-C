@@ -205,6 +205,10 @@ class OverrideStore:
             conn.execute(insert(O).values(tenant_id=self.tenant_id, plan_id=plan_id, proposal_id=proposal_id, op=op,
                                           target=target, payload=payload))
 
+    def cancelled(self, plan_id: int) -> set[str]:
+        """The programmes an active override has dropped from the plan (the contract still lists them)."""
+        return {o.target for o in self.active(plan_id) if o.op == "cancel_programme"}
+
     def for_proposal(self, proposal_id: int) -> list[Override]:
         with self.engine.connect() as conn:
             rows = conn.execute(select(O.c.op, O.c.target, O.c.payload).where(

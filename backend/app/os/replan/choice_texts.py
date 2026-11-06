@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-PATH = Path(__file__).with_name("choice_texts.yaml")
+PATH = Path(__file__).parent / "texts" / "choice_texts.yaml"
 KEYS = ("requested", "expired")
 
 

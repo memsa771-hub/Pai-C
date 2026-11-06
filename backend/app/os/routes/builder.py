@@ -19,11 +19,12 @@ from app.os.kernel.states import is_started
 from app.os.knowledge.requests import visible_programmes
 from app.os.ports import choice_requests
 from app.os.replan.ops import CancelProgramme, SwapProgramme
-from app.os.replan.store import ProposalStore
+from app.os.replan.lock import plan_lock
+from app.os.replan.store import OverrideStore, ProposalStore
 
 log = logging.getLogger(__name__)
 CHANGES_PER_DAY = 3  # swaps and removals per plan (S4-D10); the kernel has no revision limit yet (Slice 7)
-P, T, R, F = models.plans, models.tasks, models.plan_revisions, models.knowledge_facts
+P, T, R, F, PR = models.plans, models.tasks, models.plan_revisions, models.knowledge_facts, models.proposals
 
 
 class NotAllowed(ValueError):
@@ -36,6 +37,10 @@ class NotYourPlan(NotAllowed):
 
 class PlanExists(NotAllowed):
     """The student already has a plan for this route and intake (the API answers 409)."""
+
+
+class RequestOpen(NotAllowed):
+    """A change of this plan is already with the Counsellor (the API answers 409 `request_open`)."""
 
 
 class SwapLimit(NotAllowed):
@@ -118,6 +123,10 @@ def _within_limit(plans, plan_id: int) -> None:
         n = conn.execute(select(func.count()).select_from(R).where(
             R.c.plan_id == plan_id, R.c.created_at > clock.now() - timedelta(hours=24),
             R.c.cause.like("programmes:%"))).scalar()
+        # a change on a Counsellor plan is a request, not a revision: count those too (none exist with the host part off)
+        n += conn.execute(select(func.count()).select_from(PR).where(
+            PR.c.plan_id == plan_id, PR.c.source == "student", PR.c.created_at > clock.now() - timedelta(hours=24))
+        ).scalar()
     if n >= CHANGES_PER_DAY:
         raise SwapLimit(f"at most {CHANGES_PER_DAY} programme changes a day; try again tomorrow")
 
@@ -125,20 +134,34 @@ def _within_limit(plans, plan_id: int) -> None:
 def _request(plans, plan_id: int, op, places: list[str]) -> tuple[str, int] | None:
     """On a Counsellor plan the builder does not change the choice (R-07): it records the student's change as a
     proposal in status `requested` and writes its choice_request row, in one transaction. None when the plan is not
-    one the Counsellor chooses for (the host part is off, or a self-serve plan): the caller edits the plan as before."""
+    one the Counsellor chooses for (the host part is off, or a self-serve plan): the caller edits the plan as before.
+    Under the plan's replan lock: one open request per plan, and the daily limit holds."""
     tenant = plans.kernel.tenant_id
-    with plans.engine.begin() as conn:
+    with plans.engine.connect() as conn:
         if not choice_requests.applies(conn, tenant, plan_id):
             return None
-        base = choice_requests.decision_version_of(conn, tenant, plan_id)
-        if base is None:
-            raise NotAllowed("your plan is not ready to change yet")
-        sha, revision = conn.execute(select(P.c.contract_sha256, P.c.current_revision).where(P.c.id == plan_id)).one()
-        pid = ProposalStore(plans.engine, tenant).create(
-            plan_id, [], "student", [op.model_dump(mode="json")], [], big=True, expires_at=None, status="requested",
-            based_on=sha, base_revision=revision, base_decision_version=base, conn=conn)
-        choice_requests.emit(conn, tenant, plan_id, pid, base,
-                             [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(places)], clock.now())
+    with plan_lock(plans.engine, plan_id):
+        with plans.engine.begin() as conn:
+            if conn.execute(select(PR.c.id).where(PR.c.tenant_id == tenant, PR.c.plan_id == plan_id,
+                                                  PR.c.status == "requested")).first() is not None:
+                raise RequestOpen("request_open")
+        _within_limit(plans, plan_id)  # again, under the lock
+        cancelled = OverrideStore(plans.engine, tenant).cancelled(plan_id)  # live programmes only
+        chosen = [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(x for x in places if x not in cancelled)]
+        try:
+            choice_requests.check_places(chosen)
+        except ValueError:
+            raise NotAllowed("this change cannot be sent to your counsellor") from None
+        with plans.engine.begin() as conn:
+            base = choice_requests.decision_version_of(conn, tenant, plan_id)
+            if base is None:
+                raise NotAllowed("your plan is not ready to change yet")
+            sha, revision = conn.execute(select(P.c.contract_sha256, P.c.current_revision).where(
+                P.c.id == plan_id, P.c.tenant_id == tenant)).one()
+            pid = ProposalStore(plans.engine, tenant).create(
+                plan_id, [], "student", [op.model_dump(mode="json")], [], big=True, expires_at=None,
+                status="requested", based_on=sha, base_revision=revision, base_decision_version=base, conn=conn)
+            choice_requests.emit(conn, tenant, plan_id, pid, base, chosen, clock.now())
     return "requested", pid
 
 

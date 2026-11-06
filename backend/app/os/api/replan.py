@@ -46,13 +46,17 @@ EXPIRED_SHOWN = timedelta(days=7)  # an expired request stays in the student's l
 
 
 def proposal_out(p: Proposal, settings=None) -> dict:
-    """`status_note` (P1-T6) is the fixed sentence for a request, or None while its file is not approved."""
+    """`status_note` (P1-T6) is the fixed sentence for a request, left out while its file is not approved."""
     key = "requested" if p.status == "requested" else "expired" if p.status == "expired" and p.request_outcome else None
-    return {"id": p.id, "plan_id": p.plan_id, "status": p.status, "big": p.big, "source": p.source, "ops": p.ops,
-            "reasons": [] if p.source == "student" else [o["reason"] for o in p.ops], "revision": p.revision,
-            "expires_at": p.expires_at, "created_at": p.created_at, "answered_at": p.answered_at,
-            "status_note": choice_texts.note(key, settings) if key and settings is not None else None,
-            "request_outcome": p.request_outcome}
+    out = {"id": p.id, "plan_id": p.plan_id, "status": p.status, "big": p.big, "source": p.source, "ops": p.ops,
+           "reasons": [] if p.source == "student" else [o["reason"] for o in p.ops], "revision": p.revision,
+           "expires_at": p.expires_at, "created_at": p.created_at, "answered_at": p.answered_at}
+    note = choice_texts.note(key, settings) if key and settings is not None else None
+    if note is not None:  # only when set: a proposal without a request has exactly today's keys
+        out["status_note"] = note
+    if p.request_outcome is not None:
+        out["request_outcome"] = p.request_outcome
+    return out
 
 
 def student_proposals(svc: Services, student: str) -> list[dict]:

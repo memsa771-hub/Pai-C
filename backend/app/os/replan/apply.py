@@ -24,6 +24,7 @@ from app.os.ports.escalation import EscalationSink
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
+from app.os.replan.lock import LOCK_CLASS, plan_lock  # noqa: F401  (LOCK_CLASS stays importable from here)
 from app.os.replan.ops import (
     CancelProgramme, Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
 )
@@ -39,7 +40,6 @@ REFUSED_REASON = "Every proposed change was refused by the plan's checks."
 BROKEN_REASON = "This plan no longer compiles: a person needs to check it."
 NO_PLACES_REASON = "This change would leave no places in the plan: a person needs to check it."
 PAUSED_REASON = "Changes are paused while a person checks your plan: try again once they are done."
-LOCK_CLASS = 7007  # pg_advisory_lock(LOCK_CLASS, plan id): one replan or answer per plan at a time
 _OPS = TypeAdapter(Ops)
 
 
@@ -76,17 +76,9 @@ class Replanner:
         # every support case goes through the port (Slice 8 S8-D12); standalone only unless the caller wires more
         self.escalations = escalations or StandaloneSink(engine, self.tenant, self.student_of)
 
-    @contextmanager
-    def plan_lock(self, plan_id: int) -> Iterator[None]:
-        """Holds the plan's replan lock (a session advisory lock) for the block (final review I2, I5)."""
-        with self.engine.connect() as conn:
-            conn.execute(text("SELECT pg_advisory_lock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
-            conn.commit()
-            try:
-                yield
-            finally:
-                conn.execute(text("SELECT pg_advisory_unlock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
-                conn.commit()
+    def plan_lock(self, plan_id: int):
+        """Holds the plan's replan lock for the block (final review I2, I5)."""
+        return plan_lock(self.engine, plan_id)
 
     # ------------------------------------------------------------------ state
 
@@ -391,7 +383,9 @@ class Replanner:
         proposal's new status `requested`. Called under the plan lock."""
         choice = (SwapProgramme, CancelProgramme)
         contract, _ = self.plans._contract(p.plan_id)
-        places = [x.programme_ref for x in sorted(contract.programmes, key=lambda x: x.rank)]
+        cancelled = self.overrides.cancelled(p.plan_id)  # live programmes only: an override may have dropped one
+        places = [x.programme_ref for x in sorted(contract.programmes, key=lambda x: x.rank)
+                  if x.programme_ref not in cancelled]
         for op in ops:
             if isinstance(op, SwapProgramme) and op.out_ref in places and op.in_ref not in places:
                 places[places.index(op.out_ref)] = op.in_ref
@@ -405,12 +399,22 @@ class Replanner:
             base = p.base_decision_version or choice_requests.decision_version_of(conn, self.tenant, p.plan_id)
         if base is None:
             raise ProposalStale("your plan is not ready to change yet")
-        revision = self.apply(p.id, None, ops_filter=lambda op: not isinstance(op, choice))
         chosen = [ProgrammeChoice(programme_ref=ref, rank=i + 1) for i, ref in enumerate(places)]
+        try:
+            choice_requests.check_places(chosen)  # a list the contract cannot carry is refused before anything is done
+        except ValueError:
+            raise ReplanFailed("this change cannot be sent to your counsellor") from None
+        # In a mixed proposal the other operations commit FIRST, in their own kernel transaction; only the status and
+        # the request row below are one transaction. If that fails the proposal stays pending, and a retry finds the
+        # other operations already applied (stored overrides, a revision with this cause) and applies nothing twice.
+        revision = self.apply(p.id, None, ops_filter=lambda op: not isinstance(op, choice))
         with self.engine.begin() as conn:  # the status and the request row commit together, or not at all
             if not self.proposals.request(conn, p.id, revision):
                 raise ProposalStale("this suggestion is no longer waiting for you")
-            choice_requests.emit(conn, self.tenant, p.plan_id, p.id, base, chosen, self.clock())
+            try:
+                choice_requests.emit(conn, self.tenant, p.plan_id, p.id, base, chosen, self.clock())
+            except ValueError:  # a pydantic ValidationError: the transaction rolls back, the proposal stays pending
+                raise ReplanFailed("this change cannot be sent to your counsellor") from None
         return revision
 
     def decline(self, student_ref: str, proposal_id: int) -> None:
@@ -426,9 +430,8 @@ class Replanner:
         with self.engine.connect() as conn:
             ids = conn.execute(select(PR.c.id).where(PR.c.tenant_id == self.tenant, PR.c.status == "pending",
                                                      PR.c.expires_at <= now)).scalars().all()
-        for pid in ids:
-            self.proposals.set_status(pid, "expired")
-        return len(ids)
+        # only a row that is still pending: one that turned `requested` since the select is left alone
+        return sum(self.proposals.expire_if_pending(pid) for pid in ids)
 
     def retry(self, plan_id: int, instance_key: str) -> bool:
         """One retry of a failed step through the kernel; False if it is no longer failed."""

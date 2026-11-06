@@ -4,7 +4,7 @@ choice_request, written in the same transaction as the proposal's new status `re
 
 import json
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -265,11 +265,12 @@ def test_status_note_hidden_until_approved(world):
     pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
     accept(world, pid)
     [p] = world.client.get("/v1/os/inbox", headers=ME).json()["proposals"]
-    assert p["id"] == pid and p["status"] == "requested" and p["status_note"] is None
-    assert p["request_outcome"] is None and p["reasons"] == [WHY]
+    assert p["id"] == pid and p["status"] == "requested" and "status_note" not in p
+    assert "request_outcome" not in p and p["reasons"] == [WHY]
     on = replace(world.svc.settings, rehearsal=True)
     assert choice_texts.note("requested", on) == yaml.safe_load(choice_texts.PATH.read_text())["requested"]
     assert yaml.safe_load(choice_texts.PATH.read_text())["approved"] is False
+    assert choice_texts.PATH.parent.name == "texts"
     assert choice_texts.note("requested", world.svc.settings) is None
 
 
@@ -325,3 +326,134 @@ def test_ports_configure_sets_and_defaults_the_gate(world):
     ports.configure(world.svc)  # no gate given: today's behaviour
     assert choice_requests.enabled() is False
     choice_requests.notify("choice_request:1")  # no hook: nothing happens
+
+
+# ---- fix round 1 --------------------------------------------------------------------------------------------------
+
+
+def student_proposals_count(w) -> int:
+    with w.engine.connect() as conn:
+        return conn.execute(select(func.count()).select_from(PR).where(PR.c.source == "student")).scalar()
+
+
+def test_builder_double_call_is_one_request(world):
+    first = world.client.post(f"/v1/os/plans/{world.plan_id}/swap", json=swap_body(SECOND, THIRD), headers=ME)
+    second = world.client.post(f"/v1/os/plans/{world.plan_id}/swap", json=swap_body(SECOND, THIRD), headers=ME)
+    assert first.status_code == 202
+    assert second.status_code == 409 and second.json()["detail"] == "request_open"
+    assert student_proposals_count(world) == 1 and len(world.requests()) == 1
+
+
+def test_builder_daily_limit_counts_requests(world):
+    for n in range(3):  # each is answered (the Counsellor's answer expires it), so the next may be asked
+        r = world.client.post(f"/v1/os/plans/{world.plan_id}/swap", json=swap_body(SECOND, THIRD), headers=ME)
+        assert r.status_code == 202, (n, r.text)
+        assert world.r.proposals.expire_requested(r.json()["proposal_id"], "stale")
+    fourth = world.client.post(f"/v1/os/plans/{world.plan_id}/swap", json=swap_body(SECOND, THIRD), headers=ME)
+    assert fourth.status_code == 409 and "a day" in fourth.json()["detail"]
+    assert student_proposals_count(world) == 3
+
+
+def test_expire_due_never_overwrites_requested(world, monkeypatch):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    with world.engine.begin() as conn:
+        conn.execute(update(PR).where(PR.c.id == pid).values(expires_at=date(2020, 1, 1)))
+    real = world.r.proposals.expire_if_pending
+
+    def race(proposal_id):  # the student's accept lands between the select and the update
+        with world.engine.begin() as conn:  # (the student's answer is on time: it found a live suggestion)
+            conn.execute(update(PR).where(PR.c.id == proposal_id).values(
+                expires_at=datetime.now(timezone.utc) + timedelta(days=1)))
+        assert accept(world, proposal_id).json()["status"] == "requested"
+        return real(proposal_id)
+
+    monkeypatch.setattr(world.r.proposals, "expire_if_pending", race)
+    assert world.r.expire_due(datetime.now(timezone.utc)) == 0
+    assert world.proposal(pid).status == "requested"
+
+
+def test_expire_due_still_expires_pending(world):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    with world.engine.begin() as conn:
+        conn.execute(update(PR).where(PR.c.id == pid).values(expires_at=date(2020, 1, 1)))
+    assert world.r.expire_due(datetime.now(timezone.utc)) == 1
+    assert world.proposal(pid).status == "expired"
+
+
+def test_flags_off_proposal_body_has_todays_keys(engine, clean, os_db):
+    w = make_world(engine, os_db, enabled=False)
+    try:
+        w.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+        [p] = w.client.get("/v1/os/inbox", headers=ME).json()["proposals"]
+        assert set(p) == {"id", "plan_id", "status", "big", "source", "ops", "reasons", "revision", "expires_at",
+                          "created_at", "answered_at"}
+        accept(w, p["id"])
+        [c] = w.client.get(f"/v1/os/plans/{w.plan_id}/changes", headers=ME).json()["changes"]
+        assert "status_note" not in c and "request_outcome" not in c
+    finally:
+        ports.configure(None)
+
+
+def test_bad_places_refuse_cleanly(world, monkeypatch):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    from pydantic import ValidationError
+
+    def bad(*a, **k):
+        ChoiceRequestV1.model_validate({})  # raises ValidationError
+
+    monkeypatch.setattr(choice_requests, "emit", bad)
+    r = accept(world, pid)
+    assert r.status_code == 409
+    assert world.proposal(pid).status == "pending" and world.requests() == []
+    assert ValidationError  # noqa
+
+
+def test_too_many_places_refused_before_anything_applies(world):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    with world.engine.begin() as conn:  # a contract of six places cannot go in a request (at most five)
+        c = dict(world.plan().contract)
+        c["programmes"] = [{"programme_ref": f"x{i}", "rank": i} for i in range(1, 7)]
+        c["programmes"][0]["programme_ref"] = SECOND
+        conn.execute(update(P).where(P.c.id == world.plan_id).values(contract=c))
+    r = accept(world, pid)
+    assert r.status_code == 409 and world.proposal(pid).status == "pending" and world.requests() == []
+
+
+def test_emit_failure_after_other_ops_then_retry_opens_no_second_case(world, monkeypatch):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY),
+                        AddTask(template_key=_addable(world), programme_ref=None, reason=WHY))
+    real = choice_requests.emit
+    monkeypatch.setattr(choice_requests, "emit", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    with pytest.raises(RuntimeError):
+        world.r.accept(STUDENT, pid)
+    assert world.proposal(pid).status == "pending"
+    monkeypatch.setattr(choice_requests, "emit", real)
+    assert accept(world, pid).json()["status"] == "requested"
+    with world.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(models.support_cases)).scalar() == 0
+        causes = conn.execute(select(models.plan_revisions.c.cause).where(
+            models.plan_revisions.c.cause == f"replan:{pid}")).scalars().all()
+    assert len(causes) == 1 and len(world.requests()) == 1
+
+
+def test_places_exclude_programmes_cancelled_by_override(world):
+    pid = world.propose(SwapProgramme(out_ref=SECOND, in_ref=THIRD, reason=WHY))
+    world.r.overrides.add(world.plan_id, pid, "cancel_programme", FIRST, {})
+    assert accept(world, pid).json()["status"] == "requested"
+    req = ChoiceRequestV1.model_validate(world.requests()[0].payload)
+    assert [(c.programme_ref, c.rank) for c in req.programmes] == [(THIRD, 1)]
+
+
+def test_zero_places_through_the_route(world, monkeypatch):
+    pid = world.propose(CancelProgramme(programme_ref=FIRST, reason=WHY))
+    with world.engine.begin() as conn:
+        c = dict(world.plan().contract)
+        c["programmes"] = [{"programme_ref": FIRST, "rank": 1}]
+        conn.execute(update(P).where(P.c.id == world.plan_id).values(contract=c))
+    monkeypatch.setattr(Replanner, "check", lambda self, plan_id, ops: (ops, []))  # the plan checks are not the subject
+    r = accept(world, pid)
+    assert r.status_code == 200 and r.json()["status"] == "refused"
+    assert world.requests() == [] and world.proposal(pid).status == "refused"
+    assert accept(world, pid).status_code == 409  # no second case
+    with world.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(models.support_cases)).scalar() == 1
