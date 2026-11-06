@@ -138,3 +138,25 @@ def test_escalation_for_an_older_version_pauses_the_plan(svc):  # noqa: F811
     apply(svc, 2)  # a consent copy
     assert plan_source.pause_for_escalation(STUDENT, 1, "other") is True
     assert plan_row(svc, first.plan_id).status == "paused"
+
+
+def test_escalation_expires_the_open_choice_request(svc):  # noqa: F811
+    """A choice change asked of the Counsellor is moot once the Counsellor took an escalation for the plan: it
+    expires, and the outcome it was delivered with stays."""
+    from app.os.replan.store import ProposalStore
+
+    first = apply(svc, 1)
+    store = ProposalStore(svc.engine, "pai")
+    from app.os import models
+
+    with svc.engine.begin() as conn:
+        pid = conn.execute(models.proposals.insert().values(
+            tenant_id="pai", plan_id=first.plan_id, source="student", status="requested", ops=[],
+            requested_version=2, request_outcome="written").returning(models.proposals.c.id)).scalar_one()
+        done = conn.execute(models.proposals.insert().values(
+            tenant_id="pai", plan_id=first.plan_id, source="student", status="accepted", ops=[]
+        ).returning(models.proposals.c.id)).scalar_one()
+    assert plan_source.pause_for_escalation(STUDENT, 1, "not_eligible") is True
+    p = store.get(pid)
+    assert p.status == "expired" and p.request_outcome == "written"
+    assert store.get(done).status == "accepted"  # an answered proposal is left alone

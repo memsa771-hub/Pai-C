@@ -181,11 +181,11 @@ def test_no_offer_while_the_os_module_is_off(world, monkeypatch):
         assert agree(client, params).status_code == 409  # the hand-off part is off with the module
 
 
-def test_several_plans_no_places_and_no_intake_offer_nothing_and_post_writes_nothing(world):
+def test_several_plans_no_places_no_intake_and_taken_identity_offer_nothing_and_post_writes_nothing(world):
     with pre_eng() as (client, student, params):
         chosen(client, params, student)
         for key, changed, code in (("open_plans", 2, "several_plans"), ("programmes", [], "no_places"),
-                                   ("intake", None, "no_intake")):
+                                   ("intake", None, "no_intake"), ("identity_taken", True, "identity_taken")):
             world["plan"] = {**plan(), key: changed}
             assert offer(client, params) == {"offer": False, "state": code}
             r = agree(client, params)

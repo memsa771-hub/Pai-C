@@ -965,6 +965,7 @@
       "linked": "Your plan is now your PAI plan.",
       "linking_wait": "This can take a few minutes.",
       "several_plans": "You have more than one plan, so PAI cannot keep one of them yet.",
+      "identity_taken": "PAI already has a plan for this route, so it cannot keep this one.",
       "no_places": "Your plan has no places that PAI can keep.",
       "no_intake": "Your plan has no start date that PAI can keep.",
       "plan_changed": "Your plan changed. Look at it again, then keep it.",

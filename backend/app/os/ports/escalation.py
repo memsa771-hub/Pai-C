@@ -30,6 +30,21 @@ def pending_counsellor_escalations(limit: int = 100) -> list[EscalationV2]:
     return [_v2(p) for p in rows]
 
 
+def event_type_of(key: str) -> str | None:
+    """The type of the event the escalation's support case was opened for (`escalation:{case_id}`), or None for an
+    intake refusal (no case) and for any key that names no case. The frozen payload does not carry it."""
+    if not key.startswith("escalation:") or key.startswith("escalation:intake:"):
+        return None
+    svc = ports.services()
+    tenant, C, EV = svc.settings.tenant_id, models.support_cases, models.events
+    with svc.engine.connect() as conn:
+        event_ids = conn.execute(select(C.c.event_ids).where(
+            C.c.tenant_id == tenant, C.c.id == int(key.split(":")[1]))).scalar()
+        if not event_ids:
+            return None
+        return conn.execute(select(EV.c.type).where(EV.c.tenant_id == tenant, EV.c.id == event_ids[0])).scalar()
+
+
 def _v2(payload: dict) -> EscalationV2:
     """A row stored before P1-T6 is an EscalationV1: it is read as v2 with no decision version."""
     if payload.get("schema") == "pai.escalation.v1":

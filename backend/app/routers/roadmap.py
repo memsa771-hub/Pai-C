@@ -291,7 +291,7 @@ def adoption_offer(network: str = Query(...), db=Depends(get_db), x_workspace_to
     state = RouteDecisionService(db).adoption_state(workspace_id, plan)
     if state == "no_journey":
         return none
-    if state in ("several_plans", "no_places", "no_intake"):  # nothing to offer; the state says why
+    if state in ("several_plans", "identity_taken", "no_places", "no_intake"):  # nothing to offer; the state says why
         return success_response({"offer": False, "state": state})
     return success_response({"offer": True, "state": state, "text": adoption_texts.texts(),
                              "plan": {"plan_id": plan["plan_id"], "route_key": plan["route_key"],

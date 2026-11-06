@@ -263,6 +263,14 @@ def _backfill_vault(db) -> None:
             log.error("PAI OS vault backfill failed for one student: %s", type(exc).__name__)
 
 
+def _is_fact_change(e) -> bool:
+    """Whether the escalation was raised for a Vault fact change (R-22): a hand-off-only route problem."""
+    try:
+        return os_escalation.event_type_of(e.key) == "student_fact_changed"
+    except ports.OsUnavailable:
+        return False
+
+
 def _deliver(db) -> dict:
     from app.routers.escalations import EscalationInput, escalate
 
@@ -271,8 +279,14 @@ def _deliver(db) -> dict:
         if not config.PAI_OS_SERVICE_TOKEN:
             got["waiting"] += 1  # not configured: tried again on the next sweep
             continue
+        handoff = part_on("CONNECT_HANDOFF")
+        if not handoff and _is_fact_change(e):
+            # A fact change is a route problem only for the hand-off (R-22); without it the Counsellor was never told
+            # and still is not: no endpoint call, the row is closed so it does not wait for ever.
+            os_escalation.mark_counsellor_delivery(e.key, "refused", "handoff_off")
+            got["refused"] += 1
+            continue
         try:
-            handoff = part_on("CONNECT_HANDOFF")
             if handoff:  # the five reasons go as they are, with the decision version they belong to
                 body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id, reason_type=e.reason,
                                        details=e.note, decision_version=e.decision_version)

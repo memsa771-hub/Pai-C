@@ -273,22 +273,52 @@ async def test_consent_copy_after_escalation_does_not_bounce_the_stage():
         assert stage(db, journey_id) == "PROPOSED"
 
 
+def _request(programmes):
+    return {"schema": "pai.choice_request.v1", "key": "choice_request:7", "student_ref": "x", "journey_id": "j",
+            "proposal_id": 7, "based_on_version": 1, "programmes": programmes, "target_intake": None,
+            "requested_at": "2026-11-06T10:00:00Z"}
+
+
 @pytest.mark.asyncio
 @pytest.mark.req("R-11")
 async def test_choice_request_with_new_places_after_escalation_returns_to_chosen():
-    from app.pai_c.journey_sync import sync_counselor_stage
+    """The OS write itself ends the escalation hold: no stage sync call is needed."""
     async with confirmed_student() as (client, student, db, journey_id):
         await _escalated(client, student, db, journey_id)
-        request = {"schema": "pai.choice_request.v1", "key": "choice_request:7", "student_ref": "x", "journey_id": "j",
-                   "proposal_id": 7, "based_on_version": 1,
-                   "programmes": [{"programme_ref": "uni-a:cs", "rank": 1}], "target_intake": None,
-                   "requested_at": "2026-11-06T10:00:00Z"}
         with patch("app.pai_os_bridge.route_supported", return_value=True), \
                 patch("app.pai_c.connect.outbox.part_on", return_value=True):
-            assert RouteDecisionService(db).apply_choice_request(student.workspace_id, request) == ("written", 2)
+            assert RouteDecisionService(db).apply_choice_request(
+                student.workspace_id, _request([{"programme_ref": "uni-a:cs", "rank": 1}])) == ("written", 2)
         db.commit()
-        sync_counselor_stage(db, student.workspace_id, reason="student")
+        assert stage(db, journey_id) == "CHOSEN"
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-11")
+async def test_choice_request_with_the_same_places_after_escalation_keeps_proposed():
+    async with confirmed_student() as (client, student, db, journey_id):
+        await _escalated(client, student, db, journey_id)
+        same = [{"programme_ref": r, "rank": i + 1} for i, (r, _) in enumerate(DETAILS.places)]
+        with patch("app.pai_os_bridge.route_supported", return_value=True), \
+                patch("app.pai_c.connect.outbox.part_on", return_value=True):
+            assert RouteDecisionService(db).apply_choice_request(
+                student.workspace_id, _request(same)) == ("written", 2)
         db.commit()
+        assert stage(db, journey_id) == "PROPOSED"
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-11")
+async def test_builder_write_after_escalation_returns_to_chosen():
+    async with confirmed_student() as (client, student, db, journey_id):
+        await _escalated(client, student, db, journey_id)
+        with patch("app.pai_os_bridge.route_supported", return_value=True), \
+                patch("app.pai_c.connect.outbox.part_on", return_value=True):
+            got = RouteDecisionService(db).request_from_builder(
+                student.workspace_id, "PK", "GB", "bachelor", {"term": "autumn", "year": 2027},
+                [{"programme_ref": "uni-c:cs", "rank": 1}])
+        db.commit()
+        assert got == ("written", 2, None)
         assert stage(db, journey_id) == "CHOSEN"
 
 

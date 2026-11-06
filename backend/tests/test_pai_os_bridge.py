@@ -32,8 +32,9 @@ def student():
 @pytest.fixture
 def os_stub(monkeypatch):
     """The OS ports, recorded: mounted, the module on; escalations pending and their delivery marks."""
-    got = {"marked": [], "pending": []}
+    got = {"marked": [], "pending": [], "event_types": {}}
     monkeypatch.setattr(plan_source, "counsellor_enabled", lambda: True, raising=False)
+    monkeypatch.setattr(os_escalation, "event_type_of", lambda key: got["event_types"].get(key), raising=False)
     monkeypatch.setattr(os_escalation, "pending_counsellor_escalations", lambda limit=100: list(got["pending"]))
     monkeypatch.setattr(os_escalation, "mark_counsellor_delivery",
                         lambda key, status, reason=None: got["marked"].append((key, status, reason)))

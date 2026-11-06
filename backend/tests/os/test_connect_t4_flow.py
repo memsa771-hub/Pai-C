@@ -153,3 +153,42 @@ def test_a_vault_write_that_drops_marks_ends_in_a_pending_big_proposal(os_world)
         assert run_rules(os_world, plan_id) == []
         with os_world.engine.connect() as conn:
             assert conn.execute(select(func.count()).select_from(models.proposals)).scalar() == 3
+
+
+@pytest.mark.req("R-11")
+def test_flags_off_a_fact_change_escalation_is_never_sent(os_world):
+    """Module on, CONNECT_HANDOFF off, STUDENT_FACTS on: every place falls below its bar (R-22). The OS records the
+    support case and the Counsellor row, but the bridge makes no call to the escalation endpoint and the journey is
+    unchanged: today the Counsellor never heard of a fact change."""
+    from unittest.mock import MagicMock
+
+    from sqlalchemy import insert
+
+    from app.os.ports import escalation as os_escalation
+    from app.os.replan.rules import REASONS
+
+    ports.configure(os_world.svc)
+    with os_world.engine.begin() as conn:
+        plan_id = conn.execute(insert(models.plans).values(
+            tenant_id=TENANT, source="counsellor", external_ref="j-1:PK:bachelor", student_ref="ws-1", contract={},
+            contract_sha256="0" * 64).returning(models.plans.c.id)).scalar_one()
+        from app.os.replan import events as replan_events
+        event_id = replan_events.record(conn, TENANT, plan_id, "student_fact_changed", {"keys": [], "vault_version": 2},
+                                        "t-1")
+    case_id = os_world.svc.escalations.escalate(plan_id, [event_id], REASONS["fact_all_below"])
+    (pending_row,) = os_escalation.pending_counsellor_escalations()
+    assert pending_row.reason == "not_eligible" and os_escalation.event_type_of(pending_row.key) == "student_fact_changed"
+
+    endpoint = MagicMock()
+    db = MagicMock()
+    with patch.object(config, "CONNECT_STUDENT_FACTS", True, create=True), \
+            patch.object(config, "CONNECT_HANDOFF", False, create=True), \
+            patch.object(config, "PAI_OS_SERVICE_TOKEN", "local-test-token"), \
+            patch("app.routers.escalations.escalate", endpoint):
+        got = bridge._deliver(db)
+    assert endpoint.mock_calls == [] and db.mock_calls == []  # nothing sent, no journey touched
+    assert got == {"sent": 0, "refused": 1, "waiting": 0}
+    assert os_escalation.pending_counsellor_escalations() == []
+    with os_world.engine.connect() as conn:
+        row = conn.execute(select(models.outbox).where(models.outbox.c.idempotency_key == f"escalation:{case_id}")).one()
+    assert row.status == "skipped" and row.payload["delivery"] == {"status": "refused", "reason": "handoff_off"}

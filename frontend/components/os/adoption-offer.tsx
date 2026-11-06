@@ -6,9 +6,9 @@ import { workspaceApi } from '@/lib/api';
 import { adoptionRefusalText, type Adoption } from '@/lib/os-connect';
 import copy from '@/components/counselor/workspace/copy.json';
 
-const WHY_NOT = ['several_plans', 'no_places', 'no_intake'];
+const WHY_NOT = ['several_plans', 'identity_taken', 'no_places', 'no_intake'];
 
-/** True when the offer shows something: the offer itself, or the reason there is none (several plans, no places, no start date). */
+/** True when the offer shows something: the offer itself, or the reason there is none (several plans, a plan already held, no places, no start date). */
 export function adoptionShows(a: Adoption | null): boolean {
   return !!a && (a.offer ? !!a.text && !!a.plan : WHY_NOT.includes(a.state ?? ''));
 }
