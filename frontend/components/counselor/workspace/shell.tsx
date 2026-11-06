@@ -12,7 +12,7 @@ import { NotificationsMenu } from "@/components/layout/notifications-menu";
 import { UserMenu } from "@/components/layout/user-menu";
 import { NotificationsCenterView } from "@/components/notifications/notifications-center-view";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { OS_PAGES, OsNavGroup, osOpenAt, type OsPage } from "@/components/os/os-nav-group";
+import { OS_PAGES, OsNavGroup, osMenuOpen, type OsPage } from "@/components/os/os-nav-group";
 import { MyPlanProvider, useMyPlan } from "@/components/os/my-plan-context";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
@@ -322,7 +322,7 @@ function CounselorShellBody({ children }: { children?: React.ReactNode }) {
           </nav>
         </LayoutGroup>
         </div>
-        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={myPlan.on ? myPlan.plan!.pages.length > 0 : osOpenAt(stage?.id)}
+        <CommandMenu open={command} onOpenChange={setCommand} onGo={navigate} onAsk={chat} osOpen={osMenuOpen(myPlan, stage?.id)}
           pages={myPlan.on ? myPlan.plan!.pages : undefined} />
       </div>
     </SidebarProvider>

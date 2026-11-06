@@ -23,10 +23,20 @@ export interface MyPlan {
   sources: Record<string, MyPlanSource>;
 }
 
-/** An answer is a plan only when it has the shape; anything else reads as "the part is off". */
+/** The OS's own generic page set (the `os-<key>` routes that exist). A page with another key has no screen. */
+export const PAGE_KEYS = ['start', 'inbox', 'documents', 'programmes', 'statements', 'pack', 'visa'] as const;
+
+/** An answer is a plan only when it has the shape; anything else reads as "the part is off". Each page needs a known
+ * key and string label and title; a page that does not is dropped, the rest of the plan stays. */
 export function asMyPlan(body: unknown): MyPlan | null {
   const b = body as Partial<MyPlan> | null;
-  return b && typeof b === 'object' && Array.isArray(b.pages) && typeof b.state === 'string' ? (b as MyPlan) : null;
+  if (!b || typeof b !== 'object' || !Array.isArray(b.pages) || typeof b.state !== 'string') return null;
+  const pages = (b.pages as unknown[]).filter((p): p is MyPlanPage => {
+    const x = p as Partial<MyPlanPage> | null;
+    return !!x && typeof x === 'object' && typeof x.key === 'string' && (PAGE_KEYS as readonly string[]).includes(x.key)
+      && typeof x.label === 'string' && typeof x.title === 'string' && (x.noun == null || typeof x.noun === 'string');
+  });
+  return { ...(b as MyPlan), pages };
 }
 
 const page = (plan: MyPlan | null, key: string) => plan?.pages.find((p) => p.key === key);

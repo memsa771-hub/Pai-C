@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
 import { useMyPlan } from '@/components/os/my-plan-context';
 import { NotInPlan } from '@/components/os/not-in-plan';
-import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
+import { inPlan, pageTitle } from '@/lib/os-my-plan';
 import { ChangesList } from '@/components/os/changes-list';
 import { InboxList } from '@/components/os/inbox-list';
 import { PausedBanner, ProposalCard } from '@/components/os/proposal-card';
@@ -24,6 +24,7 @@ import { goToSignIn } from '@/lib/auth-redirects';
 export default function OsInboxPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
   const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'inbox');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [items, setItems] = useState<OsInboxItem[] | null>(null);
   const [notes, setNotes] = useState<OsNote[]>([]);
@@ -77,7 +78,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   }, []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -85,7 +86,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     // Placement AI: the bearer alone authorizes the call (no workspace token in the browser).
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     void load();
-  }, [loading, user, idToken, workspaceId, load]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load]);
 
   const complete = async (item: OsInboxItem, payload: Record<string, unknown> = {}) => {
     setBusyId(item.id);
@@ -154,7 +155,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
 
   if (!OS_UI_ENABLED) notFound();
 
-  if (on && !inPlan(plan, 'inbox')) return <NotInPlan workspaceId={workspaceId} />;
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
 
   return (
     <div className="mx-auto w-full max-w-3xl">

@@ -11,7 +11,8 @@ export function NotInPlan({ workspaceId }: { workspaceId: string }) {
   const href = first ? `/${workspaceId}/os-${first.key}` : `/${workspaceId}?view=journey`;
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <p className="text-sm">{copy.connect.myPlan.notInPlan}</p>
+      <h1 className="text-xl font-bold">{copy.connect.myPlan.notInPlanTitle}</h1>
+      <p className="mt-2 text-sm">{copy.connect.myPlan.notInPlan}</p>
       <Link href={href} className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
         {first ? copy.connect.myPlan.notInPlanLink : copy.connect.myPlan.emptyLink}
       </Link>

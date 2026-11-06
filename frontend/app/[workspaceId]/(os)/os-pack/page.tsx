@@ -44,6 +44,7 @@ function save(blob: Blob, filename: string) {
 export default function OsPackPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
   const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'pack');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [packs, setPacks] = useState<OsPack[] | null>(null);
   const [openRef, setOpenRef] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
   ), []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -67,7 +68,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
     workspaceApi.getVault().then(setProfile, () => setProfile(null));
-  }, [loading, user, idToken, workspaceId, load]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load]);
 
   const building = packs?.some((p) => p.status === 'building') ?? false;
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function OsPackPage({ params }: { params: Promise<{ workspaceId: 
 
   const open = packs?.find((p) => p.programme_ref === openRef);
 
-  if (on && !inPlan(plan, 'pack')) return <NotInPlan workspaceId={workspaceId} />;
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
 
   return (
     <div className="mx-auto w-full max-w-3xl">

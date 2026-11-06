@@ -45,6 +45,7 @@ function save(blob: Blob, filename: string) {
 export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
   const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'visa');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [visa, setVisa] = useState<OsVisa | null>(null);
   const [details, setDetails] = useState(false);
@@ -58,7 +59,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
   ), []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -67,7 +68,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
     workspaceApi.getVault().then(setProfile, () => setProfile(null));
-  }, [loading, user, idToken, workspaceId, load]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load]);
 
   const building = visa?.status === 'building';
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
     }
   }
 
-  if (on && !inPlan(plan, 'visa')) return <NotInPlan workspaceId={workspaceId} />;
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">

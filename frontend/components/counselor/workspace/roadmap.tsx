@@ -4,6 +4,7 @@
  * every status from the Vault and the rules; this page only shows it and
  * records the student's own choice. */
 import { useState } from "react";
+import { useMyPlan } from "@/components/os/my-plan-context";
 import { ChevronDown, Columns2, Compass, Info, Map as MapIcon, PencilLine, X } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
 import type { ChoiceOptions, FieldCard, RoadmapStatus } from "@/lib/roadmap";
@@ -41,6 +42,7 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
   onChanged?: () => void;
 }) {
   const resource = useResource(load);
+  const { refresh: refreshMyPlan } = useMyPlan();  // P1-T9: a choice makes (or changes) the plan
   const [picked, setPicked] = useState<string[]>([]),
     [sheet, setSheet] = useState<FieldCard | null>(null),
     [comparing, setComparing] = useState(false),
@@ -69,6 +71,7 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
     await workspaceApi.chooseRoute(card.field_key!);
     setSheet(null);
     await resource.refresh();
+    refreshMyPlan();
     onChanged?.();
   };
   const cardsOf = (status: RoadmapStatus) => fields.filter((c) => c.status === status);
@@ -149,7 +152,7 @@ export function Roadmap({ onNavigate, onChat, onChanged }: {
       {flow && (
         <ChoiceFlow card={flow.card} options={flow.options} onClose={() => setFlow(null)}
           onOpenVault={() => { setFlow(null); onNavigate?.("profile"); }}
-          onSaved={async () => { await resource.refresh(); onChanged?.(); }} />
+          onSaved={async () => { await resource.refresh(); refreshMyPlan(); onChanged?.(); }} />
       )}
       <CompareDialog open={comparing} onOpenChange={setComparing}
         cards={picked.map((id) => fields.find((c) => c.possibility_id === id)).filter((c): c is FieldCard => !!c)} />

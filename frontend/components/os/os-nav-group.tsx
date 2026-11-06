@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FileText, Flag, GraduationCap, Inbox, Package, PenLine, Plane, type LucideIcon } from 'lucide-react';
 import copy from '@/components/counselor/workspace/copy.json';
-import { useMyPlan } from '@/components/os/my-plan-context';
+import { useMyPlan, type MyPlanState } from '@/components/os/my-plan-context';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { OS_FROM_STAGE, OS_REHEARSAL_UI, OS_UI_ENABLED } from '@/lib/config';
 import { useT } from '@/lib/i18n';
@@ -36,6 +36,11 @@ export function osOpenAt(stageId: string | undefined, rehearsal = OS_REHEARSAL_U
   return !!stageId && stageId >= OS_FROM_STAGE;
 }
 
+/** Whether the plan's places are open at all: with My plan on, when the route has pages; off, today's stage gate. */
+export function osMenuOpen(my: MyPlanState, stageId: string | undefined): boolean {
+  return my.on ? my.plan!.pages.length > 0 : osOpenAt(stageId);
+}
+
 /** "Study abroad plan" in the counsellor's rail: the same pills, icons and current-page mark as the counsellor's own
  * places, so the two read as one app. Renders nothing until the plan is open to the student (osOpenAt). */
 export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: {
@@ -50,6 +55,7 @@ export function OsNavGroup({ stageId, current, collapsed = false, onNavigate }: 
   const { on, plan } = useMyPlan();
   // With My plan on (P1-T9) the group is always there and lists the route's own pages; off, today's group.
   if (!workspaceId || !(on ? OS_UI_ENABLED : osOpenAt(stageId))) return null;
+  if (on && plan!.pages.length === 0 && collapsed) return null;  // nothing to show in a narrow rail
   const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
   const pages: { page: OsPage; label: string }[] = on
     ? plan!.pages.map((p) => ({ page: `os-${p.key}` as OsPage, label: p.label }))
