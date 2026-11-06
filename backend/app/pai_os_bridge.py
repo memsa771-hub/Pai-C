@@ -33,6 +33,7 @@ from app.os.ports import escalation as os_escalation
 from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.ports import document_files as os_document_files, plan_source, student_facts as os_student_facts
+from app.os.ports import fact_proposals as os_fact_proposals
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
 from app.pai_c.connect.flags import part_on
@@ -209,6 +210,53 @@ def deliver_choice_request_now(key: str) -> None:
         _deliver_choice_request(db, request)
 
 
+def deliver_fact_proposals(db) -> dict:
+    """Hands the pending fact proposals (P1-T7, R-16, D-y9) to the Vault's sink, oldest first. Only while the
+    CONNECT_ONE_UPLOAD part is on. Each row: the sink writes its candidates, the app transaction commits, then the OS
+    row is marked (a crash in between repeats harmlessly: the proposal key makes the repeat a `duplicate`). An error
+    rolls back and leaves the row pending; one failure never stops the others."""
+    from app.pai_c.connect import document_facts  # lazy: Counsellor code
+
+    got = {"written": 0, "duplicate": 0, "refused": 0, "failed": 0}
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return got
+    for proposal in os_fact_proposals.pending():
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+            os_fact_proposals.mark(proposal.key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
+            got[outcome] += 1
+        except ports.OsUnavailable:
+            db.rollback()
+            break
+        except Exception as exc:  # noqa: BLE001  (class name only, no student data; the next sweep tries again)
+            db.rollback()
+            log.error("PAI OS fact proposal could not be delivered: %s", type(exc).__name__)
+            got["failed"] += 1
+    return got
+
+
+def deliver_fact_proposal_now(key: str) -> None:
+    """The post-commit nudge after the student confirmed a document (`mount_os(on_fact_proposal=)`): delivers that one
+    proposal in its own session, so the facts do not wait for the sweep. Never raises past the OS port's guard."""
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return
+    from app.database import new_session
+    from app.pai_c.connect import document_facts
+
+    proposal = next((p for p in os_fact_proposals.pending() if p.key == key), None)
+    if proposal is None:
+        return
+    with new_session() as db:
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        os_fact_proposals.mark(key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
+
+
 def _backfill(db) -> None:
     """A student whose newest decision version is above the one PAI OS holds, and whose newest row has no outbox row
     (the decision was made while the part was off), gets that row now; a delivered row the OS lacks goes back to pending. Only the newest version is queued."""
@@ -360,6 +408,13 @@ def sweep_once(db) -> dict:
         return {"mounted": False}
     delivered = failed = 0
     try:
+        if part_on("CONNECT_ONE_UPLOAD"):
+            try:  # before the pending vault events go out, so the events these proposals raise leave in this sweep
+                os_fact_proposals.backfill()
+                deliver_fact_proposals(db)
+            except Exception as exc:  # noqa: BLE001  (class name only; the rest of the sweep still runs)
+                db.rollback()
+                log.error("PAI OS sweep could not deliver fact proposals: %s", type(exc).__name__)
         handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
         if handoff or facts:
             if handoff:

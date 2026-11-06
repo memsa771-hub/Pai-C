@@ -322,3 +322,42 @@ def test_empty_plan_view_holds_nothing():
         PlanViewV1.model_validate(plan_view(documents_needed=[{"doc_type": "transcript", "status": "missing"}]))
     with pytest.raises(ValidationError, match="empty plan view"):
         PlanViewV1.model_validate(plan_view(route=ROUTE))
+
+
+# ---- P1-T7 Task 3: fact_proposal ----
+
+from app.os.contracts.fact_proposal import FactProposalV1  # noqa: E402
+
+
+def fact_proposal(**over) -> dict:
+    base = {"schema": "pai.fact_proposal.v1", "key": "fact_proposal:1:1", "student_ref": "ws-1",
+            "document_ref": "file-1", "doc_type": "hssc_certificate", "confirmed_at": "2027-01-10T09:00:00+00:00",
+            "facts": [{"key": "education.intermediate.marks_obtained", "value": 900}]}
+    return {**base, **over}
+
+
+@pytest.mark.req("R-16")
+def test_fact_proposal_valid_and_strict():
+    ok = FactProposalV1.model_validate(fact_proposal())
+    assert ok.facts[0].value == 900
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(extra="x"))  # extra="forbid"
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": "education.x", "value": 1, "note": "n"}]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(confirmed_at="2027-01-10T09:00:00"))  # must be aware
+
+
+@pytest.mark.req("R-16")
+def test_fact_proposal_facts_bounded_and_unique():
+    one = {"key": "education.intermediate.marks_obtained", "value": 1}
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[]))
+    with pytest.raises(ValidationError, match="duplicate"):
+        FactProposalV1.model_validate(fact_proposal(facts=[one, one]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": f"a.k{i}", "value": 1} for i in range(21)]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": "Bad Key", "value": 1}]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(key="Fact Proposal"))

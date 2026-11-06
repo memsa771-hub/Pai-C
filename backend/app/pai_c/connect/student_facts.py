@@ -82,7 +82,9 @@ class _Facts:
             "as_of": _aware(as_of)}
 
 
-def _record_facts(out: _Facts, records: list[dict]) -> None:
+def chosen_education(records: list[dict]) -> dict[str, dict]:
+    """The education record that stands for each family (`student_facts_keys.yaml`): the newest, a current one before
+    an older one. Also how P1-T7 picks the record a document's marks are written to."""
     from app.pai_c.memory import vault_catalog
 
     catalog, mapping = vault_catalog(), _key_map()["education"]
@@ -93,7 +95,15 @@ def _record_facts(out: _Facts, records: list[dict]) -> None:
         if family and (family not in chosen or (row.get("academic_status") == "current"
                                                 and chosen[family].get("academic_status") != "current")):
             chosen[family] = row
-    for family, row in chosen.items():
+    return chosen
+
+
+def _record_facts(out: _Facts, records: list[dict]) -> None:
+    from app.pai_c.memory import vault_catalog
+
+    catalog, mapping = vault_catalog(), _key_map()["education"]
+    spec = catalog.type("education")
+    for family, row in chosen_education(records).items():
         result, evidence = row.get("result") or {}, row.get("evidence") or {}
         values = {"level": catalog.record_level(spec, row), **result}
         for part in ("part1", "part2"):

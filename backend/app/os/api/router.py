@@ -94,7 +94,7 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
-from app.os.ports import choice_requests, document_files
+from app.os.ports import choice_requests, document_files, fact_proposals
 from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -404,7 +404,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         doc = own_document(svc, doc_id, student)
         tenant = svc.settings.tenant_id
         try:
-            confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
+            proposal_key = confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
         except NotConfirmable as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except ValueError as e:
@@ -412,7 +412,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
-        return document_out(store, store.get(doc_id), findings, svc.document_types)
+        out = document_out(store, store.get(doc_id), findings, svc.document_types)
+        fact_proposals.notify(proposal_key)  # P1-T7: after the answer is built; the host's sweep is the backup
+        return out
 
     @router.post("/documents/findings/{finding_id}/resolve", response_model=FindingOut)
     def resolve(finding_id: int, body: ResolveIn, student: str = Depends(current_student_ref_for_write),

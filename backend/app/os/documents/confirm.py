@@ -31,9 +31,12 @@ def _empty(v) -> bool:
 
 
 def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], variants: list[set[str]],
-                     doc: Document, values: dict) -> None:
+                     doc: Document, values: dict) -> str | None:
     """Every field of the type, no more and no fewer (`ValueError` otherwise). Then the findings are checked again
-    with the confirmed values, and the profile values are set."""
+    with the confirmed values, and the profile values are set. With the host part on (or a document linked to a host
+    file) the type's `fact:` fields are also offered to the Counsellor's Vault as one fact proposal (P1-T7); the
+    return value is that proposal's outbox key, or None. The caller nudges the host with `fact_proposals.notify(key)`
+    after its response is built."""
     if doc.status not in CONFIRMABLE:
         raise NotConfirmable(f"this document is {doc.status}; it can be confirmed once it is read")
     t = types[doc.doc_type]
@@ -53,6 +56,29 @@ def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, Documen
     for name, v in values.items():
         if not _empty(v):
             profile.set(doc.student_ref, f"{doc.doc_type}.{name}", v, doc.id)
+    return _propose_facts(engine, tenant_id, types, doc, values)
+
+
+def _propose_facts(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], doc: Document,
+                   values: dict) -> str | None:
+    """The fact proposal row for a document the student just confirmed. The confirmation is already stored, so a
+    failure here is logged by class name and never fails it: the sweep's backfill writes the row later."""
+    from app.os.ports import document_files, fact_proposals  # late: the ports import the stores
+
+    # The worker never configures `enabled()`, so the gate is also "linked to a host file" (a link exists only while
+    # the part was on). Off and unlinked, nothing is written.
+    if not (document_files.enabled() or doc.file_ref is not None):
+        return None
+    try:
+        facts = fact_proposals.facts_of(doc, types, values)
+        if not facts:
+            return None
+        stored = DocumentStore(engine, tenant_id).get(doc.id)  # the stored confirmation time makes the key
+        with engine.begin() as conn:
+            return fact_proposals.emit(conn, tenant_id, stored, facts)
+    except Exception as e:  # class name only: no ids, no values
+        log.error("fact proposal could not be written (%s)", type(e).__name__)
+        return None
 
 
 def _resolved_with(engine: Engine, tenant_id: str, doc: Document) -> set[str]:

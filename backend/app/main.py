@@ -24,7 +24,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.database import get_db
 from app.os.api import mount_os
-from app.pai_os_bridge import (choice_enabled, deliver_choice_request_now, document_file_bytes, documents_enabled,
+from app.pai_os_bridge import (choice_enabled, deliver_choice_request_now, deliver_fact_proposal_now, document_file_bytes, documents_enabled,
                                on_os_document_deleted, recipient_email, request_choice, student_facts)
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
@@ -481,7 +481,7 @@ OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dep
                       choice_enabled=choice_enabled, on_choice_request=deliver_choice_request_now,
                       choice_sink=request_choice, choice_sink_enabled=choice_enabled,
                       document_files=document_file_bytes, documents_enabled=documents_enabled,
-                      on_document_deleted=on_os_document_deleted)
+                      on_document_deleted=on_os_document_deleted, on_fact_proposal=deliver_fact_proposal_now)
 
 
 @app.get("/health")
