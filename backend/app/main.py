@@ -477,7 +477,7 @@ def _os_student_ref_for_write(
 OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write,
                       recipient_lookup=recipient_email, student_facts=student_facts,
                       choice_enabled=choice_enabled, on_choice_request=deliver_choice_request_now,
-                      choice_sink=request_choice)
+                      choice_sink=request_choice, choice_sink_enabled=choice_enabled)
 
 
 @app.get("/health")

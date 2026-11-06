@@ -13,11 +13,22 @@ cross as IDs and codes: `intake` is `{"term", "year"}` and `choices` is `[{"prog
 from collections.abc import Callable
 
 _request: Callable[..., dict | None] | None = None
+_enabled: Callable[[], bool] | None = None
 
 
-def configure(request: Callable[..., dict | None] | None) -> None:
-    global _request
-    _request = request
+def configure(request: Callable[..., dict | None] | None, enabled: Callable[[], bool] | None = None) -> None:
+    global _request, _enabled
+    _request, _enabled = request, enabled
+
+
+def enabled() -> bool:
+    """True only when the host configured the gate and its part is on. Unconfigured, or any exception, reads as off."""
+    if _enabled is None:
+        return False
+    try:
+        return bool(_enabled())
+    except Exception:
+        return False
 
 
 def request(student_ref: str, origin: str, destination: str, level: str, intake: dict, choices: list[dict]) -> dict | None:

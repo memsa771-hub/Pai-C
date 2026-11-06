@@ -62,7 +62,8 @@ def test_builder_with_counsellor_on_writes_decision(world):
     svc_ = world
     with germany_student() as (client, who, params), level("master"):
         begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
         body = {**START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1},
@@ -85,7 +86,8 @@ def test_builder_with_counsellor_on_writes_decision(world):
 def test_builder_no_field_is_409_choose_field_first(world):
     svc_ = world
     with germany_student() as (client, who, params), level("master"):
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
         body = {**START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1}]}
@@ -98,7 +100,8 @@ def test_builder_six_places_is_409_too_many_places(world):
     svc_ = world
     with germany_student() as (client, who, params), level("master"):
         begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
         store = ProgrammeStore(svc_.engine, "pai")
@@ -115,7 +118,8 @@ def test_builder_repeat_is_unchanged_not_new_version(world):
     svc_ = world
     with germany_student() as (client, who, params), level("master"):
         begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
         h = {"X-Test-Student": who.workspace_id}
@@ -133,7 +137,8 @@ def test_builder_note_null_until_approved(world):
     svc_ = world
     with germany_student() as (client, who, params), level("master"):
         begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         os_api = os_client(svc_)
         agree(os_api, who.workspace_id)
         r = os_api.post(f"{P}/plans/self", headers={"X-Test-Student": who.workspace_id}, json={
@@ -146,7 +151,8 @@ def test_handoff_off_the_bridge_answers_none_and_the_builder_is_standalone(world
     svc_ = world
     with germany_student() as (client, who, params), level("master"), \
             patch("app.config.config.CONNECT_HANDOFF", False, create=True):
-        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice)
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                    choice_sink_enabled=bridge.choice_enabled)
         assert bridge.request_choice(who.workspace_id, "PK", "DE", "master", WINTER,
                                      [{"programme_ref": "ovgu-eeit", "rank": 1}]) is None
         os_api = os_client(svc_)
@@ -158,3 +164,55 @@ def test_handoff_off_the_bridge_answers_none_and_the_builder_is_standalone(world
         with who.factory() as db:
             assert db.scalar(select(func.count()).select_from(RouteDecision).where(
                 RouteDecision.workspace_id == who.workspace_id)) == 0
+
+
+def test_unchanged_choice_with_the_version_applied_answers_unchanged(world):
+    svc_ = world
+    with germany_student() as (client, who, params), level("master"):
+        vault((client, who, params))
+        data(choose_with(client, params, destination="DE", places=[{"ref": "ovgu-eeit", "rank": 1}], intake=WINTER))
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                        choice_sink_enabled=bridge.choice_enabled)
+        os_api = os_client(svc_)
+        agree(os_api, who.workspace_id)
+        h = {"X-Test-Student": who.workspace_id}
+        body = {**START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1}]}
+        before = os_api.post(f"{P}/plans/self", headers=h, json=body)  # version 1 is not applied yet
+        assert before.status_code == 202 and before.json()["state"] == "preparing"
+        assert run_os(svc_) == [("planned", None)]
+        after = os_api.post(f"{P}/plans/self", headers=h, json=body)
+        assert after.status_code == 202 and after.json() == {"state": "unchanged", "decision_version": 1, "note": None}
+        assert count(svc_, "self_serve") == 0
+
+
+def test_delivery_failure_after_the_commit_still_answers_written(world):
+    svc_ = world
+    with germany_student() as (client, who, params), level("master"):
+        begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
+        with patch.object(bridge, "deliver_pending", side_effect=RuntimeError("os down")):
+            answer = bridge.request_choice(who.workspace_id, "PK", "DE", "master", WINTER, [
+                {"programme_ref": "ovgu-eeit", "rank": 1}, {"programme_ref": "btu-artificial-intelligence", "rank": 2}])
+        assert answer == {"outcome": "written", "decision_version": 2, "code": None}
+        with who.factory() as db:  # committed, and waiting for the sweep
+            assert db.scalar(select(func.max(RouteDecision.decision_version)).where(
+                RouteDecision.workspace_id == who.workspace_id)) == 2
+
+
+def test_the_decision_service_raising_is_503_and_nothing_is_written(world):
+    svc_ = world
+    with germany_student() as (client, who, params), level("master"):
+        begin(svc_, client, who, params, [{"ref": "ovgu-eeit", "rank": 1}])
+        ports.configure(svc_, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
+                        choice_sink_enabled=bridge.choice_enabled)
+        os_api = os_client(svc_)
+        agree(os_api, who.workspace_id)
+        body = {**START, "choices": [{"programme_ref": "ovgu-eeit", "rank": 1},
+                                     {"programme_ref": "btu-artificial-intelligence", "rank": 2}]}
+        with patch("app.pai_c.roadmap.decisions.RouteDecisionService.request_from_builder",
+                   side_effect=RuntimeError("db down")):
+            r = os_api.post(f"{P}/plans/self", headers={"X-Test-Student": who.workspace_id}, json=body)
+        assert r.status_code == 503 and r.json() == {"detail": "counsellor_unavailable"}
+        assert count(svc_, "self_serve") == 0
+        with who.factory() as db:
+            assert db.scalar(select(func.max(RouteDecision.decision_version)).where(
+                RouteDecision.workspace_id == who.workspace_id)) == 1

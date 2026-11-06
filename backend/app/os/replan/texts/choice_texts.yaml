@@ -6,4 +6,5 @@ requested: Your change is with your counsellor. It is not in your plan yet; we w
 expired: This change was not made, because your choice has moved on. Look at your plan and ask again if you still want it.
 preparing: Your choice is with your counsellor. Your plan is being prepared and will appear here soon.
 choose_field_first: Choose your field with PAI first. Your plan is built from that choice.
-too_many_places: You can keep at most five places in your plan. Remove some and try again.
+too_many_places: You have chosen too many places. Remove some and try again.
+adopt_first: You already have a plan of your own. Ask to move it to your counsellor first; then you can change it here.

@@ -307,11 +307,14 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except builder.ChoiceRefused as e:  # the Counsellor is on and would not take the choice (R-09)
             return JSONResponse(status_code=409, content={"detail": e.code, "note": choice_texts.note(e.code, svc.settings)})
+        except builder.CounsellorUnavailable:
+            return JSONResponse(status_code=503, content={"detail": "counsellor_unavailable"})
         except (builder.NotAllowed, PlaybookError, CompileError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         if isinstance(ref, builder.Preparing):  # no plan yet: it comes from the intake of the decision version
-            return JSONResponse(status_code=202, content={"state": "preparing", "decision_version": ref.decision_version,
-                                                          "note": choice_texts.note("preparing", svc.settings)})
+            note = choice_texts.note("preparing", svc.settings) if ref.state == "preparing" else None
+            return JSONResponse(status_code=202, content={"state": ref.state, "decision_version": ref.decision_version,
+                                                          "note": note})
         if not ref.created:
             response.status_code = 200
         return self_serve.self_plan_out(svc.plans, ref.plan_id)

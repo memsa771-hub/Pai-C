@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 PATH = Path(__file__).parent / "texts" / "choice_texts.yaml"
-KEYS = ("requested", "expired", "preparing", "choose_field_first", "too_many_places")
+KEYS = ("requested", "expired", "preparing", "choose_field_first", "too_many_places", "adopt_first")
 
 
 @cache

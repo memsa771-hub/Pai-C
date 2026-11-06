@@ -17,7 +17,7 @@ from app.os.adapters.counsellor import manifest
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef, contract_sha256
-from app.os.kernel.states import is_started
+from app.os.kernel.states import PLAN_OPEN, is_started
 from app.os.knowledge.requests import visible_programmes
 from app.os.ports import choice_requests, choice_sink
 from app.os.replan.ops import CancelProgramme, SwapProgramme
@@ -54,12 +54,19 @@ class ChoiceRefused(Exception):
         self.code = code
 
 
+class CounsellorUnavailable(Exception):
+    """With the Counsellor on, the host could not take the choice (it raised before anything was written). The API
+    answers 503; the builder never falls back to a plan of its own."""
+
+
 @dataclass(frozen=True)
 class Preparing:
     """With the Counsellor on, the choice went to the decision service as `decision_version`; the plan comes from the
-    intake of that version, not from the builder (the API answers 202)."""
+    intake of that version, not from the builder (the API answers 202). `state` is "unchanged" when the choice was
+    already the student's and an OS plan already holds that version."""
 
     decision_version: int
+    state: str = "preparing"
 
 
 class SwapLimit(NotAllowed):
@@ -78,6 +85,24 @@ def _check_programmes(plans, route_key: str, year: int, refs: list[str]) -> None
     unknown = [r for r in refs if r not in visible]
     if unknown:
         raise NotAllowed(f"not a programme of this route for {year}: {', '.join(unknown)}")
+
+
+def _open_self_serve(plans, student_ref: str) -> bool:
+    with plans.engine.connect() as conn:
+        return conn.execute(select(P.c.id).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.source == "self_serve",
+            P.c.status.in_(PLAN_OPEN)).limit(1)).first() is not None
+
+
+def _state(plans, student_ref: str, answer: dict) -> str:
+    """"unchanged" when the choice was already the student's and an OS plan already holds that version."""
+    if answer["outcome"] != "unchanged":
+        return "preparing"
+    with plans.engine.begin() as conn:
+        ids = conn.execute(select(P.c.id).where(P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref,
+                                                P.c.source == "counsellor", P.c.status.in_(PLAN_OPEN))).scalars().all()
+        applied = max((choice_requests.decision_version_of(conn, plans.kernel.tenant_id, i) or 0 for i in ids), default=0)
+    return "unchanged" if applied >= answer["decision_version"] else "preparing"
 
 
 def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
@@ -102,13 +127,19 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
     existing = plans._existing_plan(contract)
     if existing is not None and plans._contract(existing)[1] != contract_sha256(contract):
         raise PlanExists("you already have a plan for this route and intake; change its programmes with swap or remove")
-    if existing is None and manifest.is_enabled(plans.engine, plans.kernel.tenant_id):
-        answer = choice_sink.request(student_ref, book.route.origin, book.route.destination, book.route.level,
-                                     intake.model_dump(), [c.model_dump() for c in choices])
+    if manifest.is_enabled(plans.engine, plans.kernel.tenant_id) and choice_sink.enabled():
+        if _open_self_serve(plans, student_ref):  # the intake would refuse the decision it makes (adoption is Task 6)
+            raise ChoiceRefused("adopt_first")
+        try:
+            answer = choice_sink.request(student_ref, book.route.origin, book.route.destination, book.route.level,
+                                         intake.model_dump(), [c.model_dump() for c in choices])
+        except Exception:
+            log.exception("the Counsellor could not take the route builder's choice")
+            raise CounsellorUnavailable() from None
         if answer is not None:
             if answer["outcome"] == "refused":
                 raise ChoiceRefused(answer["code"])
-            return Preparing(answer["decision_version"])
+            return Preparing(answer["decision_version"], _state(plans, student_ref, answer))
     ref = plans.start_plan(contract)
     task = book.self_serve.choose_task if book.self_serve else None
     if task and ref.created:

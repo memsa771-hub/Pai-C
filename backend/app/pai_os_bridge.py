@@ -115,8 +115,11 @@ def request_choice(student_ref: str, origin: str, destination: str, level: str, 
         except Exception:
             db.rollback()
             raise
-        if outcome == "written":
-            deliver_pending(db, workspace_id)
+        if outcome in ("written", "unchanged"):
+            try:  # best effort: the decision is committed, and the sweep delivers it anyway
+                deliver_pending(db, workspace_id)
+            except Exception as exc:  # noqa: BLE001
+                log.error("PAI OS could not take the builder's decision now: %s", type(exc).__name__)
     return {"outcome": outcome, "decision_version": version, "code": code}
 
 

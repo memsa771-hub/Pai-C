@@ -355,7 +355,8 @@ class RouteDecisionService:
         `choose_field_first` (no active decision: the builder knows no field, D-x4) or `too_many_places`. The new
         version copies everything else from the active row, field and consent included. The key is
         `builder:{sha256 of the base version, route, intake and places}`: the base version keeps a student who goes back
-        to an earlier choice from being read as a repeat. No commit: the caller commits, then delivers the outbox row."""
+        to an earlier choice from being read as a repeat. The key lookup is only a backstop (the unique index is the
+        final guard); the "unchanged" comparison with the active row is the real guard against a repeat. No commit: the caller commits, then delivers the outbox row."""
         self._lock(workspace_id)
         active = self.active(workspace_id)
         if active is None:
