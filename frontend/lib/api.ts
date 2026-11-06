@@ -38,6 +38,7 @@ function mapFileResponse(raw: Record<string, unknown>): WorkspaceFile {
     channelName: (raw.channel_name ?? raw.channelName ?? null) as string | null,
     status: (raw.status || 'active') as string,
     createdAt: (raw.created_at || raw.createdAt || null) as string | null,
+    ...(raw.os_document ? { os_document: raw.os_document as import('./os-documents').OsDocumentResult } : {}),
   };
 }
 
@@ -250,6 +251,27 @@ class WorkspaceApi {
       throw new Error(`API ${res.status}: ${detail}`);
     }
     return (await res.json()) as import('./os-documents').OsDocument;
+  }
+
+  /** The one upload entry point: is it on, and which types and sentences (P1-T7, D-y5). Off, or any error: off. */
+  async getUploadOptions(): Promise<import('./os-documents').UploadOptions> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request(`/v1/uploads/options?${params}`);
+  }
+
+  /** Makes a file already stored an OS document of the picked type (P1-T7, D-y3). */
+  async registerOsDocument(fileId: string, docType: string): Promise<import('./os-documents').OsDocumentResult> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.request<{ os_document: import('./os-documents').OsDocumentResult }>(
+      `/v1/uploads/${encodeURIComponent(fileId)}/os-document?${params}`,
+      { method: 'POST', body: JSON.stringify({ doc_type: docType }) });
+    return body.os_document;
+  }
+
+  /** PAI OS: a document's fields compared with the Vault, live (P1-T7, D-y11). 404 means nothing to compare. */
+  async getOsVaultCheck(id: number): Promise<import('./os-documents').VaultCheck> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/${id}/vault-check?${params}`);
   }
 
   /** PAI OS: confirm or correct every field of one document. */
@@ -1090,11 +1112,14 @@ class WorkspaceApi {
       /** Fraction uploaded, 0–1. Never fires if the browser can't measure it. */
       onProgress?: (fraction: number) => void;
       signal?: AbortSignal;
+      /** The document type the student picked (P1-T7); left out, nothing is sent. */
+      docType?: string;
     },
   ): Promise<WorkspaceFile> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('network', this.workspaceId);
+    if (options?.docType) formData.append('doc_type', options.docType);
     if (channelName) formData.append('channel_name', channelName);
 
     return this.authHeaders().then((headers) => new Promise<WorkspaceFile>((resolve, reject) => {

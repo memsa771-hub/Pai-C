@@ -14,6 +14,7 @@ import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import type { OsConsent } from '@/lib/os-consent';
 import { typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
+import { useUploadOptions } from '@/hooks/use-upload-options';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
 
@@ -67,6 +68,9 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     void loadConsent();
   }, [outOfPlan, loading, user, idToken, workspaceId, load, loadConsent]);
 
+  // P1-T7: on, every upload goes to the one endpoint. Declared after the effect that configures the client.
+  const options = useUploadOptions(OS_UI_ENABLED && !outOfPlan && !loading && !!user);
+
   const waiting = data?.documents.some((d) => d.status === 'uploaded' || d.status === 'reading') ?? false;
   useEffect(() => {
     if (!waiting) return;
@@ -91,8 +95,18 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   async function upload(file: File, docType: string) {
     setBusy(true);
     try {
-      await workspaceApi.uploadOsDocument(file, docType);
-      await load();
+      if (options.one_upload) {
+        const saved = await workspaceApi.uploadFile(file, undefined, { docType });
+        await load();  // load() clears the error line, so the note is set after it
+        const got = saved.os_document;
+        if (got && 'refused' in got) {  // the file is saved; the server's note says why it is not a study document
+          const now = got.refused === 'consent_needed' ? await loadConsent() : null;
+          if (now && !now.agreed) { setRefused(true); setError(null); } else setError(got.note);
+        }
+      } else {
+        await workspaceApi.uploadOsDocument(file, docType);
+        await load();
+      }
     } catch (e) {
       const now = await loadConsent();
       if (now && !now.agreed) {  // refused for missing consent (the terms may have changed): the card asks

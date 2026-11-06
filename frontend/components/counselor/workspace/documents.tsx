@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DOCUMENT_ACCEPT } from "@/lib/document-types";
@@ -8,6 +8,7 @@ import { useLayout } from "@/components/layout/layout-context";
 import { cn } from "@/lib/utils";
 import { TrashView } from "@/components/files/trash-view";
 import { OsVaultStrip } from "@/components/os/vault-strip";
+import { useUploadOptions } from "@/hooks/use-upload-options";
 import copy from "./copy.json";
 
 /** Documents: the file list and a preview, with one upload action (the same
@@ -17,6 +18,8 @@ export function DocumentsView({ list, preview }: { list: React.ReactNode; previe
   const { selectedFileId, setSelectedFileId, enqueueUploads, currentFilePath } = useWorkspace();
   const { mobilePane, openMobileList, filesSection } = useLayout();
   const input = useRef<HTMLInputElement>(null);
+  const options = useUploadOptions();  // P1-T7: off, the header row is exactly as before
+  const [docType, setDocType] = useState("");
   useEffect(() => { openMobileList(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const detail = !!selectedFileId || mobilePane === "detail";
   return (
@@ -25,7 +28,16 @@ export function DocumentsView({ list, preview }: { list: React.ReactNode; previe
         <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
           <h1 className="font-display text-[1.85rem] leading-[1.15] sm:text-[2.25rem]">{copy.documentsTitle}</h1>
           <input ref={input} type="file" multiple hidden accept={`image/*,${DOCUMENT_ACCEPT}`}
-            onChange={(e) => { if (e.target.files?.length) enqueueUploads(Array.from(e.target.files), currentFilePath || ""); e.target.value = ""; }} />
+            onChange={(e) => { if (e.target.files?.length) enqueueUploads(Array.from(e.target.files), currentFilePath || "", docType || undefined); e.target.value = ""; }} />
+          {options.one_upload && (
+            <label className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="text-muted-foreground">{options.text.type_label}</span>
+              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="min-w-0 rounded-md border bg-background px-2 py-1 text-sm">
+                <option value="">{options.text.type_none}</option>
+                {options.doc_types.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </label>
+          )}
           <Button size="tap" onClick={() => input.current?.click()}><Upload aria-hidden />{copy.documents.upload}</Button>
         </div>
         <OsVaultStrip />
