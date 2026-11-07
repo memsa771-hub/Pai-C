@@ -781,3 +781,38 @@ consistency_runs = Table(
     Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
+
+# P2-T8 (os_0026): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
+INTAKE_STATES = ("planned", "open", "current", "closed")
+
+intakes = Table(
+    "os_intakes", md,
+    _id(), _tenant(),
+    Column("region", Text, nullable=False),
+    Column("family", Text, nullable=False),
+    Column("term", Text, nullable=False),
+    Column("year", Integer, nullable=False),
+    Column("state", Text, nullable=False, server_default="planned"),
+    Column("gate_passed_at", DateTime(timezone=True)),
+    Column("opened_from_id", BigInteger, ForeignKey("os.os_intakes.id", ondelete="SET NULL")),
+    _created(),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "region", "family", "term", "year", name="uq_os_intakes_key"),
+    _in("state", INTAKE_STATES, "ck_os_intakes_state"),
+    CheckConstraint("term ~ '^[a-z_]+$'", name="ck_os_intakes_term"),
+    CheckConstraint("state <> 'current' OR gate_passed_at IS NOT NULL", name="ck_os_intakes_current_gate"),
+    Index("ix_os_intakes_term_year", "tenant_id", "term", "year"),
+)
+
+fact_slots = Table(
+    "os_fact_slots", md,
+    _id(), _tenant(),
+    Column("intake_id", BigInteger, ForeignKey("os.os_intakes.id", ondelete="CASCADE"), nullable=False),
+    Column("scope", Text, nullable=False),
+    Column("ref", Text, nullable=False),
+    Column("field", Text, nullable=False),
+    Column("owner_ref", Text, nullable=False, server_default=""),
+    Column("fact_class", Text),
+    _created(),
+    UniqueConstraint("tenant_id", "intake_id", "scope", "ref", "field", "owner_ref", name="uq_os_fact_slots_key"),
+)
