@@ -184,7 +184,8 @@ export function reviewPage(item: OsInboxItem): { page: 'os-pack' | 'os-visa'; la
 
 /** The buttons an item offers and what each sends: an admission result says admitted or not (the visa page
  * pre-selects the admitted programme); "Not admitted" names the programme and asks first, since it starts removing
- * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. */
+ * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. A step with a request
+ * (P1-T8) has no button: it closes by itself when PAI has what it asked for. */
 export function completeActions(item: OsInboxItem, names: Record<string, string> = {}): CompleteAction[] {
   if (item.request) return [];  // a request closes by itself when PAI has what it asked for (D-w11)
   if (item.instance_key.startsWith(ADMISSION_PREFIX)) {
