@@ -535,10 +535,50 @@ def student_facts(student_ref: str) -> dict | None:
 
 
 def fact_conflicts(student_ref: str) -> dict | None:
-    """The student's open Vault conflicts, for PAI OS (P1-T8, D-w12; `OS_FACT_CONFLICTS` in the worker). None for now:
-    the Counsellor side that builds the list (`fact_conflicts.v1`) comes with Task 4, and until then the OS sees no
-    conflicts. The worker needs the name whenever it has `OS_STUDENT_FACTS`, so the API and the worker agree."""
-    return None
+    """The student's open Vault conflicts on a mark or a test score, for PAI OS (P1-T8, D-w12; a dict valid as
+    `FactConflictsV1`; `mount_os(fact_conflicts=)` and the worker's `OS_FACT_CONFLICTS`). None while the
+    CONNECT_STUDENT_FACTS flag is off and for a reference that names no workspace. Reads the plain flag, as
+    `student_facts` does, so the API and the worker agree. Opens its own session: PAI OS calls it on its worker thread.
+    A database error raises, so PAI OS retries."""
+    if not config.CONNECT_STUDENT_FACTS:
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import fact_conflicts as builder
+
+    with new_session() as db:
+        return builder.build(db, workspace_id)
+
+
+def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, value=None) -> dict | None:
+    """The student's answer to a "which is right" request, written to the Vault (P1-T8, D-w13; `mount_os(fact_answer=)`).
+    Returns `{"status": "resolved" | "gone" | "refused", "code"}`, or None while the CONNECT_STUDENT_FACTS part is off
+    (PAI OS answers 404), for a reference that names no workspace and on any failure (logged by type only). Opens its
+    own session and commits only a resolved answer, so a refused one writes nothing."""
+    if not part_on("CONNECT_STUDENT_FACTS"):
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import fact_conflicts as builder
+
+    with new_session() as db:
+        try:
+            outcome = builder.answer(db, workspace_id, ref, key, choice, value)
+            if outcome["status"] == "resolved":
+                db.commit()
+            else:
+                db.rollback()
+        except Exception as exc:  # noqa: BLE001  (class name only: no ids, no values)
+            db.rollback()
+            log.error("a fact question could not be answered: %s", type(exc).__name__)
+            return None
+    return outcome
 
 
 def documents_enabled() -> bool:

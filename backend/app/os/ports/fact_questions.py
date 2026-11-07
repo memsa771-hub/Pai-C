@@ -8,9 +8,13 @@ answer to one, sent back to the host. It mirrors the StudentFacts port (invarian
 A source returns None while the host's own part is off. Unconfigured, or None, means no conflicts."""
 
 import importlib
+import logging
 from collections.abc import Callable
 
+from app.os.contracts.fact_conflicts import FactConflict, FactConflictsV1
 from app.os.settings import OsSettings
+
+log = logging.getLogger("app.os.ports.fact_questions")
 
 ConflictsSource = Callable[[str], dict | None]
 AnswerSink = Callable[..., dict | None]
@@ -52,12 +56,39 @@ def from_settings(settings: OsSettings) -> ConflictsSource | None:
     return None
 
 
-def conflicts(student_ref: str) -> dict[str, str]:
-    """`fact key -> conflict ref` for the student's open Vault conflicts; empty while unconfigured or the host answers
-    None. Reads only the two names it needs: the contract check comes with the host adapter."""
+def read(student_ref: str) -> FactConflictsV1 | None:
+    """The host's open conflicts for the student, validated as `FactConflictsV1`. None while unconfigured, when the host
+    answers None, and when it answers for another student (logged by class only). An invalid document is not hidden
+    (ValidationError): the caller retries or fails, as with StudentFacts."""
     if _conflicts is None:
-        return {}
+        return None
     raw = _conflicts(student_ref)
     if not raw:
-        return {}
-    return {c["key"]: c["ref"] for c in raw.get("conflicts", ()) if c.get("key") and c.get("ref")}
+        return None
+    found = FactConflictsV1.model_validate(raw)
+    if found.student_ref != student_ref:
+        log.error("FactConflicts adapter answered for another student (student_ref_mismatch); no conflicts are seen")
+        return None
+    return found
+
+
+def conflicts(student_ref: str) -> dict[str, str]:
+    """`fact key -> conflict ref` for the student's open Vault conflicts; empty while unconfigured, when the host answers
+    None and when it answers for another student."""
+    found = read(student_ref)
+    return {c.key: c.ref for c in found.conflicts} if found else {}
+
+
+def conflict_for(student_ref: str, key: str) -> FactConflict | None:
+    """The open conflict on one fact, with both values and their sources (read live, never stored)."""
+    found = read(student_ref)
+    return next((c for c in found.conflicts if c.key == key), None) if found else None
+
+
+def answer(student_ref: str, ref: str, key: str, choice: str, value=None) -> dict | None:
+    """Sends the student's answer to the host: `{"status": "resolved" | "gone" | "refused", "code"?}`, or None when no
+    callback is configured or the host's part is off (the API then answers 404). A synchronous call, like the choice sink;
+    the host writes the Vault and commits before it returns."""
+    if _answer is None:
+        return None
+    return _answer(student_ref, ref, key, choice, value)

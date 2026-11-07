@@ -16,6 +16,16 @@ from .vault_intake import VaultAssertionService
 # value is kept as past (VAULT_SPEC §Conflicts, the four card answers).
 ISSUE_ACTIONS = frozenset({"keep_current", "accept_proposed", "both_true", "provide_new"})
 
+#: Code above shared memory (the connection to PAI OS) hears that a card was closed. Shared memory never imports PAI C,
+#: so the capability loader registers the hook (`hook(db, issue)`, in the answering transaction), as it does for the
+#: reconciler's accept hooks (P1-T8, D-w14).
+_CLOSE_HOOKS: list = []
+
+
+def register_close_hook(hook) -> None:
+    if hook not in _CLOSE_HOOKS:
+        _CLOSE_HOOKS.append(hook)
+
 
 def _unwrap(value: Any) -> Any:
     if isinstance(value, dict) and set(value) == {"value"}:
@@ -69,6 +79,7 @@ class ProfileIssueService:
                 if item is not None and item.status == "active":
                     item.conflict_state = "none"
             self._close(issue, action, note, None)
+            self._closed(issue)
             self._replay_waiting_courses(issue, self._kept_education_id(issue))
             return {"resolved": True, "action": action, "id": None}
 
@@ -112,6 +123,7 @@ class ProfileIssueService:
             original.reconciled_at = datetime.now(timezone.utc)
             VaultAssertionService(self.db).refresh_decision(original)
         self._close(issue, action, note, candidate.id)
+        self._closed(issue)
         self._replay_waiting_courses(issue, result.result_id if spec["key"] == "education" else None)
         return {"resolved": True, "action": action, "id": result.result_id}
 
@@ -131,6 +143,7 @@ class ProfileIssueService:
             if not (isinstance(value, str) and any(same_person(value, name) for name in names)):
                 self._close(issue, "keep_current",
                             note or "The typed name does not match the name on the document.", None)
+                self._closed(issue)
                 return {"resolved": True, "action": "keep_current", "id": None}
         if action in ("accept_proposed", "provide_new"):
             if not file_id:
@@ -141,6 +154,7 @@ class ProfileIssueService:
                     payload={"file_id": file_id, "owner_confirmed": True, "owner_issue_id": issue.id},
                     idempotency_key=f"document.extract:owner_confirmed:{issue.id}")
         self._close(issue, action, note, None)
+        self._closed(issue)
         return {"resolved": True, "action": action, "id": None}
 
     def _kept_education_id(self, issue: ProfileIssue) -> str | None:
@@ -217,6 +231,15 @@ class ProfileIssueService:
                 "entities": entities,
             }
         raise MemoryDataError("This legacy issue has no resolvable candidate data")
+
+    def _closed(self, issue: ProfileIssue) -> None:
+        """Tells the registered hooks that the card is closed (an error propagates: the answer must not lose its
+        hearing, as a lost Vault version would be a missed replan)."""
+        from app.capabilities import get_capability_registry
+
+        get_capability_registry()  # the capability loader registers the hooks (as `enqueue` does for the accept hooks)
+        for hook in _CLOSE_HOOKS:
+            hook(self.db, issue)
 
     @staticmethod
     def _close(issue: ProfileIssue, action: str, note: str | None, candidate_id: str | None) -> None:

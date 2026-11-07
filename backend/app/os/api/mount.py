@@ -44,7 +44,9 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
              documents_enabled: Callable[[], bool] | None = None,
              on_document_deleted: Callable[[str, str], None] | None = None,
              on_fact_proposal: Callable[[str], None] | None = None,
-             my_plan_enabled: Callable[[], bool] | None = None) -> bool:
+             my_plan_enabled: Callable[[], bool] | None = None,
+             fact_conflicts: Callable[[str], dict | None] | None = None,
+             fact_answer: Callable[..., dict | None] | None = None) -> bool:
     """False when the OS stays off. `recipient_lookup` (Slice 9b): the host's student ref -> email address function,
     handed to the RecipientLookup port for this process (the worker loads its own from OS_RECIPIENT_LOOKUP).
     `student_facts` (P1-T4): the host's student ref -> StudentFacts dict (None while its part is off), handed to the
@@ -56,7 +58,9 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     (the worker loads its own reader from OS_DOCUMENT_FILES). `on_fact_proposal` (P1-T7): the post-commit hook for a
     fact proposal made when a document is confirmed (ports.fact_proposals); the host's sweep is the backup.
     `my_plan_enabled` (P1-T9, R-53): the host's My plan gate (ports.my_plan); None keeps `GET /v1/os/plan` answering
-    404."""
+    404. `fact_conflicts` / `fact_answer` (P1-T8, D-w12, D-w13): the host's open Vault conflicts for a student and its callback
+    for the student's answer to one (ports.fact_questions); None for both means no conflicts are seen (the worker loads
+    its own `fact_conflicts` from OS_FACT_CONFLICTS)."""
     enabled = flag(os.environ if env is None else env, "OS_ENABLED")
     try:
         settings = load_settings(env)
@@ -88,7 +92,7 @@ def mount_os(app: FastAPI, *, env: Mapping[str, str] | None = None,
     app.include_router(build_router(lambda: services), prefix=PREFIX)
     ports.configure(services, recipient_lookup, student_facts, choice_enabled, on_choice_request,
                     choice_sink, choice_sink_enabled, document_files, documents_enabled, on_document_deleted, on_fact_proposal,
-                    my_plan_enabled)  # the host calls go through the ports, never the services directly
+                    my_plan_enabled, fact_conflicts, fact_answer)  # the host calls go through the ports, never the services directly
     if student_dependency is not None:
         app.dependency_overrides[current_student_ref] = student_dependency
     if student_write_dependency is not None:

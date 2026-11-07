@@ -14,6 +14,7 @@ from app.os.contracts.decision_record import DecisionRecordV1  # noqa: E402
 from app.os.contracts.decision_record_v2 import DecisionRecordV2  # noqa: E402
 from app.os.contracts.escalation import EscalationV1  # noqa: E402
 from app.os.contracts.escalation_v2 import EscalationV2  # noqa: E402
+from app.os.contracts.fact_conflicts import FactConflictsV1  # noqa: E402
 from app.os.contracts.fact_proposal import FactProposalV1  # noqa: E402
 from app.os.contracts.os_event import OsEventV1  # noqa: E402
 from app.os.contracts.plan_summary import PlanSummaryV1  # noqa: E402
@@ -29,7 +30,8 @@ MODELS = {"decision_record.v1": DecisionRecordV1, "plan_summary.v1": PlanSummary
           "programme_list.v1": ProgrammeListV1, "decision_record.v2": DecisionRecordV2,
           "route_contract.v2": RouteContractV2, "escalation.v2": EscalationV2,
           "plan_view.v1": PlanViewV1, "os_event.v1": OsEventV1, "choice_request.v1": ChoiceRequestV1,
-          "student_facts.v1": StudentFactsV1, "vault_event.v1": VaultEventV1, "fact_proposal.v1": FactProposalV1}
+          "student_facts.v1": StudentFactsV1, "vault_event.v1": VaultEventV1, "fact_proposal.v1": FactProposalV1,
+          "fact_conflicts.v1": FactConflictsV1}
 
 
 def main() -> None:

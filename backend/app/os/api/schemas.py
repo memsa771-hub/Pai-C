@@ -59,7 +59,21 @@ class RequestNeedOut(BaseModel):
     evidence: Literal["stated", "shown", "confirmed"]
 
 
-class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes of the student (never a value)
+class ChoiceSourceOut(BaseModel):
+    kind: Literal["vault", "document", "chat"]
+    evidence: Literal["stated", "shown", "confirmed", "unknown"]
+    document_ref: str | None
+    as_of: datetime | None
+
+
+class ChoiceOut(BaseModel):  # one value the student can pick for a "which is right" request, read live (never stored)
+    choice: Literal["current", "proposed", "new"]
+    label: str
+    value: str | int | float
+    source: ChoiceSourceOut
+
+
+class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes of the student
     id: int
     task_id: int | None
     kind: Literal["provide", "which_is_right"]
@@ -69,6 +83,19 @@ class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes 
     due_tz: str | None
     title: str | None
     how: str
+    choices: list[ChoiceOut] = []  # only a "which is right" request that is open
+    allow_new: bool = False  # the student may type the right value
+    new_label: str | None = None  # the words for typing it, when allowed
+
+
+class RequestAnswerIn(BaseModel):  # P1-T8, D-w13 (`AnswerIn` and `AnswerOut` are the statements' models)
+    model_config = ConfigDict(extra="forbid")
+    choice: Literal["current", "proposed", "new"]
+    value: str | int | float | None = None  # needed for "new"
+
+
+class RequestAnswerOut(BaseModel):
+    status: Literal["answered", "still_open"]
 
 
 class RequestsOut(BaseModel):

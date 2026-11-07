@@ -121,6 +121,16 @@ def bump(db, workspace_id: str, keys: list[str]) -> VaultVersion:
     return row
 
 
+def _announce(db, workspace_id: str, keys: list[str]) -> None:
+    """Raises the student's version for those keys and queues the `vault_event` (the writer's transaction)."""
+    row = bump(db, workspace_id, keys)  # an error here propagates: the write must not lose its version
+    try:
+        with db.begin_nested():
+            outbox.record_vault_event(db, workspace_id, row.version, keys)
+    except Exception as exc:  # noqa: BLE001  (the sweep queues the event again from the version table)
+        log.error("vault_event_queue_failed workspace_id=%s error_type=%s", workspace_id, type(exc).__name__)
+
+
 def after_accept(db, candidate) -> None:
     """Reconciler hook (signature `hook(db, candidate)`, the writer's transaction)."""
     if not config.CONNECT_STUDENT_FACTS:
@@ -128,10 +138,39 @@ def after_accept(db, candidate) -> None:
     keys = keys_for(candidate, db)
     if not keys:
         return
-    row = bump(db, candidate.workspace_id, keys)  # an error here propagates: the write must not lose its version
-    try:
-        with db.begin_nested():
-            outbox.record_vault_event(db, candidate.workspace_id, row.version, keys)
-    except Exception as exc:  # noqa: BLE001  (the sweep queues the event again from the version table)
-        log.error("vault_event_queue_failed workspace_id=%s error_type=%s", candidate.workspace_id,
-                  type(exc).__name__)
+    _announce(db, candidate.workspace_id, keys)
+
+
+def _card_keys(db, issue) -> list[str]:
+    """The StudentFacts keys of the record an education or test card is about (all keys of its family, or of its test)."""
+    field, model_name = _FIELD[issue.affected_type]
+    evidence = issue.evidence or {}
+    values = evidence.get("current") if isinstance(evidence.get("current"), dict) else {}
+    if not values.get(field):
+        record_id = evidence.get("record_id") or issue.affected_id
+        if record_id:
+            from app import models
+
+            row = db.get(getattr(models, model_name), record_id)
+            if row is not None and str(row.workspace_id) == str(issue.workspace_id):
+                values = {field: getattr(row, field)}
+    if not values.get(field):
+        return []
+    return sorted(set(_education_keys(values) if issue.affected_type == "education" else _test_keys(values)))
+
+
+def after_issue_closed(db, issue) -> None:
+    """Profile-issue close hook (P1-T8, D-w14; signature `hook(db, issue)`, the answering transaction). A card on an
+    education or test record that is closed without a write ("keep current") changes no fact, so no accept hook fires;
+    but PAI OS asked the student which value is right and must hear the answer, so the version is raised and a
+    `vault_event` queued. An answer that went through the reconciler was heard by `after_accept` already. Flag-gated
+    like the accept hook: with it off, nothing happens."""
+    if not config.CONNECT_STUDENT_FACTS:
+        return
+    if issue.issue_type != "conflicting_record" or issue.affected_type not in _FIELD:
+        return
+    if (issue.resolution or {}).get("candidate_id"):
+        return
+    keys = _card_keys(db, issue)
+    if keys:
+        _announce(db, issue.workspace_id, keys)

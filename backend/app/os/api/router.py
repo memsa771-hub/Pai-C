@@ -52,6 +52,8 @@ from app.os.api.schemas import (
     EligibilityOut,
     RequestIn,
     RequestOut,
+    RequestAnswerIn,
+    RequestAnswerOut,
     RequestsOut,
     RouteProgrammesOut,
     RoutesOut,
@@ -106,7 +108,7 @@ from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
 from app.os.playbooks import PlaybookError
-from app.os.requests import gate as needs_gate, store as request_store, texts as request_texts
+from app.os.requests import answers as request_answers, gate as needs_gate, store as request_store, texts as request_texts
 from app.os.requests.refresh import refresh
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
@@ -250,11 +252,43 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
             raise HTTPException(status_code=404, detail="Not Found")
         found = request_store.open_for(svc.engine, tenant, student, answered_since=clock.now() - timedelta(days=7))
-        return {"requests": [{
-            "id": r.id, "task_id": r.task_id, "kind": r.kind,
-            "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
-            "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
-            "how": request_texts.how(r.kind, r.need_kind, r.evidence)} for r in found]}
+        asked = request_answers.choices_for(svc, student, found)  # P1-T8: both values, read live from where they are held
+        out = []
+        for r in found:
+            c = asked.get(r.id, request_answers.Choices())
+            out.append({
+                "id": r.id, "task_id": r.task_id, "kind": r.kind,
+                "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
+                "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
+                "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible),
+                "choices": c.choices, "allow_new": c.allow_new,
+                "new_label": request_texts.text("new_label") if c.allow_new else None})
+        return {"requests": out}
+
+    @router.post("/requests/{request_id}/answer", response_model=RequestAnswerOut)
+    def answer_request(request_id: int, body: RequestAnswerIn, student: str = Depends(current_student_ref_for_write),
+                       svc: Services = Depends(services)) -> dict:
+        """The student's answer to a "which is right" request (D-w13). A Vault conflict is answered through the host's own
+        card resolution, a value above its total by a new value, two documents that differ by `resolve_finding`; then the
+        plan is recomputed, so the step is done before this returns. 404 for another student's request and while the gate
+        is off; 409 `already_answered`, or `answer_elsewhere` for a request that asks for information."""
+        tenant = svc.settings.tenant_id
+        if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        found = request_store.get(svc.engine, tenant, request_id)
+        if found is None or found.student_ref != student:
+            raise HTTPException(status_code=404, detail="Not Found")
+        if found.status != "open":
+            raise HTTPException(status_code=409, detail="already_answered")
+        if found.kind != "which_is_right":
+            raise HTTPException(status_code=409, detail="answer_elsewhere")  # a provide request closes when PAI has the data
+        try:
+            request_answers.answer(svc, student, found, body.choice, body.value)
+        except request_answers.AnswerError as e:
+            raise HTTPException(status_code=e.status, detail=e.detail) from None
+        refresh(svc, student, "request_answered")
+        after = request_store.get(svc.engine, tenant, request_id)
+        return {"status": "answered" if after is not None and after.status == "answered" else "still_open"}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
     def confirm(fact_id: int, body: ConfirmIn, svc: Services = Depends(services)) -> dict:
