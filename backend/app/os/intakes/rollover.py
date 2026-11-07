@@ -68,19 +68,25 @@ def rollover(engine: Engine, tenant_id: str, *, region: str, family: str, term: 
 
 
 def slot_report(engine: Engine, tenant_id: str, intake_id: int) -> list[SlotRow]:
-    """Every expected slot of the intake with its state: `expected` until a fact exists for the intake's term and
-    year, then that fact's status."""
+    """Every expected slot of the intake with its state: `expected` until a fact exists for the intake's year (and
+    term, or no recorded term), then that fact's status."""
     I = models.intakes
     q = (select(S, F.c.status, F.c.id.label("fact_id"))
          .select_from(S.join(I, and_(I.c.id == S.c.intake_id, I.c.tenant_id == S.c.tenant_id))
                       .outerjoin(F, and_(F.c.tenant_id == S.c.tenant_id, F.c.scope == S.c.scope, F.c.ref == S.c.ref,
                                          F.c.field == S.c.field, F.c.owner_ref == S.c.owner_ref,
-                                         F.c.intake_term == I.c.term, F.c.intake_year == I.c.year)))
+                                         F.c.intake_term.in_([I.c.term, ""]), F.c.intake_year == I.c.year)))
          .where(S.c.tenant_id == tenant_id, S.c.intake_id == intake_id)
          .order_by(S.c.scope, S.c.ref, S.c.field, S.c.owner_ref))
     with engine.connect() as conn:
-        return [SlotRow(r.scope, r.ref, r.field, r.owner_ref, r.fact_class, r.status or "expected", r.fact_id)
-                for r in conn.execute(q).all()]
+        rows = conn.execute(q).all()
+    best: dict[tuple, object] = {}
+    for r in rows:  # a fact whose term was never recorded ('') also fills the slot; the newest fact wins
+        key = (r.scope, r.ref, r.field, r.owner_ref)
+        if key not in best or (r.fact_id or 0) > (best[key].fact_id or 0):
+            best[key] = r
+    return [SlotRow(r.scope, r.ref, r.field, r.owner_ref, r.fact_class, r.status or "expected", r.fact_id)
+            for r in best.values()]
 
 
 EXPORT_COLUMNS = ("region", "family", "intake_term", "intake_year", "scope", "ref", "field", "owner_ref", "fact_class",

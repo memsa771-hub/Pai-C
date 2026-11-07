@@ -16,6 +16,7 @@ from app.os import clock, models
 from app.os.adapters.counsellor import manifest
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
+from app.os.intakes import IntakeStore
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import PLAN_OPEN, is_started
 from app.os.knowledge.requests import visible_programmes
@@ -116,6 +117,8 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
     if len(choices) > 10:
         raise NotAllowed("choose at most 10 programmes")
     _check_programmes(plans, route_key, intake.year, [c.programme_ref for c in choices])
+    if not IntakeStore(plans.engine, plans.kernel.tenant_id).plannable(intake.term, intake.year):  # R-63
+        raise NotAllowed(f"the {intake.term} {intake.year} intake is not open for planning yet")
     try:
         contract = RouteContract.model_validate({
             "contract_version": "1", "source": "self_serve",

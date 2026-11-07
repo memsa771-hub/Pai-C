@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Engine, and_, func, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
@@ -75,13 +75,22 @@ class SqlKnowledge:
     def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
                 intake_term: str | None, owner_ref: str, fallback_previous: bool = False):
         # P2-D24: with the fallback an earlier year's row is also read; the newest year then the newest id wins, so a
-        # row of the asked year always beats an older one, and a later year is never read.
-        year = T.c.intake_year <= intake_year if fallback_previous else T.c.intake_year == intake_year
+        # row of the asked year always beats an older one, and a later year is never read. An earlier year's row must
+        # be of the asked term; a row of the asked year whose term was never recorded ('') counts for any term, because
+        # the write paths of before P2 do not record one.
+        if fallback_previous:
+            this_year = and_(T.c.intake_year == intake_year, T.c.intake_term.in_([intake_term, ""])
+                             if intake_term is not None else true())
+            earlier = and_(T.c.intake_year < intake_year, T.c.intake_term == intake_term
+                           if intake_term is not None else true())
+            year = or_(this_year, earlier)
+        else:
+            year = T.c.intake_year == intake_year
         q = select(T).where(
             T.c.tenant_id == self.tenant_id, T.c.scope == scope, T.c.ref.in_(list(refs)),
             T.c.field.in_(list(fields)), year, T.c.owner_ref == owner_ref,
         )
-        if intake_term is not None:
+        if intake_term is not None and not fallback_previous:
             q = q.where(T.c.intake_term == intake_term)
         return q.order_by(T.c.intake_year, T.c.id)  # intake_term=None matches every term; on a clash the newest row wins
 

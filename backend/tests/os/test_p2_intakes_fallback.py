@@ -56,3 +56,14 @@ def test_never_a_later_year_other_term_or_other_owner(engine, clean):
     assert got[("p", "deadline")].value == "y"
     got = k.programme_facts(["p"], ["deadline"], 2027, owner_ref="body:one", fallback_previous=True)
     assert got[("p", "deadline")].value == "z"
+
+
+def test_asked_year_row_without_a_recorded_term_counts_in_the_fallback_read(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    k.upsert("programme", "p", "deadline", fact(2026, "old"))
+    k.upsert("programme", "p", "deadline", fact(2027, "new", term=""))  # written the pre-P2 way
+    k.upsert("programme", "q", "deadline", fact(2026, "other", term=""))  # an earlier row with no term: not read
+    got = k.programme_facts(["p", "q"], ["deadline"], 2027, intake_term="fall", fallback_previous=True)
+    assert got[("p", "deadline")].value == "new" and ("q", "deadline") not in got
+    # the strict read keeps T1's meaning: an exact term filter
+    assert k.programme_facts(["p"], ["deadline"], 2027, intake_term="fall") == {}

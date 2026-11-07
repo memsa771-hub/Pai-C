@@ -23,6 +23,10 @@ class NothingNewer(ValueError):
     """An upgrade to "the newest" playbook found none newer than the one the plan is pinned to."""
 
 
+def _intake_of(contract: RouteContract | RouteContractV2) -> tuple[str, int]:
+    return contract.target_intake.term, contract.target_intake.year
+
+
 class PlanService:
     def __init__(self, engine: Engine, settings: OsSettings, kernel: Kernel, knowledge: KnowledgePort,
                  playbooks: Mapping[tuple[str, int], Playbook], today: Callable[[], date],
@@ -129,7 +133,7 @@ class PlanService:
         existing = self._existing_plan(contract)
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
             self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-            with_needs=self.needs_gate(contract, with_needs)))
+            with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract)))
         return self.kernel.create_plan(contract, self.compile(contract, playbook))
 
     def _contract(self, plan_id: int) -> tuple[RouteContract | RouteContractV2, str]:
@@ -178,7 +182,7 @@ class PlanService:
         contract, _ = self._contract(plan_id)
         pinned = self._pinned(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-                                 with_needs=self.needs_gate(contract, with_needs))
+                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract))
         if newest.key != pinned.key or newest.version <= pinned.version:
             return False
         with self.engine.begin() as conn:
@@ -191,7 +195,7 @@ class PlanService:
         student accepted, Slice 7: never a newer one they did not see)."""
         contract, sha = self._contract(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-                                 with_needs=self.needs_gate(contract, with_needs))
+                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract))
         if version is not None:
             newest = self.playbooks[(newest.key, version)]
         else:  # the newest the gate lets through may be older than the pin (a v2 plan, the gate off): never go back
