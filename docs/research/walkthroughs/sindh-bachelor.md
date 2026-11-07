@@ -55,7 +55,7 @@ SECCAP pages are a JavaScript app. Only the text in the static HTML was read (`J
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| SB-14 | recognised list items with Province='Sindh' (count in Lists table). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Province='Sindh'` | 2026-11-07 | curl + count of list items in the HTML markup | unclear: the string Province='Sindh' is only in HTML markup (83 times), not in visible text; the statement is about that markup, but the quote is not visible text | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| SB-14 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Aga Khan University Sindh` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 
@@ -63,13 +63,13 @@ SECCAP pages are a JavaScript app. Only the text in the static HTML was read (`J
 |---|---|---|---|---|---|---|---|
 | SB-08 | 2026-27 tentative: last date for forms 26 Oct 2026; final MBBS merit list 6 Nov 2026. | https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf | `Last Date for Submission of MBBS & BDS Forms 26 October 2026` | 2026-11-07 | curl + pdftotext (PDF text layer) | correct: quote in PDF text layer word for word; page image shows 26th October 2026; statement's 6 Nov follows from SB-09 | correct: quote found word for word (pdf, HTTP 200) |
 | SB-09 | Final merit list of MBBS: 6 November 2026 (superscript split by PDF layer). | https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf | `6. Display of Final Merit List of MBBS 6 November 2026` | 2026-11-07 | curl + pdftotext (PDF text layer) | correct: quote word for word on page image (6th November 2026); text layer splits the superscript | correct: quote found word for word (pdf, HTTP 200) |
-| SB-12 | merit/call list 16-07-2026; Commencement of 1st Year Classes 17-08-2026. | https://www.neduet.edu.pk/sites/default/files/Admissions-2026/ADMISSIONS_SCHEDULE_2026.pdf | `Display of Merit/Call List 16-07-2026 Interviews (start from) 17-07-2026 Commencement of 1st Year Orientation for new Batch* 13-08-2026 17-08-2026 Classes` | 2026-11-07 | curl + pdftotext (PDF text layer) | unclear: quote on page, but in the quote the dates are run together (13-08-2026 17-08-2026 then Classes), so the quote alone does not show that 17-08-2026 is the commencement date; the two-column layout of the PDF does show it | correct: quote found word for word (pdf, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| SB-12 | merit/call list 16-07-2026; the 1st-year classes date is unclear: the text layer runs two columns together, so it cannot be tied to its label. | https://www.neduet.edu.pk/sites/default/files/Admissions-2026/ADMISSIONS_SCHEDULE_2026.pdf | `Display of Merit/Call List 16-07-2026` | 2026-11-07 | curl + pdftotext (PDF text layer) | re-check needed | correct: quote found word for word (pdf, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ### Lists table
 
 | Body | List | URL | Date | Rows | How |
 |---|---|---|---|---|---|
-| HEC | Recognised universities/DAIs, Province = Sindh | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **83** (35 public, 48 private) | counted `Province='Sindh'` items in the markup |
+| HEC | Recognised universities/DAIs, Province = Sindh | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **83** (35 public, 48 private) | markup_count: counted HTML attributes (unconfirmed on import) |
 | Sindh processing universities | MBBS/BDS institutions in the 2026-27 prospectus | https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf | Session 2026-27 | not counted | the PMDC national list (190) is the national denominator |
 
 ## Gaps

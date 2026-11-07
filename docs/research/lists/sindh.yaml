@@ -48,7 +48,7 @@ lists:
     date: null
     row_count: 83   # 35 public, 48 private
     count_quote: null
-    count_method: counted list items with Province='Sindh' in the HTML
+    count_method: markup_count - counted list items with Province='Sindh' in the HTML (unconfirmed on import)
     read_method: curl + HTML markup count
     check2: correct
 not_found:
