@@ -235,7 +235,8 @@
      - If fewer than `min_programmes` places would be left, go to step 4.
      - Otherwise, for each affected place: a `SwapProgramme` to the first close match (the `suggestions` of `_rejected`, `rules.py:59-72`), or else a `CancelProgramme`. Both are big, so the student accepts. On a Counsellor plan this becomes a T6 `choice_request`.
      - The reasons are `unanswered_swap` and `unanswered_drop` from `texts.yaml`.
-  4. **Escalation.** When every live place is affected: `Escalate(reason=text("unanswered_all"))` → support case → `CounsellorSink` maps `document_missing` to `blocking_gap` (`escalation.py:31-33`) → T6 pauses the plan, and the journey goes back to choosing.
+  4. **Escalation.** When every live place is affected: `Escalate(reason=text("unanswered_all"))` → a support case for a person. *(Corrected 2026-11-07 per Ruling problem 11: no Counsellor `blocking_gap`, no pause, and the student is not sent back to choosing. The plan, its places and any proposal stay, and reminders go on.)*
+  - **Rung 3 also calls a person** (Ruling problem 11, "a proposal plus a support case"): when the proposal is made, a support case opens for the same event. When every affected place is already held by another proposal, a support case opens too.
   - A `document_missing` on a non-request provide step keeps today's nudge (`rules.py:113-117`).
   - **Never silent.** Every open request step whose due date has passed has, within one sweep, either a pending or applied proposal, or a support case naming its event.
 - **D-w16, student sentences (approved by the owner, `approved: true`).**
@@ -548,7 +549,7 @@
   - `test_request_step_gets_reminders_on_the_cadence` (rung 1): weekly, then every 3 days, then daily, one per slot.
   - `test_blocked_step_at_risk_nudges_the_request_first` (rung 2): `deadline_at_risk` on the needing step → `Reprioritise` and `RequestFromStudent` on the provide step, and an `os_event` `deadline_at_risk`.
   - `test_overdue_request_on_some_places_proposes_swap_or_drop` (rung 3, the ireland v2 `english_proof`): one place has a close match → `SwapProgramme`; the other has none → `CancelProgramme`; both are pending big proposals.
-  - `test_overdue_request_on_every_place_escalates_blocking_gap` (rung 4): a route-level need → `Escalate` → a support case → the `CounsellorSink` outbox row has reason `blocking_gap`.
+  - `test_overdue_request_on_every_place_opens_a_support_case_and_keeps_the_plan` (rung 4, corrected per Ruling problem 11): a route-level need → `Escalate` → a support case. There is no Counsellor escalation row, the plan is not paused, and the reminders go on.
   - `test_ladder_never_leaves_fewer_than_min_programmes`.
   - `test_counsellor_plan_drop_becomes_a_choice_request` (T6 D-x2).
   - `test_overdue_which_is_right_enters_the_ladder`.
@@ -636,7 +637,7 @@
   5. **6.22, the fake Ireland v2.**
      1. No IELTS → the clock moves through the cadence: reminders, then `deadline_at_risk`.
      2. At the due date, the one place with `english_proof` gets a proposal (swap, or drop when there is no close match). Accept → T6 `choice_request` → v n+1 without that place → revised.
-     3. Then a route-level `transcript` request goes unanswered → `Escalate` with `blocking_gap` → the plan is paused → the journey is back to choosing (T6). The test also checks that `test_plan_never_fails_silently`'s rule holds.
+     3. Then a route-level request goes unanswered → `Escalate` → a support case for a person. The plan is not paused and the journey stays where it is (Ruling problem 11). The test also checks that `test_plan_never_fails_silently`'s rule holds.
   6. **Upgrade.** A v1 Germany plan started with the gate off. Turn the gate on → one `UpgradePlaybook` proposal. Accept → pinned v2, and the provide steps appear.
   7. **Gate off (standalone and flags off).** The same Germany choice → v1, no request rows, `plan_view` `needs == []` and `requests == []`, `GET /v1/os/requests` 404, and the inbox and roadmap are byte-identical to the T5 flow.
   8. Throughout:
