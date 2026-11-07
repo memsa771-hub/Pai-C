@@ -42,12 +42,12 @@ requirements:
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: true}
   R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: false}
   R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: false}
-  R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: false}
-  R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: false}
-  R-19: {title: "One open request per fact per student", phases: [P1], built: false}
-  R-20: {title: "Not-yet-existing data becomes a dated result-expected step", phases: [P1], built: false}
-  R-21: {title: "Conflicting data becomes a which-is-right step with both sources", phases: [P1], built: false}
-  R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: false}
+  R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: true}
+  R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: true}
+  R-19: {title: "One open request per fact per student", phases: [P1], built: true}
+  R-20: {title: "Not-yet-existing data becomes a dated result-expected step", phases: [P1], built: true}
+  R-21: {title: "Conflicting data becomes a which-is-right step with both sources", phases: [P1], built: true}
+  R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: true}
   R-23: {title: "Outside facts are Knowledge records with URL and quote", phases: [P2], built: false}
   R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
   R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: false}
