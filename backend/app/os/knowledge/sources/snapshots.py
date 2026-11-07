@@ -36,6 +36,7 @@ class Snapshot:
     links_off_list: int
     flagged: str | None
     fetched_at: datetime
+    original_too_large: bool = False
 
 
 def text_hash(text: str) -> str:
@@ -44,7 +45,7 @@ def text_hash(text: str) -> str:
 
 def _snap(row) -> Snapshot:
     return Snapshot(row.id, row.url, row.sha256, row.text, row.content_type, row.read_method, row.language,
-                    row.links_total, row.links_off_list, row.flagged, row.fetched_at)
+                    row.links_total, row.links_off_list, row.flagged, row.fetched_at, row.original_too_large)
 
 
 class SnapshotStore:
@@ -55,7 +56,7 @@ class SnapshotStore:
     def save(self, url: str, text: str, *, content_type: str = "", read_method: str = "fetch",
              language: str | None = None, links_total: int = 0, links_off_list: int = 0, flagged: str | None = None,
              fetched_at: datetime | None = None, original: bytes | None = None,
-             original_type: str | None = None) -> Snapshot:
+             original_type: str | None = None, original_too_large: bool = False) -> Snapshot:
         """Stores the read. The same text read again under the same URL is one snapshot (its read time and flag
         are updated), so a page that goes A, B, A has two."""
         if original is not None:
@@ -67,12 +68,13 @@ class SnapshotStore:
         values = {"tenant_id": self.tenant_id, "url": url, "sha256": text_hash(text), "text": text,
                   "content_type": content_type, "read_method": read_method, "language": language,
                   "links_total": links_total, "links_off_list": links_off_list, "flagged": flagged,
+                  "original_too_large": original_too_large,
                   "fetched_at": fetched_at or self.clock()}
         with self.engine.begin() as conn:
             row = conn.execute(insert(S).values(**values).on_conflict_do_update(
                 constraint="uq_os_page_snapshots_url_hash",
                 set_={k: values[k] for k in ("read_method", "language", "links_total", "links_off_list", "flagged",
-                                             "fetched_at")}).returning(S)).one()
+                                             "original_too_large", "fetched_at")}).returning(S)).one()
             if original is not None:
                 conn.execute(insert(F).values(
                     tenant_id=self.tenant_id, snapshot_id=row.id, sha256=hashlib.sha256(original).hexdigest(),

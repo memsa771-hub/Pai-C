@@ -827,6 +827,7 @@ page_snapshots = Table(
     Column("links_total", Integer, nullable=False, server_default="0"),
     Column("links_off_list", Integer, nullable=False, server_default="0"),
     Column("flagged", Text),
+    Column("original_too_large", Boolean, nullable=False, server_default=text("false")),  # PDF or image over the cap (review M5)
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
     _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),

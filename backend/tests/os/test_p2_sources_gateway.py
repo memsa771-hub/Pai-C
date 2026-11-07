@@ -172,8 +172,11 @@ def test_hidden_links_are_not_needed_for_spam_text_alone_also_counts(engine, cle
 
 def test_link_flood_marks_the_domain_suspect(engine, clean, fixture_sites):
     links = "".join(f"<a href='https://site{i}.test/'>read {i}</a>" for i in range(14))
+    fixture_sites.set_page(ALPHA, "/links", "<html><body><p>Admissions</p></body></html>")
+    gw, g, clock = build(engine, fixture_sites)
+    assert gw.fetch(fixture_sites.url(ALPHA, "/links"), [], [], NORTH).ok  # the baseline (review C2)
     fixture_sites.set_page(ALPHA, "/links", f"<html><body><p>Admissions</p>{links}</body></html>")
-    gw, g, _ = build(engine, fixture_sites)
+    clock.now += timedelta(days=2)
     assert gw.fetch(fixture_sites.url(ALPHA, "/links"), [], [], NORTH).blocked == "integrity:link_flood"
     assert g.domains.state_of(ALPHA).reason == "link_flood"
 
@@ -233,9 +236,8 @@ def test_worker_builds_a_guard_only_when_switched_on(engine, clean, monkeypatch)
 
     settings = load_settings({"DATABASE_URL": "x"})
     kernel = Kernel(engine, settings.tenant_id)
-    monkeypatch.delenv("OS_SOURCE_GUARD", raising=False)
     assert _source_guard(settings, engine, kernel) is None
-    monkeypatch.setenv("OS_SOURCE_GUARD", "1")
+    settings = load_settings({"DATABASE_URL": "x", "OS_SOURCE_GUARD": "1"})  # through OsSettings (review M4)
     guard = _source_guard(settings, engine, kernel)
     assert guard is not None and guard.snapshots.max_bytes == settings.page_max_bytes
     assert guard.after_change is not None

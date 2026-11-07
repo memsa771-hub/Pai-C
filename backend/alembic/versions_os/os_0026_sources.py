@@ -58,6 +58,7 @@ def upgrade() -> None:
         sa.Column("links_total", sa.Integer, nullable=False, server_default="0"),
         sa.Column("links_off_list", sa.Integer, nullable=False, server_default="0"),
         sa.Column("flagged", sa.Text),
+        sa.Column("original_too_large", sa.Boolean, nullable=False, server_default=sa.text("false")),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
         sa.CheckConstraint("read_method IN ('fetch', 'render', 'ocr', 'human')",
