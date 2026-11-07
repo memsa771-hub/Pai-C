@@ -86,14 +86,16 @@ class World:
         (found,) = [r for r in self.requests() if r["kind"] == kind and r["status"] == "open"]
         return found
 
-    def ref_of(self, request_id) -> str:
-        """The question the student sees for a request now (what the client sends back)."""
+    def seen_of(self, request_id) -> tuple[str, str]:
+        """The question and the values the student sees for a request now (what the client sends back)."""
         got = self.api.get("/v1/os/requests", headers=self.head)
         found = [r for r in got.json()["requests"] if r["id"] == request_id] if got.status_code == 200 else []
-        return (found[0]["ref"] if found else None) or "none"
+        return ((found[0]["ref"] or "none"), (found[0]["seen"] or "none")) if found else ("none", "none")
 
-    def answer(self, request_id, choice, value=None, student=None, ref=None):
-        body = {"ref": ref or self.ref_of(request_id), "choice": choice, **({"value": value} if value is not None else {})}
+    def answer(self, request_id, choice, value=None, student=None, ref=None, seen=None):
+        shown_ref, shown_seen = self.seen_of(request_id)
+        body = {"ref": ref or shown_ref, "seen": seen or shown_seen, "choice": choice,
+                **({"value": value} if value is not None else {})}
         return self.api.post(f"/v1/os/requests/{request_id}/answer", json=body,
                              headers={"x-test-student": student or self.ws})
 
@@ -240,8 +242,8 @@ def test_answer_current_keeps_the_vault_value_and_closes_the_step(world, conflic
     assert got.status_code == 200 and got.json() == {"status": "answered"}
     with world.who.factory() as db:
         assert education(db, world.ws)[0]["result"]["marks_obtained"] == 800
-        assert world.card(db).resolution["answers"] == {OBTAINED: {"choice": "current",
-                                                                    "request_id": conflict.asked["id"]}}
+        assert world.card(db).resolution["answers"] == {OBTAINED: {
+            "choice": "current", "field": "marks_obtained", "value": 800, "request_id": conflict.asked["id"]}}
         assert db.scalar(select(func.count()).select_from(MemoryCandidate)) == before  # nothing was written
     assert_closed(world, conflict.plan_id, conflict.asked)
 
@@ -263,8 +265,9 @@ def test_a_refused_answer_writes_nothing_and_keeps_the_step(world, conflict):
     with world.who.factory() as db:
         assert world.card(db).status == "open" and education(db, world.ws)[0]["result"]["marks_obtained"] == 800
     assert world.row(conflict.asked["id"]).status == "open"
-    ref = conflict.asked["ref"]
-    for body in ({"ref": ref, "choice": "maybe"}, {"ref": ref, "choice": "new", "x": 1}, {"choice": "current"}):
+    ref, seen = conflict.asked["ref"], conflict.asked["seen"]
+    for body in ({"ref": ref, "seen": seen, "choice": "maybe"}, {"ref": ref, "seen": seen, "choice": "new", "x": 1},
+                 {"choice": "current"}, {"ref": ref, "choice": "current"}):
         assert world.api.post(f"/v1/os/requests/{conflict.asked['id']}/answer", json=body,
                               headers=world.head).status_code == 422  # a body without `ref` is refused too
 
@@ -403,6 +406,7 @@ def test_finding_answer_uses_resolve_finding_and_never_the_vault(world):
     assert world.answer(one["id"], "new", "Someone Else").status_code == 422
     assert FindingStore(world.engine, TENANT).list_open(world.ws) != []
     assert world.answer(one["id"], "current").status_code == 422  # the old ids are not choices of a finding
+    assert world.answer(one["id"], "new", "Ahmed Khan").status_code == 422  # review M-3: even a listed value
     with world.who.factory() as db:
         before = (db.scalar(select(func.count()).select_from(MemoryCandidate)),
                   db.scalar(select(func.count()).select_from(OsOutbox)))
@@ -494,3 +498,23 @@ def test_get_requests_reads_the_host_once(world, conflict):
     got = world.api.get("/v1/os/requests", headers=world.head)
     assert got.status_code == 200 and [r for r in got.json()["requests"] if r["kind"] == "which_is_right"]
     assert len(calls) == 1
+
+
+def test_an_answer_to_values_that_changed_is_refused(world, conflict):
+    """Review M-2: the saved value moves from 800 to 805 between the GET and the POST: the answer is refused."""
+    shown = conflict.asked
+    with world.who.factory() as db:
+        edit = MemoryCandidateService(db).propose(
+            world.ws, "student_record", key="education", proposed_value={"result": {"marks_obtained": 805}},
+            confidence=1.0, source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            entities={"record_id": education(db, world.ws)[0]["id"]}, evidence={"quote": "q", "capture": "details"})
+        assert MemoryReconciler(db).reconcile(edit).accepted
+        db.commit()
+    from app.os.requests import texts
+
+    got = world.answer(shown["id"], "proposed", ref=shown["ref"], seen=shown["seen"])
+    assert got.status_code == 409 and got.json() == {"detail": "answer_changed", "note": texts.text("answer_changed")}
+    with world.who.factory() as db:
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 805 and world.card(db).status == "open"
+    assert world.asking()["seen"] != shown["seen"]
+    assert world.answer(shown["id"], "proposed").status_code == 200  # what is shown now is taken

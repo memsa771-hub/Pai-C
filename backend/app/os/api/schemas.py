@@ -69,6 +69,7 @@ class ChoiceSourceOut(BaseModel):
 class ChoiceOut(BaseModel):  # one value the student can pick for a "which is right" request, read live (never stored)
     ref: str  # the question the student saw (a card, a finding or an impossible value); the answer must name it back
     key: str
+    seen: str  # a short hash of the values on the question; the answer names it back
     choice: str  # current | proposed | new, or doc:<id> for a document that holds one of the values
     label: str
     value: str | int | float
@@ -85,6 +86,7 @@ class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes 
     due_tz: str | None
     title: str | None
     how: str
+    seen: str | None = None
     ref: str | None = None  # the question as the student sees it now (also when there are no choices to carry it)
     choices: list[ChoiceOut] = []  # only a "which is right" request that is open
     allow_new: bool = False  # the student may type the right value
@@ -94,6 +96,7 @@ class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes 
 class RequestAnswerIn(BaseModel):  # P1-T8, D-w13 (`AnswerIn` and `AnswerOut` are the statements' models)
     model_config = ConfigDict(extra="forbid")
     ref: str  # the `ref` of the choices the student saw: an answer to a question that changed is refused (409)
+    seen: str  # the `seen` of the choices: an answer to values that changed is refused too (409)
     choice: str = Field(pattern=r"^(current|proposed|new|doc:\d+)$")
     value: str | int | float | None = None  # needed for "new"
 

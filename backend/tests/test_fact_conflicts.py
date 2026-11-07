@@ -363,6 +363,56 @@ def test_a_close_hook_that_raises_leaves_the_card_closed_and_the_answer_saved(st
         assert education(db, ws)[0]["result"]["gpa"] == 3.2
 
 
+def test_an_answer_that_lost_the_race_after_the_lock_does_not_overwrite(student):
+    """Review I-c: the other answer lands between the read and the lock; the value it saved stands."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        found = two_differences(db, student)
+        ref = found[MARKS]["ref"]
+        real = ProfileIssueService.lock_open
+
+        def lock_after_another_answer(self, workspace_id, issue_id):
+            ProfileIssueService.lock_open = real  # the other answer, then our lock
+            assert fact_conflicts.answer(db, ws, ref, MARKS, "proposed")["status"] == "resolved"
+            return real(self, workspace_id, issue_id)
+
+        with patch.object(ProfileIssueService, "lock_open", lock_after_another_answer):
+            assert fact_conflicts.answer(db, ws, ref, MARKS, "new", 790) == {"status": "gone"}
+        db.commit()
+        assert education(db, ws)[0]["result"]["marks_obtained"] == 760
+        assert len(written(db)) == 1
+
+
+def test_a_hook_whose_version_bump_is_rolled_back_leaves_no_version_and_the_card_closed(student):
+    """Review M-1: what a failing hook wrote in its savepoint goes with it; the card still closes."""
+    from app.memory import profile_issues
+    from app.pai_c.connect import vault_version
+
+    def bump_then_fail(db, issue):
+        vault_version.bump(db, issue.workspace_id, [GPA])
+        raise RuntimeError("after the bump")
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        bachelor(db, ws, 3.4)
+        transcript_says(db, student, 3.2)
+        entry = only(db, ws)
+        before = db.get(VaultVersion, ws)
+        before = before.version if before else None
+        profile_issues.register_close_hook(bump_then_fail)
+        try:
+            assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "current") == {"status": "resolved"}
+            db.commit()
+        finally:
+            profile_issues._CLOSE_HOOKS.remove(bump_then_fail)
+        db.expire_all()
+        after = db.get(VaultVersion, ws)
+        assert (after.version if after else None) == before
+        assert db.get(ProfileIssue, entry["ref"].partition(":")[2]).status == "resolved"
+
+
 def test_refusals_write_nothing(student):
     with student.factory() as db:
         ws = student.workspace_id

@@ -6,6 +6,8 @@ answer; nothing is saved that the student did not choose. Fictional student and 
 import pytest
 from sqlalchemy import select
 
+from app.memory.candidates import MemoryCandidateService
+from app.memory.reconciler import MemoryReconciler
 from app.models import MemoryCandidate, ProfileIssue
 from app.os.playbooks.loader import load_playbook_dir
 from app.pai_c.connect import document_facts
@@ -91,8 +93,9 @@ def test_answering_the_last_value_current_closes_the_card_and_both_requests(worl
         (row,) = education(db, world.ws)
         assert row["result"] == {"marks_obtained": 760, "marks_total": 1100}  # 1050 was never saved
         assert world.card(db).resolution["answers"] == {
-            OBTAINED: {"choice": "proposed", "request_id": asked[OBTAINED]["id"]},
-            TOTAL: {"choice": "current", "request_id": asked[TOTAL]["id"]}}
+            OBTAINED: {"choice": "proposed", "field": "marks_obtained", "value": 760,
+                       "request_id": asked[OBTAINED]["id"]},
+            TOTAL: {"choice": "current", "field": "marks_total", "value": 1100, "request_id": asked[TOTAL]["id"]}}
     assert {world.row(r["id"]).status for r in asked.values()} == {"answered"}
     assert open_asks(world) == set()
 
@@ -122,3 +125,84 @@ def test_the_card_closing_on_the_vault_page_after_a_part_answer_closes_the_rest(
     assert open_asks(world) == set()
     with world.who.factory() as db:
         assert education(db, world.ws)[0]["result"] == {"marks_obtained": 800, "marks_total": 1100}
+
+
+def test_the_documents_reading_and_the_card_stay_as_read_after_a_part_answer(world):
+    """Review C1: the card and the proposing candidate keep what the document said; only the answered value is settled."""
+    from app.models import MemoryCandidate as Candidate
+
+    plan_id, asked = two_cards(world)
+    with world.who.factory() as db:
+        card = world.card(db)
+        before = (dict(card.evidence["proposed"]), db.get(Candidate, card.candidate_id).proposed_value)
+    assert world.answer(asked[OBTAINED]["id"], "new", "770").status_code == 200
+    with world.who.factory() as db:
+        card = world.card(db)
+        cand = db.get(Candidate, card.candidate_id)
+        assert card.evidence["proposed"] == before[0] == {"result": {"marks_obtained": 760, "marks_total": 1050}}
+        assert cand.proposed_value == before[1] and cand.source_type == "document" and cand.status == "needs_review"
+        # the Vault page shows the document's reading for the value still open, and the document badge is honest
+        shown = next(c for c in __import__("app.pai_c.memory", fromlist=["VaultView"]).VaultView(db).build(
+            world.ws)["conflicts"] if c["id"] == card.id)
+        assert shown["proposed"] == {"result": {"marks_total": 1050}} and shown["current"]["result"] == {"marks_total": 1100}
+        assert shown["proposed_source"]["badge"] == "From document" and shown["proposed_source"]["document"]
+        # a Vault-page accept now cannot bring back the 760 the student replaced by 770
+        from app.memory.profile_issues import ProfileIssueService
+
+        assert ProfileIssueService(db).resolve(world.ws, card.id, "accept_proposed")["resolved"]
+        db.commit()
+        assert education(db, world.ws)[0]["result"] == {"marks_obtained": 770, "marks_total": 1050}
+        from app import pai_os_bridge as bridge
+
+        assert bridge.deliver_pending(db, world.ws)["failed"] == 0
+    assert open_asks(world) == set()
+
+
+def test_confirming_the_same_document_again_is_a_duplicate(world):
+    plan_id, asked = two_cards(world)
+    assert world.answer(asked[OBTAINED]["id"], "new", "770").status_code == 200
+    with world.who.factory() as db:
+        outcome, ids = document_facts.apply(db, proposal(world.who, add_file(db, world.ws), [
+            {"key": OBTAINED, "value": 760}, {"key": TOTAL, "value": 1050}], key="fact_proposal:7:2",
+            doc_type="hssc_certificate"))
+        db.commit()
+    assert (outcome, ids) == ("duplicate", [])
+
+
+def test_a_card_that_differs_on_another_field_stays_open_for_the_vault_page(world):
+    """Review I-a: the OS asked about the mark only. When the mark is answered, the request is answered, but a card that
+    also differs on something else (the institution) is not closed behind the student's back."""
+    from app.os.requests.refresh import refresh
+
+    with world.who.factory() as db:
+        world.saved(db)
+    world.start()
+    with world.who.factory() as db:
+        record_id = education(db, world.ws)[0]["id"]
+        said = MemoryCandidateService(db).propose(
+            world.ws, "student_record", key="education", confidence=0.9, source_type="conversation",
+            input_channel="conversation", entities={"record_id": record_id},
+            proposed_value={"institution_name": "Another College", "result": {"marks_obtained": 760}},
+            evidence={"quote": "I got 760 at Another College"})
+        assert MemoryReconciler(db).reconcile(said).outcome == "needs_review"
+        db.commit()
+    assert refresh(world.svc, world.ws, "test") == 1
+    (asked,) = [r for r in world.requests() if r["kind"] == "which_is_right" and r["status"] == "open"]
+    assert world.answer(asked["id"], "proposed").status_code == 200
+    assert world.row(asked["id"]).status == "answered"  # the OS no longer asks
+    with world.who.factory() as db:
+        assert world.card(db).status == "open"  # the institution is the Vault page's to settle
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 760
+
+
+def test_a_second_answer_to_the_same_value_does_not_overwrite_the_first(world):
+    from app.pai_c.connect import fact_conflicts
+
+    plan_id, asked = two_cards(world)
+    ref = asked[OBTAINED]["ref"]
+    with world.who.factory() as db:
+        assert fact_conflicts.answer(db, world.ws, ref, OBTAINED, "proposed")["status"] == "resolved"
+        db.commit()
+        assert fact_conflicts.answer(db, world.ws, ref, OBTAINED, "new", 790) == {"status": "gone"}
+        db.commit()
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 760

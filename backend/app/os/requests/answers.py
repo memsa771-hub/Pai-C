@@ -8,6 +8,8 @@ The two values are read live on every call and never stored (R-01). A question h
 - `documents`: two of the student's documents differ on an identity field. That stays OS document data
   (`resolve_finding`); it never goes to the Vault (identity fields are not on the StudentFacts allow-list)."""
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 
 from app.os.documents.confirm import resolve_finding
@@ -34,12 +36,20 @@ class Choices:
     allow_new: bool = False
     impossible: bool = False
     ref: str | None = None  # the question the student sees; the answer names it back (409 `answer_changed` when it moved)
+    seen: str | None = None  # a short hash of the values the student sees; the answer names it back too
 
 
 def _kind(value: dict) -> str:
     """Where the value comes from. The host says "from a document" or not; it does not say whether a stated value was
     said in the chat or typed on the profile page, so a stated one is simply "vault" (saved in PAI): never a guess."""
     return "document" if value.get("document_ref") else "vault"
+
+
+def seen_token(ref: str, pairs) -> str:
+    """A short hash of the question and the values on it, so an answer can be tied to what the student saw (no value is
+    readable from it)."""
+    raw = json.dumps([ref, sorted([str(k), v] for k, v in pairs)], sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()[:12]
 
 
 def question_ref(q: state_mod.QuestionRef) -> str:
@@ -51,15 +61,16 @@ def _from_conflict(conflict, key: str) -> Choices:
     sides = {v.side: v for v in conflict.values}
     labels = {"current": texts.text("current_label"), "proposed": texts.text("proposed_label")}
     offered = {_BY_ANSWER[a] for a in conflict.answers}
+    seen = seen_token(conflict.ref, [(v.side, v.value) for v in conflict.values])
     out = []
     for side in ("current", "proposed"):
         v = sides[side]
         if side not in offered:
             continue
         source = {"kind": _kind(v.model_dump()), "evidence": v.evidence, "document_ref": v.document_ref, "as_of": v.as_of}
-        out.append({"ref": conflict.ref, "key": key, "choice": side, "label": labels[side], "value": v.value,
+        out.append({"ref": conflict.ref, "key": key, "seen": seen, "choice": side, "label": labels[side], "value": v.value,
                     "source": source})
-    return Choices(out, "new" in offered, ref=conflict.ref)
+    return Choices(out, "new" in offered, ref=conflict.ref, seen=seen)
 
 
 def doc_choice(doc_id) -> str:
@@ -70,16 +81,17 @@ def _from_finding(svc, student: str, finding: dict) -> Choices:
     """One choice per document that holds a value, each with its own id (a third document is a third choice)."""
     docs = DocumentStore(svc.engine, svc.settings.tenant_id)
     ref = f"finding:{finding['id']}"
+    seen = seen_token(ref, finding["items"])
     out = []
     for doc_id, value in finding["items"]:
         doc = docs.get(doc_id)
         if doc is None or doc.student_ref != student or doc.deleted_at is not None:
             continue
         label = svc.document_types[doc.doc_type].label if doc.doc_type in svc.document_types else doc.doc_type
-        out.append({"ref": ref, "key": doc.doc_type, "choice": doc_choice(doc_id), "label": label, "value": value,
+        out.append({"ref": ref, "key": doc.doc_type, "seen": seen, "choice": doc_choice(doc_id), "label": label, "value": value,
                     "source": {"kind": "document", "evidence": "shown", "document_ref": doc.file_ref or f"os:{doc.id}",
                                "as_of": doc.confirmed_at or doc.created_at}})
-    return Choices(out, False, ref=ref)
+    return Choices(out, False, ref=ref, seen=seen)
 
 
 def choices_for(svc, student: str, requests: list[Request]) -> dict[int, Choices]:
@@ -101,7 +113,8 @@ def choices_for(svc, student: str, requests: list[Request]) -> dict[int, Choices
             if conflict is not None:
                 out[r.id] = _from_conflict(conflict, r.need_ref)
         elif q.origin == "impossible":
-            out[r.id] = Choices([], True, impossible=True, ref=question_ref(q))
+            ref = question_ref(q)
+            out[r.id] = Choices([], True, impossible=True, ref=ref, seen=seen_token(ref, []))
         else:
             finding = FindingStore(svc.engine, svc.settings.tenant_id).get(int(q.ref.partition(":")[2]))
             if finding is not None and finding["status"] == "open":
@@ -109,15 +122,27 @@ def choices_for(svc, student: str, requests: list[Request]) -> dict[int, Choices
     return out
 
 
-def answer(svc, student: str, req: Request, ref: str, choice: str, value) -> None:
+def _seen_now(svc, student: str, req: Request, q: state_mod.QuestionRef) -> str | None:
+    """The token of the values the question holds now."""
+    if q.origin == "vault":
+        found = fact_questions.read(student)
+        conflict = next((c for c in found.conflicts if c.key == req.need_ref), None) if found else None
+        return seen_token(conflict.ref, [(v.side, v.value) for v in conflict.values]) if conflict else None
+    if q.origin == "impossible":
+        return seen_token(question_ref(q), [])
+    finding = FindingStore(svc.engine, svc.settings.tenant_id).get(int(q.ref.partition(":")[2]))
+    return seen_token(q.ref, finding["items"]) if finding else None
+
+
+def answer(svc, student: str, req: Request, ref: str, seen: str, choice: str, value) -> None:
     """Sends the student's answer to where the question comes from. Returns when it is written, or when the question is
-    gone already (answered elsewhere); the caller then refreshes the plan. `ref` is the question the student saw: if the
-    question is another one now, nothing is written (409 `answer_changed`). Raises AnswerError."""
+    gone already (answered elsewhere); the caller then refreshes the plan. `ref` and `seen` name the question and the
+    values the student saw: if either is different now, nothing is written (409 `answer_changed`). Raises AnswerError."""
     state = state_mod.build(svc.plans, student)
     q = state.question(req.need_kind, req.need_ref) if state else None
     if q is None:
         return
-    if ref != question_ref(q):
+    if ref != question_ref(q) or seen != _seen_now(svc, student, req, q):
         raise AnswerError(409, "answer_changed", texts.text("answer_changed"))
     if q.origin in ("vault", "impossible"):
         key = req.need_ref if q.origin == "vault" else q.ref.partition(":")[0]
@@ -134,13 +159,10 @@ def answer(svc, student: str, req: Request, ref: str, choice: str, value) -> Non
     if finding is None or finding["student_ref"] != student or finding["status"] != "open":
         return
     items = finding["items"]
-    if choice == "new":
-        chosen = value
-    else:
-        picked = [v for d, v in items if doc_choice(d) == choice]
-        if not picked:
-            raise AnswerError(422, "bad_choice")
-        chosen = picked[0]
+    picked = [v for d, v in items if doc_choice(d) == choice]
+    if not picked:
+        raise AnswerError(422, "bad_choice")  # typing a value is not offered for two documents: "new" is refused
+    chosen = picked[0]
     try:
         resolve_finding(svc.engine, tenant, finding, chosen)
     except ValueError:

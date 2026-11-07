@@ -261,7 +261,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                 "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
                 "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
                 "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible),
-                "ref": c.ref, "choices": c.choices, "allow_new": c.allow_new,
+                "ref": c.ref, "seen": c.seen, "choices": c.choices, "allow_new": c.allow_new,
                 "new_label": request_texts.text("new_label") if c.allow_new else None})
         return {"requests": out}
 
@@ -284,7 +284,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         if found.kind != "which_is_right":
             raise HTTPException(status_code=409, detail="answer_elsewhere")  # a provide request closes when PAI has the data
         try:
-            request_answers.answer(svc, student, found, body.ref, body.choice, body.value)
+            request_answers.answer(svc, student, found, body.ref, body.seen, body.choice, body.value)
         except request_answers.AnswerError as e:
             if e.note:
                 return JSONResponse(status_code=e.status, content={"detail": e.detail, "note": e.note})
