@@ -438,3 +438,59 @@ def test_a_finding_with_three_documents_gives_each_its_own_choice(world):
 
     (value,) = [v for v in ProfileStore(world.engine, TENANT).all(world.ws) if v["key"] == "father_name"]
     assert value["value"] == "Rasheed Khan"
+
+
+# --- review fixes: an unexpected host error, a changed question, one read of the host ----------------------------------
+
+def test_an_unexpected_host_error_is_503_not_404(world, conflict):
+    """Review M1: 404 means "does not exist / part off"; a host that fails is `counsellor_unavailable` (503)."""
+    with patch("app.pai_c.connect.fact_conflicts.answer", side_effect=RuntimeError("boom")):
+        got = world.answer(conflict.asked["id"], "proposed")
+    assert got.status_code == 503 and got.json() == {"detail": "counsellor_unavailable"}
+    with world.who.factory() as db:
+        assert world.card(db).status == "open" and education(db, world.ws)[0]["result"]["marks_obtained"] == 800
+    assert world.row(conflict.asked["id"]).status == "open"
+    # the bridge itself returns the distinct status, and names only the class of the error in its log
+    with patch("app.pai_c.connect.fact_conflicts.answer", side_effect=RuntimeError("boom")), patch.object(
+            bridge, "part_on", return_value=True):
+        assert bridge.answer_fact_question(world.ws, "profile_issue:x", OBTAINED, "current") == {"status": "error"}
+
+
+def test_an_answer_to_a_question_that_changed_is_refused(world, conflict):
+    """Review M2: the answer names the question the student saw; another card now → 409 `answer_changed`, nothing written."""
+    from app.os.requests import texts
+
+    stale = conflict.asked["ref"]
+    with world.who.factory() as db:  # the card closes and a newer certificate opens another one
+        from app.memory.profile_issues import ProfileIssueService
+
+        ProfileIssueService(db).resolve(world.ws, world.card(db).id, "keep_current")
+        db.commit()
+        world.hssc_says(db, 770, key="fact_proposal:8:1")
+    assert refresh(world.svc, world.ws, "test") >= 0
+    got = world.answer(conflict.asked["id"], "proposed", ref=stale)
+    assert got.status_code == 409
+    assert got.json() == {"detail": "answer_changed", "note": texts.text("answer_changed")}
+    with world.who.factory() as db:
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 800
+        assert db.scalars(select(ProfileIssue).where(ProfileIssue.status == "open")).first() is not None
+    fresh = world.answer(conflict.asked["id"], "proposed")  # the ref of what is shown now is taken
+    assert fresh.status_code == 200
+    with world.who.factory() as db:
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 770
+
+
+def test_get_requests_reads_the_host_once(world, conflict):
+    """Review M3: no read per request. The host's conflicts are read once for the whole list."""
+    calls = []
+    real = bridge.fact_conflicts
+
+    def counting(ref):
+        calls.append(ref)
+        return real(ref)
+
+    ports.configure(world.svc, student_facts=bridge.student_facts, fact_conflicts=counting,
+                    fact_answer=bridge.answer_fact_question)
+    got = world.api.get("/v1/os/requests", headers=world.head)
+    assert got.status_code == 200 and [r for r in got.json()["requests"] if r["kind"] == "which_is_right"]
+    assert len(calls) == 1
