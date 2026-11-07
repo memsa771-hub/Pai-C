@@ -2,8 +2,8 @@
 
 1. reminders on the cadence, 2. the deadline at risk nudges the request first, 3. a proposal to swap or drop the places
 that wait for it, 4. a support case for a person. Real services, kernel, reminders and the os.replan workflow (DBOS in
-this process) on Postgres; the Vault answers from a dict. Fictional routes, programmes and students. The student's
-"close match" list is fixed by the test: how matches are found has its own tests."""
+this process) on Postgres; the Vault answers from a dict. Fictional routes, programmes and students. Most tests fix the
+student's "close match" list; `real_live` lets the real matching find it (how matches are found has its own tests)."""
 
 import types as pytypes
 from contextlib import contextmanager
