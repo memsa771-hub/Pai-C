@@ -412,6 +412,19 @@ def tick(world, day: date) -> None:
     run_reminders(world.engine, Outbox(world.engine, TENANT), world.box.now, TENANT)
 
 
+def replan_only(world, now: datetime) -> dict[int, dict]:
+    """One replan job at `now`, without the reminders run (the hourly jobs are separate: the deadline engine and the replan
+    job can run before the reminders of the same day), then the workflows it queued run to the end."""
+    from app.os.replan.run import generation, replan_workflow_id
+
+    world.box.now = now
+    queued = [(e.plan_id, e.id) for e in events.pending(world.engine, TENANT)
+              if not world.replanner.plans.kernel.changes_paused(e.plan_id)]
+    assert run_replan_job(world.replanner, world.client, now) == len(queued)
+    return {i: world.client.retrieve_workflow(replan_workflow_id(TENANT, p, i, generation(world.engine, TENANT, p))).get_result()
+            for p, i in queued}
+
+
 def reminders_of(world, task_id) -> list[str]:
     with world.engine.connect() as conn:
         return [k for k in conn.execute(select(models.outbox.c.idempotency_key).where(
@@ -860,4 +873,119 @@ def test_an_impossible_value_is_asked_and_the_new_value_goes_to_the_vault(world)
         assert s.row_of(INTER_MARKS, "answered", "which_is_right").closed_cause == "request_answered"
         assert not any((b or "").startswith("which_is_right:") for b in s.blocked().values())
         assert s.requests("open", "which_is_right") == []
+        s.throughout()
+
+
+# --- row 6.22: the fake Ireland route, version 2: the unanswered ladder ---------------------------------------------------
+
+IE_ENGLISH = f"provide@fact:{IELTS}:shown"
+IE_TRANSCRIPT = f"provide@document:{TRANSCRIPT_DOC}:shown"
+DUE = date(2027, 7, 15)  # the fictional deadline of every place (`seed_knowledge`)
+THREE = ["ie-p1", "ie-p2", "ie-p3"]
+
+
+def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(world):
+    from tests.os.test_connect_t6_flow import at_chosen, journey_stage, places_of_plan
+    from tests.os.test_unanswered_ladder import counsellor_rows, ladder_cases, never_silent, plan_status
+
+    with signed_in(world, germany_student()) as s, level("master"), running(world):
+        vault((s.client, s.who, s.params))
+        s.before = chat_rows(s.who)
+        choose(s, world, "IE", THREE)
+        plan_id = s.plan_id()
+        f = Flow(world.svc, s.client, s.who, s.params)
+        at_chosen(f)
+        with world.engine.connect() as conn:
+            assert conn.execute(select(models.playbook_pins.c.version).where(
+                models.playbook_pins.c.plan_id == plan_id)).scalar_one() == 2
+        # 1. two requests: the transcript for every place, the English score for the two places that ask for it
+        steps = s.steps()
+        assert steps[IE_TRANSCRIPT] == "waiting_student" and steps[IE_ENGLISH] == "waiting_student"
+        assert {r.need_ref for r in s.rows("open")} == {TRANSCRIPT_DOC, IELTS}
+        english_due, transcript_due = s.step(IE_ENGLISH).due_at, s.step(IE_TRANSCRIPT).due_at
+        print("DUES", english_due, transcript_due)
+        assert english_due is not None and transcript_due is not None  # both are dated (english_proof is dated now)
+        blocked = s.blocked()
+        assert blocked["english_proof@ie-p1"] == f"awaiting_fact:{IELTS}" and "english_proof@ie-p3" not in steps
+
+        # 2. the reminders follow the cadence: weekly far away, every third day nearer, daily in the last week
+        def new_slots(day: date) -> list[str]:
+            before = len(reminders_of(world, s.step(IE_ENGLISH).id))
+            tick(world, day)
+            return [k.split(":", 2)[2] for k in reminders_of(world, s.step(IE_ENGLISH).id)[before:]]
+
+        far, near, last = new_slots(DUE - timedelta(days=60)), new_slots(DUE - timedelta(days=13)), new_slots(DUE - timedelta(days=5))
+        assert [x.split(":")[0] for x in far] == ["w"] and [x.split(":")[0] for x in near] == ["d3"] \
+            and [x.split(":")[0] for x in last] == ["d"]
+        assert new_slots(DUE - timedelta(days=5)) == []  # the same day again adds nothing
+        assert os_events(world, plan_id, "document_missing") == []  # not late yet
+        # 3. the deadline is close and the English score is still missing: the request is nudged first (at risk)
+        world.box.set(DUE - timedelta(days=1))  # a day before the deadline: no room left for the step's two days
+        deadline_engine.run(world.svc.plans, world.engine)
+        replan_only(world, world.box.now)  # the hourly replan job; the reminders run later in the day
+        # (the English step is off the critical path here: the transcript is on it, so it is the request that is nudged)
+        risky = event_of(world, plan_id, "deadline_at_risk", "apply@ie-p1")
+        nudge = world.replanner.proposals.for_event(risky.id)
+        assert nudge.status == "applied" and not nudge.big
+        assert [(o["op"], o["instance_key"]) for o in nudge.ops] == [("reprioritise", IE_TRANSCRIPT),
+                                                                    ("request_from_student", IE_TRANSCRIPT)]
+        assert pending_proposals(world, plan_id) == [] and os_events(world, plan_id, "document_missing") == []
+        with world.engine.connect() as conn:  # the Counsellor and the app are told of the risk
+            told = [r.payload["kind"] for r in conn.execute(select(models.outbox).where(models.outbox.c.template == "os_event"))]
+        assert "deadline_at_risk" in told
+
+        # 4. the dates pass: the English request goes to a proposal (swap or drop the places that ask for it), the
+        # transcript request (every place) goes to a support case for a person; reminders come first every time
+        results = sweep(world, world.box.now + timedelta(hours=1))
+        english, transcript = (event_of(world, plan_id, "document_missing", k) for k in (IE_ENGLISH, IE_TRANSCRIPT))
+        assert results[english.id]["status"] == "pending" and results[transcript.id]["status"] == "applied"
+        (proposal,) = pending_proposals(world, plan_id)
+        assert proposal.big and proposal.event_ids == [english.id]
+        assert {(o["op"], o.get("out_ref") or o["programme_ref"]) for o in proposal.ops} <= {
+            ("swap_programme", "ie-p1"), ("swap_programme", "ie-p2"), ("cancel_programme", "ie-p1"),
+            ("cancel_programme", "ie-p2")}  # only the places that ask for English; ie-p3 asks nothing of the student
+        assert {o.get("out_ref") or o["programme_ref"] for o in proposal.ops} == {"ie-p1", "ie-p2"}
+        support = SupportStore(world.engine, TENANT)
+        case_e, case_t = support.for_event(english.id), support.for_event(transcript.id)
+        assert case_e.reason == texts.text("unanswered_proposed") and case_e.proposal_id == proposal.id
+        assert case_t.reason == texts.text("unanswered_all") and case_t.proposal_id != proposal.id
+        for case in (case_e, case_t):  # PAI only: nobody is sent to choose again, the plan is not paused (Ruling problem 11)
+            assert counsellor_rows(world, case.id) == [] and case.counsellor_status is None
+        assert plan_status(world, plan_id) != "paused" and not world.svc.plans.kernel.changes_paused(plan_id)
+        assert journey_stage(f) == "CHOSEN"
+        assert never_silent(world, plan_id, world.box.now) == 2  # both requests, both with a proposal or a case
+        assert places_of_plan(f) == THREE  # nothing is removed by itself
+        with s.who.factory() as db:
+            assert bridge.sweep_once(db)["sent"] == 0  # nothing reaches the Counsellor's escalation endpoint
+        assert journey_stage(f) == "CHOSEN"
+
+        # 5. the student accepts the proposal: the OS asks the Counsellor (T6), which writes the next version; the plan is
+        # revised without the places that asked for the English score
+        print("OPS", [(o["op"], o.get("out_ref") or o["programme_ref"], o.get("in_ref")) for o in proposal.ops])
+        world.replanner.accept(s.id, proposal.id)
+        assert world.replanner.proposals.get(proposal.id).status == "requested"
+        assert places_of_plan(f) == THREE and f.versions() == [1]
+        bridge.deliver_choice_request_now(choice_requests.key_of(proposal.id))
+        assert f.versions() == [1, 2]
+        assert {p["programme_ref"] for p in f.decision(2).places}.isdisjoint({"ie-p2"})
+        assert run_os(world.svc) == [("revised", None)]
+        assert world.replanner.proposals.get(proposal.id).status == "accepted"
+        now_places = places_of_plan(f)
+        assert "ie-p2" not in now_places and "ie-p3" in now_places and "ie-p1" not in now_places
+        # the English request is no longer needed: its step and its row are cancelled, not "answered"; the transcript
+        # request stays open, still one row, still unanswered
+        assert IE_ENGLISH not in s.steps() and not s.done(IE_ENGLISH)
+        assert [r.closed_cause for r in s.rows("cancelled") if r.need_ref == IELTS]
+        assert not [r for r in s.rows("answered") if r.need_ref == IELTS]
+        assert [r.need_ref for r in s.rows("open")] == [TRANSCRIPT_DOC]
+        assert s.steps()[IE_TRANSCRIPT] == "waiting_student"
+        assert plan_status(world, plan_id) != "paused" and journey_stage(f) == "CHOSEN"
+
+        # 6. the transcript is still not shown: the plan is not stuck and not silent; the reminders go on, and the case stands
+        before = len(reminders_of(world, s.step(IE_TRANSCRIPT).id))
+        sweep_at(world, world.box.today + timedelta(days=1))
+        assert len(reminders_of(world, s.step(IE_TRANSCRIPT).id)) == before + 1
+        assert never_silent(world, plan_id, world.box.now) == 1
+        assert len(ladder_cases(world, plan_id)) == 2  # one case per request, none more
+        assert plan_status(world, plan_id) != "paused" and journey_stage(f) == "CHOSEN"
         s.throughout()
