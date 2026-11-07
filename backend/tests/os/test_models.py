@@ -56,6 +56,8 @@ def test_os_tables_present():
         "os_consistency_cases", "os_consistency_runs",
         # P2-T1 (os_0025)
         "os_fact_revisions",
+        # P2-T3 (os_0026)
+        "os_source_domains", "os_page_snapshots", "os_source_files",
     }
 
 
