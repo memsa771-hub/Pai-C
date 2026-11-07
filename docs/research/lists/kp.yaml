@@ -12,7 +12,7 @@ lists:
     date: null
     row_count: 47   # 36 public, 11 private
     count_quote: null
-    count_method: counted list items with Province='Khyber Pakhtunkhwa' in the HTML
+    count_method: markup_count - counted list items with Province='Khyber Pakhtunkhwa' in the HTML (unconfirmed on import)
     check2: correct
   - id: kp-hed-participating-colleges
     body: Higher Education, Archives & Libraries Department KP (HEMIS Cell)

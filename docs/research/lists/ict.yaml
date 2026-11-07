@@ -11,7 +11,7 @@ lists:
     date: null
     row_count: 27   # 17 public, 10 private
     count_quote: null
-    count_method: counted list items with Province='Islamabad Capital Territory' in the HTML
+    count_method: markup_count - counted list items with Province='Islamabad Capital Territory' in the HTML (unconfirmed on import)
     check2: correct
 not_found:
   - what: FDE list of Islamabad Model Colleges

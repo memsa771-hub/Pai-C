@@ -43,7 +43,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Balochistan. 
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| LB-08 | recognised list items with Province='Balochistan' (count in Lists table). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Province='Balochistan'` | 2026-11-07 | curl + count of list items in the HTML markup | unclear: (a) quote is an HTML attribute (Province='Balochistan'), not visible text; markup-count line. My recount: 12 (11 public, 1 private), matches | correct: quote found word for word (html, markup, HTTP 200) |
+| LB-08 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `University of Balochistan Balochistan` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 
@@ -55,7 +55,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Balochistan. 
 
 | Body | List | URL | Date | Rows | How |
 |---|---|---|---|---|---|
-| HEC | Recognised universities/DAIs, Province = Balochistan | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **12** (11 public, 1 private) | counted items in the markup |
+| HEC | Recognised universities/DAIs, Province = Balochistan | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **12** (11 public, 1 private) | markup_count: counted HTML attributes (unconfirmed on import) |
 
 ## Gaps
 

@@ -16,13 +16,13 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-02 | nomination needs minimum sixty five percent marks (65%) in HSSC, F.Sc (Pre-Medical) or equivalent. | https://www.doecgb.gov.pk/nominations/medical/criteria | `The applicant shall have passed, obtaining minimum sixty five percent marks (65%) in Higher Secondary School Certificate (HSSC), F.Sc (Pre-Medical) or equivalent examination` | 2026-11-07 | curl + HTML text strip (comments removed) | unclear: quote verbatim, but 'nomination needs' is not in the quote (it comes from the page heading), and the page continues 'having a minimum of twelve years of education or as per PMC criteria' | correct: quote found word for word (html, visible text, HTTP 200) |
+| GB-02 | basic eligibility: minimum sixty five percent marks (65%) in HSSC, F.Sc (Pre-Medical) or equivalent, with a minimum of twelve years of education or as per PMC criteria. | https://www.doecgb.gov.pk/nominations/medical/criteria | `the basic eligibility criteria for admission follows: The applicant shall have passed, obtaining minimum sixty five percent marks (65%) in Higher Secondary School Certificate (HSSC), F.Sc (Pre-Medical) or equivalent examination having a minimum of twelve years of education or as per PMC criteria` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Eligibility rules
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-09 | not eligible: a 'third division' or less than 50% marks in the required qualification. | https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/ | `Who have got a degree/certificate with ‘third division’ in annual system or ’less than 50% marks or equivalent for other than annual system’ in the required qualification` | 2026-11-07 | curl + HTML text strip (comments removed) | unclear: quote verbatim (curly quote marks as on the page), but the statement drops the qualifiers: 'third division' is for the annual system and 'less than 50%' for systems other than annual; stated flat it reads wider than the quote | correct: quote found word for word (html, visible text, HTTP 200) |
+| GB-09 | not eligible: ‘third division’ in the annual system, or less than 50% marks or equivalent for other than annual system, in the required qualification. | https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/ | `Who have got a degree/certificate with ‘third division’ in annual system or ’less than 50% marks or equivalent for other than annual system’ in the required qualification` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Seat categories
 
@@ -45,7 +45,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-12 | recognised list items with Province='Gilgit Baltistan' (count in Lists table). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Province='Gilgit Baltistan'` | 2026-11-07 | curl + count of list items in the HTML markup | unclear: the quote Province='Gilgit Baltistan' is only in an HTML attribute, not visible text. My recount of li elements with that Province: 2, matches the list | correct: quote found word for word (html, markup, HTTP 200) |
+| GB-12 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Karakurum International University Gilgit Baltistan` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 
@@ -58,7 +58,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | Body | List | URL | Date | Rows | How |
 |---|---|---|---|---|---|
-| HEC | Recognised universities/DAIs, Province = Gilgit Baltistan | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **2** (2 public) | counted items in the markup |
+| HEC | Recognised universities/DAIs, Province = Gilgit Baltistan | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **2** (2 public) | markup_count: counted HTML attributes (unconfirmed on import) |
 
 ## Gaps
 

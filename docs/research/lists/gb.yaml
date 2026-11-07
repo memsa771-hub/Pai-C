@@ -3,7 +3,7 @@ region: gilgit_baltistan
 retrieved: 2026-11-07
 lists:
   - {id: gb-doec-public-colleges, body: "Directorate of Education (Colleges) GB", name: List of Public Sector Govenment Colleges in Gilgit Baltistan, url: "https://www.doecgb.gov.pk/institutions", institution_type: public_college, family: intermediate, date: null, row_count: 27, count_quote: null, count_method: counted rows (serials 1-27), check2: correct}
-  - {id: hec-recognised-gb, body: HEC, name: Recognised Universities (Province = Gilgit Baltistan), url: "https://www.hec.gov.pk/english/universities/pages/recognised.aspx", institution_type: university_or_dai, family: bachelor, date: null, row_count: 2, count_quote: null, count_method: counted list items in the HTML (2 public), check2: correct}
+  - {id: hec-recognised-gb, body: HEC, name: Recognised Universities (Province = Gilgit Baltistan), url: "https://www.hec.gov.pk/english/universities/pages/recognised.aspx", institution_type: university_or_dai, family: bachelor, date: null, row_count: 2, count_quote: null, count_method: markup_count - counted list items in the HTML (unconfirmed on import) (2 public), check2: correct}
 not_found:
   - what: KIU external examinations 'Affiliated Institutions' list (private colleges / A-level, P2 §11 Q4)
     note: not opened in this pass

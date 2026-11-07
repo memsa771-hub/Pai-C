@@ -10,7 +10,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Azad Jammu an
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| AI-01 | the info desk says the secondary/intermediate examination is conducted by BISE Mirpur (its sentence begins 'in Punjab', verbatim). | https://hed.ajk.gov.pk/info-desk/ | `Examination of secondary/intermediate level in Punjab Examination is conducted by BISE Mirpur.` | 2026-11-07 | curl + HTML text strip (comments removed) | wrong: the parenthetical says the sentence begins 'in Punjab'; on the page it begins 'Examination of secondary/intermediate level in Punjab'. Quote is verbatim in visible text (HTTP 200); BISE Mirpur part follows from the quote | correct: quote found word for word (html, visible text, HTTP 200) |
+| AI-01 | the info desk sentence names BISE Mirpur as the body conducting the secondary/intermediate examination (the words 'in Punjab' are on the page as quoted). | https://hed.ajk.gov.pk/info-desk/ | `Examination of secondary/intermediate level in Punjab Examination is conducted by BISE Mirpur.` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 | AI-09 | AJK BISE site (ajkbise.net): its home page carries injected gambling spam ('situs toto', 'slot gacor'); treated as suspect (R-71), nothing taken from it. | — | **no official source found** | 2026-11-07 | suspect domain; not used | n/a: gap line | n/a: no URL: gap line |
 
 ## How admission works

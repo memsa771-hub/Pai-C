@@ -11,7 +11,7 @@ lists:
     date: null
     row_count: 12   # 11 public, 1 private
     count_quote: null
-    count_method: counted list items with Province='Balochistan' in the HTML
+    count_method: markup_count - counted list items with Province='Balochistan' in the HTML (unconfirmed on import)
     check2: correct
 not_found:
   - what: Official list of Balochistan boards and of public colleges

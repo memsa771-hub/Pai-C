@@ -34,7 +34,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Azad Jammu an
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| AB-04 | recognised list items with Province='Azad Jammu & Kashmir' (count in Lists table). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Province='Azad Jammu & Kashmir'` | 2026-11-07 | curl + count of list items in the HTML markup | unclear: the quote Province='Azad Jammu & Kashmir' is not in the visible text, only in an HTML attribute (visible text shows 'Azad Jammu & Kashmir'). My recount of li elements with that Province: 9 (7 public, 2 private), matches the list | correct: quote found word for word (html, markup, HTTP 200) |
+| AB-04 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `University of Kotli Azad Jammu & Kashmir` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 
@@ -46,7 +46,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Azad Jammu an
 
 | Body | List | URL | Date | Rows | How |
 |---|---|---|---|---|---|
-| HEC | Recognised universities/DAIs, Province = Azad Jammu & Kashmir | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **9** (7 public, 2 private) | counted items in the markup |
+| HEC | Recognised universities/DAIs, Province = Azad Jammu & Kashmir | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | no publication date | **9** (7 public, 2 private) | markup_count: counted HTML attributes (unconfirmed on import) |
 
 ## Gaps
 
