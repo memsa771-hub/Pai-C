@@ -261,7 +261,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                 "id": r.id, "task_id": r.task_id, "kind": r.kind,
                 "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
                 "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
-                "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible),
+                "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible,
+                                  documents=bool(c.ref and c.ref.startswith("finding:"))),
                 "ref": c.ref, "seen": c.seen, "choices": c.choices, "allow_new": c.allow_new,
                 "new_label": request_texts.text("new_label") if c.allow_new else None})
         return {"requests": out}

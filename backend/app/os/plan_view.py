@@ -15,7 +15,7 @@ from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX
 from app.os.kernel.states import PLAN_CLOSED
 from app.os.playbooks.loader import PlaybookError, select_playbook
 from app.os.ports import document_files
-from app.os.requests import keys, store as request_store
+from app.os.requests import gate, keys, store as request_store
 
 D = models.documents
 P, T, E, R, PR, EV, I, PIN = (models.plans, models.tasks, models.task_edges, models.plan_revisions, models.proposals,
@@ -180,7 +180,8 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
         route_key, book_key = pin.playbook_key, (pin.playbook_key, pin.version)
     book = svc.plans.playbooks.get(book_key)
     pages = [p.key for p in (getattr(book, "pages", None) or [])]  # D-z6
-    steps = [s.model_copy(update={"needs": needs}) if (needs := _needs(s, book)) else s for s in steps]
+    if gate.on(student_ref, engine=svc.engine, tenant_id=tenant_id) is not None:  # D-w1: no needs shown while the gate is off
+        steps = [s.model_copy(update={"needs": needs}) if (needs := _needs(s, book)) else s for s in steps]
     # consent is the applied row's: the Counsellor holds the newest consent itself and shows it from its own side
     return PlanViewV1(
         student_ref=student_ref, state=state, state_reason=reason, plan_id=plan.id, decision_version=version,

@@ -118,8 +118,8 @@ def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[st
     wanted: dict[tuple[str, str], tuple] = {}
     for task_id, pid, k, instance_key in _live_steps(conn, tenant_id, _open_plans(conn, tenant_id, student)):
         fact = (k.need_kind, k.ref)
-        if fact in held or instance_key in done_keys:
-            continue  # asked already, or answered just now though its step has not closed (same key: same fact and level)
+        if fact in held or (pid == plan_id and instance_key in done_keys):
+            continue  # asked already, or answered just now in THIS plan though its step has not closed (another plan's live step still gets its row: never silent, its own recompile closes it)
         if fact not in wanted or (pid == plan_id and wanted[fact][0] != plan_id):  # this plan's step first
             wanted[fact] = (pid, task_id, k)
     for fact in sorted(wanted):
