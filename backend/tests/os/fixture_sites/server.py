@@ -55,7 +55,7 @@ class FixtureSites:
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:  # noqa: N802
+            def do_GET(self) -> None:
                 host = (self.headers.get("Host") or "").split(":")[0].lower()
                 path = urlsplit(self.path).path or "/"
                 with owner._lock:

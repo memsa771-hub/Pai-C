@@ -10,8 +10,9 @@ Self-contained on purpose: it does not import app.os, so later model changes can
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 revision = "os_0025"
 down_revision = "os_0024"
