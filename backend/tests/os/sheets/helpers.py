@@ -96,4 +96,4 @@ def load_list(engine, **kw) -> None:
     RegistryStore(engine, "pai").record(olist(**kw), cause="import")
 
 
-__all__ = ["AT", "C1", "C2", "COUNTRY", "NOTICE", "datetime", "UTC", "field"]
+__all__ = ["AT", "C1", "C2", "COUNTRY", "NOTICE", "UTC", "datetime", "field"]

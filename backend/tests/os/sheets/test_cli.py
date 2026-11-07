@@ -21,7 +21,7 @@ def run(argv, d=None):
 
 
 def test_template_command(tmp_path):
-    code, text = run(["template", str(tmp_path / "t.xlsx")])
+    code, _ = run(["template", str(tmp_path / "t.xlsx")])
     assert code == 0 and openpyxl.load_workbook(tmp_path / "t.xlsx").sheetnames[:3] == ["Institutions", "Programmes", "Facts"]
 
 

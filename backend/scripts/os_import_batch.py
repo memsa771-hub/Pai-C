@@ -22,9 +22,9 @@ from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
     build_context,
-    wire_other_tasks,
     plan_file,
     run_import,
+    wire_other_tasks,
     write_report,
 )
 from app.os.knowledge.sheets.plan import OWNER_ACCEPTED, REVIEWERS, norm_url, summarise
@@ -84,7 +84,7 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                                 family=args.family, list_urls=_list_urls(Path(args.lists) if args.lists else None,
                                                                          args.country),
                                 require_list=not args.no_list_needed)
-            batch, results = plan_file(Path(args.file), ctx)
+            _, results = plan_file(Path(args.file), ctx)
             if args.report:
                 write_report(results, Path(args.report))
             _print_counts(summarise(results), out)

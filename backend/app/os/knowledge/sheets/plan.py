@@ -122,7 +122,7 @@ def read_checks(row: dict, ctx: PlanContext) -> Checks:
             c2 = None
         prov = {"checker1": r1, "checker2": r2, "checker1_name": n1, "checker2_name": n2}
     else:
-        ok = lambda n: bool(n) and ctx.attested is not None and ctx.attested(n, ctx.batch_ref)  # noqa: E731
+        ok = lambda n: bool(n) and ctx.attested is not None and ctx.attested(n, ctx.batch_ref)
         if c1 is not None and not ok(n1):
             notes.append(f"checker 1 '{n1}' has not attested batch {ctx.batch_ref}")
             c1 = None

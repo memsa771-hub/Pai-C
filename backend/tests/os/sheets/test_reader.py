@@ -47,7 +47,7 @@ def test_csv_folder_is_the_same_batch(tmp_path):
         with (folder / f"{name}.csv").open("w", newline="", encoding="utf-8") as fh:
             csv.writer(fh).writerows([[("" if c is None else c) for c in row] for row in wb[name].iter_rows(values_only=True)])
     a, b = read_batch(xlsx), read_batch(folder)
-    strip = lambda rows: [{k: v for k, v in r.items() if k != "_row"} for r in rows]  # noqa: E731
+    strip = lambda rows: [{k: v for k, v in r.items() if k != "_row"} for r in rows]
     assert strip(a.sheets["Institutions"]) == strip(b.sheets["Institutions"])
     assert strip(a.sheets["Facts"]) == strip(b.sheets["Facts"])
 

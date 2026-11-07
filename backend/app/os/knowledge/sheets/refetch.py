@@ -30,7 +30,7 @@ class Refetcher:
             try:
                 page = self.fetcher.fetch(url, (), (), Scope(region=region or "", family=self.family))
                 self._pages[url] = (normalise(page.text or ""), page.blocked)
-            except Exception as e:  # a transient failure is not a mismatch
+            except Exception as e:  # noqa: BLE001  (a transient failure is not a mismatch)
                 self._pages[url] = ("", f"error:{type(e).__name__}")
         text, blocked = self._pages[url]
         if blocked:

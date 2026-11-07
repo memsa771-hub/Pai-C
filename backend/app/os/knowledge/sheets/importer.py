@@ -11,7 +11,6 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
 from urllib.parse import urlsplit
 
 from sqlalchemy import Engine
@@ -89,7 +88,7 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
         ctx.attested, ctx.official = deps.attested, deps.official
         ctx.existing_institutions = _registry_lookup(deps.registry)
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
-        ctx.existing_region = lambda rid: (lambda e: e.region if e else None)(deps.registry.get(rid))
+        ctx.existing_region = lambda rid: getattr(deps.registry.get(rid), "region", None)
     ctx.list_urls = urls
     return ctx
 

@@ -118,7 +118,6 @@ def read_batch(path: Path, fmt: Format | None = None) -> Batch:
             absent = [c for c in spec.required if rows is not None and header and c not in header]
             if name in raw and (absent or not header):
                 raise SheetError(f"{path.name}: sheet {name} lacks required column(s) {absent or list(spec.required)}")
-        key = fmt.sheets[name].key
         kept = []
         for r in rows:
             if all(r.get(c) is None for c in fmt.all_columns(name)):

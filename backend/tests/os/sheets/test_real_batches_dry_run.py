@@ -32,7 +32,7 @@ def list_urls() -> dict[str, str]:
 
 
 def test_the_five_v4_files_map_and_every_row_is_accounted_for():
-    ctx = lambda: PlanContext(country="PK", list_urls=list_urls())  # noqa: E731
+    ctx = lambda: PlanContext(country="PK", list_urls=list_urls())
     verified = 0
     for name, (n_inst, n_prog, n_fact, layout) in ROWS.items():
         batch, results = plan_file(DATA / "batches" / name, ctx())

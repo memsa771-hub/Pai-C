@@ -5,7 +5,6 @@ import pytest
 
 from app.os.knowledge.sheets.importer import plan_file
 from app.os.knowledge.sheets.plan import (
-    OWNER_ACCEPTED,
     REVIEWERS,
     Checks,
     PlanContext,

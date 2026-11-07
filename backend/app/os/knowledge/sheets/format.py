@@ -12,6 +12,10 @@ FORMAT_FILE = HERE / "format.yaml"
 LEGACY_DIR = HERE / "legacy"
 
 
+def _fill(m: re.Match, template: str) -> str:
+    return re.sub(r"\{(\d)\}", lambda g: m.group(int(g.group(1))), template)
+
+
 @dataclass(frozen=True)
 class SheetSpec:
     name: str
@@ -80,8 +84,7 @@ class Format:
         for rule in self.raw["intake_patterns"]:
             m = re.match(rule["regex"], t)
             if m:
-                fill = lambda s: re.sub(r"\{(\d)\}", lambda g: m.group(int(g.group(1))), s)  # noqa: E731
-                return fill(rule["term"]), int(fill(rule["year"]))
+                return _fill(m, rule["term"]), int(_fill(m, rule["year"]))
         return None
 
     def owner_accepted_ref(self, which: int, name: str | None) -> str | None:

@@ -138,7 +138,7 @@ def test_an_unreadable_file_leaves_no_log_row_and_a_failure_is_logged(engine, cl
 
     bad = tmp_path / "bad.xlsx"
     bad.write_bytes(b"not a workbook")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017  (any reader error: the file is not a workbook)
         run_import(bad, deps(engine), mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref=DECISION)
     assert SheetError and ImportLog(engine, "pai").list() == []
 
@@ -160,7 +160,7 @@ def test_reviewer_mode_verifies_only_with_two_attested_different_reviewers(engin
 
 def test_model_read_rows_stay_unconfirmed_until_the_quote_matches_on_a_refetched_page(engine, clean, tmp_path):
     load_list(engine)
-    model = dict(read_method="webfetch (model-extracted)")
+    model = {"read_method": "webfetch (model-extracted)"}
     rows = [fact(1, "T-INST-001", field_="m_ok", **model), fact(2, "T-INST-001", field_="m_bad", quote_verbatim="Not on it",
                                                                     **model),
             fact(3, "T-INST-001", field_="m_blocked", source_url="https://blocked.alpha.test/x", **model)]
