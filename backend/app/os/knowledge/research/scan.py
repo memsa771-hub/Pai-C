@@ -125,7 +125,10 @@ class DoclingScanText:
         codes = _engine_codes("docling", languages)
         try:
             from docling.datamodel.base_models import InputFormat
-            from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
+            from docling.datamodel.pipeline_options import (
+                EasyOcrOptions,
+                PdfPipelineOptions,
+            )
             from docling.document_converter import DocumentConverter, ImageFormatOption
 
             options = PdfPipelineOptions(do_ocr=True, ocr_options=EasyOcrOptions(lang=codes))
@@ -136,7 +139,7 @@ class DoclingScanText:
                 text = converter.convert(str(path)).document.export_to_text()
         except ScanFailed:
             raise
-        except Exception as e:  # noqa: BLE001  (any engine failure is "could not read")
+        except Exception as e:
             raise ScanFailed(f"docling: {type(e).__name__}") from e
         return ScanResult(text.strip(), self.name)
 
@@ -164,7 +167,7 @@ def scan_document(scanner: ScanText, data: bytes, content_type: str, *, max_page
     if kind == "application/pdf":
         try:
             images = rasterise_pdf(data, max_pages)
-        except Exception as e:  # noqa: BLE001  (a PDF we cannot draw is a PDF we cannot read)
+        except Exception as e:
             raise ScanFailed(f"rasterise: {type(e).__name__}") from e
     elif kind in IMAGE_TYPES:
         images = [data]

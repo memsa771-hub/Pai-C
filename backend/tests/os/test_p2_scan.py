@@ -7,8 +7,15 @@ import sys
 import pypdfium2 as pdfium
 import pytest
 
-from app.os.knowledge.research.scan import (DoclingScanText, FixedScanText, ScanFailed, TesseractScanText,
-                                            default_languages, rasterise_pdf, scan_document)
+from app.os.knowledge.research.scan import (
+    DoclingScanText,
+    FixedScanText,
+    ScanFailed,
+    TesseractScanText,
+    default_languages,
+    rasterise_pdf,
+    scan_document,
+)
 from tests.os import scan_fixtures as fx
 
 pytestmark = pytest.mark.req("R-29")
