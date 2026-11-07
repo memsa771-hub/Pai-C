@@ -188,4 +188,17 @@ T10 questions (`docs/superpowers/plans/2026-11-07-p1-t10-gate.md` §3), as ruled
 
 ## 7. Full-suite counts and checks (E1, branch `pc/p1-t10-gate`)
 
-COUNTS_PLACEHOLDER
+Run on the head `32ecbbb` plus this file (T8's final head `f3c9f5e` and the test rename of PR #200 merged in), database `os_test_c`:
+
+| Suite | Result |
+|---|---|
+| `tests/os` (full, run before the rename merge; the renamed file and the row index were rerun after) | 2276 passed, 1 skipped, 1 xfailed |
+| After the merge: `test_os_student_requests.py` and `test_connect_rows_index.py` | 31 passed |
+| Legacy (`--ignore=tests/os`, run after `tests/os`, not in parallel) | 2557 passed, 13 skipped |
+| Frontend `npm test` | 572 passed (59 files) |
+| Frontend `npx tsc --noEmit` | clean |
+| Frontend `npx next build --webpack` | compiled successfully |
+| `tach check` | all modules validated |
+| `scripts/check_alembic_heads.py` | one head per tree |
+| `scripts/check_freeze.py --base origin/pai-connect` and `--base bed47c8` | no frozen Counsellor file or model setting changed |
+| `scripts/check_traceability.py --gate P1` | exit 0 |
