@@ -25,11 +25,12 @@ def complete(svc, student_ref: str, task_id: int, payload: dict | None = None) -
     plan for the visa step's date. A review step is closed by approving its artifact, and a request step (P1-T8, D-w11)
     by the answer, never by hand."""
     from app.os.api.packs import refresh_visa_date  # late: the API package imports this module
-    from app.os.api.queries import task_owner, task_plan_and_template
+    from app.os.api.queries import task_plan_template_owner
 
-    found = task_plan_and_template(svc.engine, svc.settings.tenant_id, task_id)
+    owned = task_plan_template_owner(svc.engine, svc.settings.tenant_id, task_id)
+    found = None if owned is None else owned[:2]
     if found is not None and found[1] in keys.TEMPLATES:  # a request closes when PAI has what it asked for (R-18)
-        if task_owner(svc.engine, svc.settings.tenant_id, task_id) != student_ref:  # not yours: told nothing about it
+        if owned[2] != student_ref:  # not yours: told nothing about it
             raise StepActionError("not_yours", "inbox item not found")
         raise StepActionError("answer_required", texts.text("answer_required"))
     if found is not None and found[1] in REVIEW_TEMPLATES:

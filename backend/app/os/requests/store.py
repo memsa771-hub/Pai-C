@@ -61,9 +61,13 @@ def _live_steps(conn: Connection, tenant_id: str, plan_ids: Collection[int]):
     return [(r.id, r.plan_id, k, r.instance_key) for r in rows if (k := keys.parse(r.instance_key)) is not None]
 
 
-def _lock_student(conn: Connection, tenant_id: str, student: str) -> None:
+def lock_student(conn: Connection, tenant_id: str, student: str) -> None:
     """One sync per student at a time, until the caller's transaction ends. Every read below happens after this, so a
-    sync sees what the one before it committed (READ COMMITTED), and two plans cannot open facts in opposite orders."""
+    sync sees what the one before it committed (READ COMMITTED), and two plans cannot open facts in opposite orders.
+
+    Lock order: the kernel takes this lock BEFORE any plan row lock (`Kernel._lock_plan`, `create_plan`). A sync that
+    holds it may write a row for another plan, which needs a share lock on that plan's row; the other plan's
+    transaction must therefore not hold that row while it waits for this lock. Advisory xact locks are re-entrant."""
     conn.execute(select(func.pg_advisory_xact_lock(LOCK_CLASS, func.hashtext(f"{tenant_id}:{student}"))))
 
 
@@ -83,7 +87,7 @@ def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[st
     student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
     if student is None:
         return
-    _lock_student(conn, tenant_id, student)
+    lock_student(conn, tenant_id, student)
     closed_plan = conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar() == PLAN_CLOSED
     done_keys = set(answered)
     steps = {r.id: r for r in conn.execute(select(T.c.id, T.c.instance_key, T.c.state).where(
@@ -114,8 +118,8 @@ def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[st
     wanted: dict[tuple[str, str], tuple] = {}
     for task_id, pid, k, instance_key in _live_steps(conn, tenant_id, _open_plans(conn, tenant_id, student)):
         fact = (k.need_kind, k.ref)
-        if fact in held or (pid == plan_id and instance_key in done_keys):
-            continue  # asked already, or answered just now though its step has not closed
+        if fact in held or instance_key in done_keys:
+            continue  # asked already, or answered just now though its step has not closed (same key: same fact and level)
         if fact not in wanted or (pid == plan_id and wanted[fact][0] != plan_id):  # this plan's step first
             wanted[fact] = (pid, task_id, k)
     for fact in sorted(wanted):

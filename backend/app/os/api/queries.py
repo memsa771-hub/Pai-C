@@ -135,12 +135,12 @@ def task_plan_and_template(engine: Engine, tenant_id: str, task_id: int) -> tupl
     return None if row is None else (row.plan_id, row.template_key)
 
 
-def task_owner(engine: Engine, tenant_id: str, task_id: int) -> str | None:
-    """The student a task's plan belongs to, or None when there is no such task."""
+def task_plan_template_owner(engine: Engine, tenant_id: str, task_id: int) -> tuple[int, str, str] | None:
+    """`(plan id, template key, the plan's student)` of a task, or None when there is no such task."""
     with engine.connect() as conn:
-        return conn.execute(select(P.c.student_ref).select_from(
-            T.join(P, P.c.id == T.c.plan_id)).where(
-            T.c.tenant_id == tenant_id, T.c.id == task_id)).scalar()
+        row = conn.execute(select(T.c.plan_id, T.c.template_key, P.c.student_ref).select_from(
+            T.join(P, P.c.id == T.c.plan_id)).where(T.c.tenant_id == tenant_id, T.c.id == task_id)).first()
+    return None if row is None else (row.plan_id, row.template_key, row.student_ref)
 
 
 def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:

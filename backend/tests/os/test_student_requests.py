@@ -24,7 +24,6 @@ TODAY = datetime(2027, 3, 1).date()
 NOTHING = StudentState()
 TYPED = StudentState(facts={OBTAINED: "stated", TOTAL: "stated"})
 ONLY_TOTAL = StudentState(facts={OBTAINED: "confirmed"})  # asks only for the total
-ALL_CONFIRMED = StudentState(facts={OBTAINED: "confirmed", TOTAL: "confirmed"})  # asks for nothing
 R = models.student_requests
 
 pytestmark = pytest.mark.req("R-19")
@@ -130,11 +129,11 @@ def test_concurrent_revisions_keep_one_open_row(engine, clean, monkeypatch):
     """Review Focus 2: two plans of one student both open the same request at the same moment."""
     from app.os.kernel import kernel as kernel_module
 
-    barrier = threading.Barrier(2, timeout=10)
+    barrier = threading.Barrier(2, timeout=3)
     real = kernel_module.request_store.sync
 
     def together(*args, **kwargs):
-        barrier.wait()  # both transactions have their steps and neither has committed
+        wait_for_the_other(barrier)  # both transactions have their steps and neither has committed
         return real(*args, **kwargs)
 
     monkeypatch.setattr(kernel_module.request_store, "sync", together)
@@ -155,16 +154,25 @@ def test_concurrent_revisions_keep_one_open_row(engine, clean, monkeypatch):
     assert store.duplicates(engine, "pai") == []
 
 
+def wait_for_the_other(barrier) -> None:
+    """The kernel takes the student lock before its plan row, so the second transaction cannot reach `sync` until the
+    first has committed: the barrier then breaks after its timeout, and the run goes on one at a time."""
+    try:
+        barrier.wait()
+    except threading.BrokenBarrierError:
+        pass
+
+
 def concurrently(engine, jobs, monkeypatch):
     """Runs the jobs in threads; each waits at a barrier just before its `sync`, so every transaction has its steps and
     none has committed. Returns the errors."""
     from app.os.kernel import kernel as kernel_module
 
-    barrier = threading.Barrier(len(jobs), timeout=10)
+    barrier = threading.Barrier(len(jobs), timeout=3)
     real = kernel_module.request_store.sync
 
     def together(*args, **kwargs):
-        barrier.wait()
+        wait_for_the_other(barrier)
         return real(*args, **kwargs)
 
     monkeypatch.setattr(kernel_module.request_store, "sync", together)
@@ -211,17 +219,76 @@ def test_a_removed_step_and_an_added_one_keep_the_open_row(engine, clean, monkey
     assert store.duplicates(engine, "pai") == []
 
 
-def test_a_row_answered_at_one_level_is_reopened_for_the_other_plan(engine, clean):
-    """Review I3: A needs the marks shown, B needs them stated and holds the row. B's is answered: A gets a row."""
+def test_a_row_answered_at_one_level_moves_on_for_both_plans(engine, clean):
+    """Review I3: A needs the marks shown, B needs them stated and holds the row. B's stated is answered (its shown is
+    still unmet): the fact has one open row, at shown, that both plans show, and the total's row is answered."""
     k = kernel(engine)
     b = k.create_plan(contract_of("ext-b"), compiled(NOTHING))
     a = k.create_plan(contract_of("ext-a"), compiled(TYPED))
     assert {r.plan_id for r in rows(engine) if r.status == "open"} == {b.plan_id}  # B holds both rows
-    assert k.revise(b.plan_id, "student_fact_changed", compiled(ALL_CONFIRMED)) is not None
+    assert k.revise(b.plan_id, "student_fact_changed", compiled(TYPED)) is not None
     opened = [r for r in rows(engine) if r.status == "open"]
-    assert [(r.need_ref, r.evidence, r.plan_id) for r in opened] == [(OBTAINED, "shown", a.plan_id)]
+    assert [(r.need_ref, r.evidence) for r in opened] == [(OBTAINED, "shown")]
     with engine.connect() as conn:
-        assert [r.id for r in store.for_plan(conn, "pai", a.plan_id)] == [opened[0].id]
+        for plan in (a.plan_id, b.plan_id):
+            assert [r.id for r in store.for_plan(conn, "pai", plan) if r.status == "open"] == [opened[0].id]
+    assert store.duplicates(engine, "pai") == []
+
+
+def test_a_key_answered_in_one_plan_is_not_reopened_for_another(engine, clean):
+    """Review round 2, item 2: a live step of another plan with the same key (same fact and level) is not reopened."""
+    k = kernel(engine)
+    a = k.create_plan(contract_of("ext-a"), compiled(NOTHING))
+    k.create_plan(contract_of("ext-b"), compiled(NOTHING))
+    with engine.begin() as conn:
+        store.sync(conn, "pai", a.plan_id, answered=[f"provide@fact:{OBTAINED}:stated"])
+    assert sorted(view(r) for r in rows(engine)) == [
+        (OBTAINED, "stated", "provide", "answered"), (TOTAL, "stated", "provide", "open")]
+
+
+def test_a_lock_order_that_cannot_deadlock(engine, clean, monkeypatch):
+    """Review round 2, item 1: A holds the student lock and opens a row for B's live step while B is mid-transaction.
+    B must not hold its plan row while it waits for the student lock."""
+    import time
+
+    from app.os.kernel import kernel as kernel_module
+
+    k = kernel(engine)
+    a = k.create_plan(contract_of("ext-a"), compiled(NOTHING))
+    b = k.create_plan(contract_of("ext-b"), compiled(NOTHING))
+    real_sync, real_lock = store.sync, store.lock_student
+    a_locked, both_in = threading.Event(), threading.Barrier(2, timeout=3)
+
+    def lock(conn, tenant, student):
+        real_lock(conn, tenant, student)
+        if threading.current_thread().name == "A":
+            a_locked.set()
+
+    def sync(conn, tenant, plan_id, *args, **kwargs):
+        try:
+            both_in.wait()  # before the fix both transactions are here, each holding its plan row
+        except threading.BrokenBarrierError:
+            pass  # after it, the second cannot get here until the first has committed
+        if threading.current_thread().name == "B":
+            a_locked.wait(10)
+            time.sleep(0.3)
+        return real_sync(conn, tenant, plan_id, *args, **kwargs)
+
+    monkeypatch.setattr(store, "lock_student", lock)
+    monkeypatch.setattr(kernel_module.request_store, "sync", sync)
+    errors: list[str] = []
+
+    def run(plan_id):
+        try:
+            kernel(engine).revise(plan_id, "student_fact_changed", compiled(TYPED))
+        except BaseException as e:  # noqa: BLE001
+            errors.append(repr(e)[:300])
+
+    threads = [threading.Thread(target=run, args=(p,), name=n) for p, n in ((a.plan_id, "A"), (b.plan_id, "B"))]
+    [t.start() for t in threads]
+    [t.join(30) for t in threads]
+    assert errors == []
+    assert [(r.need_ref, r.evidence) for r in rows(engine) if r.status == "open"] == [(OBTAINED, "shown")]
     assert store.duplicates(engine, "pai") == []
 
 

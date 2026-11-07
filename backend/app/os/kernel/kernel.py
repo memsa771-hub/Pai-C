@@ -94,6 +94,12 @@ class Kernel:
         identity = and_(P.c.tenant_id == self.tenant_id, P.c.source == contract.source,
                         P.c.external_ref == contract.external_ref)
         with self.engine.begin() as conn:
+            # The student lock comes before any plan row lock (store.lock_student): lock both students, in order, when
+            # a contract revision moves an existing plan to another student.
+            held = conn.execute(select(P.c.student_ref).where(identity)).scalar_one_or_none()
+            students = sorted({contract.student_ref, *([held] if held else [])})
+            for student in students:
+                request_store.lock_student(conn, self.tenant_id, student)
             plan_id = conn.execute(
                 pg_insert(P).values(
                     tenant_id=self.tenant_id, source=contract.source, external_ref=contract.external_ref,
@@ -436,10 +442,21 @@ class Kernel:
         os_events.emit(conn, self.tenant_id, plan_id, kind, event_id, at, key)
 
     def _lock_plan(self, conn: Connection, plan_id: int) -> None:
-        found = conn.execute(select(P.c.id).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
-                             .with_for_update()).first()
-        if found is None:
+        """The student's request lock first, then the plan row (`store.lock_student`: a sync under that lock may write
+        a row for another plan, which needs that plan's row, so no transaction may hold a plan row and wait for it)."""
+        student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
+                               ).scalar_one_or_none()
+        if student is None:
             raise KeyError(f"plan {plan_id}")
+        while True:
+            request_store.lock_student(conn, self.tenant_id, student)
+            found = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
+                                 .with_for_update()).scalar_one_or_none()
+            if found is None:
+                raise KeyError(f"plan {plan_id}")
+            if found == student:
+                return
+            student = found  # moved to another student meanwhile: take that student's lock too (rare)
 
     def _lock_task(self, conn: Connection, task_id: int):
         plan_id = conn.execute(select(T.c.plan_id).where(T.c.id == task_id, T.c.tenant_id == self.tenant_id)
