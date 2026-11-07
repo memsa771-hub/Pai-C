@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.models import ProfileIssue, VaultVersion
+from app.models import MemoryCandidate, ProfileIssue, VaultVersion
 from app.pai_c.connect.student_facts import _num, chosen_education, education_records
 from app.pai_c.connect.vault_version import key_map
 
@@ -146,15 +146,25 @@ def _open_issues(db, workspace_id: str) -> list[ProfileIssue]:
         .order_by(ProfileIssue.created_at, ProfileIssue.id)))
 
 
-def _entries(db, workspace_id: str) -> list[dict]:
+def _card_entries(issue: ProfileIssue, card: dict, chosen: dict, attempts: list[dict]) -> list[tuple[str, dict, dict]]:
+    """`(key, current side, proposed side)` for each key the card still differs on."""
+    return (_education_entries(issue, card, chosen) if issue.affected_type == "education"
+            else _test_entries(issue, card, attempts))
+
+
+def _attempts(db, workspace_id: str) -> list[dict]:
     from app.pai_c.memory import MemoryService
 
+    return list(MemoryService(db).profile(workspace_id).records.get("test_attempt", []))
+
+
+def _entries(db, workspace_id: str) -> list[dict]:
     issues = _open_issues(db, workspace_id)
     if not issues:
         return []
     cards = _cards(db, workspace_id)
     chosen = chosen_education(education_records(db, workspace_id))
-    attempts = list(MemoryService(db).profile(workspace_id).records.get("test_attempt", []))
+    attempts = _attempts(db, workspace_id)
     found: dict[str, dict] = {}
     for issue in issues:
         card = cards.get(issue.id)
@@ -163,9 +173,7 @@ def _entries(db, workspace_id: str) -> list[dict]:
         answers = [a for a in card["answers"] if a in OFFERED]
         if "keep_current" not in answers:
             continue  # no current value to keep: nothing is in question for the facts
-        entries = (_education_entries(issue, card, chosen) if issue.affected_type == "education"
-                   else _test_entries(issue, card, attempts))
-        for key, current, proposed in entries:
+        for key, current, proposed in _card_entries(issue, card, chosen, attempts):
             found.setdefault(key, {"ref": f"profile_issue:{issue.id}", "key": key, "values": [current, proposed],
                                    "answers": answers})  # the oldest card of a key stands
     return [found[k] for k in sorted(found)]
@@ -227,14 +235,98 @@ def _place(db, workspace_id: str, key: str, value) -> tuple[str, dict, str] | No
     return None
 
 
-def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None) -> dict:
+def _quote(request_id) -> str:
+    return "Student chose in PAI OS" + (f" (request {request_id})" if request_id is not None else "")
+
+
+def _evidence(request_id, **more) -> dict:
+    """What every value an answer writes names: the capture surface, the OS request, and a quote."""
+    out = {"capture": CAPTURE, "quote": _quote(request_id), **more}
+    if request_id is not None:
+        out["os_request_id"] = request_id
+    return out
+
+
+def _held(db, workspace_id: str, key: str, record_id: str):
+    """The record the key stands for, as it is now (or None)."""
+    if key.startswith("education."):
+        family = key.partition(".")[2].partition(".")[0]
+        row = chosen_education(education_records(db, workspace_id)).get(family)
+        return row if row is not None and row.get("id") == record_id else None
+    return next((r for r in _attempts(db, workspace_id) if r.get("id") == record_id), None)
+
+
+def _field_of(key: str) -> str:
+    if key.startswith("education."):
+        return key.partition(".")[2].partition(".")[2]
+    return "overall_score"
+
+
+def _raw(row: dict, field: str):
+    """The stored value of an allow-listed field: the qualification name for the level, else the result field."""
+    if field == "level":
+        return row.get("qualification_name")
+    if field == "overall_score":
+        return row.get("overall_score")
+    node = row.get("result") or {}
+    for part in field.split("."):
+        node = node.get(part) if isinstance(node, dict) else None
+    return node
+
+
+def _put(proposed: dict, field: str, raw) -> dict:
+    """A copy of the card's proposed record whose `field` holds `raw` (so the card no longer differs on it)."""
+    out = {**proposed}
+    if field in ("level", "overall_score"):
+        out["qualification_name" if field == "level" else field] = raw
+        return out
+    result = out["result"] = dict(out.get("result") or {})
+    *parents, leaf = field.split(".")
+    for part in parents:
+        result = result[part] = dict(result.get(part) or {})
+    result[leaf] = raw
+    return out
+
+
+def _level_place(db, workspace_id: str, key: str, proposed: dict) -> tuple[str, dict, str] | None:
+    """The qualification name of the card's proposed record, as a record value (the level has no typed value)."""
+    family = key.partition(".")[2].partition(".")[0]
+    row = chosen_education(education_records(db, workspace_id)).get(family)
+    name = proposed.get("qualification_name")
+    return ("education", {"qualification_name": name}, row["id"]) if row is not None and name else None
+
+
+def _write(db, workspace_id: str, issue: ProfileIssue, kind: str, record_value: dict, record_id: str, action: str,
+           request_id):
+    """The student's own value for one fact, through the reconciler, as the card's resolution writes it. Returns the
+    reconciler's result, or None when the Vault refused the value."""
+    from app.pai_c.memory import MemoryCandidateService, MemoryDataError, MemoryReconciler
+
+    candidate = MemoryCandidateService(db).propose(
+        workspace_id, "student_record", key=kind, proposed_value=record_value, entities={"record_id": record_id},
+        confidence=1.0, source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+        evidence=_evidence(request_id, profile_issue_id=issue.id, resolution_action=action))
+    try:
+        result = MemoryReconciler(db).reconcile(candidate)
+    except MemoryDataError:
+        return None
+    return result if result.accepted else None
+
+
+def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None, request_id=None) -> dict:
     """Writes the student's answer to one question about a fact, through the Vault's own paths. No commit.
 
-    `ref` is a card (`profile_issue:<id>`, answered by `ProfileIssueService.resolve`) or `impossible:<fact key>` (a value
-    above its total: only a new value is taken, written as the student's own edit through the reconciler). `choice` is
-    `current`, `proposed` or `new` (with `value`). Returns `{"status": "resolved"}`, `{"status": "gone"}` (the card is
-    closed already: the answer was given elsewhere) or `{"status": "refused", "code": ...}` with code `bad_choice`,
-    `not_offered`, `not_a_fact_question`, `new_value_required`, `invalid_value`, `not_typeable` or `not_saved`."""
+    One value at a time (owner ruling, P1-T8): an answer saves only the value of `key` and nothing else of the card.
+    `proposed` writes the card's value for that key, `new` writes the typed value, `current` writes nothing; each is
+    noted on the card so the key is no longer asked. The card stays open until no key of it differs; then it is closed
+    (the close hook fires).
+
+    `ref` is a card (`profile_issue:<id>`) or `impossible:<fact key>` (a value above its total: only a new value is
+    taken, written as the student's own edit through the reconciler). `choice` is `current`, `proposed` or `new` (with
+    `value`). `request_id` is the OS request, named on the evidence. Returns `{"status": "resolved"}` (this key is
+    answered), `{"status": "gone"}` (the card is closed already: the answer was given elsewhere) or
+    `{"status": "refused", "code": ...}` with code `bad_choice`, `not_offered`, `not_a_fact_question`,
+    `new_value_required`, `invalid_value`, `not_typeable` or `not_saved`."""
     from app.pai_c.memory import MemoryCandidateService, MemoryDataError, MemoryReconciler, ProfileIssueService
 
     action = ACTIONS.get(choice)
@@ -250,7 +342,7 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None) -
         candidate = MemoryCandidateService(db).propose(
             workspace_id, "student_record", key=kind, proposed_value=record_value, entities={"record_id": record_id},
             confidence=1.0, source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
-            evidence={"capture": CAPTURE})
+            evidence=_evidence(request_id))
         try:
             result = MemoryReconciler(db).reconcile(candidate)
         except MemoryDataError:
@@ -269,19 +361,48 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None) -
         return {"status": "refused", "code": "not_a_fact_question"}  # a name card, or no longer a question about this fact
     if action not in asked["answers"]:
         return {"status": "refused", "code": "not_offered"}
-    new_value = None
+    field = _field_of(key)
+    place = None
     if action == "provide_new":
         place = _place(db, workspace_id, key, value) if value is not None else None
         if place is None:
             return {"status": "refused", "code": "new_value_required" if value is None else "not_typeable"}
-        new_value = place[1]
-    try:
-        done = ProfileIssueService(db).resolve(workspace_id, ref.partition(":")[2], action, value=new_value,
-                                               capture=CAPTURE)
-    except MemoryDataError:
-        db.refresh(issue)
-        # closed by another answer between the read and the lock, or the Vault refused the value
-        return {"status": "refused", "code": "invalid_value"} if issue.status == "open" else {"status": "gone"}
-    if not done.get("resolved"):
+    service = ProfileIssueService(db)
+    locked = service.lock_open(workspace_id, issue_id)  # workspace before issue: the Vault's lock order
+    if locked is None:
+        return {"status": "gone"}  # closed by another answer between the read and the lock
+    proposed = dict((locked.evidence or {}).get("proposed") or {})
+    record_id = (locked.evidence or {}).get("record_id") or locked.affected_id
+    if action == "accept_proposed":
+        if field == "level":
+            place = _level_place(db, workspace_id, key, proposed)
+        else:
+            theirs = next(v["value"] for v in asked["values"] if v["side"] == "proposed")
+            place = _place(db, workspace_id, key, theirs)
+        if place is None:
+            return {"status": "refused", "code": "not_typeable"}
+    if place is not None and _write(db, workspace_id, locked, *place, action, request_id) is None:
         return {"status": "refused", "code": "invalid_value"}
+    # the card now agrees with the record on this key, whichever side the student chose
+    row = _held(db, workspace_id, key, record_id)
+    if row is None:
+        return {"status": "refused", "code": "not_saved"}
+    answers = {**((locked.evidence or {}).get("os_answers") or {}),
+               key: {"choice": choice, **({"request_id": request_id} if request_id is not None else {})}}
+    agreed = _raw(row, field)
+    locked.evidence = {**(locked.evidence or {}), "proposed": _put(proposed, field, agreed), "os_answers": answers}
+    original = db.get(MemoryCandidate, locked.candidate_id) if locked.candidate_id else None
+    if original is not None and original.status in ("pending", "needs_review") and isinstance(
+            original.proposed_value, dict):
+        wrapped = set(original.proposed_value) == {"value"}  # the proposal the Vault page would apply is narrowed too
+        body = original.proposed_value["value"] if wrapped else original.proposed_value
+        if isinstance(body, dict):
+            narrowed = _put(body, field, agreed)
+            original.proposed_value = {"value": narrowed} if wrapped else narrowed
+    db.flush()
+    card = _cards(db, workspace_id).get(locked.id)
+    left = _card_entries(locked, card, chosen_education(education_records(db, workspace_id)),
+                         _attempts(db, workspace_id)) if card is not None else []
+    if not left:
+        service.settle(locked, note="Answered in PAI OS, one value at a time.", answers=answers)
     return {"status": "resolved"}

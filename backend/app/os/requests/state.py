@@ -68,8 +68,12 @@ def _number(value) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
-def build(plans, student_ref: str) -> StudentState | None:
-    """None while the needs gate is off. `plans` is the PlanService (its engine and tenant)."""
+_READ = object()
+
+
+def build(plans, student_ref: str, conflicts=_READ) -> StudentState | None:
+    """None while the needs gate is off. `plans` is the PlanService (its engine and tenant). `conflicts` is the host's
+    `FactConflictsV1` (or None) when the caller read it already, so one request reads the host once."""
     from app.os.documents.store import DocumentStore, FindingStore  # late: keep the compiler's import light
     from app.os.eligibility.facts import current_types
     from app.os.ports import fact_questions
@@ -80,7 +84,8 @@ def build(plans, student_ref: str) -> StudentState | None:
         return None
     facts = {f.key: f.evidence for f in held.facts if f.evidence in LEVELS}
     questions: dict[str, QuestionRef] = {}
-    for key, ref in sorted(fact_questions.conflicts(student_ref).items()):
+    found = fact_questions.read(student_ref) if conflicts is _READ else conflicts
+    for key, ref in sorted(({c.key: c.ref for c in found.conflicts} if found else {}).items()):
         questions[f"fact:{key}"] = QuestionRef("vault", ref)
     values = {f.key: _number(f.value) for f in held.facts}
     for value_key, total_key in scale_pairs(current_types()):

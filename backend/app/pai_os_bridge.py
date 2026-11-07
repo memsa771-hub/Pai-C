@@ -553,11 +553,13 @@ def fact_conflicts(student_ref: str) -> dict | None:
         return builder.build(db, workspace_id)
 
 
-def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, value=None) -> dict | None:
+def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, value=None, request_id=None) -> dict | None:
     """The student's answer to a "which is right" request, written to the Vault (P1-T8, D-w13; `mount_os(fact_answer=)`).
     Returns `{"status": "resolved" | "gone" | "refused", "code"}`, or None while the CONNECT_STUDENT_FACTS part is off
-    (PAI OS answers 404), for a reference that names no workspace and on any failure (logged by type only). Opens its
-    own session and commits only a resolved answer, so a refused one writes nothing."""
+    (PAI OS answers 404) and for a reference that names no workspace. An unexpected failure (logged by type only) is
+    `{"status": "error"}`, which PAI OS answers 503, so it is not taken for "this does not exist". Opens its own session
+    and commits only a resolved answer, so a refused one writes nothing. `request_id` is the OS request, named on the
+    evidence of the value written."""
     if not part_on("CONNECT_STUDENT_FACTS"):
         return None
     try:
@@ -569,7 +571,7 @@ def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, valu
 
     with new_session() as db:
         try:
-            outcome = builder.answer(db, workspace_id, ref, key, choice, value)
+            outcome = builder.answer(db, workspace_id, ref, key, choice, value, request_id)
             if outcome["status"] == "resolved":
                 db.commit()
             else:
@@ -577,7 +579,7 @@ def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, valu
         except Exception as exc:  # noqa: BLE001  (class name only: no ids, no values)
             db.rollback()
             log.error("a fact question could not be answered: %s", type(exc).__name__)
-            return None
+            return {"status": "error"}
     return outcome
 
 

@@ -85,10 +85,11 @@ def conflict_for(student_ref: str, key: str) -> FactConflict | None:
     return next((c for c in found.conflicts if c.key == key), None) if found else None
 
 
-def answer(student_ref: str, ref: str, key: str, choice: str, value=None) -> dict | None:
-    """Sends the student's answer to the host: `{"status": "resolved" | "gone" | "refused", "code"?}`, or None when no
-    callback is configured or the host's part is off (the API then answers 404). A synchronous call, like the choice sink;
+def answer(student_ref: str, ref: str, key: str, choice: str, value=None, request_id: int | None = None) -> dict | None:
+    """Sends the student's answer to the host: `{"status": "resolved" | "gone" | "refused" | "error", "code"?}`, or None
+    when no callback is configured or the host's part is off (the API then answers 404; `error` is 503). `request_id`
+    is the OS request, for the evidence of the value the host writes. A synchronous call, like the choice sink;
     the host writes the Vault and commits before it returns."""
     if _answer is None:
         return None
-    return _answer(student_ref, ref, key, choice, value)
+    return _answer(student_ref, ref, key, choice, value, request_id)

@@ -261,7 +261,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                 "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
                 "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
                 "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible),
-                "choices": c.choices, "allow_new": c.allow_new,
+                "ref": c.ref, "choices": c.choices, "allow_new": c.allow_new,
                 "new_label": request_texts.text("new_label") if c.allow_new else None})
         return {"requests": out}
 
@@ -271,7 +271,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         """The student's answer to a "which is right" request (D-w13). A Vault conflict is answered through the host's own
         card resolution, a value above its total by a new value, two documents that differ by `resolve_finding`; then the
         plan is recomputed, so the step is done before this returns. 404 for another student's request and while the gate
-        is off; 409 `already_answered`, or `answer_elsewhere` for a request that asks for information."""
+        is off; 409 `already_answered`, `answer_elsewhere` for a request that asks for information, or `answer_changed` (with
+        a note) when the question is not the one the student saw (`ref`); 503 `counsellor_unavailable` when the host failed."""
         tenant = svc.settings.tenant_id
         if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
             raise HTTPException(status_code=404, detail="Not Found")
@@ -283,8 +284,10 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         if found.kind != "which_is_right":
             raise HTTPException(status_code=409, detail="answer_elsewhere")  # a provide request closes when PAI has the data
         try:
-            request_answers.answer(svc, student, found, body.choice, body.value)
+            request_answers.answer(svc, student, found, body.ref, body.choice, body.value)
         except request_answers.AnswerError as e:
+            if e.note:
+                return JSONResponse(status_code=e.status, content={"detail": e.detail, "note": e.note})
             raise HTTPException(status_code=e.status, detail=e.detail) from None
         refresh(svc, student, "request_answered")
         after = request_store.get(svc.engine, tenant, request_id)

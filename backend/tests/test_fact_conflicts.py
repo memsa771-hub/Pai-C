@@ -204,25 +204,28 @@ def test_the_oldest_card_of_a_key_stands(student):
 # ---- the answer ----
 
 
-def resolved_candidate(db, issue_id):
+def written(db):
+    """The candidates an OS answer wrote, oldest first."""
     db.expire_all()
-    issue = db.get(ProfileIssue, issue_id)
-    return issue, (db.get(MemoryCandidate, issue.resolution["candidate_id"]) if issue.resolution.get("candidate_id")
-                   else None)
+    return [c for c in db.scalars(select(MemoryCandidate).order_by(MemoryCandidate.created_at))
+            if (c.evidence or {}).get("capture") == "os_which_is_right"]
 
 
-def test_answer_proposed_writes_the_document_value_as_the_students_own(student):
+def test_answer_proposed_writes_only_that_value_as_the_students_own(student):
     with student.factory() as db:
         ws = student.workspace_id
         bachelor(db, ws, 3.4)
         transcript_says(db, student, 3.2)
         entry = only(db, ws)
-        assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "proposed") == {"status": "resolved"}
+        assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "proposed", request_id=41) == {"status": "resolved"}
         db.commit()
-        issue, candidate = resolved_candidate(db, entry["ref"].partition(":")[2])
-        assert issue.status == "resolved" and issue.resolution["action"] == "accept_proposed"
-        assert candidate.source_type == "user_explicit" and candidate.evidence["capture"] == "os_which_is_right"
-        assert candidate.evidence["profile_issue_id"] == issue.id
+        issue = db.get(ProfileIssue, entry["ref"].partition(":")[2])
+        assert issue.status == "resolved" and issue.resolution["action"] == "answered_by_value"
+        assert issue.resolution["answers"] == {GPA: {"choice": "proposed", "request_id": 41}}
+        (candidate,) = written(db)
+        assert candidate.source_type == "user_explicit" and candidate.evidence["profile_issue_id"] == issue.id
+        assert candidate.evidence["os_request_id"] == 41 and candidate.evidence["quote"]  # M4
+        assert candidate.proposed_value["value"] == {"result": {"gpa": 3.2}}  # nothing but the value chosen
         (row,) = education(db, ws)
         assert row["result"]["gpa"] == 3.2 and row["evidence_level"] == "stated"
         assert built(db, ws)["conflicts"] == []
@@ -237,8 +240,9 @@ def test_answer_current_keeps_the_vault_value_and_writes_nothing(student):
         before = db.scalar(select(MemoryCandidate.id).order_by(MemoryCandidate.created_at.desc()))
         assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "current") == {"status": "resolved"}
         db.commit()
-        issue, candidate = resolved_candidate(db, entry["ref"].partition(":")[2])
-        assert issue.resolution["action"] == "keep_current" and candidate is None
+        issue = db.get(ProfileIssue, entry["ref"].partition(":")[2])
+        assert issue.status == "resolved" and issue.resolution["answers"] == {GPA: {"choice": "current"}}
+        assert written(db) == []
         assert education(db, ws)[0]["result"]["gpa"] == 3.4
         assert db.scalar(select(MemoryCandidate.id).order_by(MemoryCandidate.created_at.desc())) == before
         assert built(db, ws)["conflicts"] == []
@@ -253,11 +257,108 @@ def test_answer_new_writes_the_typed_value_for_that_fact_only(student, typed, st
         entry = only(db, ws)
         assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "new", typed) == {"status": "resolved"}
         db.commit()
-        issue, candidate = resolved_candidate(db, entry["ref"].partition(":")[2])
-        assert issue.resolution["action"] == "provide_new"
+        issue = db.get(ProfileIssue, entry["ref"].partition(":")[2])
+        assert issue.status == "resolved" and issue.resolution["answers"][GPA]["choice"] == "new"
+        (candidate,) = written(db)
         assert candidate.proposed_value["value"] == {"result": {"gpa": stored}}
         (row,) = education(db, ws)
         assert row["result"] == {"gpa": stored, "gpa_scale": 4}  # the scale was not touched
+
+
+TOTAL = "education.intermediate.marks_total"
+
+
+def two_differences(db, student, obtained=760, total=1050):
+    """Saved: 800 of 1100, said by the student. A certificate then reads `obtained` of `total`: one card, two keys."""
+    from app.pai_c.connect import document_facts
+
+    ws = student.workspace_id
+    stated(db, ws, "FSc", institution_name="A College", result={"marks_obtained": 800, "marks_total": 1100})
+    outcome, ids = document_facts.apply(db, proposal(student, add_file(db, ws), [
+        {"key": MARKS, "value": obtained}, {"key": TOTAL, "value": total}], doc_type="hssc_certificate"))
+    db.commit()
+    assert outcome == "written"
+    reconcile_all(db, ids)
+    return {c["key"]: c for c in built(db, ws)["conflicts"]}
+
+
+def test_one_card_with_two_differing_values_is_two_entries_answered_one_at_a_time(student):
+    """Owner ruling (P1-T8, 2026-11-07): each answer saves only that value; the card stays open until every differing
+    value has an answer; nothing is saved that the student did not choose."""
+    with student.factory() as db:
+        ws = student.workspace_id
+        found = two_differences(db, student)
+        assert set(found) == {MARKS, TOTAL} and found[MARKS]["ref"] == found[TOTAL]["ref"]
+        ref = found[MARKS]["ref"]
+        assert fact_conflicts.answer(db, ws, ref, MARKS, "proposed", request_id=5) == {"status": "resolved"}
+        db.commit()
+        (row,) = education(db, ws)
+        assert row["result"] == {"marks_obtained": 760, "marks_total": 1100}  # the total is untouched
+        assert db.get(ProfileIssue, ref.partition(":")[2]).status == "open"
+        left = built(db, ws)["conflicts"]
+        assert [c["key"] for c in left] == [TOTAL]  # the answered key is no longer asked, the other stays
+        (candidate,) = written(db)
+        assert candidate.proposed_value["value"] == {"result": {"marks_obtained": 760}}
+        assert candidate.evidence["os_request_id"] == 5
+        # the second answer closes the card: the total stays as it is
+        assert fact_conflicts.answer(db, ws, ref, TOTAL, "current", request_id=6) == {"status": "resolved"}
+        db.commit()
+        issue = db.get(ProfileIssue, ref.partition(":")[2])
+        assert issue.status == "resolved" and built(db, ws)["conflicts"] == []
+        assert issue.resolution["answers"] == {MARKS: {"choice": "proposed", "request_id": 5},
+                                               TOTAL: {"choice": "current", "request_id": 6}}
+        assert education(db, ws)[0]["result"] == {"marks_obtained": 760, "marks_total": 1100}
+        assert len(written(db)) == 1
+
+
+def test_new_on_one_value_leaves_the_other_asked(student):
+    with student.factory() as db:
+        ws = student.workspace_id
+        found = two_differences(db, student)
+        ref = found[TOTAL]["ref"]
+        assert fact_conflicts.answer(db, ws, ref, TOTAL, "new", 1000) == {"status": "resolved"}
+        db.commit()
+        assert education(db, ws)[0]["result"] == {"marks_obtained": 800, "marks_total": 1000}
+        assert db.get(ProfileIssue, ref.partition(":")[2]).status == "open"
+        assert [c["key"] for c in built(db, ws)["conflicts"]] == [MARKS]
+
+
+def test_current_on_one_value_does_not_let_a_later_vault_page_accept_overwrite_it(student):
+    """The student kept 1100; answering the other value then closing is not an "accept all" that brings 1050 back."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        found = two_differences(db, student)
+        ref = found[TOTAL]["ref"]
+        assert fact_conflicts.answer(db, ws, ref, TOTAL, "current")["status"] == "resolved"
+        db.commit()
+        assert ProfileIssueService(db).resolve(ws, ref.partition(":")[2], "accept_proposed")["resolved"]
+        db.commit()
+        assert education(db, ws)[0]["result"] == {"marks_obtained": 760, "marks_total": 1100}
+
+
+def test_a_close_hook_that_raises_leaves_the_card_closed_and_the_answer_saved(student):
+    """Review I2: a hook runs in a savepoint; its failure is logged by class and never undoes the answer."""
+    from app.memory import profile_issues
+
+    def broken(db, issue):
+        db.execute(select(ProfileIssue.id))  # touches the session, then fails
+        raise RuntimeError("hook failed")
+
+    with student.factory() as db:
+        ws = student.workspace_id
+        bachelor(db, ws, 3.4)
+        transcript_says(db, student, 3.2)
+        entry = only(db, ws)
+        profile_issues.register_close_hook(broken)
+        try:
+            assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "proposed") == {"status": "resolved"}
+            db.commit()
+        finally:
+            profile_issues._CLOSE_HOOKS.remove(broken)
+        assert db.get(ProfileIssue, entry["ref"].partition(":")[2]).status == "resolved"
+        assert education(db, ws)[0]["result"]["gpa"] == 3.2
 
 
 def test_refusals_write_nothing(student):
