@@ -52,6 +52,8 @@ def test_os_tables_present():
         "os_plan_adoptions",
         # P1-T8 (os_0023)
         "os_student_requests",
+        # P1-T10 (os_0024)
+        "os_consistency_cases", "os_consistency_runs",
     }
 
 

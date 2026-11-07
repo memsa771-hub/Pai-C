@@ -21,6 +21,7 @@ from app.services import auth_emails
 from tests.os.test_counsellor_intake_v2 import svc  # noqa: F401 - the fixture is used by name
 from tests.test_roadmap_api import TOKEN, data, pre_eng
 from tests.test_roadmap_choice_api import EMAIL, FIELD, choose_with, post, rows, vault
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-10"), pytest.mark.req("R-79")]
 
@@ -101,6 +102,7 @@ def public(client, method, path, status=200):
     return response.json()["data"]
 
 
+@pytest.mark.connect_row("6.4")
 def test_an_adult_chooses_withdraws_and_gives_consent_again(svc, world):  # noqa: F811
     with student() as (client, who, params):
         # 1. a supported route with a place and an intake: the plan is made
@@ -135,8 +137,10 @@ def test_an_adult_chooses_withdraws_and_gives_consent_again(svc, world):  # noqa
         with who.factory() as db:
             assert bridge.sweep_once(db)["submitted"] == 0
         assert run_os(svc) == []
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
+@pytest.mark.connect_row("6.15")
 def test_an_under_18_student_is_held_until_the_guardian_agrees_and_paused_when_the_guardian_withdraws(svc, world):  # noqa: F811
     mails = world
     with student(dob="2012-05-05") as (client, who, params):
@@ -176,8 +180,10 @@ def test_an_under_18_student_is_held_until_the_guardian_agrees_and_paused_when_t
             assert [c.outcome for c in db.scalars(select(GuardianConsent).order_by(GuardianConsent.created_at))] \
                 == ["agreed", "withdrawn"]
         assert [r.decision_version for r in rows(who)] == [1, 2, 3]
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
+@pytest.mark.connect_row("6.14")
 def test_a_route_the_os_cannot_run_puts_nothing_in_the_os(svc, world):  # noqa: F811
     with student() as (client, who, params):
         with who.factory() as db:
@@ -197,6 +203,7 @@ def test_a_route_the_os_cannot_run_puts_nothing_in_the_os(svc, world):  # noqa: 
         with who.factory() as db:
             assert bridge.sweep_once(db)["submitted"] == 0
         assert count(svc, models.counsellor_intake) == 0
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_a_supported_choice_without_places_is_refused_so_a_later_withdrawal_still_pauses_the_plan(svc, world):  # noqa: F811
@@ -213,6 +220,7 @@ def test_a_supported_choice_without_places_is_refused_so_a_later_withdrawal_stil
         assert run_os(svc) == [("paused", "consent_missing")]
         (paused,) = plans_of(svc, who)
         assert (paused.id, paused.status) == (plan.id, "paused")
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_with_the_flag_off_a_guardian_withdrawal_pauses_the_plan_once_the_flag_is_back(svc, world):  # noqa: F811
@@ -229,3 +237,4 @@ def test_with_the_flag_off_a_guardian_withdrawal_pauses_the_plan_once_the_flag_i
             assert bridge.sweep_once(db)["submitted"] == 1
         assert run_os(svc) == [("paused", "consent_missing")]
         assert [p.status for p in plans_of(svc, who)] == ["paused"]
+        assert_consistent(who.factory)  # the flag is back and the sweep caught up: both sides agree (R-04, R-05)

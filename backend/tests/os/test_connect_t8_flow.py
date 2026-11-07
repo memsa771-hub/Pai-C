@@ -63,6 +63,7 @@ from tests.os.test_counsellor_intake_v2 import svc as _intake_svc  # noqa: F401
 from tests.os.test_unanswered_ladder import event_of, pending_proposals, running, sweep
 from tests.test_roadmap_api import TOKEN, data, pre_eng
 from tests.test_roadmap_choice_api import choose_with, post
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-17"), pytest.mark.req("R-18"), pytest.mark.req("R-19"), pytest.mark.req("R-20"),
               pytest.mark.req("R-21"), pytest.mark.req("R-22")]
@@ -446,6 +447,7 @@ HSSC_VALUES = {**SSC_VALUES, "marks_obtained": 910, "marks_total": 1100}
 APPLY = ("uni_assist_apply", "direct_apply")
 
 
+@pytest.mark.connect_row("6.19")
 def test_6_19_germany_v2_asks_for_the_certificates_and_blocks_the_applications(world):
     with signed_in(world, germany_student()) as s, level("master"):
         vault((s.client, s.who, s.params))
@@ -521,6 +523,7 @@ def test_6_19_germany_v2_asks_for_the_certificates_and_blocks_the_applications(w
         assert all(not (s.blocked()[k] or "").startswith("awaiting_fact") for k in apply_keys)
         assert s.view()["requests"] == [r for r in s.view()["requests"] if r["status"] != "open"]
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 @contextmanager
@@ -645,6 +648,7 @@ def test_6_20_result_expected_then_provide_then_stated_then_shown(world):
         assert ticked.status_code == 200 and ticked.json() == {"completed": True}
         assert s.steps()["admission_form"] == "done" and s.steps()["merit_list@pk-i1"] == "waiting_student"
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- row 6.21: Germany, the CGPA the student said and the CGPA a transcript shows -------------------------------------
@@ -727,6 +731,7 @@ def closed_everywhere(world, s, asked, plan_id, reminders_before: int) -> None:
     assert s.cards() == []
 
 
+@pytest.mark.connect_row("6.21")
 def test_6_21_germany_the_two_values_are_shown_and_the_answer_goes_to_the_vault(world):
     with signed_in(world, germany_student()) as s, level("master"):
         plan_id = germany_with_a_stated_cgpa(world, s)
@@ -759,6 +764,7 @@ def test_6_21_germany_the_two_values_are_shown_and_the_answer_goes_to_the_vault(
             assert written.evidence["os_request_id"] == asked["id"]
         closed_everywhere(world, s, asked, plan_id, before)
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_6_21_second_student_answers_current_on_the_vault_page_and_the_step_closes_in_the_same_delivery(world):
@@ -780,6 +786,7 @@ def test_6_21_second_student_answers_current_on_the_vault_page_and_the_step_clos
         assert s.record_with("gpa")["result"]["gpa"] == 3.4  # the Vault keeps the student's value
         closed_everywhere(world, s, asked, plan_id, reminders)
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault_event(world):
@@ -828,6 +835,7 @@ def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault
         assert s.record_with("gpa")["result"]["gpa"] == 3.4
         closed_everywhere(world, s, asked, plan_id, reminders)
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- an impossible value: marks above their total ---------------------------------------------------------------------
@@ -874,6 +882,7 @@ def test_an_impossible_value_is_asked_and_the_new_value_goes_to_the_vault(world)
         assert not any((b or "").startswith("which_is_right:") for b in s.blocked().values())
         assert s.requests("open", "which_is_right") == []
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- row 6.22: the fake Ireland route, version 2: the unanswered ladder ---------------------------------------------------
@@ -884,6 +893,7 @@ DUE = date(2027, 7, 15)  # the fictional deadline of every place (`seed_knowledg
 THREE = ["ie-p1", "ie-p2", "ie-p3"]
 
 
+@pytest.mark.connect_row("6.22")
 def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(world):
     from tests.os.test_connect_t6_flow import at_chosen, journey_stage, places_of_plan
     from tests.os.test_unanswered_ladder import counsellor_rows, ladder_cases, never_silent, plan_status
@@ -989,6 +999,7 @@ def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(w
         assert len(ladder_cases(world, plan_id)) == 2  # one case per request, none more
         assert plan_status(world, plan_id) != "paused" and journey_stage(f) == "CHOSEN"
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- the upgrade: a version-1 plan moves to version 2 only through the student's own accept ---------------------------------
@@ -1044,6 +1055,7 @@ def test_a_version_1_plan_is_upgraded_only_by_an_accepted_proposal(world):
         assert {r.need_ref for r in s.rows("open")} == {SSC, HSSC}
         assert [r["need"]["ref"] for r in s.requests("open")] == sorted([SSC, HSSC])
         s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- gate off: the app is today's, byte for byte --------------------------------------------------------------------------

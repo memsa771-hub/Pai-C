@@ -67,6 +67,12 @@ def test_a_young_pending_intake_row_is_in_flight_at_night_and_a_finding_when_set
     only(run(c, os_(**waiting), "nightly"), 1, "no_plan")  # an OS view without the ages: no excuse
 
 
+def test_a_finished_plan_still_holds_its_decision_version():
+    c = side()
+    assert run(c, os_(plans=[plan(status="done")])) == [] and run(c, os_(plans=[plan(status="done")]), "nightly") == []
+    only(run(c, os_(plans=[plan(status="closed")])), 1, "no_plan")  # a closed plan holds nothing
+
+
 def test_a_clean_pair_has_no_finding_in_either_mode():
     c, o = side(), os_()
     assert run(c, o) == [] and run(c, o, "nightly") == []

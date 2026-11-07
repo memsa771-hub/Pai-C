@@ -22,6 +22,7 @@ OS_PART_OF_RULE = {1: "CONNECT_HANDOFF", 2: "CONNECT_HANDOFF", 3: "CONNECT_HANDO
                    8: "CONNECT_HANDOFF"}  # the connection part each rule needs (§1: a rule runs only while its part is on)
 HELD_INTAKE = ("planned", "revised", "replaced", "refused", "held", "paused")  # an intake outcome that settles rule 1
 PLAN_OPEN = ("active", "at_risk", "paused")  # the OS plan statuses still being worked on (app.os.kernel.states)
+PLAN_HELD = (*PLAN_OPEN, "done")  # a finished plan still holds its decision version (rule 1)
 PLAN_SOURCE = "counsellor"
 WITHDRAWN_PREFIX = "withdrawn"  # the close reason the OS intake writes for a withdrawal: `withdrawn:{decision_id}`
 Mode = Literal["nightly", "settled"]
@@ -244,7 +245,7 @@ def _rule1(c, o, mode, now):
     status = o.intake_status_by_version.get(n.version)
     settled = latest == n.version and status in HELD_INTAKE
     if settled and (o.refusal_by_version.get(n.version) or any(
-            p.source == PLAN_SOURCE and p.decision_version == n.version and p.status in PLAN_OPEN for p in o.plans)):
+            p.source == PLAN_SOURCE and p.decision_version == n.version and p.status in PLAN_HELD for p in o.plans)):
         return []
     return [Finding(1, ("no_plan",))]
 

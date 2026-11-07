@@ -42,6 +42,7 @@ from tests.os.test_connect_t5_flow import (  # noqa: F401
 )
 from tests.test_roadmap_api import data
 from tests.test_roadmap_choice_api import choose_with, post, vault
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-04"), pytest.mark.req("R-44"), pytest.mark.req("R-45")]
 
@@ -215,6 +216,7 @@ def test_the_lifecycle_of_a_choice_on_each_route_within_one_sweep_each(lane, rou
             assert chosen(client, params) is None or chosen(client, params).get("steps") in (None, [])
             assert "plan_stopped" in [kind for kind, _ in bell(who)]
             no_chat(who, before)
+            assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- row 6.18: plan finished ---------------------------------------------------------------------------------------
@@ -288,6 +290,7 @@ def test_a_finished_plan_is_one_notice_shows_finished_ends_the_checkin_and_adds_
             journey = db.scalar(select(StudentJourney).where(StudentJourney.workspace_id == who.workspace_id))
             assert journey.current_stage == stage_before  # no new journey stage (Q6; R-45)
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- row 6.9: a constraint changes (fake Pakistan BS: the merit seed of the T4 flow) -----------------------------------
@@ -362,6 +365,7 @@ def test_a_changed_constraint_is_one_event_one_sweep_and_never_a_silent_removal(
         assert places_of(os_world, plan_id) == places  # nothing removed by itself
         assert os_world.replanner.proposals.pending_for(ws) == []
         assert bridge.sweep_once(db)["submitted"] == 0
+        assert_consistent(student.factory, handoff=True)  # the end-of-test check (R-04, R-05)
 
 
 def excluded_world(os_world, student, db):
@@ -407,6 +411,7 @@ def test_an_excluded_field_leaves_every_counsellor_reader_at_once_and_reaches_th
         assert bridge.sweep_once(db)["submitted"] == 1
         assert [e["keys"] for e in fact_events(os_world.engine, plan_id)[seen:]] == [["constraint.excluded_fields"]]
         assert places_of(os_world, plan_id) == places and os_world.replanner.proposals.pending_for(ws) == []
+        assert_consistent(student.factory, handoff=True)  # the end-of-test check (R-04, R-05)
 
 
 @pytest.mark.connect_row("6.9")
@@ -449,3 +454,4 @@ def test_an_excluded_field_leaves_the_stage_h_list(os_world):
             write(db, ws, "vault_item", "option", {"text": exclusions.field_label("pharm_d"), "status": "ruled_out"})
             assert list(exclusions.excluded_fields(db, ws)) == ["pharm_d"]
             assert places._stage_h_programs(db, ws) == []
+            assert_consistent(student.factory, handoff=True)  # the end-of-test check (R-04, R-05)

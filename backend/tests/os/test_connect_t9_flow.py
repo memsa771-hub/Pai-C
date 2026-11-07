@@ -29,6 +29,7 @@ from tests.os.test_connect_t5_flow import (  # noqa: F401 - fixtures
 from tests.os.test_connect_t6_flow import OVGU, chat_rows, no_chat
 from tests.test_roadmap_api import TOKEN, data
 from tests.test_roadmap_choice_api import choose_with
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-51"), pytest.mark.req("R-53"), pytest.mark.req("R-54"), pytest.mark.req("R-55")]
 
@@ -74,6 +75,7 @@ def test_pk_bs_student_before_and_after_a_choice(on):
         assert bridge.plan_view(who.workspace_id)["pages"] == ["inbox", "documents", "programmes"]  # R-51: the same codes
         assert "visa" not in [p["key"] for p in got["pages"]]
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_germany_student_pages_and_sources(on):
@@ -96,6 +98,7 @@ def test_germany_student_pages_and_sources(on):
         assert any(s["confirmed"] is False for s in dated.values())  # the walkthrough's unticked sources say so
         assert any(s["confirmed"] is True for s in dated.values())
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_self_serve_student_and_adoption(on):
@@ -118,6 +121,7 @@ def test_self_serve_student_and_adoption(on):
         assert (theirs["source"], theirs["plan_id"]) == ("counsellor", plan_id)
         assert theirs["pages"] == mine["pages"]
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_part_off_the_plan_is_a_404_and_nothing_else_changes(on):

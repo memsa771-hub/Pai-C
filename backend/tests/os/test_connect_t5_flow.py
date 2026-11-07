@@ -25,6 +25,7 @@ from tests.os.test_counsellor_intake_v2 import svc  # noqa: F401 - the fixture i
 from tests.test_roadmap_api import TOKEN, data, roadmap_client
 from tests.test_roadmap_choice_api import FIELD, choose_with, post, vault
 from tests.test_roadmap_engine import fsc
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-04"), pytest.mark.req("R-44"), pytest.mark.req("R-45")]
 
@@ -117,6 +118,7 @@ def level(name):
         yield
 
 
+@pytest.mark.connect_row("6.1", "6.2", "6.4", "6.11")
 def test_germany_route(world):
     svc = world  # noqa: F811
     with germany_student() as (client, who, params), level("master"):
@@ -182,6 +184,7 @@ def test_germany_route(world):
         assert "plan_stopped" in [kind for kind, _ in bell(who)]
 
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_fake_pakistan_intermediate_route_is_planned(world):
@@ -203,6 +206,7 @@ def test_fake_pakistan_intermediate_route_is_planned(world):
             bridge.deliver_os_events(db)
         assert bell(who) and "chat" not in " ".join(t for _, t in bell(who)).lower()
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 @pytest.mark.req("R-19")
@@ -231,6 +235,7 @@ def test_flags_off_no_request_rows(world):
     assert pins and set(pins) == {1}  # the gate off keeps version 1
 
 
+@pytest.mark.connect_row("6.14")
 def test_a_route_the_os_cannot_run_keeps_the_labelled_checklist(world):
     svc = world  # noqa: F811
     from tests.test_roadmap_api import pre_eng
@@ -255,3 +260,4 @@ def test_a_route_the_os_cannot_run_keeps_the_labelled_checklist(world):
             assert bridge.deliver_os_events(db) == {"sent": 0, "refused": 0, "waiting": 0, "stale": 0}
         assert bell(who) == []
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
