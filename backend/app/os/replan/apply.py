@@ -121,14 +121,23 @@ class Replanner:
                     and any(op.get("programme_ref") not in firm for op in p.ops):
                 self.proposals.expire_if_pending(p.id)
 
-    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
+    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False,
+              with_held: bool = False) -> PlanState:
         contract, _ = self.plans._contract(plan_id)
         book = self.plans._pinned(plan_id)
         tasks = task_rows(self.engine, self.tenant, plan_id)
         programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
         suggestions = {ref: self._suggestions(contract, book, ref) for ref in programmes} if with_suggestions else {}
         return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version,
-                         self.below(plan_id) if with_below else ())
+                         self.below(plan_id) if with_below else (), self.held(plan_id) if with_held else ())
+
+    def held(self, plan_id: int) -> tuple[str, ...]:
+        """The programmes a swap or a removal that waits for the student (or the Counsellor) already covers, so the
+        unanswered ladder does not propose them twice (P1-T8, R-22)."""
+        refs = {op.get("out_ref") or op.get("programme_ref") for p in self.proposals.for_plan(plan_id)
+                if p.status in ("pending", "requested") for op in p.ops
+                if op.get("op") in ("swap_programme", "cancel_programme")}
+        return tuple(sorted(r for r in refs if r))
 
     def _suggestions(self, contract, book, ref: str) -> list[str]:
         """Up to 3 programmes on the route the student likely meets, not in the plan, most confirmed facts first."""

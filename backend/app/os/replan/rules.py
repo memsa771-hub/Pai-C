@@ -12,6 +12,8 @@ from app.os.replan.events import Event
 from app.os.replan.ops import (
     AddTask, CancelProgramme, Escalate, Op, Reprioritise, RequestFromStudent, SwapProgramme, TaskRow, UpgradePlaybook,
 )
+from app.os.requests import keys
+from app.os.requests.texts import text
 
 REASONS = {
     "rejected": "The programme did not admit you: its remaining steps are removed.",
@@ -42,6 +44,7 @@ class PlanState:
     suggestions: dict[str, list[str]] = field(default_factory=dict)  # programme -> close matches (Slice 4 swaps)
     playbook_version: int = 1
     below: tuple[str, ...] = ()  # programmes whose eligibility now reads likely_below (set for student_fact_changed)
+    held: tuple[str, ...] = ()  # programmes a pending or requested swap or removal already covers (P1-T8, R-22)
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,43 @@ def _at_risk(event: Event, state: PlanState) -> list[Op] | Handover:
     return ops
 
 
+def is_request_step(instance_key: str | None) -> bool:
+    """Whether the key is a step the compiler added to ask the student for data (P1-T8): provide or which is right."""
+    parsed = keys.parse(instance_key or "")
+    return parsed is not None and parsed.template in keys.REQUEST_KINDS
+
+
+def _unanswered(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op]:
+    """Rungs 3 and 4 of the unanswered ladder (P1-T8 D-w15, R-22). Reminders and the at-risk nudge come first, from the
+    workers; this is what a request still open after its date leads to.
+
+    The places it holds up are those of the open steps that hard-depend on it; a route-level step holds up every place.
+    - Some places: each gets a swap to its first close match, else a removal. Both are big: the student answers them.
+    - Every place, or too few left: an escalation, for a person to look at (never back to choosing for the student)."""
+    key = event.payload.get("instance_key")
+    waiting = [t for t in state.tasks.values() if _open(t) and (key, True) in t.depends_on]
+    affected = [p for p in state.programmes if any(t.programme_ref in (None, p) for t in waiting)]
+    if not affected:  # nothing on the plan waits for it any more: the nudge of every other missing item
+        return [RequestFromStudent(instance_key=key, message=MESSAGE, reason=REASONS["request"])]
+    live = len(state.programmes)
+    if len(affected) == live:
+        return [Escalate(reason=text("unanswered_all"))]
+    ops: list[Op] = []
+    taken = set(state.programmes)
+    dropped = sum(1 for p in affected if p in state.held)  # a pending removal may take it: counted, to stay safe
+    for ref in (p for p in affected if p not in state.held):
+        match = next((s for s in state.suggestions.get(ref, []) if s not in taken), None)
+        if match is None:
+            ops.append(CancelProgramme(programme_ref=ref, reason=text("unanswered_drop")))
+            dropped += 1
+        else:
+            taken.add(match)
+            ops.append(SwapProgramme(out_ref=ref, in_ref=match, reason=text("unanswered_swap")))
+    if live - dropped < cfg.min_programmes:  # R-22: never leave fewer than the minimum
+        return [Escalate(reason=text("unanswered_all"))]
+    return ops
+
+
 def rules_for(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | Handover | Retry:
     """The rules' answer to one event (spec §2). [] means nothing needs to change."""
     p = event.payload
@@ -116,6 +156,8 @@ def rules_for(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
         key = p.get("instance_key")
         if not _open(state.tasks.get(key)):
             return []
+        if is_request_step(key):
+            return _unanswered(event, state, cfg)
         return [RequestFromStudent(instance_key=key, message=MESSAGE, reason=REASONS["request"])]
     if event.type == "task_failed":
         if int(p.get("attempt") or 1) < 2:

@@ -191,3 +191,36 @@ def test_fact_questions_port_reads_key_to_ref_and_is_empty_when_unconfigured():
     assert fact_questions.from_settings(load_settings({"DATABASE_URL": "x"})) is None
     with pytest.raises(fact_questions.FactQuestionsSourceError, match="OS_FACT_CONFLICTS"):
         fact_questions.from_settings(load_settings({"DATABASE_URL": "x", "OS_STUDENT_FACTS": "json:dumps"}))
+
+
+# --- P1-T8 Task 5 (R-22, D-w15 step 1): a request step past its date enters the unanswered ladder -----------------
+
+def _asked_plan(engine, student):
+    from app.os.compiler import compile_plan
+    from tests.os.kernel_helpers import kernel as plain_kernel
+    from tests.os.test_compile_needs import INTER2, contract as needs_contract, merit
+
+    k = plain_kernel(engine)
+    return k, k.create_plan(needs_contract(), compile_plan(needs_contract(), INTER2, {}, merit(), TODAY, student=student))
+
+
+@pytest.mark.req("R-22")
+def test_overdue_request_steps_record_document_missing_and_no_escalate(engine, clean):
+    from app.os.requests.state import QuestionRef, StudentState
+
+    asked = StudentState(questions={"fact:education.matric.marks_obtained": QuestionRef("vault", "profile_issue:1")})
+    _, ref = _asked_plan(engine, asked)  # a "which is right" step, and a "tell us" step for the other mark
+    box = Outbox(engine, "pai")
+    run_reminders(engine, box, datetime(2027, 9, 1, 8, tzinfo=timezone.utc), "pai")
+    with engine.connect() as conn:
+        late = {e.payload["instance_key"] for e in conn.execute(
+            select(models.events).where(models.events.c.type == "document_missing"))}
+        escalated = conn.execute(select(models.events).where(models.events.c.type == "escalate")).all()
+        mail = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
+    assert late == {"which_is_right@fact:education.matric.marks_obtained:shown",
+                    "provide@fact:education.matric.marks_total:stated"}
+    assert escalated == [] and len(mail) == 2  # the student is still reminded; the ladder, not a support call, acts
+    run_reminders(engine, box, datetime(2027, 9, 2, 8, tzinfo=timezone.utc), "pai")
+    with engine.connect() as conn:  # the next day: one more reminder each, but the same two events
+        assert len(conn.execute(select(models.events).where(models.events.c.type == "document_missing")).all()) == 2
+

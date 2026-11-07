@@ -14,7 +14,7 @@ from app.os import models
 from app.os.knowledge.research.readings import AgentRuns, cost
 from app.os.replan import events as ev
 from app.os.replan.apply import Replanner, ops_of
-from app.os.replan.rules import Handover, Retry, rules_for
+from app.os.replan.rules import Handover, Retry, is_request_step, rules_for
 from app.os.replan.supervisor import propose
 from app.os.settings import OsSettings
 
@@ -71,8 +71,10 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
 
     def rules(plan_id: int, event_id: int) -> dict:
         e = ev.get(engine, tenant, event_id)
-        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected",
-                                           with_below=e.type == "student_fact_changed"), replanner.config(plan_id))
+        unanswered = e.type == "document_missing" and is_request_step(e.payload.get("instance_key"))  # D-w15 steps 3-4
+        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected" or unanswered,
+                                           with_below=e.type == "student_fact_changed", with_held=unanswered),
+                        replanner.config(plan_id))
         if isinstance(got, Handover):
             return {"handover": got.reason}
         if isinstance(got, Retry):
