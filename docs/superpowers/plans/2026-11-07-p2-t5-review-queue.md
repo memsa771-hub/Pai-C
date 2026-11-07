@@ -33,3 +33,6 @@ Frontend: `lib/os-review.ts`, `lib/api.ts` (reviewer calls), `components/os/revi
 `app/[workspaceId]/os-admin/review/page.tsx`, `components/os/visa-funds.tsx` (verified counts as confirmed).
 Tests: `tests/os/test_p2t5_{verified_consumers,review_flow,review_api,reviewers_script,migration}.py`, `tests/os/test_models.py`
 (table list), `lib/os-review.test.ts`, `components/os/review-item.test.tsx`.
+
+## Verification (after the review fixes)
+tests/os 2418 passed; legacy 2560 passed; vitest 590 passed; next build ok; tach, freeze, one alembic head, traceability ok.
