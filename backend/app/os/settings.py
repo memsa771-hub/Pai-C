@@ -29,6 +29,11 @@ class OsSettings:
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
+    render_shell_max_chars: int = 200  # P2-T4: a fetched page with fewer visible characters and scripts is a JavaScript shell
+    render_timeout_s: float = 20.0  # P2-T4: how long the headless browser may take for one page
+    render_browser_path: str | None = None  # P2-T4: a Chromium executable; None = Playwright's own (OS_RENDER_BROWSER)
+    scan_min_pdf_chars: int = 20  # P2-T4: a PDF with less text than this is a scan (read by OCR when a scanner is set)
+    scan_max_pages: int = 10  # P2-T4: pages of a scanned PDF that are read
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
     price_cheap_in: float | None = 0.75
@@ -114,6 +119,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
+        render_shell_max_chars=int(env.get("OS_RENDER_SHELL_MAX_CHARS") or 200),
+        render_timeout_s=float(env.get("OS_RENDER_TIMEOUT_S") or 20.0),
+        render_browser_path=(env.get("OS_RENDER_BROWSER") or "").strip() or None,
+        scan_min_pdf_chars=int(env.get("OS_SCAN_MIN_PDF_CHARS") or 20),
+        scan_max_pages=int(env.get("OS_SCAN_MAX_PAGES") or 10),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

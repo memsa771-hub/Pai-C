@@ -6,9 +6,13 @@ Ported from the Spike 1 harness (spike1-design SP1-D4): the standard-library par
 
 import io
 import re
+import unicodedata
+from functools import cache
+from pathlib import Path
 from html.parser import HTMLParser
 from urllib.parse import urldefrag, urljoin
 
+import yaml
 from pypdf import PdfReader
 
 _BLOCK = {"p", "div", "br", "li", "tr", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article",
@@ -60,6 +64,44 @@ def pdf_to_text(data: bytes) -> str:
     return "\n".join((page.extract_text() or "") for page in PdfReader(io.BytesIO(data)).pages)
 
 
+NORMALISE_FILE = Path(__file__).with_name("normalise.yaml")
+
+
+@cache
+def _folding(path: Path = NORMALISE_FILE) -> tuple[dict[int, int | None], dict]:
+    """The str.translate table and the language data, from `normalise.yaml` (P2-D14)."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    table: dict[int, int | None] = {}
+    for target, letters in data["fold"].items():
+        for ch in letters:
+            table[ord(ch)] = ord(target)
+    for lo, hi in data["remove"]["ranges"]:
+        for cp in range(int(lo, 16), int(hi, 16) + 1):
+            table[cp] = None
+    for cp in data["remove"]["singles"]:
+        table[int(cp, 16)] = None
+    for start in data["digits"]:
+        for i in range(10):
+            table[int(start, 16) + i] = ord(str(i))
+    return table, data
+
+
+def detect_language(text: str) -> str | None:
+    """The language code of a text when most of its letters are in a script the data maps to one, else None."""
+    _, data = _folding()
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return None
+    counts: dict[str, int] = {}
+    for c in letters:
+        script = unicodedata.name(c, "").split(" ")[0]
+        counts[script] = counts.get(script, 0) + 1
+    script, n = max(counts.items(), key=lambda kv: kv[1])
+    if n / len(letters) >= data["min_script_share"]:
+        return data["language_by_script"].get(script)
+    return None
+
+
 def normalise(text: str) -> str:
     """Whitespace collapsed, dashes and quotes unified, case folded: the form quotes are matched in.
 
@@ -68,4 +110,5 @@ def normalise(text: str) -> str:
     text = text.replace("\x00a0", " ").replace("\x00a0", " ").replace(" ", " ")
     text = text.replace("–", "-").replace("—", "-")
     text = text.replace("’", "'").replace("“", '"').replace("”", '"')
+    text = text.translate(_folding()[0])
     return re.sub(r"\s+", " ", text).strip().casefold()

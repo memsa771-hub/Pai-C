@@ -58,6 +58,8 @@ def test_os_tables_present():
         "os_fact_revisions",
         # P2-T3 (os_0026)
         "os_source_domains", "os_page_snapshots", "os_source_files",
+        # P2-T4 (os_0027)
+        "os_not_readable",
     }
 
 

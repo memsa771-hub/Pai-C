@@ -1,0 +1,21 @@
+# Text folding for quote matching (P2-D14, R-76 spelling). Applied by `text.normalise` to the quote and the page alike, so a
+# quote typed with one form of a letter still matches a page that uses another. Quotes stay in their own language (D-15);
+# only the comparison form is folded. Latin text is not touched by this file.
+#
+# Folded letters are the ones keyboards and OCR use interchangeably. Letters that make different words are NOT folded
+# (for example the two Urdu forms of yeh at the end of a word, and the aspirate heh).
+fold:   # target: [letters that become the target]
+  "ی": ["ي", "ى"]        # Urdu yeh <- Arabic yeh, Arabic alef maksura
+  "ک": ["ك"]             # Urdu kaf <- Arabic kaf
+  "ہ": ["ه"]             # Urdu heh goal <- Arabic heh
+remove:   # code points removed: diacritics (harakat), tatweel, joiners
+  ranges: [["064B", "065F"], ["0670", "0670"], ["06D6", "06DC"], ["06DF", "06E4"], ["06E7", "06E8"], ["06EA", "06ED"]]
+  singles: ["0640", "200C", "200D"]
+digits:   # each range of ten digits becomes 0-9
+  - "0660"   # Arabic-Indic
+  - "06F0"   # Extended Arabic-Indic (used with Urdu)
+# Which language a text is in, by the script most of its letters are in. Only scripts listed here are labelled: a text
+# in any other script gets no language (nothing is guessed, and Latin pages keep today's behaviour).
+language_by_script:
+  ARABIC: ur
+min_script_share: 0.5   # share of the letters that must be in the script
