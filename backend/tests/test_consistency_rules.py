@@ -56,6 +56,17 @@ def only(findings, rule, *codes):
     assert findings == [Finding(rule, tuple(codes), findings[0].plan_id if findings else None)], findings
 
 
+def test_a_young_pending_intake_row_is_in_flight_at_night_and_a_finding_when_settled():
+    waiting = dict(intake_status_by_version={1: "pending"}, plans=[])
+    c = side()  # delivered
+    young = os_(**waiting, intake_pending_since_by_version={1: YOUNG})
+    old = os_(**waiting, intake_pending_since_by_version={1: OLD})
+    assert run(c, young, "nightly") == []
+    only(run(c, old, "nightly"), 1, "no_plan")  # pending for two hours: stuck
+    only(run(c, young, "settled"), 1, "no_plan")  # the end-of-test check tolerates nothing pending
+    only(run(c, os_(**waiting), "nightly"), 1, "no_plan")  # an OS view without the ages: no excuse
+
+
 def test_a_clean_pair_has_no_finding_in_either_mode():
     c, o = side(), os_()
     assert run(c, o) == [] and run(c, o, "nightly") == []

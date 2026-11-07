@@ -90,6 +90,7 @@ class OsSideLike(Protocol):
     latest_version: int | None
     intake_status_by_version: Mapping[int, str]
     refusal_by_version: Mapping[int, str | None]
+    intake_pending_since_by_version: Mapping[int, datetime]  # optional: only rows still pending (nightly in-flight)
     plans: Sequence[PlanLike]
     latest_vault_version: int | None
     unprocessed_fact_events: Sequence[Any]  # an age in seconds, or an object with `age_seconds`
@@ -232,6 +233,9 @@ def _rule1(c, o, mode, now):
         return []  # a recorded refusal on the Counsellor side
     if _in_flight(row, mode, now):
         return []
+    since = (getattr(o, "intake_pending_since_by_version", None) or {}).get(n.version)
+    if mode == "nightly" and since is not None and (now - _utc(since)).total_seconds() < IN_FLIGHT_SECONDS:
+        return []  # delivered, and the OS intake row is young and still pending: on its way
     latest = o.latest_version
     if latest is not None and latest > n.version:
         return [Finding(1, ("version_ahead",))]
