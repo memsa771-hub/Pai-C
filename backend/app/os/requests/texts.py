@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 
 PATH = Path(__file__).with_name("texts.yaml")
-KEYS = ("how_stated", "how_shown", "how_confirmed", "how_document", "how_which_is_right", "how_impossible",
+KEYS = ("how_stated", "how_shown", "how_confirmed", "how_document", "how_which_is_right", "how_which_is_right_documents", "how_impossible",
         "answer_required", "current_label", "proposed_label", "proposed_said_label", "new_label", "unanswered_swap", "unanswered_drop",
         "unanswered_all", "unanswered_proposed", "answer_changed")
 
@@ -29,8 +29,9 @@ def text(key: str) -> str:
     return _TEXTS[key]
 
 
-def how(kind: str, need_kind: str, evidence: str, impossible: bool = False) -> str:
-    """The sentence that tells the student how a request closes."""
+def how(kind: str, need_kind: str, evidence: str, impossible: bool = False, documents: bool = False) -> str:
+    """The sentence that tells the student how a request closes. `documents`: two of the student's documents differ (no
+    typed value is offered for those)."""
     if kind == "which_is_right":
-        return _TEXTS["how_impossible" if impossible else "how_which_is_right"]
+        return _TEXTS["how_impossible" if impossible else "how_which_is_right_documents" if documents else "how_which_is_right"]
     return _TEXTS["how_document" if need_kind == "document" else f"how_{evidence}"]

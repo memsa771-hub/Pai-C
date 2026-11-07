@@ -8,6 +8,7 @@ texts:
   how_confirmed: "Check it on your profile page. This step closes by itself when you confirm it."
   how_document: "Upload it on the Documents page and check what PAI read. This step closes by itself when you confirm it."
   how_which_is_right: "Two places say different things. Choose the one that is right, or type the right value."
+  how_which_is_right_documents: "Two of your documents say different things. Choose the one that is right."
   how_impossible: "This value is higher than its total. Type the right value."
   answer_required: "This step closes by itself when PAI has what it needs."
   current_label: "Saved in PAI"

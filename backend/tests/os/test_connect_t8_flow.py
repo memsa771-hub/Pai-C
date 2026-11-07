@@ -487,6 +487,7 @@ def test_6_19_germany_v2_asks_for_the_certificates_and_blocks_the_applications(w
         for k in asked:
             done = s.os.post(f"/v1/os/inbox/{s.step(k).id}/complete", json={}, headers=s.me)
             assert done.status_code == 409, done.text
+            assert done.json()["detail"] == texts.text("answer_required")
             assert s.steps()[k] == "waiting_student"
         ticked = post(s.client, s.params, "steps", {"key": asked[0], "done": True})
         assert ticked.status_code in (400, 404, 409, 422), ticked.text
@@ -633,8 +634,7 @@ def test_6_20_result_expected_then_provide_then_stated_then_shown(world):
         assert (values["marks_obtained"], values["marks_total"]) == (910, 1100)
         assert s.confirm(doc_id).status_code == 200
         assert s.deliver()["written"] == 1
-        record = s.record_with("marks_obtained") if False else [r for r in s.records()
-                                                               if (r.get("result") or {}).get("marks_obtained") == 910][0]
+        record = [r for r in s.records() if (r.get("result") or {}).get("marks_obtained") == 910][0]
         assert record["evidence_level"] == "shown"
         assert s.cards() == []  # the same value: nothing to ask
         assert len(s.done(shown)) == 1 and s.open_steps("provide@") == []
@@ -903,7 +903,6 @@ def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(w
         assert steps[IE_TRANSCRIPT] == "waiting_student" and steps[IE_ENGLISH] == "waiting_student"
         assert {r.need_ref for r in s.rows("open")} == {TRANSCRIPT_DOC, IELTS}
         english_due, transcript_due = s.step(IE_ENGLISH).due_at, s.step(IE_TRANSCRIPT).due_at
-        print("DUES", english_due, transcript_due)
         assert english_due is not None and transcript_due is not None  # both are dated (english_proof is dated now)
         blocked = s.blocked()
         assert blocked["english_proof@ie-p1"] == f"awaiting_fact:{IELTS}" and "english_proof@ie-p3" not in steps
@@ -961,7 +960,6 @@ def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(w
 
         # 5. the student accepts the proposal: the OS asks the Counsellor (T6), which writes the next version; the plan is
         # revised without the places that asked for the English score
-        print("OPS", [(o["op"], o.get("out_ref") or o["programme_ref"], o.get("in_ref")) for o in proposal.ops])
         world.replanner.accept(s.id, proposal.id)
         assert world.replanner.proposals.get(proposal.id).status == "requested"
         assert places_of_plan(f) == THREE and f.versions() == [1]
@@ -1033,7 +1031,7 @@ def test_a_version_1_plan_is_upgraded_only_by_an_accepted_proposal(world):
         assert proposal.big and [o["op"] for o in proposal.ops] == ["upgrade_playbook"] and proposal.event_ids == [newer[0].id]
         run_replan_job(world.replanner, world.client, world.box.now + timedelta(hours=1))  # a repeat adds no second proposal
         assert len(os_events(world, plan_id, "playbook_newer")) == 1 and len(pending_proposals(world, plan_id)) == 1
-        assert s.steps() == {**before} or set(s.steps()) == set(before)  # the plan itself is unchanged
+        assert s.steps() == before  # the plan itself is unchanged: same steps, same states
         # accepted: pinned to version 2, the manual certificates step gives way to the two requests
         world.replanner.accept(s.id, proposal.id)
         assert world.replanner.proposals.get(proposal.id).status == "accepted" and pinned(world, plan_id) == 2
@@ -1062,9 +1060,10 @@ def masked_view(s) -> dict:
 
 
 def test_gate_off_the_plan_view_the_inbox_and_the_roadmap_are_todays(world):
-    """The standalone Counsellor and every flag off: version 1, no request row, no `needs`, `GET /v1/os/requests` is a 404, and
-    the inbox and the roadmap are what they are on a deployment that has no version 2 at all (the T5 flow's answers)."""
-    pre_t8 = {k: v for k, v in world.books.items() if k[1] == 1 or k[0] == "germany_master" and k[1] == 1}
+    """The standalone Counsellor and every flag off: version 1, no request row, no `needs`, `GET /v1/os/requests` is a 404.
+    Compares this deployment (version 1 and 2 playbooks loaded) with one that has version 1 only: the plan view, the inbox
+    and the roadmap are equal once ids and times are masked. It does not compare with the code before T8."""
+    pre_t8 = {k: v for k, v in world.books.items() if k[1] == 1}
     seen = []
     for books in (None, pre_t8):  # the books of this deployment (v1 and v2), then the books of a deployment before T8
         if books is not None:
@@ -1084,4 +1083,4 @@ def test_gate_off_the_plan_view_the_inbox_and_the_roadmap_are_todays(world):
                                  headers=s.me).status_code == 404
             seen.append(masked_view(s))
             s.throughout()
-    assert seen[0] == seen[1]  # byte for byte (ids and times masked)
+    assert seen[0] == seen[1]  # equal with ids and times masked

@@ -25,6 +25,7 @@ from app.os.documents.store import DocumentStore, FindingStore
 from app.os.knowledge import Fact, SqlKnowledge
 from app.os.requests import store as request_store
 from app.os.requests.refresh import refresh
+from app.os.requests import texts
 from app.os.settings import load_settings
 from app.pai_c.connect import document_facts
 from tests.one_upload_support import upload_world
@@ -401,6 +402,7 @@ def test_finding_answer_uses_resolve_finding_and_never_the_vault(world):
     assert [(c["choice"], c["value"], c["source"]["kind"]) for c in one["choices"]] == [
         (f"doc:{a}", "Ahmed Khan", "document"), (f"doc:{b}", "Rashid Khan", "document")]  # each document its own id
     assert {c["ref"] for c in one["choices"]} == {one["ref"]} and one["ref"].startswith("finding:")
+    assert one["how"] == texts.text("how_which_is_right_documents") and one["allow_new"] is False  # no "type the right value"
     assert one["allow_new"] is False
     # review M7: a value that is none of the documents' on an OPEN finding is refused with exactly 422, and nothing is closed
     assert world.answer(one["id"], "new", "Someone Else").status_code == 422

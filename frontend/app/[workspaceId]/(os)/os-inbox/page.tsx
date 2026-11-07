@@ -15,7 +15,7 @@ import type { OsInboxItem } from '@/lib/os-inbox';
 import { dateFactStatus, type FactStatus } from '@/lib/os-programmes';
 import type { OsChanges, OsProposal } from '@/lib/os-replan';
 import { changeMessage } from '@/lib/os-connect';
-import { answerRefusal, completeRefusal, withRequests, type OsRequest, type RequestWords } from '@/lib/os-requests';
+import { answerRefusal, completeRefusal, isRequestItem, withRequests, type OsRequest, type RequestWords } from '@/lib/os-requests';
 import copy from '@/components/counselor/workspace/copy.json';
 import { swapPrompt, type OsNote } from '@/lib/os-self-serve';
 import { usePaiAuth } from '@/lib/pai-auth-context';
@@ -107,7 +107,8 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       await workspaceApi.completeOsInboxItem(item.id, payload);
       await load();
     } catch (e) {
-      setError(completeRefusal(e) ?? 'That did not save. Please try again.');  // a request step: the server says why
+      const said = completeRefusal(e);  // only the approved "closes by itself" sentence is shown; any other 409 keeps today's line
+      setError(said !== null && (isRequestItem(item) || said === copy.connect.requests.pending) ? said : 'That did not save. Please try again.');
     } finally {
       setBusyId(null);
     }

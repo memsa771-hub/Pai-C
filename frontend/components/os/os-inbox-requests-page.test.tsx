@@ -131,6 +131,15 @@ describe('the inbox page and the requests', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('This step closes by itself when PAI has what it needs.');
   });
 
+  it('a refused Mark as done on an ordinary step keeps today\'s line, whatever the 409 says', async () => {
+    vi.mocked(workspaceApi.getOsRequests).mockResolvedValue(null);
+    vi.mocked(workspaceApi.completeOsInboxItem).mockRejectedValue(new Error('API 409: {"detail":"approve the pack to finish this step"}'));
+    vi.mocked(workspaceApi.getOsInboxAll).mockResolvedValue({ items: [{ ...step, instance_key: 'x@1', inbox_kind: 'act' }], notes: [], proposals: [] } as never);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as done' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('That did not save. Please try again.');
+  });
+
   it('every word the requests screen needs exists in copy.json', () => {
     const w = copy.connect.requests as Record<string, unknown>;
     for (const k of ['use', 'kinds', 'levels', 'asOf', 'pending', 'gone', 'unavailable', 'failed']) expect(w[k]).toBeTruthy();

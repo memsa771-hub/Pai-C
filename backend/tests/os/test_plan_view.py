@@ -453,8 +453,38 @@ def test_documents_needed_from_pack_checklist(engine, clean):
 
 # --- P1-T8 Task 3: the plan's requests and what each step needs (R-17, R-19) ------------------------------------------
 
+@pytest.fixture
+def gate_on(monkeypatch):
+    """The needs gate is on (D-w1): the host's StudentFacts adapter answers for the student."""
+    from app.os.requests import gate
+
+    monkeypatch.setattr(gate, "on", lambda *a, **k: object())
+
+
 @pytest.mark.req("R-17")
-def test_plan_view_lists_requests_and_step_needs(engine, clean):
+def test_plan_view_shows_no_needs_while_the_gate_is_off_even_for_a_v2_plan(engine, clean, monkeypatch):
+    """Final review (D-w1): `steps[].needs` is [] when the gate is off, though the plan is pinned to a version with needs."""
+    from datetime import date
+
+    from app.os.compiler import compile_plan
+    from app.os.requests import gate
+    from app.os.requests.state import StudentState
+    from tests.os.kernel_helpers import kernel
+    from tests.os.test_compile_needs import BOOKS, INTER2, contract, merit
+
+    who = contract().model_copy(update={"student_ref": STUDENT})
+    ref = kernel(engine).create_plan(who, compile_plan(who, INTER2, {}, merit(), date(2027, 3, 1), student=StudentState()))
+    decision(engine, "planned", ref.plan_id)
+    svc = _Svc(engine, books=BOOKS)
+    monkeypatch.setattr(gate, "on", lambda *a, **k: object())
+    assert any(s.needs for s in build_plan_view(svc, STUDENT).steps)  # gate on: the needs are shown
+    monkeypatch.setattr(gate, "on", lambda *a, **k: None)
+    off = build_plan_view(svc, STUDENT)
+    assert off.steps and all(s.needs == [] for s in off.steps)
+
+
+@pytest.mark.req("R-17")
+def test_plan_view_lists_requests_and_step_needs(engine, clean, gate_on):
     from dataclasses import replace
     from datetime import date
 
@@ -503,7 +533,7 @@ def test_plan_view_lists_requests_and_step_needs(engine, clean):
 
 
 @pytest.mark.req("R-17")
-def test_result_expected_step_shows_no_need_and_no_request(engine, clean):
+def test_result_expected_step_shows_no_need_and_no_request(engine, clean, gate_on):
     from datetime import date
 
     from app.os.compiler import compile_plan
