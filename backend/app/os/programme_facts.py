@@ -3,7 +3,7 @@ level, source, quote, checked date and intake. The level and whether a value tra
 (`knowledge/display.py`); a fact of another intake is read through the labelled fallback (P2-D24) and always carries
 its own intake."""
 
-from sqlalchemy import Engine, distinct, select
+from sqlalchemy import Engine, select
 
 from app.os import models
 from app.os.compiler.compile import needed_fields
@@ -21,7 +21,7 @@ def _fields(engine: Engine, tenant_id: str, books, programme_ref: str, route_key
     book = newest_plain(books.values()).get(route_key)
     names = set(needed_fields(book)[1]) if book is not None else set()
     with engine.connect() as conn:
-        names |= set(conn.execute(select(distinct(K.c.field)).where(
+        names |= set(conn.execute(select(K.c.field).distinct().where(
             K.c.tenant_id == tenant_id, K.c.scope == "programme", K.c.ref == programme_ref,
             K.c.intake_year <= year)).scalars().all())
     return sorted(names)
