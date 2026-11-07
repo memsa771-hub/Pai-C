@@ -589,6 +589,12 @@ def documents_enabled() -> bool:
     return part_on("CONNECT_ONE_UPLOAD")
 
 
+def documents_flag() -> bool:
+    """The plain CONNECT_ONE_UPLOAD flag, for the worker's OS_DOCUMENTS_ENABLED (P1-T7, R-01). Not `part_on`: PAI OS
+    checks the `counsellor` module row itself, and the worker cannot ask the API for it."""
+    return bool(config.CONNECT_ONE_UPLOAD)
+
+
 def document_file_bytes(student_ref: str, file_ref: str) -> bytes:
     """The bytes of the student's stored file `file_ref`, for the OS reader (P1-T7, D-y6; `mount_os(document_files=)`
     and the worker's OS_DOCUMENT_FILES). The file must exist, belong to the workspace `student_ref` and be active (not

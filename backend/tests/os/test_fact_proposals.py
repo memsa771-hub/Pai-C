@@ -284,9 +284,7 @@ def test_backfill_covers_a_crash_between_confirm_and_emit(world, monkeypatch):
         m.setattr(fact_proposals, "emit", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("killed")))
         world.confirm(doc_id)
     assert world.rows() == []
-    assert fact_proposals.backfill() == 0  # no Counsellor decision for this student yet
-    world.intake()
-    assert fact_proposals.backfill() == 1 and fact_proposals.backfill() == 0
+    assert fact_proposals.backfill() == 1  # any student, as emit covers: no Counsellor decision is needed and fact_proposals.backfill() == 0
     assert delivered(world)["written"] == 1 and len(world.candidates()) == 1
     assert fact_proposals.backfill() == 0 and delivered(world)["written"] == 0
 
@@ -444,3 +442,38 @@ def test_a_corrected_confirmation_replaces_the_value_without_a_conflict_card(wor
         db.commit()
         (row,) = MemoryService(db).profile(world.id).records["education"]
         assert row["result"]["marks_obtained"] == 910 and db.scalars(select(ProfileIssue)).all() == []
+
+
+# --- P1-T7 final review: backfill matches emit; a deleted OS-only document sends nothing ------------------------
+
+
+def confirm_directly(world, doc_id, values=HSSC):
+    with world.svc.engine.begin() as conn:
+        conn.execute(update(models.documents).where(models.documents.c.id == doc_id).values(
+            status="confirmed", confirmed_at=func.now()))
+        for name, v in values.items():
+            conn.execute(update(models.document_fields).where(
+                models.document_fields.c.document_id == doc_id, models.document_fields.c.field == name
+            ).values(value_confirmed=v))
+
+
+def test_backfill_covers_a_student_with_no_counsellor_decision_and_is_paged(world, monkeypatch):
+    doc_id = world.os_only()
+    world.read(doc_id)
+    confirm_directly(world, doc_id)  # no intake row at all: emit would have covered this student
+    monkeypatch.setattr(fact_proposals, "_SCAN_PAGE", 1)  # the scan reads page by page and still finds it
+    assert fact_proposals.backfill() == 1 and fact_proposals.backfill() == 0
+
+
+def test_a_deleted_os_only_document_sends_nothing_to_the_vault(world):
+    doc_id = world.os_only()
+    world.read(doc_id)
+    world.confirm(doc_id)
+    assert len(world.rows()) == 1 and world.rows()[0].status == "pending"
+    got = world.os.delete(f"/v1/os/documents/{doc_id}", headers=world.me)
+    assert got.status_code in (200, 204), got.text
+    (row,) = world.rows()
+    assert row.status == "skipped" and row.payload["outcome"] == "deleted"
+    assert fact_proposals.pending() == []
+    assert delivered(world)["written"] == 0 and world.candidates() == []
+    assert fact_proposals.backfill() == 0  # a deleted document is not confirmed any more

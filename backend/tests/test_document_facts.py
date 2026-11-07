@@ -379,3 +379,54 @@ def test_a_later_value_from_another_source_ends_the_correction_right(student):
         db.commit()
         _, _, (result,) = second_confirmation(db, student, file_id, 910)
         assert result.outcome == "needs_review"
+
+
+def test_a_reconfirm_back_to_an_earlier_value_is_applied_for_an_education_record(student):
+    """900, then 910, then 900 again: the Vault must end at 900 (final review I2)."""
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+        _, ids = document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:1"))
+        db.commit()
+        reconcile_all(db, ids)
+        _, _, (r2,) = second_confirmation(db, student, file_id, 910, key="fact_proposal:7:2")
+        assert r2.accepted and education(db, ws)[0]["result"]["marks_obtained"] == 910
+        outcome, _, (r3,) = second_confirmation(db, student, file_id, 900, key="fact_proposal:7:3")
+        assert outcome == "written" and r3.accepted
+        assert education(db, ws)[0]["result"] == {"marks_obtained": 900, "marks_total": 1100}
+        # 910 again, then 900 again: each is a return to a value an earlier proposal already carried
+        assert second_confirmation(db, student, file_id, 910, key="fact_proposal:7:4")[0] == "written"
+        assert second_confirmation(db, student, file_id, 900, key="fact_proposal:7:5")[0] == "written"
+        assert education(db, ws)[0]["result"]["marks_obtained"] == 900
+        # and the same values again are still a repeat
+        assert document_facts.apply(db, proposal(student, file_id, key="fact_proposal:7:6"))[0] == "duplicate"
+
+
+def test_a_reconfirm_back_to_an_earlier_value_is_applied_for_a_test_score(student):
+    with student.factory() as db:
+        ws = student.workspace_id
+        file_id = add_file(db, ws)
+
+        def confirm(score, n):
+            outcome, ids = document_facts.apply(db, proposal(student, file_id, [{"key": "test.ielts.score",
+                                                "value": score}], key=f"fact_proposal:8:{n}", doc_type="ielts_trf"))
+            db.commit()
+            return outcome, reconcile_all(db, ids)
+
+        confirm(6.5, 1)
+        confirm(7, 2)
+        outcome, (result,) = confirm(6.5, 3)
+        assert outcome == "written" and result.accepted
+        (row,) = MemoryService(db).profile(ws).records["test_attempt"]
+        assert float(row["overall_score"]) == 6.5
+        assert confirm(6.5, 4)[0] == "duplicate"
+
+
+def test_a_return_to_an_earlier_value_before_the_reconciler_ran_is_applied(student):
+    """900, 910, 900 delivered back to back: the latest earlier proposal (910) is the one compared with."""
+    with student.factory() as db:
+        file_id = add_file(db, student.workspace_id)
+        out = [document_facts.apply(db, proposal(student, file_id, [
+            {"key": "education.intermediate.marks_obtained", "value": v}], key=f"fact_proposal:7:{n}"))[0]
+            for n, v in ((1, 900), (2, 910), (3, 900))]
+        assert out == ["written", "written", "written"]

@@ -394,3 +394,46 @@ def test_both_on_a_field_without_a_vault_key_still_comes_from_the_stored_values(
     vault_on(mounted, test__ielts__score=7.0)
     assert profile_of(plans_of(mounted), "stu-1") == {"min_passing_grade_letter.min_pass": "C", "entry_test.score": 80,
                                                       "ielts_trf.overall": 7.0}
+
+
+FLAG = {"on": True}
+
+
+def flag_on() -> bool:
+    return FLAG["on"]
+
+
+@pytest.mark.req("R-01")
+def test_the_worker_is_given_the_one_upload_gate_and_profile_of_follows_the_per_field_rule(mounted, os_db, monkeypatch):
+    """P1-T7 final review I1: the worker loads OS_DOCUMENTS_ENABLED, so its eligibility uses the same rule as the API."""
+    from dbos import DBOS
+
+    from app.os.ports import document_files
+    from app.os.runner import worker
+    from app.os.settings import load_settings
+
+    monkeypatch.setattr(worker, "register_job", lambda *a: None)
+    for var in ("OS_TEST_RESEARCH_MODEL", "OS_TEST_DOCUMENT_MODEL", "OS_TEST_STATEMENT_MODEL", "OS_TEST_REPLAN_MODEL",
+                "OS_EXTRA_MODULES"):
+        monkeypatch.delenv(var, raising=False)
+    settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ENABLED": "true", "OS_WORKER_ID": "w1",
+                              "OS_DOCUMENTS_ENABLED": f"{__name__}:flag_on"})
+    seed(mounted)
+    try:
+        _, _, client, _ = worker.build(settings)  # builds what the worker runs; sets the port
+        client.destroy()
+        vault_on(mounted, test__ielts__score=7.5, education__intermediate__marks_total=1100)  # after: build resets it
+        FLAG["on"] = True
+        got = profile_of(plans_of(mounted), "stu-1")
+        assert document_files.enabled() is True
+        assert "transcript.cgpa" not in got  # per-field rule: a field with a Vault key is the Vault's alone
+        assert got["ielts_trf.overall"] == 7.5 and got["min_passing_grade_letter.min_pass"] == "C"
+        FLAG["on"] = False  # the flag off: T4's overlay again
+        assert profile_of(plans_of(mounted), "stu-1")["transcript.cgpa"] == 3.0
+        manifest.set_enabled(mounted, TENANT, False)  # the OS's own module row also gates it
+        FLAG["on"] = True
+        assert document_files.enabled() is False
+    finally:
+        FLAG["on"] = True
+        document_files.configure()
+        DBOS.destroy(destroy_registry=True)

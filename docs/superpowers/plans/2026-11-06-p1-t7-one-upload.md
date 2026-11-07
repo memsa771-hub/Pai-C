@@ -548,3 +548,9 @@
   - `tach check`, `python scripts/check_freeze.py --base origin/pai-connect`, `backend/scripts/check_alembic_heads.py`.
   - Report the counts.
 - [ ] **Step 4: Commit** `test(connect): T7 flow test; R-16 built`. Add `(R-01)` to the message if it was set.
+
+## Owner rulings (2026-11-06, in chat)
+- **Rulings 4 and D-y12 (data split):** approved for P1. Marks, GPA and test scores live only in the Vault. Identity fields (name, father's name, date of birth, passport) stay out of the Vault on purpose, for privacy. `min_pass` and `scale_best` stay OS-owned until they get Vault types in a later phase.
+- **Ruling 6 (delete):** approved. Deleting a document deletes the file in both places. Facts the Vault already learned stay.
+- **Ruling 2 (chat):** approved. No type picker in the frozen chat. The student picks the type later on the Documents page.
+- **D-y9 (switch-on backfill):** approved. Documents confirmed before the switch was on are sent to the Vault. A different value raises a "which is right?" question.
