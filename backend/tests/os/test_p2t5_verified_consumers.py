@@ -24,10 +24,19 @@ URL, QUOTE = "https://uni.example/apply", "Apply by 15 July"
 AT = datetime(2026, 10, 22, tzinfo=timezone.utc)
 
 
+def upsert_as(kb, scope, ref, field, fact) -> int:
+    """T1: `verified` is reached only through review, so a verified row is made confirmed first."""
+    if fact.status != "verified":
+        return kb.upsert(scope, ref, field, fact)
+    fid = kb.upsert(scope, ref, field, Fact(**{**fact.__dict__, "status": "confirmed"}))
+    kb.set_status(fid, "verified", cause="review")
+    return fid
+
+
 def put(kb, field="deadline_close", value=None, status="confirmed") -> int:
     value = value if value is not None else {"date": "2027-07-15", "tz": "Europe/Berlin"}
     quote, url = (QUOTE, URL) if status in ("confirmed", "verified") else ("", "")
-    return kb.upsert("programme", "p1", field, Fact(value, quote, url, NOW, 2027, status))
+    return upsert_as(kb, "programme", "p1", field, Fact(value, quote, url, NOW, 2027, status))
 
 
 def test_instructions_use_a_verified_route():
@@ -48,7 +57,7 @@ def test_fee_row_passes_verified_through():
 
 def test_verified_required_documents_override_the_checklist(engine, clean):
     kb = SqlKnowledge(engine, "pai")
-    kb.upsert("programme", "p1", "required_documents", Fact(["passport", "other"], QUOTE, URL, AT, 2027, "verified"))
+    upsert_as(kb, "programme", "p1", "required_documents", Fact(["passport", "other"], QUOTE, URL, AT, 2027, "verified"))
     inp = load_inputs(engine, "pai", kb, BOOK, CFG, None, "s1", "p1", 2027)
     assert inp.required_override == ["passport"]
     kb.upsert("programme", "p1", "required_documents", Fact(["passport"], "", "", AT, 2027, "unconfirmed"))
@@ -61,14 +70,14 @@ def test_replan_counts_a_verified_programme_as_confirmed(engine, clean):
     assert Replanner.confirmed(me, "p1", 2027) is False
     kb.upsert("programme", "p1", "deadline_close", Fact({"date": "2027-07-15"}, QUOTE, URL, AT, 2027, "unconfirmed"))
     assert Replanner.confirmed(me, "p1", 2027) is False
-    kb.upsert("programme", "p1", "deadline_close", Fact({"date": "2027-07-15"}, QUOTE, URL, AT, 2027, "verified"))
+    upsert_as(kb, "programme", "p1", "deadline_close", Fact({"date": "2027-07-15"}, QUOTE, URL, AT, 2027, "verified"))
     assert Replanner.confirmed(me, "p1", 2027) is True
 
 
 def test_sweeper_makes_an_old_verified_fact_stale(engine, clean):
     svc, kb, _ = service(engine)
-    fid = kb.upsert("programme", "p1", "application_route", Fact("direct", QUOTE, URL, NOW - timedelta(days=40), 2027,
-                                                                 "verified"))
+    fid = upsert_as(kb, "programme", "p1", "application_route",
+                    Fact("direct", QUOTE, URL, NOW - timedelta(days=40), 2027, "verified"))
     assert freshness.run(svc, engine, NOW, ttl_days=30) == 1
     assert status_of(engine, fid) == "stale"
     with engine.connect() as conn:

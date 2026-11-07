@@ -342,3 +342,15 @@ def test_attestation_is_once_per_reviewer_and_batch(s):
     assert s.q.attested("amina", "b3") and not s.q.attested("amina", "b4") and not s.q.attested("bilal", "b3")
     s.reviewers.set_active("amina", False)
     assert not s.q.attested("amina", "b3")
+
+
+@pytest.mark.req("R-25")
+def test_revise_cannot_set_verified_and_a_changed_verified_reading_drops(s):
+    fid = s.fact()
+    with pytest.raises(ValueError):
+        s.kb.revise(fid, status="verified", cause="review")
+    item, _ = s.q.open_verify(fid)
+    two_checks(s, item, fid)
+    assert s.status(fid) == "verified"
+    s.kb.revise(fid, value={"date": "2027-09-01"}, quote="Apply by 1 September 2027", cause="research")
+    assert s.status(fid) == "unconfirmed" and s.kb.revisions(fid)[-1].before["status"] == "verified"

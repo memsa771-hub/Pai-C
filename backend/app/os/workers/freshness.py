@@ -14,7 +14,6 @@ from sqlalchemy import Engine, insert, select
 from app.os import models
 from app.os.compiler.compile import date_of
 from app.os.knowledge.changes import after_fact_change
-from app.os.knowledge.port import CONFIRMED_LEVELS
 
 F = models.knowledge_facts
 RECHECK_DAYS = (30, 7)
@@ -48,7 +47,7 @@ def run(service, engine: Engine, now: datetime, ttl_days: int | None = None) -> 
     ttl = ttl_days if ttl_days is not None else service.settings.fact_ttl_days
     anchors = service.anchor_fields()
     with engine.connect() as conn:
-        rows = conn.execute(select(F).where(F.c.tenant_id == kernel.tenant_id, F.c.status.in_(CONFIRMED_LEVELS))
+        rows = conn.execute(select(F).where(F.c.tenant_id == kernel.tenant_id, F.c.status.in_(("confirmed", "verified")))
                             .order_by(F.c.id)).all()
     knowledge = service.knowledge
     stale = 0

@@ -20,7 +20,6 @@ from app.os.kernel import IllegalTransition, StaleDraft
 from app.os.contracts.route_contract import ProgrammeChoice
 from app.os.ports import choice_requests
 from app.os.ports.escalation import EscalationSink
-from app.os.knowledge.port import CONFIRMED_LEVELS
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
@@ -190,7 +189,7 @@ class Replanner:
         with self.engine.connect() as conn:
             return bool(conn.execute(select(func.count()).select_from(F).where(
                 F.c.tenant_id == self.tenant, F.c.scope == "programme", F.c.ref == ref, F.c.intake_year == year,
-                F.c.status.in_(CONFIRMED_LEVELS))).scalar())
+                F.c.status.in_(("confirmed", "verified")))).scalar())
 
     def check(self, plan_id: int, ops: list[Op]) -> tuple[list[Op], list[dict]]:
         """(kept, refused). Raises CompileError when the plan does not compile even without the operations."""

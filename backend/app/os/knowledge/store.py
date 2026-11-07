@@ -73,32 +73,48 @@ class SqlKnowledge:
         self.tenant_id = tenant_id
 
     def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
-                intake_term: str | None, owner_ref: str):
+                intake_term: str | None, owner_ref: str | None):
         q = select(T).where(
             T.c.tenant_id == self.tenant_id, T.c.scope == scope, T.c.ref.in_(list(refs)),
-            T.c.field.in_(list(fields)), T.c.intake_year == intake_year, T.c.owner_ref == owner_ref,
+            T.c.field.in_(list(fields)), T.c.intake_year == intake_year,
         )
         if intake_term is not None:
             q = q.where(T.c.intake_term == intake_term)
-        return q.order_by(T.c.id)  # intake_term=None matches every term; on a clash the newest row wins
+        if owner_ref is not None:
+            q = q.where(T.c.owner_ref.in_(sorted({owner_ref, ""})))
+        return q.order_by(T.c.id)
+
+    @staticmethod
+    def _resolve(rows, owner_ref: str | None, key) -> dict:
+        """One row per key (P2-D8, plan "Resolution order"):
+        - owner: with an owner_ref, that owner's row wins over the general ('') row; with None (any owner), the
+          general row wins, then the newest id;
+        - term: with intake_term=None, the newest id wins among terms (T8 will prefer the intake's current term)."""
+        best: dict = {}
+        for r in rows:  # ordered by id, so a later row of equal rank replaces an earlier one
+            rank = (r.owner_ref == owner_ref) if owner_ref else (r.owner_ref == "")
+            k = key(r)
+            if k not in best or rank >= best[k][0]:
+                best[k] = (rank, r)
+        return {k: _fact(r) for k, (_, r) in best.items()}
 
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
-        intake_term: str | None = None, owner_ref: str = "",
+        intake_term: str | None = None, owner_ref: str | None = None,
     ) -> dict[tuple[str, str], Fact]:
         if not refs or not fields:
             return {}
         with self.engine.connect() as conn:
             rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref)).all()
-        return {(r.ref, r.field): _fact(r) for r in rows}
+        return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field))
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
-                    intake_term: str | None = None, owner_ref: str = "") -> dict[str, Fact]:
+                    intake_term: str | None = None, owner_ref: str | None = None) -> dict[str, Fact]:
         if not fields:
             return {}
         with self.engine.connect() as conn:
             rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref)).all()
-        return {r.field: _fact(r) for r in rows}
+        return self._resolve(rows, owner_ref, lambda r: r.field)
 
     def _row(self, conn, fact_id: int, lock: bool = False):
         q = select(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
@@ -131,25 +147,41 @@ class SqlKnowledge:
         return {"tenant_id": self.tenant_id, "scope": scope, "ref": ref, "field": field,
                 "intake_term": fact.intake_term, "intake_year": fact.intake_year, "owner_ref": fact.owner_ref}
 
+    @staticmethod
+    def _no_verified(status: str) -> None:
+        if status == "verified":
+            raise ValueError("verified is reached only through review: set_status(..., cause='review')")
+
     def upsert(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "manual",
                research_run_id: int | None = None, evidence: list | None = None, *,
                cause: str | None = None, cause_ref: str | None = None, actor: str | None = None) -> int:
         """Adds or replaces a fact. An admin's fact is `manual` (the default); research passes `research`,
-        its run and the evidence of every reading (Slice 2 spec §4.4). Each change is a revision (P2-D9)."""
+        its run and the evidence of every reading (Slice 2 spec §4.4). Each change is a revision (P2-D9).
+        A write onto a `verified` row keeps `verified` when value and quote are the same; otherwise the row drops
+        to `unconfirmed` and goes back to review (the revision records the cause and before/after)."""
+        self._no_verified(fact.status)
         values = {**self._values(fact, source), "research_run_id": research_run_id, "evidence": evidence}
-        stmt = insert(T).values(**self._key(scope, ref, field, fact), **values)
-        stmt = stmt.on_conflict_do_update(
-            constraint="uq_os_knowledge_facts", set_={**values, "updated_at": func.now()}
-        ).returning(T.c.id)
         with self.engine.begin() as conn:
             before = self._keyed(conn, scope, ref, field, fact)
-            fact_id = conn.execute(stmt).scalar_one()
+            if before is None:  # a concurrent first insert loses the race here and is re-read as an update
+                fact_id = conn.execute(insert(T).values(**self._key(scope, ref, field, fact), **values)
+                                       .on_conflict_do_nothing(constraint="uq_os_knowledge_facts")
+                                       .returning(T.c.id)).scalar()
+                if fact_id is None:
+                    before = self._keyed(conn, scope, ref, field, fact)
+            if before is not None:
+                fact_id = before.id
+                if before.status == "verified":
+                    same = before.value == fact.value and before.quote == fact.quote
+                    values["status"] = "verified" if same else "unconfirmed"
+                conn.execute(update(T).where(T.c.id == fact_id).values(**values, updated_at=func.now()))
             _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), cause or source, cause_ref, actor)
             return fact_id
 
     def insert_if_absent(self, scope: Scope, ref: str, field: str, fact: Fact, source: Source = "seed", *,
                          cause: str | None = None, cause_ref: str | None = None, actor: str | None = None) -> None:
         """Adds a fact only if its key is new: re-seeding never overwrites a confirmed or researched fact (M6)."""
+        self._no_verified(fact.status)
         stmt = insert(T).values(
             **self._key(scope, ref, field, fact), **self._values(fact, source),
         ).on_conflict_do_nothing(constraint="uq_os_knowledge_facts").returning(T.c.id)
@@ -167,11 +199,11 @@ class SqlKnowledge:
         return row.scope, row.ref, row.field, _fact(row)
 
     def mark_stale(self, fact_id: int) -> bool:
-        """A confirmed or verified fact becomes stale (spec §4.7, P2-D6). False if it was no longer confirmed."""
+        """A confirmed or verified fact becomes stale (spec §4.7). False if it was neither any more."""
         with self.engine.begin() as conn:
             before = self._row(conn, fact_id, lock=True)
             r = conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id,
-                                             T.c.status.in_(CONFIRMED_LEVELS))
+                                             T.c.status.in_(("confirmed", "verified")))
                              .values(status="stale", updated_at=func.now()).returning(T.c.id))
             if r.first() is None:
                 return False
@@ -180,12 +212,15 @@ class SqlKnowledge:
 
     def set_status(self, fact_id: int, status: str, *, cause: str, cause_ref: str | None = None,
                    actor: str | None = None) -> Fact:
-        """Moves a fact to another trust level with its cause (P2-D6, D9). The trust rule is checked first:
-        `confirmed` and `verified` need a quote and URL. T5 decides who may set `verified`."""
-        _, _, _, old = self.get(fact_id)
-        Fact(**{**old.__dict__, "status": status})  # validates
+        """Moves a fact to another trust level with its cause (P2-D6, D9). The trust rule is checked on the locked
+        row: `confirmed` and `verified` need a quote and URL, and `verified` needs cause `review` (T5 decides who)."""
+        if status == "verified" and cause != "review":
+            raise ValueError("verified is reached only with cause 'review'")
         with self.engine.begin() as conn:
             before = self._row(conn, fact_id, lock=True)
+            if before is None:
+                raise KeyError(fact_id)
+            Fact(**{**_fact(before).__dict__, "status": status})  # validates
             conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
                          .values(status=status, updated_at=func.now()))
             after = self._row(conn, fact_id)
@@ -202,7 +237,10 @@ class SqlKnowledge:
         bad = sorted(set(changes) - set(self._REVISABLE))
         if bad:
             raise ValueError(f"cannot revise {bad}")
+        self._no_verified(changes.get("status"))
         _, _, _, old = self.get(fact_id)
+        if old.status == "verified" and {"value", "quote", "url"} & set(changes) and "status" not in changes:
+            changes = {**changes, "status": "unconfirmed"}  # a changed reading is no longer verified (T1 rule)
         Fact(**{**old.__dict__, **changes})  # validates
         values = dict(changes)
         if {"value", "quote", "url"} & set(changes):
@@ -215,7 +253,8 @@ class SqlKnowledge:
             _revise(conn, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
         return _fact(after)
 
-    def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None) -> None:
+    def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None, cause: str = "research",
+                 cause_ref: str | None = None, actor: str | None = None) -> None:
         """Research found the same value again (`checked_at`), or a different one (`conflict_note`), for a
         confirmed fact: the value, quote and status stay (spec §4.6 step 6)."""
         values: dict = {"conflict_note": conflict_note, "updated_at": func.now()}
@@ -225,10 +264,11 @@ class SqlKnowledge:
             before = self._row(conn, fact_id, lock=True)
             conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id).values(**values))
             if before is not None:
-                _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), "research", None, None)
+                _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), cause, cause_ref, actor)
 
     def confirm(self, fact_id: int, *, value, quote: str, url: str, status: str,
                 conflict_note: str | None = None) -> Fact:
+        self._no_verified(status)
         _, _, _, old = self.get(fact_id)
         new = Fact(value=value, quote=quote, url=url, checked_at=old.checked_at, intake_year=old.intake_year,
                    status=status, conflict_note=conflict_note, id=fact_id, intake_term=old.intake_term,
@@ -237,7 +277,7 @@ class SqlKnowledge:
         stamp = clock.now()  # the shared clock: freshness compares checked_at with it
         with self.engine.begin() as conn:
             before = self._row(conn, fact_id, lock=True)
-            conn.execute(update(T).where(T.c.id == fact_id).values(
+            conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id).values(
                 value=value, quote=quote, url=url, status=status, conflict_note=conflict_note,
                 checked_at=stamp, updated_at=stamp, source="manual",
             ))

@@ -23,7 +23,7 @@ MODELS = {"programme_facts.v1": ProgrammeFactsV1, "merit_check.v1": MeritCheckV1
           "programme_list.v2": ProgrammeListV2}
 SCHEMA_SHA256 = {
     "programme_facts.v1": "b185515934fd4c5f567e15d0a02a9d25a2cc268209dbdd9a72b79aa00fe42a5f",
-    "merit_check.v1": "db1d0655051b7fb7995e2e72917087a03345081f3c1e03004de9d6f4fda4012f",
+    "merit_check.v1": "7a7057b29173909fef92781c3130d5f937c79a3f91187115649b371fbfe5c8f4",
     "programme_list.v2": "62bc2c6e0d28d0485fd17e9edabf10ba306ff64538c8dc4b7aafc7e868348bcf",
 }
 
@@ -135,3 +135,13 @@ def test_programme_list_v2_keeps_v1_fields():
     assert set(ProgrammeEntry.model_fields) <= set(ProgrammeEntryV2.model_fields)
     with pytest.raises(ValidationError):
         ProgrammeListV2.model_validate({**sample("programme_list_v2.json"), "schema": "pai.programme_list.v1"})
+
+
+@pytest.mark.req("R-25")
+def test_closing_merit_value_only_when_verified():
+    d = sample("merit_check_computed.json")
+    cm = d["closing_merits"][0]
+    with pytest.raises(ValidationError, match="only when verified"):
+        MeritCheckV1.model_validate({**d, "closing_merits": [{**cm, "level": "confirmed"}]})
+    ok = MeritCheckV1.model_validate({**d, "closing_merits": [{**cm, "level": "not_confirmed", "value": None}]})
+    assert ok.closing_merits[0].value is None
