@@ -1,0 +1,165 @@
+# H3, Punjab part (P2 spec §6.2; master R-35a). Researched by Claude, 2026-11-07.
+# Counts were got from the official files themselves; count_quote is null where no sentence states the count.
+# Check 2 (independent re-download, 2026-11-07) recomputed every count. Walkthroughs: docs/research/walkthroughs/punjab-*.md
+region: punjab
+retrieved: 2026-11-07
+lists:
+  - id: hed-punjab-boards
+    body: HED Punjab
+    name: Boards of Intermediate and Secondary Education
+    url: https://hed.punjab.gov.pk/boards
+    institution_type: examination_board
+    family: intermediate
+    date: null
+    row_count: 9
+    count_quote: "The Higher Education Department has a network of 09 Boards of Intermediate and Secondary Education"
+    read_method: curl + HTML text strip
+    check2: correct
+  - id: hed-punjab-public-colleges-bwp
+    body: HED Punjab
+    name: List of public colleges, Bahawalpur division
+    url: https://hed.punjab.gov.pk/system/files/Bahawalpur_Colleges_0.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2021-11-09   # PDF creation date (metadata); no date printed
+    row_count: 68
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both)
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+  - id: hed-punjab-public-colleges-dgk
+    body: HED Punjab
+    name: List of public colleges, D.G. Khan division
+    url: https://hed.punjab.gov.pk/system/files/DGKhan_Colleges.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2021-11-09   # PDF creation date (metadata); no date printed
+    row_count: 76
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both)
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+  - id: hed-punjab-public-colleges-fsd
+    body: HED Punjab
+    name: List of public colleges, Faisalabad division
+    url: https://hed.punjab.gov.pk/system/files/Faisalabad_Colleges_0.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2021-11-09   # PDF creation date (metadata); no date printed
+    row_count: 98
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both)
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+  - id: hed-punjab-public-colleges-grw
+    body: HED Punjab
+    name: List of public colleges, Gujranwala division
+    url: https://hed.punjab.gov.pk/system/files/Gujranwala_Division.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-10   # PDF creation date (metadata); no date printed
+    row_count: 132
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both); no serials in text layer
+    read_method: curl + pdftotext (PDF text layer)
+    check2: unclear   # count methods disagree or no serials; count by hand
+  - id: hed-punjab-public-colleges-lhr
+    body: HED Punjab
+    name: List of public colleges, Lahore division
+    url: https://hed.punjab.gov.pk/system/files/Lahore_Division_Colleges_0.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-16   # PDF creation date (metadata); no date printed
+    row_count: 108
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 110
+    read_method: curl + pdftotext (PDF text layer)
+    check2: unclear   # count methods disagree or no serials; count by hand
+  - id: hed-punjab-public-colleges-mul
+    body: HED Punjab
+    name: List of public colleges, Multan division
+    url: https://hed.punjab.gov.pk/system/files/Multan_division_Colleges.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-16   # PDF creation date (metadata); no date printed
+    row_count: 70
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both); no serials in text layer
+    read_method: curl + pdftotext (PDF text layer)
+    check2: unclear   # count methods disagree or no serials; count by hand
+  - id: hed-punjab-public-colleges-rwp
+    body: HED Punjab
+    name: List of public colleges, Rawalpindi division
+    url: https://hed.punjab.gov.pk/system/files/Rawalpindi_division_Colleges.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-16   # PDF creation date (metadata); no date printed
+    row_count: 110
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 111
+    read_method: curl + pdftotext (PDF text layer)
+    check2: unclear   # count methods disagree or no serials; count by hand
+  - id: hed-punjab-public-colleges-swl
+    body: HED Punjab
+    name: List of public colleges, Sahiwal division
+    url: https://hed.punjab.gov.pk/system/files/Sahiwal_division_Colleges.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-16   # PDF creation date (metadata); no date printed
+    row_count: 37
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both)
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+  - id: hed-punjab-public-colleges-sgd
+    body: HED Punjab
+    name: List of public colleges, Sargodha division
+    url: https://hed.punjab.gov.pk/system/files/Sargodha_division_Colleges.pdf
+    institution_type: public_college
+    family: intermediate
+    date: 2019-04-16   # PDF creation date (metadata); no date printed
+    row_count: 95
+    count_quote: null
+    count_method: college lines carrying a gender column (Male/Female/Both)
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+  - id: hec-recognised-punjab
+    body: HEC
+    name: Recognised Universities (Province = Punjab)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 105   # 57 public, 48 private
+    count_quote: null
+    count_method: counted list items with Province='Punjab' in the HTML
+    read_method: curl + HTML markup count
+    check2: correct
+not_found:
+  - what: Private colleges and A-level schools in Punjab (board affiliation lists; P2 §11 Q4)
+    note: no official list found in this pass
+  - what: OCAS participating colleges and college search
+    urls: [http://ocas.pitb.gov.pk/detail/colleges_merit, https://hep.punjab.gov.pk/detail/colleges, https://cis.punjab.gov.pk/]
+    note: connection reset (cis, hep) or not opened; not readable on 2026-11-07
+  - what: UHS private and public college counts for 2026-27
+    note: in the prospectus; not counted in this pass (batch 2 v4 has the rows)
+domains:
+  - body: HED Punjab
+    domains: [hed.punjab.gov.pk]
+    evidence: pages and college PDFs fetched from it
+  - body: OCAS (HED Punjab)
+    domains: [ocas.punjab.gov.pk]
+    evidence: "page footer: '© OCAS, Higher Education Department, Government of the Punjab'"
+  - body: BISE Lahore
+    domains: [biselahore.com, data.biselahore.com]
+    evidence: notifications page fetched from biselahore.com; batch 2 PDFs on data.biselahore.com
+    note: not on .edu.pk / .gov.pk; preferred-suffix rule (R-71) needs a person to confirm this is the board's own domain
+  - body: UHS Lahore
+    domains: [uhs.edu.pk, www.uhs.edu.pk]
+    evidence: 2026-27 prospectus fetched from it
+  - body: UET Lahore
+    domains: [uet.edu.pk, ecat.uet.edu.pk, admission.uet.edu.pk]
+    evidence: ECAT and admission pages fetched from them
+  - body: other eight Punjab BISEs
+    status: candidate
+    note: domains are in batch 1 v4 (Institutions sheet); not re-read in this pass
