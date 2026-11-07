@@ -18,6 +18,21 @@ env -u PAI_API_KEY python -m scripts.eval_counselor_deep --offline --policy-mode
 
 Use another `--result-dir` (for example `r47-after/default`) for an AFTER run, then compare the two JSON files.
 
+## P1 (T10)
+
+- `p1/before/{default,guided}/` - replay on the P1 start (`bed47c8`), run from a temporary git worktree of that commit.
+- `p1/after/{default,guided}/` - the same on the T10 branch. `p1/diff.md` holds the `compare.py` result (no differences).
+- `p1/stage-a-i/{off,on}.json` and `p1/stage-a-i.md` - the stage A-I replay with the connection off and on. It records every
+  model call's input, which the persona replay does not. Regenerate it from `backend/` (needs `OS_TEST_DATABASE_URL`):
+  `env -u PAI_API_KEY python -m scripts.connect_stage_replay --out ../docs/connect/replays/p1/stage-a-i`.
+
+```
+git worktree add <scratch>/p1-before bed47c8
+(cd <scratch>/p1-before/backend && env -u PAI_API_KEY python -m scripts.eval_counselor_deep --offline --result-dir <repo>/docs/connect/replays/p1/before/default)
+(cd <scratch>/p1-before/backend && env -u PAI_API_KEY python -m scripts.eval_counselor_deep --offline --policy-mode guided --result-dir <repo>/docs/connect/replays/p1/before/guided)
+git worktree remove <scratch>/p1-before
+```
+
 ## What the replay cannot show
 
 - It forces each analysis job to `succeeded`, so C2's cascade never appears.
