@@ -1,0 +1,21 @@
+# Integrity checks on every fetched page (P2 spec §4.2; R-71). Thresholds and word lists are data: edit here, not in code.
+# Spam words are matched against the visible text, the link texts and the link addresses of the page. Add a language by
+# adding a key; every listed language is always checked (a page's language is not guessed).
+spam:
+  min_distinct_terms: 2   # one stray word is not spam: a page needs this many different terms
+  terms:
+    en: [casino, betting, jackpot, poker, slot, slots, "free spins", roulette, "sports book", "payday loan"]
+    ur: ["کیسینو", "جوا"]   # to be reviewed by an Urdu reader before the first live run
+
+# The share of links that go to domains that are on no list, compared with the last clean snapshot of the same page.
+link_flood:
+  min_off_list_links: 10   # fewer than this is never a flood
+  min_share: 0.5           # off-list links / all links
+  min_increase: 0.3        # how much the share grew over the last clean snapshot (no snapshot: 0)
+
+# The text is very different from the last clean snapshot and nothing explains it.
+wholesale_change:
+  min_words_before: 40     # a short page can change completely
+  max_similarity: 0.3      # shared 3-word phrases / all phrases of both texts; below this the page was replaced
+  explained_by:            # a word that the new text has and the old one did not: a notice announces the change
+    en: [notice, announcement, circular, corrigendum, revised, updated]
