@@ -63,16 +63,21 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
     if rec.status == "running":
         raise ValueError(f"import {import_id} is still running")
     cref, uref = cause_ref(import_id), f"undo-{import_id}"
+    # imports already undone have cancelled themselves out: their revisions and undo revisions do not count as changes
+    cancelled = [ref for r in log.list(10_000) if r.status == "undone" and r.id != import_id
+                 for ref in (cause_ref(r.id), f"undo-{r.id}")]
     result = UndoResult()
     with engine.begin() as conn:
         fact_chains = _chains(conn, tenant_id, FR, "fact_id", cref)
         reg_chains = _chains(conn, tenant_id, RR, "registry_id", cref)
         for fid, chain in fact_chains.items():
-            last = conn.execute(select(func.max(FR.c.id)).where(FR.c.fact_id == fid)).scalar()
+            last = conn.execute(select(func.max(FR.c.id)).where(
+                FR.c.fact_id == fid, FR.c.cause_ref.notin_(cancelled) | FR.c.cause_ref.is_(None))).scalar()
             if last != chain[-1].id:
                 result.conflicts.append(f"fact {fid}")
         for rid, chain in reg_chains.items():
-            last = conn.execute(select(func.max(RR.c.id)).where(RR.c.registry_id == rid)).scalar()
+            last = conn.execute(select(func.max(RR.c.id)).where(
+                RR.c.registry_id == rid, RR.c.cause_ref.notin_(cancelled) | RR.c.cause_ref.is_(None))).scalar()
             if last != chain[-1].id:
                 ent = conn.execute(select(R.c.entity_id).where(R.c.id == rid)).scalar()
                 result.conflicts.append(f"registry {ent}")

@@ -80,7 +80,7 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
                 ctx = build_context(make_deps(svc), country=country, mode=OWNER_ACCEPTED, batch_ref=path.stem,
                                     family=family)
                 _, results = plan_file(path, ctx)
-            except SheetError as e:
+            except (SheetError, ValueError) as e:
                 raise HTTPException(status_code=422, detail=str(e)) from e
         return {"counts": summarise(results), "rows": [row_out(r) for r in results if r.bucket != "accepted"]}
 

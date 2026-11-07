@@ -77,6 +77,10 @@ def _registry_lookup(registry: RegistryStore):
 
 def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref: str, family: str,
                   list_urls: dict[str, str] | None = None, require_list: bool = True) -> PlanContext:
+    from app.os.knowledge.regions import countries
+
+    if country not in countries():
+        raise ValueError(f"no region vocabulary for country '{country}' (known: {countries()})")
     ctx = PlanContext(country=country, mode=mode, batch_ref=batch_ref, family=family, require_list=require_list)
     urls: dict[str, str] = dict(list_urls or {})
     if deps is not None:
