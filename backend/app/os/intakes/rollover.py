@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
 from app.os.intakes.store import Intake, IntakeError, IntakeStore
+from app.os.knowledge.store import _revise
 from app.os.playbooks import Playbook
 
 F = models.knowledge_facts
@@ -143,7 +144,11 @@ def backfill_intake_terms(engine: Engine, tenant_id: str, playbooks: Mapping[tup
                           ) -> BackfillResult:
     """P2-D5 / D-t1-1: facts from before P2 have `intake_term = ''`. Each gets the term its route's playbooks declare
     (`intake_terms`), when that is exactly one. A route with none or several, a ref that belongs to no known route,
-    and a row whose new key is already taken are left alone and reported: no term is ever guessed."""
+    and a row whose new key is already taken are left alone and reported: no term is ever guessed.
+
+    Rule: a route's terms are the union of `intake_terms` over all its playbook versions, so a route that ever offered
+    two terms is "several_terms" and is not backfilled. Each update writes a `backfill` revision (cause_ref D-t1-1,
+    actor os.rollover) in the same transaction, with the row before and after."""
     terms_of: dict[str, set[str]] = {}
     for book in playbooks.values():
         terms_of.setdefault(book.key, set()).update(book.intake_terms)
@@ -169,6 +174,7 @@ def backfill_intake_terms(engine: Engine, tenant_id: str, playbooks: Mapping[tup
             if reason is not None:
                 skipped.append(Skipped(r.scope, r.ref, r.field, r.intake_year, reason))
                 continue
-            conn.execute(update(F).where(F.c.id == r.id).values(intake_term=term))
+            after = conn.execute(update(F).where(F.c.id == r.id).values(intake_term=term).returning(F)).one()
+            _revise(conn, tenant_id, r.id, r, after, "backfill", "D-t1-1", "os.rollover")
             updated += 1
     return BackfillResult(updated, skipped)

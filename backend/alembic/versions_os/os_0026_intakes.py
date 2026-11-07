@@ -23,7 +23,14 @@ depends_on = None
 S = "os"
 
 
+_CAUSES = ("'seed', 'manual', 'research', 'import', 'review', 'monitor', 'report', 'rollover'")
+
+
 def upgrade() -> None:
+    # D-t1-1: the term backfill leaves a revision, so `backfill` is an allowed cause (T1's check is replaced)
+    op.drop_constraint("ck_os_fact_revisions_cause", "os_fact_revisions", schema=S)
+    op.create_check_constraint("ck_os_fact_revisions_cause", "os_fact_revisions", f"cause IN ({_CAUSES}, 'backfill')",
+                               schema=S)
     op.create_table(
         "os_intakes",
         sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
@@ -61,6 +68,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(f"DELETE FROM {S}.os_fact_revisions WHERE cause = 'backfill'")
+    op.drop_constraint("ck_os_fact_revisions_cause", "os_fact_revisions", schema=S)
+    op.create_check_constraint("ck_os_fact_revisions_cause", "os_fact_revisions", f"cause IN ({_CAUSES})", schema=S)
     op.drop_table("os_fact_slots", schema=S)
     op.drop_index("ix_os_intakes_term_year", "os_intakes", schema=S)
     op.drop_table("os_intakes", schema=S)

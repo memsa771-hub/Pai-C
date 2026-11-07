@@ -15,9 +15,10 @@ T = models.knowledge_facts
 RV = models.fact_revisions
 Scope = Literal["route", "programme"]
 Source = Literal["seed", "manual", "research"]
-# P2-D9: what a revision records of a fact (its key columns never change, so they are not repeated)
+# P2-D9: what a revision records of a fact. The key columns do not change, except `intake_term` once: the backfill of
+# facts written before P2 (D-t1-1) sets it, and that revision must show it.
 _TRACKED = ("value", "quote", "url", "checked_at", "status", "conflict_note", "source", "fact_class", "read_method",
-            "language")
+            "language", "intake_term")
 
 
 def _fact(row) -> Fact:
@@ -71,17 +72,20 @@ class SqlKnowledge:
     def __init__(self, engine: Engine, tenant_id: str) -> None:
         self.engine = engine
         self.tenant_id = tenant_id
-    def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
 
-                intake_term: str | None, owner_ref: str | None, fallback_previous: bool = False):
+    def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
+                intake_term: str | None, owner_ref: str | None, fallback_previous: bool = False,
+                fallback_year: int | None = None):
         # P2-D24: with the fallback an earlier year's row is also read (`_resolve` lets the asked year win). An earlier
         # year's row must be of the asked term; a row of the asked year whose term was never recorded ('') counts for
         # any term, because the write paths of before P2 do not record one.
         if fallback_previous:
             this_year = and_(T.c.intake_year == intake_year, T.c.intake_term.in_([intake_term, ""])
                              if intake_term is not None else true())
-            earlier = and_(T.c.intake_year < intake_year, T.c.intake_term == intake_term
-                           if intake_term is not None else true())
+            # the newest earlier year; with `fallback_year`, only that year (a registered intake names its source year)
+            earlier = and_(T.c.intake_year == fallback_year if fallback_year is not None
+                           else T.c.intake_year < intake_year,
+                           T.c.intake_term == intake_term if intake_term is not None else true())
             year = or_(this_year, earlier)
         else:
             year = T.c.intake_year == intake_year
@@ -123,23 +127,24 @@ class SqlKnowledge:
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
         intake_term: str | None = None, owner_ref: str | None = None, fallback_previous: bool = False,
+        fallback_year: int | None = None,
     ) -> dict[tuple[str, str], Fact]:
         if not refs or not fields:
             return {}
         with self.engine.connect() as conn:
             rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref,
-                                             fallback_previous)).all()
+                                             fallback_previous, fallback_year)).all()
             prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
         return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field), prefer)
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
                     intake_term: str | None = None, owner_ref: str | None = None,
-                    fallback_previous: bool = False) -> dict[str, Fact]:
+                    fallback_previous: bool = False, fallback_year: int | None = None) -> dict[str, Fact]:
         if not fields:
             return {}
         with self.engine.connect() as conn:
             rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref,
-                                             fallback_previous)).all()
+                                             fallback_previous, fallback_year)).all()
             prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
         return self._resolve(rows, owner_ref, lambda r: r.field, prefer)
 

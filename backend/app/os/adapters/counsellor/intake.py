@@ -18,6 +18,7 @@ from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel import PlanIdentityTaken, StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
+from app.os.intakes import IntakeError
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
 from app.os.replan.store import OverrideStore, ProposalStore
@@ -325,7 +326,7 @@ def process(svc, intake: Intake) -> IntakeResult:
         else:
             started = svc.plans.start_plan(contract)
             plan_id, status, revision = started.plan_id, "planned", None
-    except CompileError:
+    except (CompileError, IntakeError):  # an intake not open for planning (R-63) is not a route the OS can run yet
         return _refuse_v2(svc, intake, decision, "route_not_supported")
     if isinstance(decision, DecisionRecordV2):  # the Counsellor's n+1 is applied: its requests are done (D-x3)
         _settle_requests(svc, plan_id, decision, revision)
