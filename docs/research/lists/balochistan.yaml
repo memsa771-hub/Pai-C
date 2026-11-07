@@ -1,0 +1,32 @@
+# H3, Balochistan part. Researched by Claude, 2026-11-07. Check 2 v2 recomputed the count.
+region: balochistan
+retrieved: 2026-11-07
+lists:
+  - id: hec-recognised-balochistan
+    body: HEC
+    name: Recognised Universities (Province = Balochistan)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 12   # 11 public, 1 private
+    count_quote: null
+    count_method: counted list items with Province='Balochistan' in the HTML
+    check2: correct
+not_found:
+  - what: Official list of Balochistan boards and of public colleges
+  - what: Intermediate college admission rules
+    url: https://hed.balochistan.gov.pk/
+    note: HTTP 500 on 2026-11-07
+  - what: 2026-27 MBBS/BDS prospectus (latest found is 2025-26)
+  - what: A-level schools in Balochistan (P2 §11 Q4)
+domains:
+  - body: BBISE Quetta
+    domains: [bbiseqta.edu.pk]
+    evidence: "page text: 'BBISE Quetta Board of Intermediate & Secondary Education Quetta'"
+  - body: Bolan Medical College (prospectus host)
+    domains: [bmc.edu.pk]
+    evidence: 2025-26 prospectus PDF fetched
+  - body: Government of Balochistan
+    domains: [balochistan.gov.pk]
+    status: candidate   # home page fetched, nothing on admissions read
