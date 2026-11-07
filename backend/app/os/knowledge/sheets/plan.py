@@ -138,7 +138,7 @@ def decide(status: str | None, chk: Checks, high_stakes: bool) -> tuple[str, str
     2026-11-07) and the spec's status mapping, in this order."""
     if status in _SKIP_STATUS:
         return "skipped", None, _SKIP_STATUS[status], None
-    if status == "not_readable" or chk.c1 == "not_readable":
+    if status == "not_readable":  # nothing was read: a checker collects the official document (R-72)
         return "queued", None, "not_readable", "collect"
     if chk.c1 == "wrong":
         return "queued", None, "checker1_wrong", "import_dispute"
@@ -475,7 +475,7 @@ def summarise(results: list[RowResult]) -> dict[str, dict[str, int]]:
     for r in results:
         s = out.setdefault(r.sheet, dict.fromkeys(BUCKETS, 0))
         s[r.bucket] += 1
-        if r.bucket in ("accepted", "unconfirmed") and r.level:
+        if r.bucket == "accepted" and r.level:
             s[r.level] = s.get(r.level, 0) + 1
         if r.needs_refetch:
             s["needs_refetch"] = s.get("needs_refetch", 0) + 1

@@ -42,7 +42,7 @@ def plan(tmp_path, institutions=(), facts=(), programmes=(), **kw):
     ("conflict", "correct", "yes", True, ("unconfirmed", "unconfirmed", "conflict")),
     ("unconfirmed", "unclear", None, True, ("unconfirmed", "unconfirmed", None)),
     ("not_readable", "correct", "yes", True, ("queued", None, "collect")),
-    ("found", "not_readable", None, True, ("queued", None, "collect")),
+    ("found", "not_readable", None, True, ("unconfirmed", "unconfirmed", None)),  # README v4: check 1 not_readable
     ("not_found", "correct", "yes", True, ("skipped", None, None)),
     ("lead_only", "correct", "yes", True, ("skipped", None, None)),
     ("superseded", "correct", "yes", True, ("skipped", None, None)),
