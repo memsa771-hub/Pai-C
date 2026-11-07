@@ -608,6 +608,21 @@ class WorkspaceApi {
     });
   }
 
+  /** PAI OS admin: consistency cases (P1-T10, R-05). A 404 means the check is not part of this deployment. */
+  async getOsConsistencyCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-consistency').OsConsistencyCase[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
+    const body = await this.adminJson<{ cases: import('./os-consistency').OsConsistencyCase[] }>(
+      `/v1/os/admin/consistency?${params}`, adminToken);
+    return body.cases;
+  }
+
+  async resolveOsConsistencyCase(adminToken: string, id: number, note: string): Promise<import('./os-consistency').OsConsistencyCase> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.adminJson(`/v1/os/admin/consistency/${id}/resolve?${params}`, adminToken, {
+      method: 'POST', body: JSON.stringify({ note }),
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // PAI OS visa file (Slice 6b spec §4)
   // ---------------------------------------------------------------------------
