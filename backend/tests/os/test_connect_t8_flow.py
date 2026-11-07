@@ -989,3 +989,99 @@ def test_6_22_ireland_the_ladder_reminders_at_risk_proposal_and_a_support_case(w
         assert len(ladder_cases(world, plan_id)) == 2  # one case per request, none more
         assert plan_status(world, plan_id) != "paused" and journey_stage(f) == "CHOSEN"
         s.throughout()
+
+
+# --- the upgrade: a version-1 plan moves to version 2 only through the student's own accept ---------------------------------
+
+
+def germany_with_the_gate_off(world, s) -> int:
+    """A Germany master plan made while the needs gate is off (`CONNECT_STUDENT_FACTS` off): version 1, no request."""
+    vault((s.client, s.who, s.params))
+    s.before = chat_rows(s.who)
+    with patch.object(config, "CONNECT_STUDENT_FACTS", False):
+        choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
+        plan_id = s.plan_id()
+        assert s.os.get("/v1/os/requests", headers=s.me).status_code == 404
+        assert s.os.get("/v1/os/inbox", headers=s.me).status_code == 200
+    return plan_id
+
+
+def pinned(world, plan_id) -> int:
+    with world.engine.connect() as conn:
+        return conn.execute(select(models.playbook_pins.c.version).where(models.playbook_pins.c.plan_id == plan_id)).scalar_one()
+
+
+def test_a_version_1_plan_is_upgraded_only_by_an_accepted_proposal(world):
+    from tests.os.test_connect_t6_flow import places_of_plan  # noqa: F401
+
+    with signed_in(world, germany_student()) as s, level("master"), running(world):
+        plan_id = germany_with_the_gate_off(world, s)
+        assert pinned(world, plan_id) == 1
+        before = s.steps()
+        assert "school_certificates" in before and not [k for k in before if k.startswith("provide@")]
+        assert s.rows() == [] and s.view()["requests"] == [] and all(x["needs"] == [] for x in s.view()["steps"])
+        # the gate goes on (the Counsellor's part is switched on): nothing moves by itself, one proposal appears
+        world.box.set(world.box.today + timedelta(days=1))
+        assert run_replan_job(world.replanner, world.client, world.box.now) == 1  # records `playbook_newer`, queues the replan
+        assert pinned(world, plan_id) == 1 and s.rows() == []
+        newer = os_events(world, plan_id, "playbook_newer")
+        assert len(newer) == 1 and (newer[0].payload["version"], newer[0].payload["from"]) == (2, 1)
+        deadline = time.time() + 60
+        while not pending_proposals(world, plan_id) and time.time() < deadline:
+            time.sleep(0.2)
+        (proposal,) = pending_proposals(world, plan_id)
+        assert proposal.big and [o["op"] for o in proposal.ops] == ["upgrade_playbook"] and proposal.event_ids == [newer[0].id]
+        run_replan_job(world.replanner, world.client, world.box.now + timedelta(hours=1))  # a repeat adds no second proposal
+        assert len(os_events(world, plan_id, "playbook_newer")) == 1 and len(pending_proposals(world, plan_id)) == 1
+        assert s.steps() == {**before} or set(s.steps()) == set(before)  # the plan itself is unchanged
+        # accepted: pinned to version 2, the manual certificates step gives way to the two requests
+        world.replanner.accept(s.id, proposal.id)
+        assert world.replanner.proposals.get(proposal.id).status == "accepted" and pinned(world, plan_id) == 2
+        after = s.steps()
+        assert sorted(k for k in after if k.startswith("provide@")) == [f"provide@document:{HSSC}:shown",
+                                                                        f"provide@document:{SSC}:shown"]
+        assert "school_certificates" not in after
+        assert {r.need_ref for r in s.rows("open")} == {SSC, HSSC}
+        assert [r["need"]["ref"] for r in s.requests("open")] == sorted([SSC, HSSC])
+        s.throughout()
+
+
+# --- gate off: the app is today's, byte for byte --------------------------------------------------------------------------
+
+
+def masked_view(s) -> dict:
+    """The roadmap's chosen route and the OS inbox, with the ids and the clock-bound stamps masked, so two students compare."""
+    import json
+    import re
+
+    ids = re.compile(r'"(id|task_id|plan_id|decision_id|student_ref|workspace_id|possibility_id)": ("[^"]*"|\d+)')
+    stamp = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?")
+    road, inbox = chosen(s.client, s.params), s.inbox()
+    text = json.dumps({"roadmap": road, "inbox": inbox}, sort_keys=True, default=str)
+    return json.loads(stamp.sub("<time>", ids.sub(r'"\1": "<id>"', text)))
+
+
+def test_gate_off_the_plan_view_the_inbox_and_the_roadmap_are_todays(world):
+    """The standalone Counsellor and every flag off: version 1, no request row, no `needs`, `GET /v1/os/requests` is a 404, and
+    the inbox and the roadmap are what they are on a deployment that has no version 2 at all (the T5 flow's answers)."""
+    pre_t8 = {k: v for k, v in world.books.items() if k[1] == 1 or k[0] == "germany_master" and k[1] == 1}
+    seen = []
+    for books in (None, pre_t8):  # the books of this deployment (v1 and v2), then the books of a deployment before T8
+        if books is not None:
+            world.svc.plans.playbooks.clear()
+            world.svc.plans.playbooks.update(books)
+        with signed_in(world, germany_student()) as s, level("master"):
+            plan_id = germany_with_the_gate_off(world, s)
+            assert pinned(world, plan_id) == 1
+            view = s.view()
+            assert view["requests"] == [] and all(x["needs"] == [] for x in view["steps"])
+            assert s.rows() == [] and not [k for k in s.steps() if k.startswith(("provide@", "which_is_right@", "result_expected@"))]
+            assert all("request" not in x for x in chosen(s.client, s.params)["steps"])
+            # with every connect flag off the host answers none of the new routes either
+            with patch.object(config, "CONNECT_STUDENT_FACTS", False), patch.object(config, "CONNECT_HANDOFF", False):
+                assert s.os.get("/v1/os/requests", headers=s.me).status_code == 404
+                assert s.os.post("/v1/os/requests/1/answer", json={"ref": "x", "seen": "y", "choice": "current"},
+                                 headers=s.me).status_code == 404
+            seen.append(masked_view(s))
+            s.throughout()
+    assert seen[0] == seen[1]  # byte for byte (ids and times masked)
