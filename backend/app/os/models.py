@@ -35,6 +35,10 @@ TASK_STATES = (
 )
 
 FACT_SOURCES = ("seed", "manual", "research")
+FACT_STATUSES = ("confirmed", "unconfirmed", "stale", "verified")  # P2-D6: `verified` is confirmed + two reviews
+READ_METHODS = ("fetch", "render", "ocr", "human", "model")  # P2-D11/D18: how the fact's source text was read
+REVISION_ACTIONS = ("insert", "change", "status", "undo")
+REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
 
 md = OsBase.metadata
 
@@ -216,10 +220,37 @@ knowledge_facts = Table(
     Column("source", Text, nullable=False, server_default="seed"),
     Column("research_run_id", BigInteger, ForeignKey("os.os_research_runs.id", ondelete="SET NULL")),
     Column("evidence", JSONB),
-    UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_year", name="uq_os_knowledge_facts"),
+    # P2-T1 (os_0025): the intake term, the body that owns the value, its class, how it was read, its language.
+    Column("intake_term", Text, nullable=False, server_default=""),
+    Column("owner_ref", Text, nullable=False, server_default=""),
+    Column("fact_class", Text),
+    Column("read_method", Text),
+    Column("language", Text),
+    UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
+                     name="uq_os_knowledge_facts"),
     _in("scope", ("route", "programme"), "ck_os_knowledge_facts_scope"),
-    _in("status", ("confirmed", "unconfirmed", "stale"), "ck_os_knowledge_facts_status"),
+    _in("status", FACT_STATUSES, "ck_os_knowledge_facts_status"),
     _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
+    _in("read_method", READ_METHODS, "ck_os_knowledge_facts_read_method"),
+    CheckConstraint("language ~ '^[a-z]{2,3}$'", name="ck_os_knowledge_facts_language"),
+)
+
+# P2-D9: append-only history of every fact insert, change, status change and undo, with its cause.
+fact_revisions = Table(
+    "os_fact_revisions", md,
+    _id(), _tenant(),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT"), nullable=False),
+    Column("action", Text, nullable=False),
+    Column("before", JSONB),
+    Column("after", JSONB, nullable=False),
+    Column("cause", Text, nullable=False),
+    Column("cause_ref", Text),
+    Column("actor", Text),
+    Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    _in("action", REVISION_ACTIONS, "ck_os_fact_revisions_action"),
+    _in("cause", REVISION_CAUSES, "ck_os_fact_revisions_cause"),
+    Index("ix_os_fact_revisions_fact", "tenant_id", "fact_id", "id"),
+    Index("ix_os_fact_revisions_cause", "tenant_id", "cause", "cause_ref"),
 )
 
 # --- Slice 2: Knowledge (spec 2026-10-19 §5) -------------------------------------------------------

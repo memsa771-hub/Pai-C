@@ -1,0 +1,50 @@
+# Fact classes and the high-stakes rule (P2 spec P2-D7, master R-25 and §8.2). High-stakes facts show as fact only
+# when `verified`; other facts from `confirmed` (knowledge/display.py). `fields` maps a Knowledge field name to its
+# class; a fact may also carry its class in `os_knowledge_facts.fact_class`. A field not listed here is
+# `unclassified`, which is high-stakes (fail safe, plan D-t1-3).
+version: 1
+classes:
+  # high-stakes (master §8.2)
+  deadline: {high_stakes: true, label: Deadline}
+  schedule_date: {high_stakes: true, label: Schedule date}
+  merit_formula: {high_stakes: true, label: Merit formula}
+  closing_merit: {high_stakes: true, label: Closing merit}
+  eligibility_threshold: {high_stakes: true, label: Eligibility threshold}
+  seat_category: {high_stakes: true, label: Seat category}
+  seat_quota: {high_stakes: true, label: Seats and quota}
+  fee: {high_stakes: true, label: Fee}
+  test_date: {high_stakes: true, label: Test date}
+  test_pattern: {high_stakes: true, label: Test pattern}
+  test_syllabus: {high_stakes: true, label: Test syllabus}
+  unclassified: {high_stakes: true, label: Fact}
+  # other classes
+  admission_requirement: {high_stakes: false, label: Admission requirement}
+  language_requirement: {high_stakes: false, label: Language requirement}
+  document_list: {high_stakes: false, label: Documents}
+  application_route: {high_stakes: false, label: How to apply}
+  portal: {high_stakes: false, label: Application portal}
+  intake: {high_stakes: false, label: Intakes}
+  notice_window: {high_stakes: false, label: Notice window}
+  programme_detail: {high_stakes: false, label: Programme detail}
+fields:
+  deadline_close: deadline
+  deadline_open: schedule_date
+  decision_date: schedule_date
+  merit_list_date: schedule_date
+  semester_start: schedule_date
+  result_date: schedule_date
+  tuition_fee_non_eu_eur: fee
+  semester_contribution_eur: fee
+  blocked_account_yearly_eur: fee
+  uni_assist_fee_first_eur: fee
+  uni_assist_fee_additional_eur: fee
+  grade_requirement: eligibility_threshold
+  statement_requirement: admission_requirement
+  language_of_instruction: programme_detail
+  admission_test: admission_requirement
+  german_requirement: language_requirement
+  english_requirement: language_requirement
+  required_documents: document_list
+  application_route: application_route
+  portal_url: portal
+  intakes: intake
