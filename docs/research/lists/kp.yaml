@@ -1,0 +1,45 @@
+# H3, Khyber Pakhtunkhwa part (P2 spec §6.2; master R-35a). Researched by Claude, 2026-11-07.
+# Check 2 (independent v2: visible text + statement fact check, 2026-11-07) recomputed every count.
+region: khyber_pakhtunkhwa
+retrieved: 2026-11-07
+lists:
+  - id: hec-recognised-kp
+    body: HEC
+    name: Recognised Universities (Province = Khyber Pakhtunkhwa)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 47   # 36 public, 11 private
+    count_quote: null
+    count_method: counted list items with Province='Khyber Pakhtunkhwa' in the HTML
+    check2: correct
+  - id: kp-hed-participating-colleges
+    body: Higher Education, Archives & Libraries Department KP (HEMIS Cell)
+    name: Participating Colleges
+    url: https://admission.hed.gkp.pk/colleges.php
+    institution_type: public_college
+    family: intermediate
+    row_count: null
+    status: not_readable   # dynamic; a plain download shows 'No Participant College...'
+not_found:
+  - what: Official list of KP BISE boards
+  - what: Private colleges and A-level schools in KP (P2 §11 Q4)
+  - what: hed.gkp.pk/colleges (Public Sector Colleges)
+    note: connection failed on 2026-11-07
+domains:
+  - body: Higher Education, Archives & Libraries Department KP
+    domains: [hed.gkp.pk, admission.hed.gkp.pk]
+    evidence: "admission portal footer: 'HEMIS CELL - Higher Education, Archives & Libraries Department , Government of Khyber Pakhtunkhwa'"
+  - body: BISE Peshawar
+    domains: [bisep.edu.pk, www.bisep.edu.pk]
+    evidence: "page title 'Board of Intermediate & Secondary Education Peshawar :: BISEP'"
+  - body: Khyber Medical University (MBBS/BDS admitting university)
+    domains: [cas.kmu.edu.pk, kmu.edu.pk]
+    evidence: cas.kmu.edu.pk fetched; it names https://cas.kmu.edu.pk as the admission form site
+  - body: ETEA
+    domains: [etea.edu.pk]
+    evidence: page fetched (HTTP 200)
+  - body: other KP BISEs (Abbottabad, Bannu, D.I. Khan, Kohat, Mardan, Malakand, Swat)
+    status: candidate
+    note: domains in batch 1 v4; not re-read
