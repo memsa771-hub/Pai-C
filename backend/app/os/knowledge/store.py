@@ -13,7 +13,7 @@ from app.os.knowledge.port import Fact
 
 T = models.knowledge_facts
 RV = models.fact_revisions
-Scope = Literal["route", "programme"]
+Scope = Literal["route", "programme", "registry"]
 Source = Literal["seed", "manual", "research"]
 # P2-D9: what a revision records of a fact (its key columns never change, so they are not repeated)
 _TRACKED = ("value", "quote", "url", "checked_at", "status", "conflict_note", "source", "fact_class", "read_method",
