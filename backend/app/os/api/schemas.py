@@ -60,7 +60,7 @@ class RequestNeedOut(BaseModel):
 
 
 class ChoiceSourceOut(BaseModel):
-    kind: Literal["vault", "document"]  # a stated value is "vault": the host does not say chat or profile page
+    kind: Literal["vault", "document", "said"]  # held value "vault"; its proposed side with no document "said" (chat or profile page: the host does not say which)
     evidence: Literal["stated", "shown", "confirmed", "unknown"]
     document_ref: str | None
     as_of: datetime | None

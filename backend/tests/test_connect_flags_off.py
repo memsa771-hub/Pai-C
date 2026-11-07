@@ -310,18 +310,20 @@ def test_t7_upload_responses_unchanged(tmp_path, monkeypatch):
 
 @pytest.mark.req("R-44")
 @pytest.mark.req("R-19")
-def test_t8_roadmap_and_inbox_unchanged():
-    """P1-T8 Task 6: a plan with no request step (every plan while the needs part is off) answers exactly as before: no
-    `request` key on any step, today's tick rule, and the roadmap bodies equal the fixture captured before the change."""
+def test_t8_plan_steps_unchanged():
+    """P1-T8 Task 6: a plan with no request step (every plan while the needs part is off) answers exactly as before: each
+    step dict equals the one the adapter built before T8 (tests/fixtures/connect/plan_steps_pre_t8.json, captured from
+    commit 7f16bce), and the roadmap bodies equal the fixture captured before the adapter."""
     import json
     from pathlib import Path
 
+    from app.pai_c.roadmap import plan_adapter
     from tests.roadmap_snapshots import walk
-    from tests.test_plan_adapter import STEPS, page, plan_client, view_of
+    from tests.test_plan_adapter import STEPS, view_of
 
-    with plan_client(view_of(STEPS)) as (client, _, params, _f, _):
-        steps = page(client, params)["steps"]
-    assert steps and all("request" not in s for s in steps)
-    assert [s["tickable"] for s in steps] == [True, False, False, False, False]
-    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
-    assert json.dumps(walk(), sort_keys=True) == json.dumps(expected, sort_keys=True)
+    here = Path(__file__).parent / "fixtures" / "connect"
+    before = json.loads((here / "plan_steps_pre_t8.json").read_text())
+    now = json.loads(json.dumps(plan_adapter.steps_of(view_of(STEPS)), default=str, sort_keys=True))
+    assert now == before
+    assert json.dumps(walk(), sort_keys=True) == json.dumps(
+        json.loads((here / "roadmap_pre_adapter.json").read_text()), sort_keys=True)

@@ -120,7 +120,7 @@ def steps_of(view: dict) -> list[dict]:
         if status is None:
             continue
         request = request_of(step)
-        tickable = (request is None and step["owner"] == "student" and step["status"] == "waiting_student"
+        tickable = (step.get("template_key") not in REQUESTS and step["owner"] == "student" and step["status"] == "waiting_student"
                     and step["inbox_kind"] in TICK_KINDS and not step.get("review"))
         out.append({"key": step["instance_key"], "kind": "os", "label_key": "", "values": {}, "status": status,
                     "evidence": None, "rule": None, "manual_done": False, "timing": None,
