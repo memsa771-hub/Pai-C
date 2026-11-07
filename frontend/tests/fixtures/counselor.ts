@@ -374,6 +374,12 @@ export const osPlanRoute: ChosenRoute = {
   choice: routeChoice(),
 };
 
+/** A request step (P1-T8): waits for the student's data, so it has no tick; the text is the backend's (request_texts.yaml). */
+export const osRequestStep: RouteStep = osStep("provide@fact:education.matric.marks_obtained:stated", "Your matric marks", {
+  owner: "student", tickable: false, status: "not", colour: "red",
+  request: { kind: "provide", evidence: "stated", text: "PAI needs this from you. Tell PAI in the chat or on your profile page." },
+});
+
 export const roadmapPage: RoadmapPage = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },

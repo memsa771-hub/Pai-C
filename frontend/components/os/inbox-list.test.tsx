@@ -185,3 +185,97 @@ describe('plan change words (batch B review)', () => {
     expect(changeLine({ change: 'kept', instance_key: 'k', title: 'Apply', programme_ref: null })).toBe('Kept: Apply');
   });
 });
+
+// P1-T8 Task 6: the inbox shows what the plan asks of the student (R-19) and lets them settle two values (R-21).
+import type { OsChoice, OsRequest } from '@/lib/os-requests';
+import { withRequests } from '@/lib/os-requests';
+
+const choice = (over: Partial<OsChoice>): OsChoice => ({
+  ref: 'card-1', key: 'education.matric.marks_obtained', seen: 'tok', choice: 'current', label: 'Saved in PAI', value: 770,
+  source: { kind: 'vault', evidence: 'stated', document_ref: null, as_of: null }, ...over,
+});
+const request = (over: Partial<OsRequest>): OsRequest => ({
+  id: 9, task_id: 40, kind: 'provide', need: { kind: 'fact', ref: 'education.matric.marks_obtained', evidence: 'stated' },
+  status: 'open', due_at: null, due_tz: null, title: null, how: 'Tell PAI in the chat or on your profile page.',
+  ref: null, seen: null, choices: [], allow_new: false, new_label: null, ...over,
+});
+const which = request({
+  id: 10, task_id: 41, kind: 'which_is_right', how: 'Two places say different things. Choose the one that is right, or type the right value.',
+  ref: 'card-1', seen: 'tok', allow_new: true, new_label: 'Neither: I will type the right value',
+  choices: [choice({}), choice({ choice: 'proposed', label: 'From your document', value: 760,
+    source: { kind: 'document', evidence: 'shown', document_ref: 'doc-1', as_of: '2027-02-01T00:00:00Z' } })],
+});
+
+describe('requests in the inbox (P1-T8 Task 6)', () => {
+  afterEach(() => cleanup());
+
+  // req: R-19
+  it('request item shows how and no Mark as done', () => {
+    const items = withRequests([item({ id: 40, inbox_kind: 'provide', title: 'Your matric marks' })], [request({})]);
+    render(<InboxList items={items} now={NOW} onComplete={() => {}} />);
+    expect(screen.getByText('Tell PAI in the chat or on your profile page.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Mark as done' })).toBeNull();
+    expect(screen.queryByText(/Uploading alone/)).toBeNull();
+    expect(completeActions(items[0])).toEqual([]);
+  });
+
+  // req: R-19
+  it('an answered request, or none, leaves the item as today', () => {
+    const plain = item({ id: 40, inbox_kind: 'provide' });
+    expect(withRequests([plain], null)).toEqual([plain]);
+    expect(withRequests([plain], [request({ status: 'answered' })])).toEqual([plain]);
+    render(<InboxList items={[plain]} now={NOW} onComplete={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Mark as done' })).toBeTruthy();
+  });
+
+  // req: R-21
+  it('which is right shows both values with sources and answers', () => {
+    const onAnswer = vi.fn();
+    const items = withRequests([item({ id: 41, inbox_kind: 'choose', title: 'Which marks are right?' })], [which]);
+    render(<InboxList items={items} now={NOW} onComplete={() => {}} onAnswer={onAnswer} />);
+    expect(screen.getByText(which.how)).toBeTruthy();
+    const saved = screen.getByRole('button', { name: /Saved in PAI/ });
+    const doc = screen.getByRole('button', { name: /From your document/ });
+    expect(saved.textContent).toContain('770');
+    expect(saved.textContent).toContain('Saved in PAI');
+    expect(saved.textContent).toContain('you told PAI');
+    expect(doc.textContent).toContain('760');
+    expect(doc.textContent).toContain('Your document');
+    expect(doc.textContent).toContain('shown in a document');
+    expect(doc.textContent).toContain('1 Feb 2027');
+    expect(screen.queryByRole('button', { name: 'Mark as done' })).toBeNull();
+    fireEvent.click(doc);
+    expect(onAnswer).toHaveBeenCalledWith(which, 'proposed', undefined);
+  });
+
+  // req: R-21
+  it('typing a new value sends choice new', () => {
+    const onAnswer = vi.fn();
+    const items = withRequests([item({ id: 41, inbox_kind: 'choose' })], [which]);
+    render(<InboxList items={items} now={NOW} onComplete={() => {}} onAnswer={onAnswer} />);
+    const field = screen.getByLabelText('Neither: I will type the right value');
+    const use = screen.getByRole('button', { name: 'Use this value' }) as HTMLButtonElement;
+    expect(use.disabled).toBe(true);
+    fireEvent.change(field, { target: { value: '765' } });
+    fireEvent.click(use);
+    expect(onAnswer).toHaveBeenCalledWith(which, 'new', 765);
+  });
+
+  // req: R-21
+  it('a finding of documents offers no field to type in', () => {
+    const finding = { ...which, allow_new: false, new_label: null,
+      choices: which.choices.map((c, i) => ({ ...c, choice: `doc:${i + 1}` })) };
+    render(<InboxList items={withRequests([item({ id: 41 })], [finding])} now={NOW} onComplete={() => {}} onAnswer={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Use this value' })).toBeNull();
+    expect(screen.getAllByRole('button').map((b) => b.textContent).join()).toContain('760');
+  });
+
+  // req: R-18
+  it('an impossible value asks only for the right value', () => {
+    const impossible = request({ id: 11, task_id: 42, kind: 'which_is_right', how: 'This value is higher than its total. Type the right value.',
+      ref: 'impossible:a:b', seen: 'z', allow_new: true, new_label: 'Neither: I will type the right value', choices: [] });
+    render(<InboxList items={withRequests([item({ id: 42 })], [impossible])} now={NOW} onComplete={() => {}} onAnswer={() => {}} />);
+    expect(screen.getByText(impossible.how)).toBeTruthy();
+    expect(screen.getByLabelText('Neither: I will type the right value')).toBeTruthy();
+  });
+});

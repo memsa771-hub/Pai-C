@@ -35,6 +35,8 @@ export interface OsInboxItem {
   changes?: OsPlanChange[];
   /** A step blocked on a fact nobody has given yet (state "blocked"): what it waits for, in the playbook's words. */
   waiting_for?: string | null;
+  /** P1-T8: the open request this step makes of the student (set by the page from GET /v1/os/requests). */
+  request?: import('./os-requests').OsRequest;
 }
 
 export interface OsPlanChange {
@@ -184,6 +186,7 @@ export function reviewPage(item: OsInboxItem): { page: 'os-pack' | 'os-visa'; la
  * pre-selects the admitted programme); "Not admitted" names the programme and asks first, since it starts removing
  * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. */
 export function completeActions(item: OsInboxItem, names: Record<string, string> = {}): CompleteAction[] {
+  if (item.request) return [];  // a request closes by itself when PAI has what it asked for (D-w11)
   if (item.instance_key.startsWith(ADMISSION_PREFIX)) {
     const name = programmeName(item, names) ?? 'this programme';
     return [{ label: 'Admitted', payload: { choice: 'admitted' } },
@@ -199,6 +202,7 @@ export function completeActions(item: OsInboxItem, names: Record<string, string>
 
 /** What a step's button means, when it is not plain: a "provide" step is not closed by an upload alone. */
 export function actionHint(item: OsInboxItem): string | null {
+  if (item.request) return item.request.how;
   if (item.inbox_kind === 'provide') return 'Uploading alone does not close this step: tap Mark as done when it is all done.';
   return null;
 }

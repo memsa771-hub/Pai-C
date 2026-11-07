@@ -15,6 +15,7 @@ import type { OsInboxItem } from '@/lib/os-inbox';
 import { dateFactStatus, type FactStatus } from '@/lib/os-programmes';
 import type { OsChanges, OsProposal } from '@/lib/os-replan';
 import { changeMessage } from '@/lib/os-connect';
+import { answerRefusal, withRequests, type OsRequest, type RequestWords } from '@/lib/os-requests';
 import copy from '@/components/counselor/workspace/copy.json';
 import { swapPrompt, type OsNote } from '@/lib/os-self-serve';
 import { usePaiAuth } from '@/lib/pai-auth-context';
@@ -35,6 +36,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   const [changes, setChanges] = useState<OsChanges | null>(null);  // Slice 7: suggestions and what changed
   const [sent, setSent] = useState<OsProposal[]>([]);  // P1-T6: requests to the Counsellor and recent expired ones
   const [info, setInfo] = useState<string | null>(null);
+  const [requests, setRequests] = useState<OsRequest[] | null>(null);  // P1-T8: null = no requests endpoint (today's inbox)
 
   const load = useCallback(async () => {
     let notesFound: OsNote[] = [];
@@ -47,6 +49,11 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     } catch {
       setSent([]);
       setError('Could not load your next steps. Please try again.');
+    }
+    try {  // P1-T8: what the plan asks of the student (extra: a 404 or an error leaves today's inbox)
+      setRequests(await workspaceApi.getOsRequests());
+    } catch {
+      setRequests(null);
     }
     try {  // Slice 7: suggested changes and what changed (extra: the inbox works without them)
       const got = await workspaceApi.getOsChanges();
@@ -98,6 +105,23 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     } finally {
       setBusyId(null);
     }
+  };
+
+  const answerRequest = async (request: OsRequest, choice: string, value?: string | number) => {
+    const question = { ref: request.ref ?? request.choices[0]?.ref ?? '', seen: request.seen ?? request.choices[0]?.seen ?? '' };
+    setBusyId(request.task_id);
+    setInfo(null);
+    let message: string | null = null;
+    let reload = true;  // the student looks at the list again: the step closed, or the question changed
+    try {
+      await workspaceApi.answerOsRequest(request.id, choice, question, value);
+    } catch (e) {
+      ({ text: message, reload } = answerRefusal(e, copy.connect.requests as RequestWords));
+    } finally {
+      setBusyId(null);
+    }
+    if (reload) await load();
+    if (message) setError(message);  // after the reload, which clears the old error
   };
 
   const swap = async (note: OsNote, inRef: string) => {
@@ -188,7 +212,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       {items === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <InboxList items={items} now={new Date()} onComplete={complete} busyId={busyId}
+        <InboxList items={withRequests(items, requests)} onAnswer={answerRequest} now={new Date()} onComplete={complete} busyId={busyId}
                    factStatus={factStatus} programmesHref={`/${workspaceId}/os-programmes`} basePath={`/${workspaceId}`}
                    notes={notes} names={names} onSwap={swap} onReadNote={readNote} />
       )}
