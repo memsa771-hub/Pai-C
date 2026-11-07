@@ -9,6 +9,7 @@ Self-contained on purpose: it does not import app.os, so later model changes can
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "os_0026"

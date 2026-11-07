@@ -6,9 +6,18 @@ import pytest
 from sqlalchemy import select
 
 from app.os import models
-from app.os.knowledge.sources.allowlist import (AllowList, AllowListError, NotApproved, Scope, SourceDomains,
-                                                SourceEntry, host_matches, load_allowlist, resolve_claims,
-                                                seed_route_entries)
+from app.os.knowledge.sources.allowlist import (
+    AllowList,
+    AllowListError,
+    NotApproved,
+    Scope,
+    SourceDomains,
+    SourceEntry,
+    host_matches,
+    load_allowlist,
+    resolve_claims,
+    seed_route_entries,
+)
 
 pytestmark = pytest.mark.req("R-24", "R-71")
 FIX = Path(__file__).parent / "fixtures" / "sources"

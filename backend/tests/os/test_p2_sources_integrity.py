@@ -5,11 +5,17 @@ import ssl
 import httpx
 import pytest
 
-from app.os.knowledge.sources.integrity import Previous, check_page, is_tls_failure, load_config, similarity
+from app.os.knowledge.sources.integrity import (
+    Previous,
+    check_page,
+    is_tls_failure,
+    load_config,
+    similarity,
+)
 
 pytestmark = pytest.mark.req("R-71")
 CLEAN = " ".join(f"word{i}" for i in range(60))
-ON = lambda url: "own.test" in url  # noqa: E731
+ON = lambda url: "own.test" in url
 
 
 def codes(text, links=(), previous=None, cfg=None):

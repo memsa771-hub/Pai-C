@@ -5,7 +5,7 @@ spam:
   min_distinct_terms: 2   # one stray word is not spam: a page needs this many different terms
   terms:
     en: [casino, betting, jackpot, poker, slot, slots, "free spins", roulette, "sports book", "payday loan"]
-    ur: ["کیسینو", "جوا"]   # to be reviewed by an Urdu reader before the first live run
+    ur: ["کیسینو", "جوا"]   # to be reviewed by a reader of the language before the first live run
 
 # The share of links that go to domains that are on no list, compared with the last clean snapshot of the same page.
 link_flood:

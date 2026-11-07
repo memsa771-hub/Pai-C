@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.os.knowledge.sources.snapshots import SnapshotError, SnapshotStore, text_hash
 
@@ -40,5 +41,5 @@ def test_original_bytes_for_pdf_and_images_only_with_a_cap(engine, clean):
     with pytest.raises(SnapshotError):
         s.save("https://x.test/c", "t", original=b"x", original_type="text/html")
     assert s.original(10**6) is None
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         s.save("https://x.test/d", "t", read_method="guess")

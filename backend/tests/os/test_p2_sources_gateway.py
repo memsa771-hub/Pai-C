@@ -2,6 +2,7 @@
 
 import ssl
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,13 +11,15 @@ from sqlalchemy import func, select
 from app.os import models
 from app.os.knowledge.port import Fact
 from app.os.knowledge.research.pages import PageGateway, TransientFetchError
-from app.os.knowledge.sources.allowlist import AllowList, Scope, SourceDomains, load_allowlist
-from app.os.knowledge.sources.snapshots import SnapshotStore
+from app.os.knowledge.sources.allowlist import (
+    Scope,
+    SourceDomains,
+    load_allowlist,
+)
 from app.os.knowledge.sources.suspect import SourceGuard
 from app.os.knowledge.store import SqlKnowledge
 from app.os.settings import load_settings
 from tests.os.test_research_pages import minimal_pdf
-from pathlib import Path
 
 pytestmark = pytest.mark.req("R-24", "R-71", "R-29")
 FIX = Path(__file__).parent / "fixtures" / "sources"
@@ -217,3 +220,17 @@ def test_without_a_guard_a_tls_failure_is_a_transient_error_as_before(engine, cl
     gw, _, _ = build(engine, fixture_sites, guard=False, client=_tls_client())
     with pytest.raises(TransientFetchError):
         gw.fetch(fixture_sites.url(ALPHA, "/admissions/notice"), ["alpha-university.test"], [])
+
+
+def test_worker_builds_a_guard_only_when_switched_on(engine, clean, monkeypatch):
+    from app.os.kernel import Kernel
+    from app.os.runner.worker import _source_guard
+
+    settings = load_settings({"DATABASE_URL": "x"})
+    kernel = Kernel(engine, settings.tenant_id)
+    monkeypatch.delenv("OS_SOURCE_GUARD", raising=False)
+    assert _source_guard(settings, engine, kernel) is None
+    monkeypatch.setenv("OS_SOURCE_GUARD", "1")
+    guard = _source_guard(settings, engine, kernel)
+    assert guard is not None and guard.snapshots.max_bytes == settings.page_max_bytes
+    assert guard.after_change is not None

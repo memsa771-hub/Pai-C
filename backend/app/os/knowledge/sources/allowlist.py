@@ -59,7 +59,7 @@ class SourceEntry:
 
 @dataclass(frozen=True)
 class Scope:
-    """Where a page is read for: a region and family, or a route (Germany's profile)."""
+    """Where a page is read for: a region and family, or a route."""
     region: str = ""
     family: str = ""
     route_key: str = ""
@@ -176,7 +176,7 @@ class SourceDomains:
             for e in allow.entries:
                 where = (D.c.tenant_id == self.tenant_id, D.c.domain == e.domain, D.c.region == e.region,
                          D.c.family == e.family, D.c.route_key == e.route_key)
-                fields = dict(body_ref=e.body_ref, tier=e.tier, list_ref=e.list_ref, reviewed_by=e.reviewed_by)
+                fields = {"body_ref": e.body_ref, "tier": e.tier, "list_ref": e.list_ref, "reviewed_by": e.reviewed_by}
                 if conn.execute(select(D.c.id).where(*where)).first() is None:
                     reason = claims.get(e.domain)
                     conn.execute(insert(D).values(

@@ -64,9 +64,10 @@ class SnapshotStore:
                 raise SnapshotError("original files are kept for PDFs and images only")
             if len(original) > self.max_bytes:
                 raise SnapshotError(f"original is {len(original)} bytes; the limit is {self.max_bytes}")
-        values = dict(tenant_id=self.tenant_id, url=url, sha256=text_hash(text), text=text, content_type=content_type,
-                      read_method=read_method, language=language, links_total=links_total,
-                      links_off_list=links_off_list, flagged=flagged, fetched_at=fetched_at or self.clock())
+        values = {"tenant_id": self.tenant_id, "url": url, "sha256": text_hash(text), "text": text,
+                  "content_type": content_type, "read_method": read_method, "language": language,
+                  "links_total": links_total, "links_off_list": links_off_list, "flagged": flagged,
+                  "fetched_at": fetched_at or self.clock()}
         with self.engine.begin() as conn:
             row = conn.execute(insert(S).values(**values).on_conflict_do_update(
                 constraint="uq_os_page_snapshots_url_hash",
