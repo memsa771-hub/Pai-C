@@ -815,7 +815,7 @@ def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault
         asked = s.request(GPA, "which_is_right")
         current, proposed = asked["choices"]
         assert (current["value"], current["source"]["kind"], current["source"]["evidence"]) == (3.2, "document", "shown")
-        assert (proposed["value"], proposed["source"]["kind"], proposed["source"]["evidence"]) == (3.4, "vault", "stated")
+        assert (proposed["value"], proposed["source"]["kind"], proposed["source"]["evidence"]) == (3.4, "said", "stated")
         assert s.steps()[WHICH_GPA] == "waiting_student"
         tick(world, world.box.today + timedelta(days=1))
         reminders = len(reminders_of(world, asked["task_id"]))
