@@ -119,5 +119,14 @@ def test_other_intake_always_labelled():
     assert not same.other_intake  # a term not recorded is not another intake
 
 
-def test_explicit_class_wins():
-    assert display(fact("confirmed", fact_class="document_list"), "deadline_close", intake_year=2027).show_value
+def test_explicit_class_is_reported():
+    assert display(fact("confirmed", fact_class="document_list"), "deadline_close", intake_year=2027).fact_class \
+        == "document_list"
+
+
+@pytest.mark.req("R-25")
+def test_explicit_class_cannot_make_a_high_stakes_field_ordinary():
+    d = display(fact("confirmed", fact_class="document_list"), "deadline_close", intake_year=2027)
+    assert (d.high_stakes, d.level, d.show_value) == (True, "not_confirmed", False)
+    up = display(fact("confirmed", fact_class="fee"), "required_documents", intake_year=2027)
+    assert (up.high_stakes, up.show_value) == (True, False)

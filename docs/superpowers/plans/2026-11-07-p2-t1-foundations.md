@@ -141,19 +141,36 @@ id=None, intake_term="", owner_ref="", fact_class=None, read_method=None, langua
 "unconfirmed", "stale", "verified")`; `READ_METHODS`. `confirmed` and `verified` need quote and URL. `.confirmed` =
 confirmed or verified; `.verified`.
 
-**`KnowledgePort`**:
+**`KnowledgePort`** (revised after the T1 review):
 ```python
 def programme_facts(self, refs, fields, intake_year, *, intake_term: str | None = None,
-                    owner_ref: str = "") -> dict[tuple[str, str], Fact]
+                    owner_ref: str | None = None) -> dict[tuple[str, str], Fact]
 def route_facts(self, route_key, fields, intake_year, *, intake_term: str | None = None,
-                owner_ref: str = "") -> dict[str, Fact]
+                owner_ref: str | None = None) -> dict[str, Fact]
 ```
-`intake_term=None` matches every term (today's behaviour; newest `id` wins on a clash). **T8** adds
-`fallback_previous: bool = False` (P2-D24) as another keyword and marks fallbacks by `fact.intake_year`.
+**Resolution order** (one row per key):
+- owner: `owner_ref="<id>"` returns that owner's row, else the general (`''`) row; other owners never. `owner_ref=""`
+  returns only general rows. `owner_ref=None` (default) = any owner: the general row wins, then the newest id.
+- term: `intake_term="<t>"` filters. `intake_term=None` matches every term; on a clash the newest id wins **until T8**,
+  after which the row whose term is the intake's current term wins (T8 changes `_resolve`).
+**T8** adds `fallback_previous: bool = False` (P2-D24) as another keyword and marks fallbacks by `fact.intake_year`.
+
+**Raw-SQL readers of `os_knowledge_facts` that must be updated by T2/T8** (they ignore term and owner today):
+`my_plan.py:80-82` (fields Knowledge has), `api/self_serve.py:39` and `:59` (programme has facts / researched),
+`knowledge/requests.py:95-100` (`_has_facts`). They are existence checks; all rows are `''`/`''` today, so a filter
+would change nothing now but would hide owner and term rows later, so no filter is added in T1. T2 decides owner
+semantics there, T8 term semantics.
+
+**`verified` only through review.** `upsert`, `insert_if_absent` and `confirm` raise `ValueError` on status
+`verified`; `set_status(fid, "verified", cause="review")` is the only way in (any other cause raises). A write
+(`upsert`, any cause) onto a verified row: same value and quote → stays `verified`; value or quote changed → status
+`unconfirmed` (back to review); the revision records cause, cause_ref and before/after. `mark_stale` and the
+freshness sweeper take `confirmed` and `verified` (the event's `old.status` is the real one).
 
 **`SqlKnowledge`** writes: `upsert(scope, ref, field, fact, source="manual", research_run_id=None, evidence=None, *,
 cause=None, cause_ref=None, actor=None) -> int`; `insert_if_absent(..., *, cause=None, cause_ref=None, actor=None)`;
-`mark_stale(fact_id)`; `confirm(...)`; `set_status(fact_id, status, *, cause, cause_ref=None, actor=None) -> Fact`
+`mark_stale(fact_id)`; `confirm(...)`; `annotate(fact_id, *, conflict_note, checked_at=None, cause="research",
+cause_ref=None, actor=None)`; `set_status(fact_id, status, *, cause, cause_ref=None, actor=None) -> Fact`
 (**T5** uses it for `verified`; **T3/T7** for drops to `unconfirmed`); `revisions(fact_id) -> list[Revision]`
 (`Revision(id, fact_id, action, before, after, cause, cause_ref, actor, at)`). `cause` defaults to `source`.
 **T6**'s `knowledge.record()` is built on `upsert` + `set_status` and reverses imports from `revisions`.
@@ -165,7 +182,9 @@ case. `app/os/knowledge/fact_classes.py`: `fact_class(field, explicit=None) -> s
 
 **Display** (`app/os/knowledge/display.py`): `display(fact: Fact | None, field: str, *, intake_year: int,
 intake_term: str | None = None, estimate: bool = False) -> Display(level, show_value, high_stakes, fact_class,
-other_intake, year_label)`; `level` in `verified | confirmed | not_confirmed | estimated | missing`. Used by T7 and T10
+other_intake, year_label)`. An explicit `fact_class` never makes a high-stakes field ordinary
+(`high = high(field's class) or high(explicit)`). Until T8, `year_label` is the year only, and a fact with term `''`
+is never "another intake" by term. `level` in `verified | confirmed | not_confirmed | estimated | missing`. Used by T7 and T10
 (and P1 `plan_view` later).
 
 **Contracts** (`app/os/contracts/`, frozen once merged):
@@ -175,8 +194,9 @@ other_intake, year_label)`; `level` in `verified | confirmed | not_confirmed | e
 - `merit_check.v1` (`MeritCheckV1`): `schema, student_ref, programme_ref, intake, category|null,
   status: computed|not_confirmed|missing, formula{parts[{name, marks_part, weight}], total, owner_ref|null, level,
   source}|null, aggregate|null, marks_used[{key, value|null, out_of|null, evidence: stated|shown|confirmed|unknown}],
-  parts[{name, status: known|missing|not_confirmed}], closing_merits[{intake, value, list_number|null, list_complete,
-  level, source}]`. No chance or prediction field (R-31).
+  parts[{name, status: known|missing|not_confirmed}], closing_merits[{intake, value|null, list_number|null,
+  list_complete, level, source}]`. `level` (formula and closing merit) is `verified|confirmed|not_confirmed`, the
+  programme_facts words; a closing merit carries a value only when `verified`. No chance or prediction field (R-31).
 - `programme_list.v2` (`ProgrammeListV2`): v1 fields plus per entry `coverage_level: listed|researched|verified`,
   `region|null`, `not_run_yet: bool`.
 

@@ -20,12 +20,15 @@ class Display:
     fact_class: str
     other_intake: bool  # the fact is for another intake than the one asked for
     year_label: int | None  # the year to print next to the value; set whenever other_intake
+    # Limit until T8: a fact whose term is '' (not recorded) is never "another intake" by term, and year_label is
+    # the year only (no term). T8 adds the term to the label once terms are backfilled.
 
 
 def display(fact: Fact | None, field: str, *, intake_year: int, intake_term: str | None = None,
             estimate: bool = False) -> Display:
     cls = fact_class(field, fact.fact_class if fact is not None else None)
-    high = is_high_stakes(cls)
+    # an explicit class never makes a high-stakes field ordinary (no bypass of R-25)
+    high = is_high_stakes(fact_class(field)) or is_high_stakes(cls)
     if estimate:
         return Display("estimated", True, high, cls, False, None)
     if fact is None:

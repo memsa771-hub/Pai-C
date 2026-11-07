@@ -55,12 +55,12 @@ class Fact:
 class KnowledgePort(Protocol):
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
-        intake_term: str | None = None, owner_ref: str = "", fallback_previous: bool = False,
+        intake_term: str | None = None, owner_ref: str | None = None, fallback_previous: bool = False,
     ) -> dict[tuple[str, str], Fact]:
         """`fallback_previous` (P2-D24): a key with no fact for `intake_year` gets the newest earlier year's fact. It
         is marked by its own `intake_year`, which differs from the one asked for; the default is today's strict read."""
         ...
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
-                    intake_term: str | None = None, owner_ref: str = "",
+                    intake_term: str | None = None, owner_ref: str | None = None,
                     fallback_previous: bool = False) -> dict[str, Fact]: ...

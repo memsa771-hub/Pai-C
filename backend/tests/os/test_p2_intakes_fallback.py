@@ -51,7 +51,7 @@ def test_never_a_later_year_other_term_or_other_owner(engine, clean):
     k.upsert("programme", "p", "deadline", fact(2028, "x"))
     k.upsert("programme", "p", "deadline", fact(2026, "y", term="spring"))
     k.upsert("programme", "p", "deadline", fact(2026, "z", owner_ref="body:one"))
-    assert k.programme_facts(["p"], ["deadline"], 2027, intake_term="fall", fallback_previous=True) == {}
+    assert k.programme_facts(["p"], ["deadline"], 2027, intake_term="fall", owner_ref="", fallback_previous=True) == {}
     got = k.programme_facts(["p"], ["deadline"], 2027, intake_term="spring", fallback_previous=True)
     assert got[("p", "deadline")].value == "y"
     got = k.programme_facts(["p"], ["deadline"], 2027, owner_ref="body:one", fallback_previous=True)
@@ -67,3 +67,22 @@ def test_asked_year_row_without_a_recorded_term_counts_in_the_fallback_read(engi
     assert got[("p", "deadline")].value == "new" and ("q", "deadline") not in got
     # the strict read keeps T1's meaning: an exact term filter
     assert k.programme_facts(["p"], ["deadline"], 2027, intake_term="fall") == {}
+
+
+@pytest.mark.req("R-62")
+def test_current_term_wins_a_clash_and_requested_programmes_follow_the_term(engine, clean):
+    from app.os.intakes import IntakeStore
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+    from app.os.knowledge.requests import visible_programmes
+
+    k = SqlKnowledge(engine, "pai")
+    k.upsert("programme", "p", "fee", fact(2027, "fall-value", term="fall"))
+    k.upsert("programme", "p", "fee", fact(2027, "spring-value", term="spring"))  # the newest row
+    assert k.programme_facts(["p"], ["fee"], 2027)[("p", "fee")].value == "spring-value"  # no intake registered
+    IntakeStore(engine, "pai").create("r_one", "undergrad", "fall", 2027, state="open")
+    assert k.programme_facts(["p"], ["fee"], 2027)[("p", "fee")].value == "fall-value"  # the intake's term wins
+    assert k.programme_facts(["p"], ["fee"], 2027, intake_term="spring")[("p", "fee")].value == "spring-value"
+    ProgrammeStore(engine, "pai").upsert(Programme("p", "r", "U", "N", (), (), (), status="requested"))
+    assert [p.ref for p in visible_programmes(engine, "pai", "r", 2027)] == ["p"]
+    assert [p.ref for p in visible_programmes(engine, "pai", "r", 2027, "fall")] == ["p"]
+    assert visible_programmes(engine, "pai", "r", 2027, "winter") == []

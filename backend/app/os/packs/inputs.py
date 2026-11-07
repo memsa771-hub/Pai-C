@@ -89,7 +89,7 @@ def load_inputs(engine, tenant_id: str, knowledge, book, cfg: PackConfig, statem
     facts = {name: f for (_, name), f in found.items()}
     required = facts.get("required_documents")
     override = None
-    if not visa and required is not None and required.status == "confirmed" and isinstance(required.value, list):
+    if not visa and required is not None and required.status in ("confirmed", "verified") and isinstance(required.value, list):
         override = [k for k in required.value if k != "other"]
     funds = None
     if visa and cfg.funds is not None:
