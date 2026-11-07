@@ -10,26 +10,26 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Balochistan. 
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| LI-01 | the Board of Intermediate & Secondary Education Quetta (BBISE Quetta) has its own site. | https://bbiseqta.edu.pk/ | `BBISE Quetta Board of Intermediate & Secondary Education Quetta` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
+| LI-01 | the Board of Intermediate & Secondary Education Quetta (BBISE Quetta) has its own site. | https://bbiseqta.edu.pk/ | `BBISE Quetta Board of Intermediate & Secondary Education Quetta` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: quote found word for word in visible text (HTTP 200); statement follows from quote | correct: quote found word for word (html, visible text, HTTP 200) |
 
 ## How admission works
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| LI-03 | intermediate college admission rules in Balochistan: no official source found (provincial higher education site returned HTTP 500). | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| LI-03 | intermediate college admission rules in Balochistan: no official source found (provincial higher education site returned HTTP 500). | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote to check | n/a: no URL: gap line |
 
 ## Official lists
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| LI-02 | official list of Balochistan's boards (Quetta, Khuzdar, Turbat in batch 1): no official source read. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
-| LI-04 | official list of public colleges in Balochistan: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| LI-02 | official list of Balochistan's boards (Quetta, Khuzdar, Turbat in batch 1): no official source read. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote to check | n/a: no URL: gap line |
+| LI-04 | official list of public colleges in Balochistan: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote to check | n/a: no URL: gap line |
 
 ## Calendar
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| LI-05 | intermediate admission calendar: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| LI-05 | intermediate admission calendar: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote to check | n/a: no URL: gap line |
 
 ## Gaps
 
@@ -42,4 +42,4 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Balochistan. 
 
 - Lines: 5; cited: 1; gaps: 4.
 - Check 2: correct 1, wrong 0, unclear 0, n/a 4 (run 2026-11-07T20:00:29.348765+00:00).
-- Check 1: not done yet.
+- Check 1 (blind, 2026-11-07): correct 1, wrong 0, unclear 0, n/a 4.
