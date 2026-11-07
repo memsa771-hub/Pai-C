@@ -45,7 +45,7 @@ def test_key_includes_term_and_owner(engine, clean):
 
 @pytest.mark.req("R-25")
 def test_status_and_read_method_checks(engine, clean):
-    base = dict(tenant_id="pai", scope="programme", ref="p", field="f", intake_year=2027, checked_at=AT)
+    base = {"tenant_id": "pai", "scope": "programme", "ref": "p", "field": "f", "intake_year": 2027, "checked_at": AT}
     with engine.begin() as conn:
         conn.execute(insert(T).values(**base, status="verified", quote="q", url="u"))
     for bad in ({"status": "bogus"}, {"status": "confirmed", "read_method": "guess", "field": "g"},
