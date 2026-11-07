@@ -97,7 +97,7 @@ def test_rollover_proof_2026_to_2027(world, engine):
 
 
 def test_gate_closes_the_fallback(world, engine):
-    svc, kb, kernel, s = world
+    svc, _kb, _kernel, s = world
     res = rollover(engine, "pai", region="r_one", family="masters", term="winter", year=2027)
     s.set_state(res.intake.id, "current", gate_passed_at=datetime(2026, 11, 19, tzinfo=UTC))
     assert not s.fallback_applies("winter", 2027)
@@ -136,7 +136,7 @@ def test_builder_refuses_an_intake_that_is_not_open(world, engine):
     from app.os.knowledge.programmes import Programme, ProgrammeStore
     from app.os.routes import builder
 
-    svc, kb, kernel, s = world
+    svc, _kb, _kernel, s = world
     ProgrammeStore(engine, "pai").upsert(Programme("p1", "ireland_master", "Alpha University", "Programme", (), (), ()))
     choice = [ProgrammeChoice(programme_ref="p1", rank=1)]
     s.create("r_one", "masters", "winter", 2028)  # registered, still planned

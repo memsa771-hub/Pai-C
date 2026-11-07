@@ -1,6 +1,6 @@
 """P2-T8: the labelled previous-year read (P2-D24; R-26, R-63) in the port and in the compiler."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import pytest
 

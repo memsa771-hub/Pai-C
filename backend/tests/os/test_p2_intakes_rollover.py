@@ -9,7 +9,12 @@ from sqlalchemy import insert, select
 
 from app.os import models
 from app.os.intakes import IntakeError, IntakeStore
-from app.os.intakes.rollover import backfill_intake_terms, export_csv, rollover, slot_report
+from app.os.intakes.rollover import (
+    backfill_intake_terms,
+    export_csv,
+    rollover,
+    slot_report,
+)
 from app.os.knowledge.port import Fact
 from app.os.knowledge.store import SqlKnowledge
 from app.os.playbooks import load_playbook
@@ -60,7 +65,7 @@ def test_rollover_opens_the_intake_and_copies_keys_not_values(engine, clean):
 
 
 def test_rollover_twice_adds_nothing_and_slots_fill_from_facts(engine, clean):
-    k, s, _ = seed_2026(engine)
+    k, _s, _ = seed_2026(engine)
     rollover(engine, "pai", region="r_one", family="undergrad", term="fall", year=2027)
     again = rollover(engine, "pai", region="r_one", family="undergrad", term="fall", year=2027)
     assert again.slots_added == 0
@@ -118,7 +123,7 @@ def test_backfill_sets_the_term_from_the_playbook(engine, clean):
         conn.execute(insert(models.programmes), [
             {"tenant_id": "pai", "ref": ref, "route_key": rk, "university": "u", "name": "n"}
             for ref, rk in (("pa", one.key), ("pb", "two_terms"), ("pc", "no_terms"))])
-    legacy = dict(value=1, quote="q", url="https://a.test/x", checked_at=AT, status="confirmed")
+    legacy = {"value": 1, "quote": "q", "url": "https://a.test/x", "checked_at": AT, "status": "confirmed"}
     for ref in ("pa", "pb", "pc", "ghost"):
         k.upsert("programme", ref, "fee", Fact(intake_year=2027, **legacy))
     k.upsert("route", one.key, "funds", Fact(intake_year=2027, **legacy))
@@ -140,7 +145,8 @@ def test_backfill_keeps_the_newer_row_when_the_key_is_taken(engine, clean):
         conn.execute(insert(models.programmes).values(tenant_id="pai", ref="pa", route_key=one.key, university="u",
                                                       name="n"))
     k = SqlKnowledge(engine, "pai")
-    base = dict(value=1, quote="q", url="https://a.test/x", checked_at=AT, status="confirmed", intake_year=2027)
+    base = {"value": 1, "quote": "q", "url": "https://a.test/x", "checked_at": AT, "status": "confirmed",
+            "intake_year": 2027}
     k.upsert("programme", "pa", "fee", Fact(**base))
     k.upsert("programme", "pa", "fee", Fact(intake_term=term, **base))
     res = backfill_intake_terms(engine, "pai", {(one.key, 1): one})

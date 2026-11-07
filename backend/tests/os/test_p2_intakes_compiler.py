@@ -1,12 +1,12 @@
 """P2-T8: a fact of another intake is labelled and never firm in the compiler (P2-D24; R-26, R-63)."""
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
 
 from app.os.compiler import compile_plan
 from tests.os.test_compiler import IE, contract, fact, task
-from dataclasses import replace
 
 pytestmark = pytest.mark.req("R-26")
 TODAY = date(2026, 11, 20)  # the 2027 intake is being planned; the 2026 cycle's deadlines are in the future or past

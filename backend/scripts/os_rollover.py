@@ -17,7 +17,12 @@ import sys
 from pathlib import Path
 
 from app.os.intakes import IntakeError, IntakeStore, UnknownTerm
-from app.os.intakes.rollover import backfill_intake_terms, export_csv, rollover, slot_report
+from app.os.intakes.rollover import (
+    backfill_intake_terms,
+    export_csv,
+    rollover,
+    slot_report,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
