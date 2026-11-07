@@ -1,0 +1,32 @@
+# The review queue's rules as data (P2 spec §4.5, P2-D15, owner ruling §11.2 of 2026-11-07).
+version: 1
+
+# Which kinds of reviewer count towards `verified`. The owner ruled on 2026-11-07 that an independent AI check 1 and
+# AI check 2 count as the two checks (this deviates from master R-25 and R-42, "a person checks and a second person
+# approves"; recorded in the P2 handoff). To require people again, remove `ai` here or raise `min_persons`; no code
+# changes. Independence stays either way: two different reviewer ids, and a reviewer sees no other review of an item
+# before giving their own.
+counting_kinds: [person, ai]
+min_persons: 0
+
+# How many positive reviews a fact needs, by its class (knowledge/fact_classes.yaml): high-stakes facts need a check
+# and an approval by two different reviewers, other facts one positive check (§4.5).
+steps_high_stakes: 2
+steps_other: 1
+
+# Reading by machine or by hand is not trusted until a reviewer compares it with the original (R-72): a fact read
+# this way becomes `confirmed` at the first positive check.
+compare_with_original: [ocr, human]
+
+# Evidence files for the `collect` flow (a scan or screenshot of the original, R-72).
+evidence:
+  max_bytes: 10485760
+  content_types: [application/pdf, image/png, image/jpeg, image/webp, text/plain, text/html]
+  required_for_collect: true
+
+# The queue is filled from confirmed facts by `sync`: only high-stakes facts by default.
+sync:
+  high_stakes_only: true
+
+# The largest page text a reviewer's screen receives, in characters.
+snapshot_max_chars: 200000

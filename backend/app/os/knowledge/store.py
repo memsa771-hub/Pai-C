@@ -192,6 +192,29 @@ class SqlKnowledge:
             _revise(conn, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
         return _fact(after)
 
+    _REVISABLE = ("value", "quote", "url", "status", "conflict_note", "read_method", "language")
+
+    def revise(self, fact_id: int, *, cause: str, cause_ref: str | None = None, actor: str | None = None,
+               **changes: Any) -> Fact:
+        """Changes some columns of a fact in one step, with its cause (P2-D9). Used by the review queue (T5) to
+        correct a value or move a fact down. The trust rule is checked first; a new value, quote or URL sets
+        `checked_at` to the shared clock. Nothing is deleted: the old state stays in the revision."""
+        bad = sorted(set(changes) - set(self._REVISABLE))
+        if bad:
+            raise ValueError(f"cannot revise {bad}")
+        _, _, _, old = self.get(fact_id)
+        Fact(**{**old.__dict__, **changes})  # validates
+        values = dict(changes)
+        if {"value", "quote", "url"} & set(changes):
+            values["checked_at"] = clock.now()
+        with self.engine.begin() as conn:
+            before = self._row(conn, fact_id, lock=True)
+            conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
+                         .values(**values, updated_at=func.now()))
+            after = self._row(conn, fact_id)
+            _revise(conn, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
+        return _fact(after)
+
     def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None) -> None:
         """Research found the same value again (`checked_at`), or a different one (`conflict_note`), for a
         confirmed fact: the value, quote and status stay (spec §4.6 step 6)."""
