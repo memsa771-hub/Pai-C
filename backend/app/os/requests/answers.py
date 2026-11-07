@@ -122,10 +122,9 @@ def choices_for(svc, student: str, requests: list[Request]) -> dict[int, Choices
     return out
 
 
-def _seen_now(svc, student: str, req: Request, q: state_mod.QuestionRef) -> str | None:
-    """The token of the values the question holds now."""
+def _seen_now(svc, req: Request, q: state_mod.QuestionRef, found) -> str | None:
+    """The token of the values the question holds now. `found` is the host's conflicts, read once by the caller."""
     if q.origin == "vault":
-        found = fact_questions.read(student)
         conflict = next((c for c in found.conflicts if c.key == req.need_ref), None) if found else None
         return seen_token(conflict.ref, [(v.side, v.value) for v in conflict.values]) if conflict else None
     if q.origin == "impossible":
@@ -138,11 +137,12 @@ def answer(svc, student: str, req: Request, ref: str, seen: str, choice: str, va
     """Sends the student's answer to where the question comes from. Returns when it is written, or when the question is
     gone already (answered elsewhere); the caller then refreshes the plan. `ref` and `seen` name the question and the
     values the student saw: if either is different now, nothing is written (409 `answer_changed`). Raises AnswerError."""
-    state = state_mod.build(svc.plans, student)
+    found = fact_questions.read(student)  # read once: the state and the check of what the student saw share it
+    state = state_mod.build(svc.plans, student, conflicts=found)
     q = state.question(req.need_kind, req.need_ref) if state else None
     if q is None:
         return
-    if ref != question_ref(q) or seen != _seen_now(svc, student, req, q):
+    if ref != question_ref(q) or seen != _seen_now(svc, req, q, found):
         raise AnswerError(409, "answer_changed", texts.text("answer_changed"))
     if q.origin in ("vault", "impossible"):
         key = req.need_ref if q.origin == "vault" else q.ref.partition(":")[0]

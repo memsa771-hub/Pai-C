@@ -2,12 +2,13 @@
 
 The card keeps the document's reading exactly as it was (`evidence.proposed` and the proposing candidate are never
 changed). What the student answered is noted apart, in `evidence.os_answers[key]`: `{choice, field, value, request_id?}`,
-`field` the record field the answer is about and `value` the value the Vault holds for it after the answer. Three places
+`field` the record field the answer is about and `value` the value the Vault held after the answer (an audit note). Three places
 read it:
 
 - the code that picks the next question (an answered key is not asked again);
-- the card's resolution, which replaces an answered field of the proposed record with the saved value, so a value the
-  student refused cannot come back through "accept";
+- the card's resolution, which leaves the answered fields out of the record it applies, so a value the student refused
+  cannot come back through "accept" and a later edit of the field is not reverted either (the reconciler's partial
+  upsert keeps what the record holds now);
 - the Vault page, which leaves answered fields out of the two values it shows."""
 
 from typing import Any
@@ -62,11 +63,3 @@ def drop(record: Any, answers: dict) -> Any:
         return out
 
     return walk(record, (), paths(answers))
-
-
-def settle_value(record: Any, answers: dict) -> Any:
-    """The record to apply: each answered field takes the value the Vault holds, never the one on the card."""
-    for answer in answers.values():
-        if isinstance(answer, dict) and answer.get("field") and "value" in answer:
-            record = put(record, answer["field"], answer["value"])
-    return record

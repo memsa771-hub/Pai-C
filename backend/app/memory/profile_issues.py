@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.models import MemoryCandidate, ProfileIssue, VaultItem, Workspace
 from .candidates import MemoryCandidateService
 from .errors import MemoryDataError
-from .issue_answers import answers_of, settle_value
+from .issue_answers import answers_of, drop
 from .reconciler import MemoryReconciler
 from .vault_intake import VaultAssertionService
 
@@ -116,7 +116,7 @@ class ProfileIssueService:
         if issue.affected_type == "vault_item" and issue.affected_id:
             # Answer about the entry the card names, never a loose look-alike.
             spec["entities"] = {**(spec["entities"] or {}), "item_id": issue.affected_id}
-        proposed_value = value if action == "provide_new" else settle_value(spec["proposed_value"], answers_of(issue))
+        proposed_value = value if action == "provide_new" else drop(spec["proposed_value"], answers_of(issue))
         candidate = self.candidates.propose(
             workspace_id=workspace_id,
             candidate_type=spec["candidate_type"],

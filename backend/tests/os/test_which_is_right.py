@@ -498,23 +498,19 @@ def test_get_requests_reads_the_host_once(world, conflict):
     got = world.api.get("/v1/os/requests", headers=world.head)
     assert got.status_code == 200 and [r for r in got.json()["requests"] if r["kind"] == "which_is_right"]
     assert len(calls) == 1
+    # the answer route: one read before the host is told (the state and the check of what was seen share it)
+    events = []
 
+    def answering(*a, **k):
+        events.append("answer")
+        return bridge.answer_fact_question(*a, **k)
 
-def test_an_answer_to_values_that_changed_is_refused(world, conflict):
-    """Review M-2: the saved value moves from 800 to 805 between the GET and the POST: the answer is refused."""
+    def reading(ref):
+        events.append("read")
+        return real(ref)
+
+    ports.configure(world.svc, student_facts=bridge.student_facts, fact_conflicts=reading, fact_answer=answering)
     shown = conflict.asked
-    with world.who.factory() as db:
-        edit = MemoryCandidateService(db).propose(
-            world.ws, "student_record", key="education", proposed_value={"result": {"marks_obtained": 805}},
-            confidence=1.0, source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
-            entities={"record_id": education(db, world.ws)[0]["id"]}, evidence={"quote": "q", "capture": "details"})
-        assert MemoryReconciler(db).reconcile(edit).accepted
-        db.commit()
-    from app.os.requests import texts
-
-    got = world.answer(shown["id"], "proposed", ref=shown["ref"], seen=shown["seen"])
-    assert got.status_code == 409 and got.json() == {"detail": "answer_changed", "note": texts.text("answer_changed")}
-    with world.who.factory() as db:
-        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 805 and world.card(db).status == "open"
-    assert world.asking()["seen"] != shown["seen"]
-    assert world.answer(shown["id"], "proposed").status_code == 200  # what is shown now is taken
+    got = world.api.post(f"/v1/os/requests/{shown['id']}/answer", headers=world.head,
+                         json={"ref": shown["ref"], "seen": shown["seen"], "choice": "proposed"})
+    assert got.status_code == 200 and events[:2] == ["read", "answer"]

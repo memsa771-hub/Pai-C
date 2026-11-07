@@ -7,6 +7,7 @@ from app.memory.candidates import MemoryCandidateService  # noqa: F401  re-expor
 from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import VaultView  # noqa: F401  re-exported for PAI C (P1-T8 fact conflicts)
+from app.memory import issue_answers  # noqa: F401  re-exported for PAI C (P1-T8: per-value answers on a card)
 from app.memory.errors import MemoryDataError  # noqa: F401  re-exported for PAI C (P1-T8)
 from app.memory.profile_issues import ProfileIssueService  # noqa: F401  re-exported for PAI C (P1-T8)
 from app.memory.reconciler import MemoryReconciler  # noqa: F401  re-exported for PAI C (P1-T8)
@@ -476,5 +477,3 @@ class MemoryService:
             result = retriever._fallback(workspace_id, query, kinds, None,
                 top_k or config.PAI_SEMANTIC_RECALL_TOP_K, ("session_summary",))
         return [{"id": item.id, "kind": item.kind, "text": item.text} for item in result.ordered]
-
-from app.memory import issue_answers  # noqa: E402,F401  re-exported for PAI C (P1-T8: per-value answers on a card)

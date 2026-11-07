@@ -206,3 +206,27 @@ def test_a_second_answer_to_the_same_value_does_not_overwrite_the_first(world):
         assert fact_conflicts.answer(db, world.ws, ref, OBTAINED, "new", 790) == {"status": "gone"}
         db.commit()
         assert education(db, world.ws)[0]["result"]["marks_obtained"] == 760
+
+
+@pytest.mark.parametrize("action", ["accept_proposed", "both_true"])
+def test_a_vault_page_accept_never_reverts_a_later_edit(world, action):
+    """Review N1: an OS answer, then the student edits that field on the profile page, then accepts on the Vault page:
+    the edit stands (an answered field is left out of what the accept applies)."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    plan_id, asked = two_cards(world)
+    assert world.answer(asked[OBTAINED]["id"], "current").status_code == 200  # kept 800
+    with world.who.factory() as db:
+        edit = MemoryCandidateService(db).propose(
+            world.ws, "student_record", key="education", proposed_value={"result": {"marks_obtained": 805}},
+            confidence=1.0, source_type="user_explicit", allow_user_explicit=True, input_channel="profile",
+            entities={"record_id": education(db, world.ws)[0]["id"]}, evidence={"quote": "q", "capture": "details"})
+        assert MemoryReconciler(db).reconcile(edit).accepted
+        db.commit()
+        assert education(db, world.ws)[0]["result"]["marks_obtained"] == 805
+        done = ProfileIssueService(db).resolve(world.ws, world.card(db).id, action)
+        db.commit()
+        assert done["resolved"] is True
+        rows = education(db, world.ws)
+        assert [r["result"]["marks_obtained"] for r in rows if r["result"].get("marks_obtained") is not None][0] == 805
+        assert rows[0]["result"]["marks_total"] == 1050  # the value not answered here is the card's to apply
