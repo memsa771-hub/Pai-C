@@ -450,13 +450,18 @@ class Kernel:
             raise KeyError(f"plan {plan_id}")
         while True:
             request_store.lock_student(conn, self.tenant_id, student)
+            # The row lock is taken in a savepoint: if the plan moved to another student meanwhile (rare), rolling the
+            # savepoint back releases the row before that student's lock is taken, so the order above always holds.
+            savepoint = conn.begin_nested()
             found = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
                                  .with_for_update()).scalar_one_or_none()
+            if found == student:
+                savepoint.commit()
+                return
+            savepoint.rollback()
             if found is None:
                 raise KeyError(f"plan {plan_id}")
-            if found == student:
-                return
-            student = found  # moved to another student meanwhile: take that student's lock too (rare)
+            student = found
 
     def _lock_task(self, conn: Connection, task_id: int):
         plan_id = conn.execute(select(T.c.plan_id).where(T.c.id == task_id, T.c.tenant_id == self.tenant_id)

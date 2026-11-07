@@ -292,6 +292,46 @@ def test_a_lock_order_that_cannot_deadlock(engine, clean, monkeypatch):
     assert store.duplicates(engine, "pai") == []
 
 
+def test_a_plan_that_moves_student_is_never_locked_while_waiting_for_the_new_students_lock(engine, clean, monkeypatch):
+    """Review round 3: if the plan moved to another student between the unlocked read and the row lock, the row lock is
+    released before the new student's lock is taken (student lock, then plan row, always)."""
+    from sqlalchemy import text, update
+    from sqlalchemy.exc import OperationalError
+
+    k = kernel(engine)
+    a = k.create_plan(contract_of("ext-a"), compiled(NOTHING))
+    with engine.connect() as c:
+        first = c.execute(select(models.plans.c.student_ref).where(models.plans.c.id == a.plan_id)).scalar_one()
+    moved = first + "-moved"
+    real_lock = store.lock_student
+    seen: list[tuple[str, bool]] = []
+
+    def row_is_free() -> bool:
+        with engine.connect() as other:
+            try:
+                other.execute(text("SET LOCAL lock_timeout = '200ms'"))
+                other.execute(select(models.plans.c.id).where(models.plans.c.id == a.plan_id).with_for_update(nowait=True))
+                return True
+            except OperationalError:
+                return False
+
+    def lock(conn, tenant, student):
+        if student == first and not seen:
+            with engine.begin() as other:  # someone moves the plan right after our unlocked read
+                other.execute(update(models.plans).where(models.plans.c.id == a.plan_id).values(student_ref=moved))
+        if student == moved:
+            seen.append((student, row_is_free()))
+        else:
+            seen.append((student, True))
+        real_lock(conn, tenant, student)
+
+    monkeypatch.setattr(store, "lock_student", lock)
+    with engine.begin() as conn:
+        k._lock_plan(conn, a.plan_id)
+        assert not row_is_free()  # held once the student matches
+    assert seen == [(first, True), (moved, True)]
+
+
 def test_a_key_in_answered_closes_a_step_that_still_asks(engine, clean):
     """Review M3: `answered` names a live step's key (an answer that arrived outside the kernel)."""
     ref = kernel(engine).create_plan(contract(), compiled(NOTHING))
