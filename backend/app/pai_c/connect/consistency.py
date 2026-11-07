@@ -111,14 +111,20 @@ def _key_version(key: str) -> int | None:
 
 
 def _stage_h(db, workspace_id: str) -> dict[str, set[str]]:
-    """Study field key -> the programme refs of the student's completed programme searches for that field."""
+    """Study field key -> the programme refs of the student's completed programme searches for that field that the
+    Counsellor still serves (a search of a ruled-out, unrestored field is not served: `places.run_is_served`)."""
     from app.models import ExecutionRun, PaiPossibility
+    from app.pai_c.connect.places import run_is_served
+    from app.pai_c.paths.exclusions import excluded_fields
 
+    excluded = excluded_fields(db, workspace_id)
     found: dict[str, set[str]] = {}
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
                                                   ExecutionRun.task_type == "program_search",
                                                   ExecutionRun.status == "completed")).all()
     for run in runs:
+        if not run_is_served(db, run, excluded):
+            continue
         result = (run.result or {}).get("capability_result") or {}
         refs = {p.get("opportunity_id") for p in result.get("programs", []) if p.get("opportunity_id")}
         if not refs:
