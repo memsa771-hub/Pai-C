@@ -605,7 +605,10 @@ class Kernel:
         self._event(conn, plan_id, None, "plan_revised", {"number": number, "cause": cause, "diff": d.as_json()})
         self._set_risk(conn, plan_id, draft.at_risk)
         self._promote(conn, plan_id)
-        request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())  # P1-T8, D-w7
+        # P1-T8, D-w7. Called on every revision on purpose: the student lock is already held by `_lock_plan`, and what it reads
+        # (this plan's request steps, the student's open rows) is what a skip would have to read too; a skip could also miss
+        # another plan's live step that needs a row.
+        request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())
         return number
 
     def _promote(self, conn: Connection, plan_id: int) -> None:
