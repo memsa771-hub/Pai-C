@@ -448,7 +448,7 @@
   - `backend/app/os/inbox_actions.py` (:22-40): the `answer_required` refusal (D-w11).
   - `backend/app/os/api/router.py`: new `GET /requests` (D-w19, without `choices` until Task 4). `backend/app/os/api/schemas.py`: new `RequestsOut` (new model only).
 - Tests:
-  - new: `backend/tests/os/test_os_0023_migration.py`, `backend/tests/os/test_student_requests.py`;
+  - new: `backend/tests/os/test_os_0023_migration.py`, `backend/tests/os/test_os_student_requests.py`;
   - extend: `tests/os/test_plan_view.py` (new cases; the T5 and T7 cases stay as they are), `tests/os/test_plan_actions.py` and `tests/os/test_api.py` (inbox cases; new cases only).
 
 - [ ] **Step 1: Write the failing tests (`@pytest.mark.req("R-19")` unless noted).**
