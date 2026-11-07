@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.os.contracts.programme_facts import SourceRef
 from app.os.contracts.route_contract import IntakeRef
 
-Level = Literal["verified", "confirmed", "unconfirmed"]
+Level = Literal["verified", "confirmed", "not_confirmed"]  # the programme_facts.v1 words
 
 
 class FormulaPart(BaseModel):
@@ -65,7 +65,7 @@ class ClosingMerit(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     intake: IntakeRef
-    value: float
+    value: float | None = None  # high-stakes: carried only at level verified (R-25)
     list_number: int | None = Field(None, ge=1)
     list_complete: bool  # false: the value is the lowest on list N, not the closing merit
     level: Level
@@ -75,6 +75,8 @@ class ClosingMerit(BaseModel):
     def _list(self) -> "ClosingMerit":
         if not self.list_complete and self.list_number is None:
             raise ValueError("a merit from a list that is not complete must name its list")
+        if (self.value is not None) != (self.level == "verified"):
+            raise ValueError("a closing merit carries a value only when verified")
         return self
 
 
