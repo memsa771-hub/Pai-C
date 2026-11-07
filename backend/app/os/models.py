@@ -264,6 +264,7 @@ reviewers = Table(
     _id(), _tenant(),
     Column("ref", Text, nullable=False),  # the reviewer's id in checks and spreadsheets, e.g. a name or ai_check_1
     Column("display_name", Text, nullable=False),
+    Column("identity", Text, nullable=False),  # the person or the model and prompt behind the ref; checks need two
     Column("role", Text, nullable=False),
     Column("kind", Text, nullable=False, server_default="person"),
     Column("token_hash", Text, nullable=False),  # sha256 of the personal token (the token is shown once)
@@ -330,6 +331,7 @@ fact_reviews = Table(
     Column("corrected_quote", Text),
     Column("note", Text),
     Column("evidence_file_id", BigInteger, ForeignKey("os.os_review_files.id", ondelete="RESTRICT")),
+    Column("high_stakes", Boolean, nullable=False, server_default=text("true")),  # the need as of this review
     Column("fact_digest", Text),  # sha256 of the value, quote and URL the reviewer saw: a changed fact voids the item
     _created(),
     UniqueConstraint("item_id", "reviewer_id", name="uq_os_fact_reviews_reviewer"),

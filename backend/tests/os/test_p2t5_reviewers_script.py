@@ -15,13 +15,14 @@ def run(engine, *args):
 
 
 def test_add_prints_a_working_token_once_and_list_never_shows_it(engine, clean, capsys):
-    code, out = run(engine, "add", "--ref", "ai_check_1", "--name", "AI check 1", "--role", "checker", "--kind", "ai")
+    code, out = run(engine, "add", "--ref", "ai_check_1", "--name", "AI check 1", "--role", "checker", "--kind", "ai",
+                   "--identity", "model-a/prompt-1")
     assert code == 0
     token = out[0].split("shown once): ")[1]
     r = ReviewerStore(engine, "pai").authenticate(token)
-    assert (r.ref, r.role, r.kind) == ("ai_check_1", "checker", "ai")
+    assert (r.ref, r.role, r.kind, r.identity) == ("ai_check_1", "checker", "ai", "model-a/prompt-1")
     _, listed = run(engine, "list")
-    assert listed == ["ai_check_1\tAI check 1\tchecker\tai\tactive"] and token not in "".join(listed)
+    assert listed == ["ai_check_1\tAI check 1\tchecker\tai\tmodel-a/prompt-1\tactive"] and token not in "".join(listed)
 
 
 def test_disable_enable_rotate(engine, clean):

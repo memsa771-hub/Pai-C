@@ -1,6 +1,12 @@
 # The review queue's rules as data (P2 spec §4.5, P2-D15, owner ruling §11.2 of 2026-11-07).
 version: 1
 
+# Independence of the two checks (owner ruling 2026-11-07). Each reviewer has an `identity`: the person, or for an AI
+# check the model and prompt, behind the ref. Two checks of one fact need two distinct identities, so two refs that
+# are really one person or one model are refused. The owner's ruling that "AI check 1 and AI check 2 are two checks"
+# relies on them being set up with separate model or prompt identities (scripts/os_reviewers.py --identity), on
+# check 2 never seeing check 1's verdict first, and on neither being the author of the reading.
+#
 # Which kinds of reviewer count towards `verified`. The owner ruled on 2026-11-07 that an independent AI check 1 and
 # AI check 2 count as the two checks (this deviates from master R-25 and R-42, "a person checks and a second person
 # approves"; recorded in the P2 handoff). To require people again, remove `ai` here or raise `min_persons`; no code
@@ -19,9 +25,14 @@ steps_other: 1
 compare_with_original: [ocr, human]
 
 # Evidence files for the `collect` flow (a scan or screenshot of the original, R-72).
+# Why this list: evidence is looked at in the staff app, so it must never be able to run code there. Only passive
+# formats are allowed: PDF, raster images, plain text. HTML, SVG and scripts are refused, whatever the upload claims.
+# The type is decided by the server from the file's first bytes (review/sniff.py), never from the client's claim, and a
+# claim that disagrees with the bytes is refused. Only PDF and images are shown in the browser; anything else
+# (plain text) is a download. The size cap is also checked against the request's Content-Length before the body is read.
 evidence:
   max_bytes: 10485760
-  content_types: [application/pdf, image/png, image/jpeg, image/webp, text/plain, text/html]
+  content_types: [application/pdf, image/png, image/jpeg, image/webp, text/plain]
   required_for_collect: true
 
 # The queue is filled from confirmed facts by `sync`: only high-stakes facts by default.

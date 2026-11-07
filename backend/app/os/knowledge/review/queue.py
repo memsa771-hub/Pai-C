@@ -9,19 +9,21 @@ Trust rules:
 - `verified` needs `confirmed` first, then positive checks by different reviewers: a check and an approval for a
   high-stakes fact, one check for any other (policy file). Reviewer kinds that count are policy data: by the owner's
   ruling of 2026-11-07 an AI check 1 and an AI check 2 count as the two checks.
-- The checks are independent. A reviewer is a different id for every step; a reviewer sees no review of an item before
-  giving their own (admins excepted); the author of a correction or a collection cannot check it.
-- A fact read by machine or by hand (`read_method` ocr or human) becomes `confirmed` only when a reviewer has compared
-  it with the original (R-72).
-- A fact that changes while it is under review voids the item; a new one is opened.
+- The checks are independent. Two checks need two distinct reviewer identities (the person, or the model and prompt
+  behind an AI reviewer); a reviewer, an admin too, sees no review of an item before giving their own or before it is
+  closed (`audit` is the separate admin-only view); the author of a correction or a collection cannot check it.
+- A fact read by machine or by hand (`read_method` ocr or human) becomes `confirmed` when a reviewer has compared it
+  with the original (R-72). That comparing check does not also count towards `verified`: it needs checks after it.
+- A fact whose reading (value, quote, URL, class, read method) changes voids its open verify item at that moment (in
+  the store's write), and every write by this queue is refused if the reading is no longer the one decided on.
 """
 
 import hashlib
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -33,7 +35,8 @@ from app.os.knowledge.research.text import normalise
 from app.os.knowledge.research.trust import quote_on_page
 from app.os.knowledge.review.policy import ReviewPolicy, load_policy
 from app.os.knowledge.review.reviewers import Reviewer
-from app.os.knowledge.store import SqlKnowledge
+from app.os.knowledge.review.sniff import sniff
+from app.os.knowledge.store import SqlKnowledge, StaleFact, fact_digest
 
 I = models.review_items
 RV = models.fact_reviews
@@ -88,11 +91,6 @@ def _item(row) -> Item:
                 row.join_count, row.opened_by, row.created_at, row.closed_at)
 
 
-def digest(fact: Fact) -> str:
-    """What the reviewers saw: value, quote and URL. A change to any of them voids reviews already given."""
-    return hashlib.sha256(json.dumps([fact.value, fact.quote, fact.url], sort_keys=True, default=str).encode()).hexdigest()
-
-
 class ReviewQueue:
     def __init__(self, engine: Engine, tenant_id: str, knowledge: SqlKnowledge, *, policy: ReviewPolicy | None = None,
                  on_fact_change: FactChanged | None = None,
@@ -111,9 +109,9 @@ class ReviewQueue:
     def open_item(self, kind: str, *, dedupe_key: str, fact_id: int | None = None, subject: str = "",
                   field: str | None = None, intake_term: str = "", intake_year: int | None = None, owner_ref: str = "",
                   summary: str = "", payload: dict | None = None, batch_ref: str | None = None,
-                  opened_by: str = "manual") -> tuple[int, bool]:
+                  opened_by: str = "manual", conn=None) -> tuple[int, bool]:
         """(item id, created). The same thing opened again while its item is open joins it (`join_count`), so a
-        fact reported ten times is one item (P2-D22)."""
+        fact reported ten times is one item (P2-D22). With `conn` it is part of the caller's transaction."""
         if kind not in models.REVIEW_ITEM_KINDS:
             raise ValueError(f"unknown review item kind '{kind}'")
         if kind == "verify" and fact_id is None:
@@ -124,17 +122,17 @@ class ReviewQueue:
         values = dict(tenant_id=self.tenant_id, kind=kind, fact_id=fact_id, subject=subject, field=field,
                       intake_term=intake_term, intake_year=intake_year, owner_ref=owner_ref, summary=summary,
                       payload=payload or {}, batch_ref=batch_ref, dedupe_key=dedupe_key, opened_by=opened_by)
-        for _ in range(2):
-            with self.engine.begin() as conn:
-                open_row = conn.execute(select(I.c.id).where(I.c.tenant_id == self.tenant_id,
-                                                             I.c.dedupe_key == dedupe_key, I.c.status == "open")
-                                        .with_for_update()).first()
+        with self.knowledge._tx(conn) as c:
+            for _ in range(2):
+                open_row = c.execute(select(I.c.id).where(I.c.tenant_id == self.tenant_id,
+                                                          I.c.dedupe_key == dedupe_key, I.c.status == "open")
+                                     .with_for_update()).first()
                 if open_row is not None:
-                    conn.execute(update(I).where(I.c.id == open_row.id).values(join_count=I.c.join_count + 1))
+                    c.execute(update(I).where(I.c.id == open_row.id).values(join_count=I.c.join_count + 1))
                     return open_row.id, False
                 try:
-                    with conn.begin_nested():
-                        return conn.execute(I.insert().values(**values).returning(I.c.id)).scalar_one(), True
+                    with c.begin_nested():
+                        return c.execute(I.insert().values(**values).returning(I.c.id)).scalar_one(), True
                 except IntegrityError:
                     continue  # another writer opened it between our read and insert: join theirs
         raise RuntimeError("could not open or join a review item")
@@ -181,7 +179,7 @@ class ReviewQueue:
     def _reviews(self, item_id: int) -> list:
         with self.engine.connect() as conn:
             return conn.execute(select(RV, RW.c.ref.label("reviewer_ref"), RW.c.kind.label("reviewer_kind"),
-                                       RW.c.display_name).join(RW, RW.c.id == RV.c.reviewer_id)
+                                       RW.c.identity.label("reviewer_identity"), RW.c.display_name).join(RW, RW.c.id == RV.c.reviewer_id)
                                 .where(RV.c.item_id == item_id, RV.c.tenant_id == self.tenant_id)
                                 .order_by(RV.c.id)).all()
 
@@ -200,20 +198,35 @@ class ReviewQueue:
                 "text": text[: self.policy.snapshot_max_chars], "truncated": len(text) > self.policy.snapshot_max_chars,
                 "quote_found": quote_on_page(fact.quote, normalise(text)) if fact.quote.strip() else False}
 
-    def files_for(self, item_id: int) -> list[dict]:
+    def files_for(self, item_id: int, viewer: Reviewer | None = None, show_all: bool = True) -> list[dict]:
+        """The item's evidence files. Who uploaded one is shown under the same rule as the reviews (M3)."""
         with self.engine.connect() as conn:
             rows = conn.execute(select(FL.c.id, FL.c.filename, FL.c.content_type, FL.c.size, FL.c.sha256,
-                                       FL.c.created_at, RW.c.ref).join(RW, RW.c.id == FL.c.uploaded_by)
+                                       FL.c.created_at, FL.c.uploaded_by, RW.c.ref)
+                                .join(RW, RW.c.id == FL.c.uploaded_by)
                                 .where(FL.c.item_id == item_id, FL.c.tenant_id == self.tenant_id)
                                 .order_by(FL.c.id)).all()
         return [{"id": r.id, "filename": r.filename, "content_type": r.content_type, "size": r.size,
-                 "sha256": r.sha256, "uploaded_at": r.created_at, "uploaded_by": r.ref} for r in rows]
+                 "sha256": r.sha256, "uploaded_at": r.created_at,
+                 "uploaded_by": r.ref if show_all or (viewer is not None and r.uploaded_by == viewer.id) else None}
+                for r in rows]
+
+    def _entries(self, reviews, identity: bool = False) -> list[dict]:
+        return [{"id": r.id, "reviewer": r.reviewer_ref, "kind": r.reviewer_kind, "step": r.step,
+                 "outcome": r.outcome, "corrected_value": r.corrected_value, "corrected_quote": r.corrected_quote,
+                 "note": r.note, "at": r.created_at, **({"identity": r.reviewer_identity} if identity else {})}
+                for r in reviews]
 
     def detail(self, item_id: int, viewer: Reviewer) -> dict:
-        """The item with its fact, page and files. Other reviewers' checks are shown only to an admin, or to a
-        reviewer who has given their own: check 2 never sees check 1 before it gives its own (§11.2)."""
+        """The item with its fact, page and files. Other reviewers' checks (and who uploaded files) are shown to a
+        reviewer, an admin too, only after they have given their own or the item is closed: check 2 never sees
+        check 1 before it gives its own (§11.2). `audit` is the separate admin-only view."""
         item = self.get_item(item_id)
-        out: dict[str, Any] = {"item": item, "fact": None, "snapshot": None, "files": self.files_for(item_id)}
+        reviews = self._reviews(item_id)
+        mine = next((r for r in reviews if r.reviewer_id == viewer.id), None)
+        visible = item.status == "closed" or mine is not None
+        out: dict[str, Any] = {"item": item, "fact": None, "snapshot": None,
+                               "files": self.files_for(item_id, viewer, visible)}
         if item.fact_id is not None:
             scope, ref, field, fact = self.knowledge.get(item.fact_id)
             cls = fact_class(field, fact.fact_class)
@@ -223,14 +236,15 @@ class ReviewQueue:
                            "owner_ref": fact.owner_ref, "fact_class": cls, "high_stakes": is_high_stakes(cls),
                            "read_method": fact.read_method, "language": fact.language}
             out["snapshot"] = self._snapshot(fact)
-        reviews = self._reviews(item_id)
-        mine = next((r for r in reviews if r.reviewer_id == viewer.id), None)
-        show = reviews if (viewer.role == "admin" or mine is not None) else []
-        out["reviews"] = [{"id": r.id, "reviewer": r.reviewer_ref, "kind": r.reviewer_kind, "step": r.step,
-                           "outcome": r.outcome, "corrected_value": r.corrected_value,
-                           "corrected_quote": r.corrected_quote, "note": r.note, "at": r.created_at} for r in show]
+        out["reviews"] = self._entries(reviews) if visible else []
         out["my_review"] = None if mine is None else {"step": mine.step, "outcome": mine.outcome}
         return out
+
+    def audit(self, item_id: int) -> dict:
+        """Every review of an item with the reviewer's identity, for the admin token (not for a reviewer's screen)."""
+        item = self.get_item(item_id)
+        return {"item": item, "reviews": self._entries(self._reviews(item_id), identity=True),
+                "files": self.files_for(item_id)}
 
     # --- a check ----------------------------------------------------------------------------------------------------
 
@@ -260,38 +274,46 @@ class ReviewQueue:
         if item.kind != "verify":
             raise ReviewError(422, "only a verify item takes checks")
         self._may_review(reviewer, item, step)
-        scope, ref, field, fact = self.knowledge.get(item.fact_id)
-        if corrected_value is not None and self.check_value is not None:
-            try:
-                self.check_value(field, corrected_value)
-            except ValueError as e:
-                raise ReviewError(422, str(e)) from None
-        promotable = fact.status == "unconfirmed" and fact.read_method in self.policy.compare_with_original
-        if fact.status != "confirmed" and not promotable:
-            raise _no(f"the fact is {fact.status}; only a confirmed fact (or a machine or hand reading) is checked")
         with self.engine.begin() as conn:
             row = conn.execute(select(I).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
                                .with_for_update()).one()
             if row.status != "open":
                 raise _no("this item is already closed")
+            scope, ref, field, fact = self.knowledge.locked(conn, row.fact_id)
+            if corrected_value is not None and self.check_value is not None:
+                try:
+                    self.check_value(field, corrected_value)
+                except ValueError as e:
+                    raise ReviewError(422, str(e)) from None
+            if fact.status != "confirmed" and not self._promotable(fact):
+                raise _no(f"the fact is {fact.status}; only a confirmed fact (or a machine or hand reading) is checked")
             if evidence_file_id is not None and not self._file_of(conn, evidence_file_id, item_id):
                 raise ReviewError(422, "that evidence file belongs to another item")
+            if conn.execute(select(RV.c.id).join(RW, RW.c.id == RV.c.reviewer_id).where(
+                    RV.c.item_id == item_id, RW.c.identity == reviewer.identity, RW.c.id != reviewer.id)).first():
+                raise _no("a review of this item already came from the same identity; "
+                          "two checks need two distinct identities")
             try:
                 with conn.begin_nested():
                     conn.execute(RV.insert().values(
-                        tenant_id=self.tenant_id, item_id=item_id, fact_id=item.fact_id, reviewer_id=reviewer.id,
+                        tenant_id=self.tenant_id, item_id=item_id, fact_id=row.fact_id, reviewer_id=reviewer.id,
                         step=step, outcome=outcome, corrected_value=corrected_value, corrected_quote=corrected_quote,
-                        note=note, evidence_file_id=evidence_file_id, fact_digest=digest(fact)))
+                        note=note, evidence_file_id=evidence_file_id, fact_digest=fact_digest(fact),
+                        high_stakes=is_high_stakes(fact_class(field, fact.fact_class))))
             except IntegrityError:
                 raise _no("you have already reviewed this item") from None
         return self.evaluate(item_id, reviewer)
+
+    def _promotable(self, fact: Fact) -> bool:
+        return fact.status == "unconfirmed" and fact.read_method in self.policy.compare_with_original
 
     def _file_of(self, conn, file_id: int, item_id: int) -> bool:
         return conn.execute(select(FL.c.id).where(FL.c.id == file_id, FL.c.item_id == item_id,
                                                   FL.c.tenant_id == self.tenant_id)).first() is not None
 
     def evaluate(self, item_id: int, actor: Reviewer | None = None) -> dict:
-        """Applies the checks given so far. Safe to call again: a closed item is returned as it is."""
+        """Applies the checks given so far, all in one transaction (fact changes, follow-up items, closing the item):
+        a crash leaves nothing half done, and calling it again is safe. Callbacks that revise plans run after."""
         after: list[Callable[[], None]] = []
         with self.engine.begin() as conn:
             row = conn.execute(select(I).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
@@ -313,68 +335,75 @@ class ReviewQueue:
         return {"item_id": row.id, "item_status": row.status, "resolution": row.resolution, "fact_status": status}
 
     def _decide(self, conn, item, actor: Reviewer | None, after: list) -> str | None:
-        scope, ref, field, fact = self.knowledge.get(item.fact_id)
+        scope, ref, field, fact = self.knowledge.locked(conn, item.fact_id)
+        seen = fact_digest(fact)
         cause_ref = str(item.id)
-        who = actor.ref if actor else None
-        reviews = conn.execute(select(RV, RW.c.ref.label("rref"), RW.c.kind.label("rkind")).join(
-            RW, RW.c.id == RV.c.reviewer_id).where(RV.c.item_id == item.id).order_by(RV.c.id)).all()
-        if any(r.fact_digest != digest(fact) for r in reviews):
+        reviews = conn.execute(select(RV, RW.c.ref.label("rref"), RW.c.kind.label("rkind"),
+                                      RW.c.identity.label("rident")).join(RW, RW.c.id == RV.c.reviewer_id)
+                               .where(RV.c.item_id == item.id).order_by(RV.c.id)).all()
+        if any(r.fact_digest != seen for r in reviews):
             self._reopen_after(item, fact, after)
             return "void"
         if fact.status == "verified":
             return "verified"
-        promotable = fact.status == "unconfirmed" and fact.read_method in self.policy.compare_with_original
-        if fact.status != "confirmed" and not promotable:
+        if fact.status != "confirmed" and not self._promotable(fact):
             return "void"  # the fact moved (stale, unconfirmed) while it waited
-        wrong = next((r for r in reviews if r.outcome == "wrong"), None)
-        if wrong is not None:
-            return self._wrong(item, fact, scope, ref, field, wrong, after)
-        if any(r.outcome == "reject" for r in reviews):
-            self.open_item("conflict", dedupe_key=f"conflict:verify:{item.id}", fact_id=item.fact_id,
-                           summary="A reviewer rejected a reading another reviewer found correct",
-                           payload={"source_item": item.id}, opened_by="review", batch_ref=item.batch_ref)
-            return "rejected"
-        unclear = next((r for r in reviews if r.outcome == "unclear"), None)
-        if unclear is not None:
-            self.open_item("collect", dedupe_key=f"collect:{item.fact_id}", fact_id=item.fact_id,
-                           summary="A reviewer could not tell if the reading is right; read the original again",
-                           payload={"reason": "unclear", "source_item": item.id}, opened_by="review",
-                           batch_ref=item.batch_ref)
-            return "unclear"
-        checks = [r for r in reviews if r.outcome == "correct"]
-        approvals = [r for r in reviews if r.outcome == "approve"]
-        status = fact.status
-        if status == "unconfirmed" and checks:  # compared with the original: now confirmed (R-72)
-            fact = self.knowledge.revise(item.fact_id, status="confirmed", cause="review", cause_ref=cause_ref,
-                                         actor=checks[0].rref)
-            status = fact.status
-            after.append(lambda: self._changed(scope, ref, field, item.fact_id, "confirmed", fact.intake_year, True))
-        high = is_high_stakes(fact_class(field, fact.fact_class))
-        need = self.policy.steps_high_stakes if high else self.policy.steps_other
-        positives = checks + approvals
-        enough = bool(checks and approvals) if need >= 2 else bool(positives)
-        if need >= 2 and len({r.reviewer_id for r in positives}) < 2:
-            enough = False
-        persons = sum(1 for r in positives if r.rkind == "person")
-        if enough and status == "confirmed" and persons >= self.policy.min_persons:
-            self.knowledge.set_status(item.fact_id, "verified", cause="review", cause_ref=cause_ref,
-                                      actor=who or positives[-1].rref)
-            return "verified"
-        return None
+        guard = dict(cause="review", cause_ref=cause_ref, expected_digest=seen, except_item=item.id, conn=conn)
+        try:
+            wrong = next((r for r in reviews if r.outcome == "wrong"), None)
+            if wrong is not None:
+                return self._wrong(conn, item, fact, scope, ref, field, wrong, after, guard)
+            if any(r.outcome == "reject" for r in reviews):
+                self.open_item("conflict", dedupe_key=f"conflict:verify:{item.id}", fact_id=item.fact_id,
+                               summary="A reviewer rejected a reading another reviewer found correct",
+                               payload={"source_item": item.id}, opened_by="review", batch_ref=item.batch_ref,
+                               conn=conn)
+                return "rejected"
+            if any(r.outcome == "unclear" for r in reviews):
+                self.open_item("collect", dedupe_key=f"collect:{item.fact_id}", fact_id=item.fact_id,
+                               summary="A reviewer could not tell if the reading is right; read the original again",
+                               payload={"reason": "unclear", "source_item": item.id}, opened_by="review",
+                               batch_ref=item.batch_ref, conn=conn)
+                return "unclear"
+            checks = [r for r in reviews if r.outcome == "correct"]
+            promoter = item.payload.get("promoted_by")
+            if fact.status == "unconfirmed" and checks:  # compared with the original: now confirmed (R-72)
+                self.knowledge.revise(item.fact_id, status="confirmed", actor=checks[0].rref, **guard)
+                promoter = checks[0].id
+                conn.execute(update(I).where(I.c.id == item.id).values(payload={**item.payload,
+                                                                                "promoted_by": promoter}))
+                after.append(lambda: self._changed(scope, ref, field, item.fact_id, "confirmed", fact.intake_year, True))
+                fact = self.knowledge.locked(conn, item.fact_id)[3]
+            # the check that confirmed a machine or hand reading does not also count towards verified (M2)
+            counted = [r for r in reviews if r.outcome in POSITIVE and r.id != promoter]
+            high = any(r.high_stakes for r in reviews) or is_high_stakes(fact_class(field, fact.fact_class))
+            need = self.policy.steps_high_stakes if high else self.policy.steps_other
+            has_check = any(r.outcome == "correct" for r in counted)
+            has_approval = any(r.outcome == "approve" for r in counted)
+            enough = (has_check and has_approval and len({r.rident for r in counted}) >= 2) if need >= 2 \
+                else bool(counted)
+            persons = sum(1 for r in counted if r.rkind == "person")
+            if enough and fact.status == "confirmed" and persons >= self.policy.min_persons:
+                self.knowledge.set_status(item.fact_id, "verified", actor=actor.ref if actor else counted[-1].rref,
+                                          cause="review", cause_ref=cause_ref, expected_digest=seen, conn=conn)
+                return "verified"
+            return None
+        except StaleFact:  # the reading changed under us after it was read: nothing was written
+            self._reopen_after(item, fact, after)
+            return "void"
 
-    def _wrong(self, item, fact: Fact, scope: str, ref: str, field: str, wrong, after: list) -> str:
-        cause_ref = str(item.id)
+    def _wrong(self, conn, item, fact: Fact, scope: str, ref: str, field: str, wrong, after: list, guard: dict) -> str:
         if wrong.corrected_value is not None:
             self.knowledge.revise(item.fact_id, value=wrong.corrected_value, quote=wrong.corrected_quote,
-                                  status="unconfirmed", read_method="human", cause="review", cause_ref=cause_ref,
-                                  actor=wrong.rref,
-                                  conflict_note=f"corrected by {wrong.rref}; was {fact.value!r}: \"{fact.quote}\"")
+                                  status="unconfirmed", read_method="human", actor=wrong.rref,
+                                  conflict_note=f"corrected by {wrong.rref}; was {fact.value!r}: \"{fact.quote}\"",
+                                  **guard)
             resolution = "corrected"
             self.open_verify_later(item, wrong.rref, after)
         else:
             self.knowledge.revise(item.fact_id, status="unconfirmed" if fact.status != "unconfirmed" else fact.status,
-                                  conflict_note=f"marked wrong by {wrong.rref}: {wrong.note}", cause="review",
-                                  cause_ref=cause_ref, actor=wrong.rref)
+                                  conflict_note=f"marked wrong by {wrong.rref}: {wrong.note}", actor=wrong.rref,
+                                  **guard)
             resolution = "demoted"
         if fact.status != "unconfirmed":
             after.append(lambda: self._changed(scope, ref, field, item.fact_id, "unconfirmed", fact.intake_year, False))
@@ -388,8 +417,7 @@ class ReviewQueue:
 
     def _reopen_after(self, item, fact: Fact, after: list) -> None:
         """The fact changed under review: its reviews no longer apply. A fresh item opens if it can still be checked."""
-        if fact.status != "confirmed" and not (fact.status == "unconfirmed"
-                                               and fact.read_method in self.policy.compare_with_original):
+        if fact.status != "confirmed" and not self._promotable(fact):
             return
         after.append(lambda: self.open_verify(item.fact_id, opened_by="review", batch_ref=item.batch_ref,
                                               author_ref=item.payload.get("author_ref")))
@@ -410,8 +438,11 @@ class ReviewQueue:
             raise ReviewError(422, "only a collect item takes a collected reading")
         if reviewer.kind not in self.policy.counting_kinds:
             raise ReviewError(403, f"readings by {reviewer.kind} reviewers do not count (review policy)")
-        if not (quote.strip() and url.strip()):
-            raise ReviewError(422, "a reading needs the exact quote and the page URL")
+        if not quote.strip():
+            raise ReviewError(422, "a reading needs the exact quote")
+        parts = urlsplit(url.strip())
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise ReviewError(422, "the source must be an http or https page address")
         if self.policy.collect_needs_evidence and evidence_file_id is None:
             raise ReviewError(422, "upload the original (a scan, screenshot or PDF) as evidence")
         if read_method not in ("human", "ocr"):
@@ -422,21 +453,10 @@ class ReviewQueue:
                 self.check_value(item.field, value)
             except ValueError as e:
                 raise ReviewError(422, str(e)) from None
-        with self.engine.begin() as conn:
-            row = conn.execute(select(I).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
-                               .with_for_update()).one()
-            if row.status != "open":
-                raise _no("this item is already closed")
-            if evidence_file_id is not None and not self._file_of(conn, evidence_file_id, item_id):
-                raise ReviewError(422, "that evidence file belongs to another item")
+        url = url.strip()
         cause_ref = str(item_id)
-        if item.fact_id is not None:
-            scope, ref, field, old = self.knowledge.get(item.fact_id)
-            self.knowledge.revise(item.fact_id, value=value, quote=quote, url=url, status="unconfirmed",
-                                  read_method=read_method, language=language, conflict_note=None, cause="review",
-                                  cause_ref=cause_ref, actor=reviewer.ref)
-            fact_id, year = item.fact_id, old.intake_year
-        else:
+        new_fact_id = None
+        if item.fact_id is None:  # a source that was never read: the fact is created (its own commit; collecting again is safe)
             try:
                 scope, ref, field, year = pl["scope"], pl["ref"], item.field, item.intake_year
                 if year is None or not field:
@@ -446,18 +466,36 @@ class ReviewQueue:
                             fact_class=pl.get("fact_class"), read_method=read_method, language=language)
             except (KeyError, ValueError) as e:
                 raise ReviewError(422, f"this collect item cannot store a fact: {e}") from None
-            fact_id = self.knowledge.upsert(scope, ref, field, fact, source="manual", cause="review",
-                                            cause_ref=cause_ref, actor=reviewer.ref)
+            new_fact_id = self.knowledge.upsert(scope, ref, field, fact, source="manual", cause="review",
+                                                cause_ref=cause_ref, actor=reviewer.ref)
         with self.engine.begin() as conn:
+            row = conn.execute(select(I).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
+                               .with_for_update()).one()
+            if row.status != "open":
+                raise _no("this item is already closed")
+            if evidence_file_id is not None and not self._file_of(conn, evidence_file_id, item_id):
+                raise ReviewError(422, "that evidence file belongs to another item")
+            if new_fact_id is None:
+                fact_id = item.fact_id
+                scope, ref, field, _ = self.knowledge.locked(conn, fact_id)
+                stored = self.knowledge.revise(fact_id, value=value, quote=quote, url=url, status="unconfirmed",
+                                               read_method=read_method, language=language, conflict_note=None,
+                                               cause="review", cause_ref=cause_ref, actor=reviewer.ref, conn=conn)
+                year = stored.intake_year
+            else:
+                fact_id = new_fact_id
+                stored = self.knowledge.locked(conn, fact_id)[3]
             conn.execute(RV.insert().values(
                 tenant_id=self.tenant_id, item_id=item_id, fact_id=fact_id, reviewer_id=reviewer.id, step="collect",
                 outcome="collected", corrected_value=value, corrected_quote=quote, note=note,
-                evidence_file_id=evidence_file_id, fact_digest=digest(self.knowledge.get(fact_id)[3])))
+                evidence_file_id=evidence_file_id, fact_digest=fact_digest(stored),
+                high_stakes=is_high_stakes(fact_class(field, stored.fact_class))))
             conn.execute(update(I).where(I.c.id == item_id).values(
                 status="closed", resolution="collected", closed_at=func.now(), closed_by=reviewer.id, fact_id=fact_id))
+            verify_id, _ = self.open_item("verify", dedupe_key=f"verify:{fact_id}", fact_id=fact_id,
+                                          batch_ref=item.batch_ref, opened_by="review",
+                                          payload={"author_ref": reviewer.ref}, conn=conn)
         self._changed(scope, ref, field, fact_id, "unconfirmed", year, False)
-        verify_id, _ = self.open_verify(fact_id, opened_by="review", batch_ref=item.batch_ref,
-                                        author_ref=reviewer.ref)
         return {"item_id": item_id, "item_status": "closed", "resolution": "collected", "fact_id": fact_id,
                 "verify_item_id": verify_id}
 
@@ -484,22 +522,27 @@ class ReviewQueue:
     # --- evidence files -----------------------------------------------------------------------------------------------
 
     def add_file(self, item_id: int, reviewer: Reviewer, filename: str, content_type: str, data: bytes) -> dict:
+        """Stores evidence. What the file is comes from its bytes; a claim that disagrees is refused (C1)."""
         item = self.get_item(item_id)
         if item.status != "open":
             raise _no("this item is already closed")
-        if content_type not in self.policy.evidence_types:
-            raise ReviewError(422, f"evidence must be one of {list(self.policy.evidence_types)}")
         if not data:
             raise ReviewError(422, "the file is empty")
         if len(data) > self.policy.evidence_max_bytes:
             raise ReviewError(413, f"the file is larger than {self.policy.evidence_max_bytes} bytes")
+        kind = sniff(data)
+        if kind is None or kind not in self.policy.evidence_types:
+            raise ReviewError(422, f"evidence must be one of {list(self.policy.evidence_types)}")
+        claimed = (content_type or "").split(";")[0].strip().lower()
+        if claimed not in ("", "application/octet-stream", kind):
+            raise ReviewError(422, f"the file is {kind}, not {claimed}")
         name = (filename or "evidence").replace("\\", "/").rsplit("/", 1)[-1][:200] or "evidence"
         with self.engine.begin() as conn:
             fid = conn.execute(FL.insert().values(
                 tenant_id=self.tenant_id, item_id=item_id, uploaded_by=reviewer.id, filename=name,
-                content_type=content_type, size=len(data), sha256=hashlib.sha256(data).hexdigest(), data=data,
+                content_type=kind, size=len(data), sha256=hashlib.sha256(data).hexdigest(), data=data,
             ).returning(FL.c.id)).scalar_one()
-        return {"id": fid, "filename": name, "content_type": content_type, "size": len(data)}
+        return {"id": fid, "filename": name, "content_type": kind, "size": len(data)}
 
     def get_file(self, file_id: int) -> tuple[dict, bytes]:
         with self.engine.connect() as conn:

@@ -6,7 +6,7 @@ import { ReviewItem, type ReviewActions } from '@/components/os/review-item';
 import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
-import { kindLabel, type OsReviewDetail, type OsReviewItem, type OsReviewer } from '@/lib/os-review';
+import { kindLabel, openEvidence, type OsReviewDetail, type OsReviewItem, type OsReviewer } from '@/lib/os-review';
 
 /**
  * PAI OS review queue: /<workspace>/os-admin/review (P2-T5, spec §4.5). Hidden unless NEXT_PUBLIC_OS_ENABLED=true.
@@ -75,8 +75,20 @@ export default function OsReviewPage({ params }: { params: Promise<{ workspaceId
     },
     openFile: (fileId) => {
       void guard(async () => {
-        const url = URL.createObjectURL(await workspaceApi.getOsReviewFile(token, fileId));
-        window.open(url, '_blank', 'noopener');
+        const blob = await workspaceApi.getOsReviewFile(token, fileId);
+        const name = detail?.files.find((f) => f.id === fileId)?.filename ?? 'evidence';
+        openEvidence(blob, name, {
+          createObjectURL: (b) => URL.createObjectURL(b),
+          revokeObjectURL: (u) => setTimeout(() => URL.revokeObjectURL(u), 10_000),
+          open: (u) => { window.open(u, '_blank', 'noopener'); },
+          download: (u, n) => {
+            const a = document.createElement('a');
+            a.href = u;
+            a.download = n;
+            a.rel = 'noopener';
+            a.click();
+          },
+        });
       }, 'Could not open the file.');
     },
   };

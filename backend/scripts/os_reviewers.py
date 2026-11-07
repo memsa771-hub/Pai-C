@@ -1,14 +1,16 @@
 """Add, list, disable and re-key reviewers of the review queue (P2-D15). No SQL by hand.
 
     python -m scripts.os_reviewers add --ref amina --name "Amina" --role checker [--kind person]
-    python -m scripts.os_reviewers add --ref ai_check_1 --name "AI check 1" --role checker --kind ai
+    python -m scripts.os_reviewers add --ref ai_check_1 --name "AI check 1" --role checker --kind ai \
+        --identity "model-a/prompt-check-1"
     python -m scripts.os_reviewers list
     python -m scripts.os_reviewers disable --ref amina        (their past checks stay)
     python -m scripts.os_reviewers enable --ref amina
     python -m scripts.os_reviewers rotate --ref amina         (a new token; the old one stops working)
 
 Roles: checker (gives the `check` step), approver (the `approve` step), admin (either, and sees all reviews).
-Kinds: person, ai. Which kinds count towards `verified` is the review policy file, not this script.
+Kinds: person, ai. Identity: the person, or for an AI check the model and prompt behind the ref (default: the ref).
+Two checks of one fact need two distinct identities, so give separate AI checks separate model or prompt identities. Which kinds count towards `verified` is the review policy file, not this script.
 `add` and `rotate` print the token once. It is stored hashed and cannot be shown again; give it to the reviewer
 over a private channel. Needs OS_DATABASE_URL (or DATABASE_URL) and optionally OS_TENANT_ID. Exit code 2 when refused.
 """
@@ -27,6 +29,7 @@ def main(argv: list[str] | None = None, engine=None, tenant_id: str | None = Non
     add.add_argument("--name", required=True)
     add.add_argument("--role", required=True, choices=("checker", "approver", "admin"))
     add.add_argument("--kind", default="person", choices=("person", "ai"))
+    add.add_argument("--identity", help="the person, or the model and prompt, behind the ref (default: the ref)")
     sub.add_parser("list", help="every reviewer, active or not")
     for name in ("disable", "enable", "rotate"):
         sub.add_parser(name).add_argument("--ref", required=True)
@@ -41,11 +44,11 @@ def main(argv: list[str] | None = None, engine=None, tenant_id: str | None = Non
     store = ReviewerStore(engine, tenant_id or "pai")
     try:
         if args.cmd == "add":
-            r, token = store.add(args.ref, args.name, args.role, args.kind)
+            r, token = store.add(args.ref, args.name, args.role, args.kind, args.identity)
             out(f"added {r.ref} ({r.role}, {r.kind}). Token (shown once): {token}")
         elif args.cmd == "list":
             for r in store.list():
-                out(f"{r.ref}\t{r.display_name}\t{r.role}\t{r.kind}\t{'active' if r.active else 'disabled'}")
+                out(f"{r.ref}\t{r.display_name}\t{r.role}\t{r.kind}\t{r.identity}\t{'active' if r.active else 'disabled'}")
         elif args.cmd in ("disable", "enable"):
             if not store.set_active(args.ref, args.cmd == "enable"):
                 raise ReviewerError(f"no reviewer '{args.ref}'")

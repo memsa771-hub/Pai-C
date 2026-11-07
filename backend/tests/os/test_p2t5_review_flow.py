@@ -12,6 +12,7 @@ from app.os.knowledge import Fact, SqlKnowledge
 from app.os.knowledge.review import ReviewError, ReviewerError, ReviewerStore, ReviewQueue, load_policy
 
 URL, QUOTE = "https://uni.test/apply", "Apply by 15 July 2027"
+PNG = b"\x89PNG\r\n\x1a\n" + b"data"
 AT = datetime(2026, 10, 22, tzinfo=timezone.utc)
 VALUE = {"date": "2027-07-15", "tz": "Europe/Berlin"}
 
@@ -120,17 +121,23 @@ def test_one_reviewer_cannot_give_both_steps_or_wrong_role(s):
 
 
 @pytest.mark.req("R-42")
-def test_a_reviewer_sees_no_other_review_before_giving_their_own(s):
+def test_a_reviewer_sees_no_other_review_before_giving_their_own_admins_too(s):
     item, _ = s.q.open_verify(s.fact())
+    f = s.q.add_file(item, s.r["ai_check_1"], "n.png", "image/png", PNG)
     s.q.submit_review(item, s.r["ai_check_1"], "check", "correct", note="matches the page")
-    before = s.q.detail(item, s.r["ai_check_2"])
-    assert before["reviews"] == [] and before["my_review"] is None
-    assert "matches the page" not in repr(before)
-    assert len(s.q.detail(item, s.r["owner"])["reviews"]) == 1  # an admin sees all
+    for who in ("ai_check_2", "owner"):  # an admin has no view into open reviews either
+        before = s.q.detail(item, s.r[who])
+        assert before["reviews"] == [] and before["my_review"] is None
+        assert "matches the page" not in repr(before)
+        assert [f["uploaded_by"] for f in before["files"]] == [None]  # who is reviewing is hidden too
+    assert s.q.detail(item, s.r["ai_check_1"])["files"][0]["uploaded_by"] == "ai_check_1"
+    audit = s.q.audit(item)  # the separate admin-token view
+    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [("ai_check_1", "ai_check_1")]
     s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
     after = s.q.detail(item, s.r["ai_check_2"])
     assert [r["reviewer"] for r in after["reviews"]] == ["ai_check_1", "ai_check_2"]
     assert after["my_review"] == {"step": "approve", "outcome": "approve"}
+    assert len(s.q.detail(item, s.r["owner"])["reviews"]) == 2  # closed: visible to all
 
 
 @pytest.mark.req("R-42")
@@ -192,7 +199,9 @@ def test_correction_keeps_the_old_state_and_needs_other_reviewers(s):
     s.q.submit_review(nxt.id, s.r["amina"], "check", "correct")  # compared with the original: confirmed
     assert s.status(fid) == "confirmed"
     assert s.changes[-1][4:] == ("confirmed", 2027, True)
-    assert s.q.submit_review(nxt.id, s.r["ai_check_2"], "approve", "approve")["fact_status"] == "verified"
+    # that comparing check does not also count towards verified (M2): an approval alone is not enough
+    assert s.q.submit_review(nxt.id, s.r["ai_check_2"], "approve", "approve")["fact_status"] == "confirmed"
+    assert s.q.submit_review(nxt.id, s.r["owner"], "check", "correct")["fact_status"] == "verified"
 
 
 @pytest.mark.req("R-75")
@@ -227,7 +236,7 @@ def test_collect_with_evidence_then_independent_checks(s):
     with pytest.raises(ReviewError) as e:  # evidence is required
         s.q.collect(c.id, s.r["amina"], value=VALUE, quote=QUOTE, url=URL)
     assert e.value.status == 422
-    f = s.q.add_file(c.id, s.r["amina"], "../scan.png", "image/png", b"\x89PNGdata")
+    f = s.q.add_file(c.id, s.r["amina"], "../scan.png", "image/png", PNG)
     assert f["filename"] == "scan.png"
     out = s.q.collect(c.id, s.r["amina"], value=VALUE, quote=QUOTE, url=URL, evidence_file_id=f["id"])
     assert out["resolution"] == "collected" and s.status(fid) == "unconfirmed"
@@ -237,9 +246,10 @@ def test_collect_with_evidence_then_independent_checks(s):
         s.q.submit_review(nxt, s.r["amina"], "check", "correct")  # the collector cannot check their own reading
     s.q.submit_review(nxt, s.r["ai_check_1"], "check", "correct")
     assert s.status(fid) == "confirmed"
-    assert s.q.submit_review(nxt, s.r["bilal"], "approve", "approve")["fact_status"] == "verified"
+    assert s.q.submit_review(nxt, s.r["bilal"], "approve", "approve")["fact_status"] == "confirmed"  # M2
+    assert s.q.submit_review(nxt, s.r["owner"], "check", "correct")["fact_status"] == "verified"
     meta, data = s.q.get_file(f["id"])
-    assert data == b"\x89PNGdata" and meta["content_type"] == "image/png"
+    assert data == PNG and meta["content_type"] == "image/png"
 
 
 @pytest.mark.req("R-72")
@@ -263,29 +273,145 @@ def test_evidence_limits_and_ownership(s):
                             payload={"scope": "programme", "ref": "p9"})
     other, _ = s.q.open_item("collect", dedupe_key="c2", field="fee", intake_year=2027,
                              payload={"scope": "programme", "ref": "p8"})
-    for ctype, data, code in (("application/x-msdownload", b"x", 422), ("image/png", b"", 422),
-                              ("image/png", b"x" * (load_policy().evidence_max_bytes + 1), 413)):
+    for ctype, data, code in (("application/x-msdownload", b"MZ\x90\x00\x03", 422), ("image/png", b"", 422),
+                              ("text/plain", b"x" * (load_policy().evidence_max_bytes + 1), 413)):
         with pytest.raises(ReviewError) as e:
             s.q.add_file(item, s.r["amina"], "a", ctype, data)
         assert e.value.status == code
-    f = s.q.add_file(other, s.r["amina"], "a.png", "image/png", b"x")
+    f = s.q.add_file(other, s.r["amina"], "a.png", "image/png", PNG)
     with pytest.raises(ReviewError) as e:  # another item's file
         s.q.collect(item, s.r["amina"], value=1, quote="q", url=URL, evidence_file_id=f["id"])
     assert e.value.status == 422
 
 
+@pytest.mark.req("R-72")
+def test_the_server_decides_the_file_type_from_its_bytes(s):
+    item, _ = s.q.open_item("collect", dedupe_key="c1", field="fee", intake_year=2027,
+                            payload={"scope": "programme", "ref": "p9"})
+    for name, ctype, data in (("a.html", "text/html", b"<script>alert(1)</script>"),
+                              ("a.svg", "image/svg+xml", b"<svg onload=alert(1)/>"),
+                              ("a.png", "image/png", b"<html><script>1</script></html>"),  # a lie about the type
+                              ("a.png", "image/png", b"\x00\x01\x02 binary")):
+        with pytest.raises(ReviewError) as e:
+            s.q.add_file(item, s.r["amina"], name, ctype, data)
+        assert e.value.status == 422, name
+    assert "text/html" not in load_policy().evidence_types
+    ok = s.q.add_file(item, s.r["amina"], "a.txt", "", b"Notice: fee is 100")  # no claim: the bytes decide
+    assert ok["content_type"] == "text/plain"
+    pdf = s.q.add_file(item, s.r["amina"], "a.pdf", "application/octet-stream", b"%PDF-1.7 ...")
+    assert pdf["content_type"] == "application/pdf"
+
+
+@pytest.mark.req("R-72")
+def test_a_collected_source_must_be_a_web_address(s):
+    item, _ = s.q.open_item("collect", dedupe_key="c1", field="fee", intake_year=2027,
+                            payload={"scope": "programme", "ref": "p9"})
+    f = s.q.add_file(item, s.r["amina"], "a.png", "image/png", PNG)
+    for bad in ("javascript:alert(1)", "file:///etc/passwd", "ftp://x.test/a", "uni.test/apply", "https://"):
+        with pytest.raises(ReviewError) as e:
+            s.q.collect(item, s.r["amina"], value=1, quote="q", url=bad, evidence_file_id=f["id"])
+        assert e.value.status == 422, bad
+
+
 # --- changes under review, items, attestation ------------------------------------------------------------------------------
 
 @pytest.mark.req("R-25")
-def test_a_changed_fact_voids_the_reviews_and_opens_a_new_item(s):
+def test_a_changed_fact_voids_its_open_item_at_the_moment_of_the_change(s):
     fid = s.fact()
     item, _ = s.q.open_verify(fid)
     s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
     s.kb.revise(fid, value={"date": "2027-09-01"}, quote="Apply by 1 September 2027", cause="research")
+    closed = s.q.get_item(item)
+    assert (closed.status, closed.resolution) == ("closed", "void")  # no waiting for the next review to notice
+    with pytest.raises(ReviewError) as e:
+        s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
+    assert e.value.status == 409
+    assert s.q.sync() == 1  # the changed reading gets a fresh item
+
+
+@pytest.mark.req("R-25")
+@pytest.mark.parametrize("change", [{"fact_class": "fee"}, {"read_method": "ocr"}, {"url": "https://uni.test/other"}])
+def test_every_part_of_the_reading_voids_the_item(s, change):
+    """The digest covers value, quote, URL, class and how it was read (I4)."""
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.kb.upsert("programme", "p1", "deadline_close", Fact(
+        VALUE, QUOTE, change.get("url", URL), AT, 2027, "confirmed", fact_class=change.get("fact_class"),
+        read_method=change.get("read_method")))
+    assert s.q.get_item(item).resolution == "void"
+
+
+@pytest.mark.req("R-25")
+def test_a_writer_that_gets_in_before_the_lock_voids_the_decision(s, monkeypatch):
+    """The race (I2): another writer changes the reading just before the review takes the fact's lock. The review
+    works on the locked row, sees the new reading, and verifies nothing."""
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
+    real = s.kb.locked
+    done = []
+
+    def racing(conn, fact_id):
+        if not done:  # the writer commits before our lock is taken
+            done.append(1)
+            s.kb.revise(fact_id, value={"date": "2027-10-01"}, quote="Apply by 1 October 2027", cause="research",
+                        status="confirmed")
+        return real(conn, fact_id)
+
+    monkeypatch.setattr(s.kb, "locked", racing)
     r = s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
-    assert (r["item_status"], r["resolution"], r["fact_status"]) == ("closed", "void", "confirmed")
-    [new] = [i for i in s.q.list_items(kind="verify") if i.id != item]
-    assert new.fact_id == fid and new.status == "open"
+    assert r["item_status"] == "closed" and r["fact_status"] == "confirmed"
+    assert s.kb.get(fid)[3].value == {"date": "2027-10-01"}
+
+
+def test_set_status_and_revise_check_the_digest_on_the_locked_row(s):
+    from app.os.knowledge.store import StaleFact, fact_digest
+
+    fid = s.fact()
+    good = fact_digest(s.kb.get(fid)[3])
+    s.kb.revise(fid, value={"date": "2027-10-01"}, quote="Apply by 1 October 2027", cause="research", status="confirmed")
+    with pytest.raises(StaleFact):
+        s.kb.set_status(fid, "verified", cause="review", expected_digest=good)
+    with pytest.raises(StaleFact):
+        s.kb.revise(fid, status="unconfirmed", cause="review", expected_digest=good)
+    assert s.status(fid) == "confirmed"
+    s.kb.set_status(fid, "verified", cause="review", expected_digest=fact_digest(s.kb.get(fid)[3]))
+
+
+@pytest.mark.req("R-42")
+def test_two_checks_need_two_distinct_identities(s):
+    """M1: two refs that are one model (or one person) are not two checks."""
+    twin, _ = s.reviewers.add("ai_check_3", "AI check 3", "approver", "ai", identity="ai_check_1")
+    item, _ = s.q.open_verify(s.fact())
+    s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
+    with pytest.raises(ReviewError) as e:
+        s.q.submit_review(item, twin, "approve", "approve")
+    assert e.value.status == 409 and "identit" in e.value.detail
+    assert s.q.get_item(item).status == "open"
+    s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
+    assert s.q.get_item(item).resolution == "verified"
+    assert s.reviewers.add("x1", "X", "checker")[0].identity == "x1"  # default: the ref
+
+
+@pytest.mark.req("R-25")
+def test_the_high_stakes_need_is_recorded_with_the_review(s):
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
+    with s.engine.connect() as conn:
+        assert conn.execute(select(models.fact_reviews.c.high_stakes)).scalar() is True
+    s.kb.revise(fid, status="unconfirmed", conflict_note="x", cause="manual")  # unrelated, same reading
+    assert s.q.get_item(item).status == "open"
+
+
+@pytest.mark.req("R-25")
+def test_evaluate_can_be_run_again(s):
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    two_checks(s, item, fid)
+    again = s.q.evaluate(item)
+    assert (again["item_status"], again["resolution"]) == ("closed", "verified")
+    assert [r.action for r in s.kb.revisions(fid)].count("status") == 1
 
 
 @pytest.mark.req("R-25")

@@ -6,6 +6,7 @@ export type ReviewItemKind = 'verify' | 'report' | 'change' | 'suspect_domain' |
 export interface OsReviewer {
   ref: string;
   display_name: string;
+  identity: string;
   role: ReviewerRole;
   kind: 'person' | 'ai';
   active: boolean;
@@ -64,7 +65,7 @@ export interface OsReviewFile {
   filename: string;
   content_type: string;
   size: number;
-  uploaded_by: string;
+  uploaded_by: string | null;  // hidden until you have given your own review (blind checks)
 }
 
 export interface OsReviewEntry {
@@ -166,4 +167,34 @@ export function parseValue(text: string): { ok: true; value: unknown } | { ok: f
   } catch {
     return { ok: false };
   }
+}
+
+/** Only these are shown in the browser; anything else is a download (C1: evidence must never run in the app's origin). */
+const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|webp))$/;
+
+export function evidenceDelivery(contentType: string): 'view' | 'download' {
+  return VIEWABLE.test(contentType.split(';')[0].trim().toLowerCase()) ? 'view' : 'download';
+}
+
+/** A file name safe to hand to the browser's download: no path, no control or markup characters. */
+export function safeFilename(name: string): string {
+  const cleaned = name.replace(/[\\/]/g, '_').replace(/[^\w.\- ]+/g, '_').trim().slice(0, 150);
+  return cleaned || 'evidence';
+}
+
+/**
+ * Shows a PDF or an image in a new tab, and forces a download of everything else as application/octet-stream, so that
+ * no uploaded file is ever opened as a page in the app's origin. The type used is the server's, never the file's name.
+ */
+export function openEvidence(blob: Blob, filename: string, env: {
+  createObjectURL: (b: Blob) => string; revokeObjectURL: (u: string) => void;
+  open: (url: string) => void; download: (url: string, name: string) => void;
+}): void {
+  if (evidenceDelivery(blob.type) === 'view') {
+    env.open(env.createObjectURL(new Blob([blob], { type: blob.type.split(';')[0].trim().toLowerCase() })));
+    return;
+  }
+  const url = env.createObjectURL(new Blob([blob], { type: 'application/octet-stream' }));
+  env.download(url, safeFilename(filename));
+  env.revokeObjectURL(url);
 }

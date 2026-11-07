@@ -4,7 +4,7 @@ the shared admin token. The admin token opens items and syncs the queue from con
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.os import models
@@ -12,6 +12,7 @@ from app.os.api.services import Services
 from app.os.knowledge.changes import after_fact_change
 from app.os.knowledge.review import Item, ReviewError, ReviewerStore, ReviewQueue
 from app.os.knowledge.review.reviewers import Reviewer
+from app.os.knowledge.review.sniff import safe_disposition
 
 REVIEWER_HEADER = "X-OS-Reviewer-Token"
 LANG = r"^[a-z]{2,3}$"
@@ -74,7 +75,8 @@ def item_out(i: Item) -> dict:
 
 
 def reviewer_out(r: Reviewer) -> dict:
-    return {"ref": r.ref, "display_name": r.display_name, "role": r.role, "kind": r.kind, "active": r.active}
+    return {"ref": r.ref, "display_name": r.display_name, "identity": r.identity, "role": r.role, "kind": r.kind,
+            "active": r.active}
 
 
 def queue_for(svc: Services) -> ReviewQueue:
@@ -143,9 +145,12 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
             raise _fail(e) from None
 
     @router.post("/review/items/{item_id}/evidence", status_code=201)
-    def evidence(item_id: int, file: UploadFile = File(...), who: Reviewer = Depends(reviewer),
+    def evidence(item_id: int, request: Request, file: UploadFile = File(...), who: Reviewer = Depends(reviewer),
                  svc: Services = Depends(services)) -> dict:
         q = queue_for(svc)
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > q.policy.evidence_max_bytes + 65536:  # before the body is read
+            raise HTTPException(status_code=413, detail="the upload is too large")
         data = file.file.read(q.policy.evidence_max_bytes + 1)  # never read more than the cap allows
         try:
             return q.add_file(item_id, who, file.filename or "evidence", (file.content_type or "").split(";")[0], data)
@@ -158,9 +163,9 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
             meta, data = queue_for(svc).get_file(file_id)
         except ReviewError as e:
             raise _fail(e) from None
-        inline = meta["content_type"] != "text/html"  # an uploaded page is a download, never run in our origin
+        inline = meta["content_type"] == "application/pdf" or meta["content_type"].startswith("image/")
         return Response(content=data, media_type=meta["content_type"], headers={
-            "Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{meta["filename"]}"',
+            "Content-Disposition": safe_disposition("inline" if inline else "attachment", meta["filename"]),
             "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "no-store"})
 
     @router.post("/review/batches/{batch_ref}/attest")
@@ -181,6 +186,15 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
     @router.post("/admin/review/sync", dependencies=[Depends(require_admin)])
     def sync(body: SyncIn, svc: Services = Depends(services)) -> dict:
         return {"opened": queue_for(svc).sync(**body.model_dump())}
+
+    @router.get("/admin/review/items/{item_id}/audit", dependencies=[Depends(require_admin)])
+    def audit(item_id: int, svc: Services = Depends(services)) -> dict:
+        """Every review of an item with the reviewer's identity: for the audit, not for a reviewer's screen."""
+        try:
+            d = queue_for(svc).audit(item_id)
+        except ReviewError as e:
+            raise _fail(e) from None
+        return {**d, "item": item_out(d["item"])}
 
     @router.get("/admin/review/reviewers", dependencies=[Depends(require_admin)])
     def reviewers(svc: Services = Depends(services)) -> dict:

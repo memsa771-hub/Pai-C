@@ -20,6 +20,7 @@ from tests.os.test_api import ADMIN, TOKEN
 FAKE = Path(__file__).parent / "playbooks"
 AT = datetime(2026, 10, 22, tzinfo=timezone.utc)
 URL, QUOTE = "https://uni.test/apply", "Apply by 15 July 2027"
+PNG = b"\x89PNG\r\n\x1a\n" + b"fake"
 PAGE = "Admissions\nApply by 15 July 2027 through the portal.\nContact us."
 pytestmark = [pytest.mark.req("R-42"), pytest.mark.req("R-25")]
 
@@ -55,7 +56,8 @@ def test_reviewer_endpoints_need_a_reviewer_token_not_the_admin_token(api):
     for headers in ({}, ADMIN, {REVIEWER_HEADER: "rvt_nope"}, {REVIEWER_HEADER: ""}):
         assert api.get("/v1/os/review/items", headers=headers).status_code == 401
     assert api.get("/v1/os/review/me", headers=api.tokens["amina"]).json() == {
-        "ref": "amina", "display_name": "amina", "role": "checker", "kind": "person", "active": True}
+        "ref": "amina", "display_name": "amina", "identity": "amina", "role": "checker", "kind": "person",
+        "active": True}
     # and the admin endpoints do not take a reviewer token
     assert api.post("/v1/os/admin/review/sync", headers=api.tokens["owner"], json={}).status_code == 401
     assert api.get("/v1/os/admin/review/reviewers", headers=api.tokens["owner"]).status_code == 401
@@ -132,29 +134,54 @@ def test_collection_with_evidence_over_http(api):
                    files={"file": ("a.exe", b"MZ", "application/x-msdownload")})
     assert bad.status_code == 422
     up = api.post(f"/v1/os/review/items/{collect['id']}/evidence", headers=h,
-                  files={"file": ("scan.png", b"\x89PNGfake", "image/png")})
+                  files={"file": ("scan.png", PNG, "image/png")})
     assert up.status_code == 201
     fid = up.json()["id"]
     done = api.post(f"/v1/os/review/items/{collect['id']}/collect", headers=h, json={**body, "evidence_file_id": fid})
     assert done.status_code == 200 and done.json()["resolution"] == "collected"
     got = api.get(f"/v1/os/review/files/{fid}", headers=h)
-    assert got.content == b"\x89PNGfake" and got.headers["content-type"] == "image/png"
+    assert got.content == PNG and got.headers["content-type"] == "image/png"
     assert got.headers["x-content-type-options"] == "nosniff" and got.headers["content-security-policy"] == "sandbox"
     assert api.get(f"/v1/os/review/files/{fid}").status_code == 401
     assert api.get("/v1/os/review/files/999", headers=h).status_code == 404
 
 
-def test_an_uploaded_page_is_a_download_and_the_size_cap_holds(api):
+def test_active_content_is_refused_and_text_is_a_download(api):
+    """C1: HTML and SVG are refused whatever they claim; plain text is served as an attachment with a safe name."""
     item = open_verify(api)
     h = api.tokens["amina"]
-    up = api.post(f"/v1/os/review/items/{item}/evidence", headers=h,
-                  files={"file": ("p.html", b"<script>1</script>", "text/html")})
+    url = f"/v1/os/review/items/{item}/evidence"
+    for name, ctype, body in (("p.html", "text/html", b"<script>1</script>"), ("p.svg", "image/svg+xml", b"<svg/>"),
+                              ("p.png", "image/png", b"<script>1</script>")):
+        assert api.post(url, headers=h, files={"file": (name, body, ctype)}).status_code == 422
+    up = api.post(url, headers=h, files={"file": ('n"\r\nx.txt', b"Notice text", "text/plain")})
     assert up.status_code == 201
     got = api.get(f"/v1/os/review/files/{up.json()['id']}", headers=h)
-    assert got.headers["content-disposition"].startswith("attachment")
+    disp = got.headers["content-disposition"]
+    assert disp.startswith("attachment") and "\r" not in disp and "\n" not in disp and "filename*=UTF-8''" in disp
+    assert got.headers["x-content-type-options"] == "nosniff"
+    pdf = api.post(url, headers=h, files={"file": ("a.pdf", b"%PDF-1.4 x", "application/pdf")})
+    assert api.get(f"/v1/os/review/files/{pdf.json()['id']}", headers=h).headers["content-disposition"].startswith("inline")
+
+
+def test_the_size_cap_holds_before_and_after_reading(api):
+    item = open_verify(api)
+    h = api.tokens["amina"]
     big = b"x" * (load_policy().evidence_max_bytes + 1)
     assert api.post(f"/v1/os/review/items/{item}/evidence", headers=h,
                     files={"file": ("big.txt", big, "text/plain")}).status_code == 413
+
+
+def test_admin_audit_shows_identities_and_reviewers_do_not(api):
+    item = open_verify(api)
+    api.post(f"/v1/os/review/items/{item}/review", headers=api.tokens["ai_check_1"],
+             json={"step": "check", "outcome": "correct"})
+    admin_reviewer = api.get(f"/v1/os/review/items/{item}", headers=api.tokens["owner"]).json()
+    assert admin_reviewer["reviews"] == []  # an admin reviewer has no view into open reviews
+    audit = api.get(f"/v1/os/admin/review/items/{item}/audit", headers=ADMIN).json()
+    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [("ai_check_1", "ai_check_1")]
+    assert api.get(f"/v1/os/admin/review/items/{item}/audit", headers=api.tokens["owner"]).status_code == 401
+    assert api.get("/v1/os/admin/review/items/999/audit", headers=ADMIN).status_code == 404
 
 
 def test_resolve_and_attest_over_http(api):

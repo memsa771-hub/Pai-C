@@ -46,7 +46,7 @@ export function ReviewItem({ detail, reviewer, busy, actions }: {
           {detail.files.map((f) => (
             <li key={f.id}>
               <button type="button" className="underline" onClick={() => actions.openFile(f.id)}>{f.filename}</button>
-              <span className="text-xs text-muted-foreground"> · {f.content_type} · {f.size} bytes · {f.uploaded_by}</span>
+              <span className="text-xs text-muted-foreground"> · {f.content_type} · {f.size} bytes{f.uploaded_by ? ` · ${f.uploaded_by}` : ''}</span>
             </li>
           ))}
         </ul>

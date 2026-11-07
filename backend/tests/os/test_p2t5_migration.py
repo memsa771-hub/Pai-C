@@ -34,8 +34,8 @@ def test_os_0026_upgrade_downgrade(os_db, engine, clean):
 
 def test_downgrade_refuses_to_drop_records(os_db, engine, clean):
     with engine.begin() as conn:
-        conn.execute(insert(models.reviewers).values(tenant_id="pai", ref="amina", display_name="A", role="checker",
-                                                     token_hash="h1"))
+        conn.execute(insert(models.reviewers).values(tenant_id="pai", ref="amina", display_name="A", identity="amina",
+                                                     role="checker", token_hash="h1"))
     engine.dispose()
     with pytest.raises(Exception):
         run_alembic(["downgrade", "os_0025"], os_db)
@@ -43,7 +43,7 @@ def test_downgrade_refuses_to_drop_records(os_db, engine, clean):
 
 def _reviewer(conn, ref="amina", token="h1", **kw) -> int:
     return conn.execute(insert(models.reviewers).values(
-        tenant_id="pai", ref=ref, display_name=ref, role="checker", token_hash=token, **kw
+        tenant_id="pai", ref=ref, display_name=ref, identity=ref, role="checker", token_hash=token, **kw
     ).returning(models.reviewers.c.id)).scalar()
 
 
@@ -61,7 +61,7 @@ def test_database_rules(engine, clean):
     for kw in ({"ref": "amina", "token": "h2"}, {"ref": "x", "token": "h1"}, {"ref": "y", "token": "h3", "role": "boss"}):
         with pytest.raises(IntegrityError), engine.begin() as conn:
             _reviewer(conn, **kw) if "role" not in kw else conn.execute(insert(models.reviewers).values(
-                tenant_id="pai", ref="y", display_name="y", role="boss", token_hash="h3"))
+                tenant_id="pai", ref="y", display_name="y", identity="y", role="boss", token_hash="h3"))
     with pytest.raises(IntegrityError), engine.begin() as conn:  # one open item per key
         _item(conn)
     with engine.begin() as conn:

@@ -22,7 +22,7 @@ const detail = (over: Partial<OsReviewDetail> = {}, item: Partial<OsReviewDetail
               text: `Admissions\n${QUOTE} through the portal.`, truncated: false, quote_found: true },
   files: [], reviews: [], my_review: null, ...over,
 });
-const who = (role: OsReviewer['role']): OsReviewer => ({ ref: 'r1', display_name: 'R One', role, kind: 'ai', active: true });
+const who = (role: OsReviewer['role']): OsReviewer => ({ ref: 'r1', display_name: 'R One', role, kind: 'ai', active: true, identity: 'r1' });
 const actions = (): ReviewActions => ({
   review: vi.fn().mockResolvedValue(undefined), collect: vi.fn().mockResolvedValue(undefined),
   resolve: vi.fn().mockResolvedValue(undefined), upload: vi.fn().mockResolvedValue(11), openFile: vi.fn(),

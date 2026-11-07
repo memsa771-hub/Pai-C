@@ -26,6 +26,7 @@ class Reviewer:
     id: int
     ref: str
     display_name: str
+    identity: str
     role: str
     kind: str
     active: bool
@@ -36,7 +37,7 @@ def _hash(token: str) -> str:
 
 
 def _reviewer(row) -> Reviewer:
-    return Reviewer(row.id, row.ref, row.display_name, row.role, row.kind, row.active)
+    return Reviewer(row.id, row.ref, row.display_name, row.identity, row.role, row.kind, row.active)
 
 
 class ReviewerStore:
@@ -44,8 +45,11 @@ class ReviewerStore:
         self.engine = engine
         self.tenant_id = tenant_id
 
-    def add(self, ref: str, display_name: str, role: str, kind: str = "person") -> tuple[Reviewer, str]:
-        """(the reviewer, the token). The token cannot be read again; `rotate` makes a new one."""
+    def add(self, ref: str, display_name: str, role: str, kind: str = "person",
+            identity: str | None = None) -> tuple[Reviewer, str]:
+        """(the reviewer, the token). The token cannot be read again; `rotate` makes a new one. `identity` is the
+        person, or for an AI check the model and prompt, behind the ref (default: the ref). Two checks of one fact
+        need two distinct identities, so two refs that are really one person or one model do not make two checks."""
         if not REF.match(ref):
             raise ReviewerError("ref must be 2-64 characters: lower-case letters, digits, '_', '.', '-'")
         if role not in models.REVIEWER_ROLES:
@@ -54,11 +58,15 @@ class ReviewerStore:
             raise ReviewerError(f"kind must be one of {models.REVIEWER_KINDS}")
         if not display_name.strip():
             raise ReviewerError("display name is required")
+        identity = (identity or ref).strip()
+        if not identity:
+            raise ReviewerError("identity is required")
         token = TOKEN_PREFIX + secrets.token_urlsafe(32)
         try:
             with self.engine.begin() as conn:
                 row = conn.execute(R.insert().values(
-                    tenant_id=self.tenant_id, ref=ref, display_name=display_name.strip(), role=role, kind=kind,
+                    tenant_id=self.tenant_id, ref=ref, display_name=display_name.strip(), identity=identity,
+                    role=role, kind=kind,
                     token_hash=_hash(token)).returning(R)).one()
         except IntegrityError:
             raise ReviewerError(f"reviewer '{ref}' already exists") from None
