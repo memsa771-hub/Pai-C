@@ -49,6 +49,8 @@ class PlanContext:
     list_urls: dict[str, str] = field(default_factory=dict)  # official list URL -> list entity id
     existing_institutions: Callable[[str], str | None] = lambda inst_id: None  # inst_id -> registry id already loaded
     existing_programmes: Callable[[str], bool] = lambda ref: False
+    existing_region: Callable[[str], str | None] = lambda registry_id: None  # registry id -> region code
+    region_lookup: Callable[[str], str | None] = lambda registry_id: None  # set by the plan: file first, then database
     require_list: bool = True  # False only for a dry run that asks "what if every list were loaded"
     fmt: Format = field(default_factory=load_format)
 
@@ -285,6 +287,10 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
     registry_ids = {res.row_id: res.payload["entry"].entity_id for res in institutions
                     if res.bucket in ("accepted", "unconfirmed") and "entry" in res.payload}
 
+    file_regions = {res.payload["entry"].entity_id: res.payload["entry"].region for res in institutions
+                    if "entry" in res.payload}
+    ctx.region_lookup = lambda rid: file_regions.get(rid) or ctx.existing_region(rid)
+
     def inst_registry_id(inst_id: str) -> str | None:
         return registry_ids.get(inst_id) or ctx.existing_institutions(inst_id)
 
@@ -367,9 +373,9 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
         facts.append({"field": name, "value": value, "fact_class": spec["fact_class"]})
     res.payload = {"row": r, "provenance": chk.provenance, "inst_registry_id": reg_id, "term": term, "year": year,
                    "facts": facts, "read_method": rm, "checked_at": checked, "url": url, "quote": quote,
-                   "programme_new": rid not in seen_programmes}
+                   "programme_new": rid not in seen_programmes, "region": ctx.region_lookup(reg_id)}
     seen_programmes.add(rid)
-    _cap(res, url, None, quote, ctx, rm)
+    _cap(res, url, res.payload["region"], quote, ctx, rm)
     return None, ""
 
 
@@ -451,7 +457,9 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
                    "value": {"value": value, "unit": unit}, "quote": quote or "", "url": url, "term": term,
                    "year": year, "read_method": rm, "language": lang, "checked_at": checked, "high_stakes": high,
                    "source_type": _text(r.get("source_type"))}
-    _cap(res, url, None, quote, ctx, rm)
+    region = ctx.region_lookup(ref) if scope == "registry" else None
+    res.payload["region"] = region
+    _cap(res, url, region, quote, ctx, rm)
     return None, ""
 
 

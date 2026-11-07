@@ -85,6 +85,7 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
         ctx.attested, ctx.official = deps.attested, deps.official
         ctx.existing_institutions = _registry_lookup(deps.registry)
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
+        ctx.existing_region = lambda rid: (lambda e: e.region if e else None)(deps.registry.get(rid))
     ctx.list_urls = urls
     return ctx
 
