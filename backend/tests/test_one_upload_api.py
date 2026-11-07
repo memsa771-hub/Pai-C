@@ -110,7 +110,7 @@ def test_untyped_upload_runs_todays_pipeline_even_when_on(world, os_on):
     assert [p for _, p in jobs(student, "document.extract")] == [{"file_id": file_id}]
 
 
-@pytest.mark.parametrize("code", ["consent_needed", "duplicate", "not_readable", "unknown_type"])
+@pytest.mark.parametrize("code", ["consent_needed", "not_readable", "unknown_type"])
 def test_refused_registration_keeps_the_file(world, os_on, code):
     client, student, auth = world
     os_on.answer = {"refused": code}
@@ -119,6 +119,15 @@ def test_refused_registration_keeps_the_file(world, os_on, code):
     assert got.json()["data"]["os_document"] == {"refused": code, "note": uploads.text(code)}
     assert len(files(student)) == 1
     assert "extract" not in parse_payloads(student)[0]  # nothing else reads it, so today's pipeline does
+
+
+def test_a_duplicate_typed_upload_skips_the_counsellor_extraction_too(world, os_on):
+    """The same bytes already have an OS document that reads them: the Counsellor does not read them a second time."""
+    client, student, auth = world
+    os_on.answer = {"refused": "duplicate"}
+    got = post_file(client, student, auth, doc_type="transcript")
+    assert got.json()["data"]["os_document"] == {"refused": "duplicate", "note": uploads.text("duplicate")}
+    assert len(files(student)) == 1 and parse_payloads(student)[0].get("extract") is False
 
 
 @pytest.mark.parametrize("code", ["terms_not_set", "not_on"])

@@ -444,7 +444,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
                         student: str = Depends(consented_student),
                         svc: Services = Depends(services)) -> dict:
-        if document_files.enabled():  # P1-T7: the one upload is POST /v1/files; refused before the file is read into memory
+        # P1-T7: the one upload is POST /v1/files. The body still arrives; this guard only avoids reading it into memory.
+        if document_files.enabled():
             raise HTTPException(status_code=409, detail=connect_texts.text("use_documents_page"))
         t = svc.document_types.get(doc_type)
         if t is None:

@@ -87,16 +87,22 @@ def _stage_h_programs(db, workspace_id: str) -> list[dict]:
     endpoint shows them: `opportunity_id`, `title`, `country`."""
     from sqlalchemy import select
 
-    from app.models import ExecutionRun
+    from app.models import ExecutionRun, PaiPossibility
     from app.pai_c.memory import MemoryService
+    from app.pai_c.paths.exclusions import _restored, excluded_fields
     from app.pai_c.paths.programs import current_programs
 
     runs = db.scalars(select(ExecutionRun).where(
         ExecutionRun.workspace_id == workspace_id, ExecutionRun.task_type == "program_search",
         ExecutionRun.status == "completed").order_by(ExecutionRun.created_at.desc())).all()
     facts = MemoryService(db).comparable_facts(workspace_id)
+    excluded = excluded_fields(db, workspace_id)  # R-15: a field the student ruled out offers no places
     seen, found = set(), []
     for run in runs:
+        path = db.get(PaiPossibility, (run.constraints or {}).get("possibility_id")) if excluded else None
+        option = excluded.get((path.study_field or {}).get("key")) if path is not None else None
+        if option is not None and not _restored(path, option):
+            continue
         result = ((run.result or {}).get("capability_result") or {})
         current, _ = current_programs(db, workspace_id, result, facts)
         for program in current["programs"]:

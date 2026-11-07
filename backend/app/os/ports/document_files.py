@@ -7,7 +7,8 @@ reaches those bytes and how the host tells the OS about files.
 Host side (all optional; an unconfigured port is the OS exactly as it was, with its own `os_document_files` table):
 - `read(student_ref, file_ref) -> bytes`: the bytes of the student's file. Any failure is `KeyError` (the port turns other host errors into one). The worker
   loads it from `OS_DOCUMENT_FILES=module.path:callable`, like `OS_STUDENT_FACTS`; the API gets it from `mount_os`.
-- `enabled() -> bool`: whether the host part is on (the OS cannot read host flags). False when unconfigured or when
+- `enabled() -> bool`: whether the host part is on (the OS cannot read host flags; the worker loads its own from
+  `OS_DOCUMENTS_ENABLED=module.path:callable`). False when unconfigured or when
   the callable raises.
 - `on_deleted(student_ref, file_ref)`: called after the OS has deleted a linked document, so the host can purge the
   file (D-y7). Errors are swallowed by the caller.
@@ -73,6 +74,22 @@ def load(spec: str) -> Read:
 def from_settings(settings: OsSettings) -> Read | None:
     """The worker's host reader: loaded from OS_DOCUMENT_FILES, or None."""
     return load(settings.document_files) if settings.document_files else None
+
+
+def gate_from_settings(settings: OsSettings, module_on: Callable[[], bool]) -> Callable[[], bool] | None:
+    """The worker's gate: the host flag from OS_DOCUMENTS_ENABLED and the OS's own `counsellor` module row
+    (`module_on`), both needed. None when OS_DOCUMENTS_ENABLED is unset (the part stays off in the worker). The flag's
+    value is never logged."""
+    if not settings.documents_enabled:
+        return None
+    try:
+        module_path, _, name = settings.documents_enabled.partition(":")
+        flag = getattr(importlib.import_module(module_path), name)
+    except (ImportError, AttributeError, ValueError) as e:
+        raise DocumentFilesSourceError(f"OS_DOCUMENTS_ENABLED cannot be imported ({type(e).__name__})") from None
+    if not callable(flag):
+        raise DocumentFilesSourceError("OS_DOCUMENTS_ENABLED is not callable")
+    return lambda: bool(flag()) and module_on()
 
 
 def enabled() -> bool:

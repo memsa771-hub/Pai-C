@@ -202,8 +202,6 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     student_facts.configure(student_facts.from_settings(settings))  # P1-T4: the host's StudentFacts adapter, if any
     fact_questions.configure(conflicts=fact_questions.from_settings(settings))  # P1-T8: and its open Vault conflicts
     host_files = document_files.from_settings(settings)  # P1-T7: the host's file reader, if any
-    if host_files is not None:  # unset leaves the port as it is: a worker with its own bytes needs none
-        document_files.configure(read=host_files)
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
@@ -220,6 +218,12 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
+    from app.os.adapters.counsellor import manifest as os_manifest
+
+    host_gate = document_files.gate_from_settings(  # P1-T7: the one upload gate; also needs the OS's module row
+        settings, lambda: os_manifest.is_enabled(engine, settings.tenant_id))
+    if host_files is not None or host_gate is not None:  # unset leaves the port as it is
+        document_files.configure(read=host_files, enabled=host_gate)
     install_clock(settings, engine)  # Slice 9a: rehearsal mode reads the stored offset (loud warning); else real time
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
