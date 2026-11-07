@@ -117,7 +117,8 @@ def germany_v3_with_a_gpa_need() -> Playbook:
     row 6.21 run on the same route. Test data only: the playbook files are not touched."""
     data_ = yaml.safe_load((PLAYBOOK_DIR / "germany_master.v2.yaml").read_text(encoding="utf-8"))
     data_["version"] = 3
-    data_["asks"][GPA] = {"stated": "Tell us your final CGPA", "which_is_right": "Which CGPA is right?"}
+    data_["asks"][GPA] = {"stated": "Tell us your final CGPA", "which_is_right": "Which CGPA is right?",
+                          "citations": data_["asks"][SSC]["citations"]}
     for task in data_["tasks"]:
         if task["template_key"] in ("uni_assist_apply", "direct_apply"):
             task["needs"].append({"fact": GPA, "evidence": "stated"})
@@ -327,6 +328,10 @@ class Student:
         doc_id = self.upload(name, doc_type)
         simulate_read(self.svc.engine, doc_id, doc_type, values)
         return doc_id
+
+    def files(self) -> list:
+        with self.who.factory() as db:
+            return list(db.scalars(select(FileRecord).where(FileRecord.workspace_id == self.id).order_by(FileRecord.created_at)))
 
     def fields_of(self, doc_id) -> dict:
         return {f["field"]: (f["value_confirmed"] if f["confirmed_at"] else f["value_read"])
@@ -614,4 +619,187 @@ def test_6_20_result_expected_then_provide_then_stated_then_shown(world):
         ticked = s.os.post(f"/v1/os/inbox/{s.step('admission_form').id}/complete", json={}, headers=s.me)
         assert ticked.status_code == 200 and ticked.json() == {"completed": True}
         assert s.steps()["admission_form"] == "done" and s.steps()["merit_list@pk-i1"] == "waiting_student"
+        s.throughout()
+
+
+# --- row 6.21: Germany, the CGPA the student said and the CGPA a transcript shows -------------------------------------
+
+STATED_CGPA = {"qualification_name": "bachelor", "academic_status": "completed", "result": {"gpa": 3.4, "gpa_scale": 4.0}}
+WHICH_GPA = f"which_is_right@fact:{GPA}:stated"
+TRANSCRIPT_FILE = "b2_transcript.png"  # the sample key: CGPA 3.2 on a scale of 4.0
+
+
+def vault_post(s, card, answer):
+    return s.client.post(f"/v1/vault/conflicts/{card.id}/resolve?network={s.id}", headers=s.auth, json={"answer": answer})
+
+
+def transcript_read(world, s) -> int:
+    """Uploads the sample transcript typed, and waits for the offline reader."""
+    with reader(world):
+        doc_id = s.upload(TRANSCRIPT_FILE, TRANSCRIPT_DOC)
+        s.reader_waits_for(doc_id, "read")
+    assert s.fields_of(doc_id)["cgpa"] == 3.2
+    return doc_id
+
+
+def germany_with_a_stated_cgpa(world, s) -> int:
+    """The student said CGPA 3.4 in chat and chose two places in Germany; the plan is on the version that asks for the CGPA."""
+    world.svc.plans.playbooks[("germany_master", 3)] = germany_v3_with_a_gpa_need()
+    vault((s.client, s.who, s.params))
+    s.before = chat_rows(s.who)
+    choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
+    plan_id = s.plan_id()
+    with world.engine.connect() as conn:
+        assert conn.execute(select(models.playbook_pins.c.version).where(
+            models.playbook_pins.c.plan_id == plan_id)).scalar_one() == 3
+    ask = f"provide@fact:{GPA}:stated"  # the CGPA is missing: asked, and the applications wait for it
+    assert s.steps()[ask] == "waiting_student" and s.row_of(GPA).kind == "provide"
+    assert all(s.blocked()[k].startswith("awaiting_fact:") for k in s.steps()
+               if k.split("@")[0] in APPLY)
+    s.say("education", STATED_CGPA)  # the student tells PAI in chat: the Vault holds it as stated
+    assert s.record_with("gpa")["evidence_level"] == "stated"
+    assert s.steps().get(ask) is None and len(s.done(ask)) == 1 and s.row_of(GPA, "answered")
+    assert not [k for k in s.steps() if "bachelor.gpa" in k and "#" not in k]  # stated: nothing asked, no question
+    return plan_id
+
+
+def the_conflict_is_asked(world, s, plan_id) -> dict:
+    """The transcript is confirmed: the Vault opens one card (3.4 stated, 3.2 shown); the hourly recompile turns it into one
+    which-is-right request and pauses the steps that use the CGPA."""
+    doc_id = transcript_read(world, s)
+    assert s.confirm(doc_id).status_code == 200
+    assert s.deliver()["written"] == 1
+    assert s.record_with("gpa")["result"]["gpa"] == 3.4  # a document never overwrites a stated value
+    (card,) = s.cards()
+    assert card.evidence["current"]["result"]["gpa"] == 3.4 and card.evidence["proposed"]["result"]["gpa"] == 3.2
+    assert WHICH_GPA not in s.steps()  # nothing yet: the OS has not looked since the card opened
+    tick(world, world.box.today)  # the hourly deadline recompute
+    steps = s.steps()
+    assert steps[WHICH_GPA] == "waiting_student" and s.step(WHICH_GPA).inbox_kind == "choose"
+    apply_keys = [k for k in steps if k.split("@")[0] in APPLY]
+    assert apply_keys
+    for k in apply_keys:  # paused with the reason
+        assert steps[k] == "blocked" and s.blocked()[k] == f"which_is_right:{GPA}", (k, s.blocked()[k])
+    (asked,) = s.requests("open", "which_is_right")
+    assert asked["need"] == {"kind": "fact", "ref": GPA, "evidence": "stated"}
+    return asked
+
+
+def closed_everywhere(world, s, asked, plan_id, reminders_before: int) -> None:
+    """Answered anywhere closes everywhere (R-19, Review Focus 3): the step is done, the row answered, the inbox does not list
+    it, no further reminder is written, and the plan view shows it answered."""
+    assert WHICH_GPA not in s.steps() and len(s.done(WHICH_GPA)) == 1
+    row = [r for r in s.rows("answered") if r.need_ref == GPA and r.kind == "which_is_right"]
+    assert len(row) == 1 and row[0].closed_cause == "request_answered" and not [r for r in s.rows("open") if r.need_ref == GPA]
+    assert not [i for i in s.inbox()["items"] if i["instance_key"].startswith("which_is_right@")]
+    assert s.requests("open", "which_is_right") == []
+    assert [r["status"] for r in s.requests(None, "which_is_right")] == ["answered"]
+    assert [r["status"] for r in s.view()["requests"] if r["need"]["ref"] == GPA and r["request_id"] == asked["id"]] == [
+        "answered"]
+    run_reminders(world.engine, Outbox(world.engine, TENANT), world.box.now + timedelta(days=3), TENANT)
+    assert len(reminders_of(world, asked["task_id"])) == reminders_before  # no reminder after it closed
+    assert not any((b or "").startswith("which_is_right:") for b in s.blocked().values())  # the steps resume
+    assert s.cards() == []
+
+
+def test_6_21_germany_the_two_values_are_shown_and_the_answer_goes_to_the_vault(world):
+    with signed_in(world, germany_student()) as s, level("master"):
+        plan_id = germany_with_a_stated_cgpa(world, s)
+        asked = the_conflict_is_asked(world, s, plan_id)
+        # what the student sees: both values, each with its source and level (read live from the Vault, never stored)
+        current, proposed = asked["choices"]
+        assert (current["choice"], current["value"], current["source"]["kind"], current["source"]["evidence"]) == (
+            "current", 3.4, "vault", "stated")
+        assert (proposed["choice"], proposed["value"], proposed["source"]["kind"], proposed["source"]["evidence"]) == (
+            "proposed", 3.2, "document", "shown")
+        assert proposed["source"]["document_ref"] == s.files()[-1].id
+        assert asked["allow_new"] is True and asked["how"] and asked["title"]
+        stored = [tuple(r) for r in s.rows()]
+        assert all(3.4 not in r and 3.2 not in r for r in stored)  # R-01: the OS keeps no value
+        # a reminder is written for the question while it waits
+        tick(world, world.box.today + timedelta(days=1))
+        before = len(reminders_of(world, asked["task_id"]))
+        assert before >= 1
+        # the roadmap shows the request line, not tickable
+        road = s.roadmap_steps()[WHICH_GPA]
+        assert road["tickable"] is False and road["request"]["kind"] == "which_is_right"
+        # answer `proposed`: the Vault holds 3.2, written as the student's explicit choice with the request in its evidence
+        got = s.answer(asked, "proposed")
+        assert got.status_code == 200 and got.json() == {"status": "answered"}
+        assert s.record_with("gpa")["result"]["gpa"] == 3.2 and s.record_with("gpa")["evidence_level"] == "stated"
+        with s.who.factory() as db:
+            written = db.scalars(select(MemoryCandidate).where(MemoryCandidate.input_channel == "profile")
+                                 .order_by(MemoryCandidate.created_at.desc())).first()
+            assert written.source_type == "user_explicit" and written.evidence["capture"] == "os_which_is_right"
+            assert written.evidence["os_request_id"] == asked["id"]
+        closed_everywhere(world, s, asked, plan_id, before)
+        s.throughout()
+
+
+def test_6_21_second_student_answers_current_on_the_vault_page_and_the_step_closes_in_the_same_delivery(world):
+    with signed_in(world, germany_student()) as s, level("master"):
+        plan_id = germany_with_a_stated_cgpa(world, s)
+        asked = the_conflict_is_asked(world, s, plan_id)
+        tick(world, world.box.today + timedelta(days=1))
+        reminders = len(reminders_of(world, asked["task_id"]))
+        (card,) = s.cards()
+        with s.who.factory() as db:
+            before = db.scalar(select(func.count()).select_from(OsOutbox).where(OsOutbox.kind == "vault_event"))
+        assert vault_post(s, card, "keep_current").status_code == 200
+        assert s.row_of(GPA, "open").kind == "which_is_right"  # the OS has not heard yet
+        with s.who.factory() as db:
+            events_ = db.scalars(select(OsOutbox).where(OsOutbox.kind == "vault_event")).all()
+            assert len(events_) == before + 1  # nothing was written to the Vault, yet the close raised its event
+            assert GPA in max(events_, key=lambda r: r.payload["vault_version"]).payload["keys"]
+            assert bridge.deliver_pending(db, s.id)["failed"] == 0  # one delivery: the OS recompiles and the step is done
+        assert s.record_with("gpa")["result"]["gpa"] == 3.4  # the Vault keeps the student's value
+        closed_everywhere(world, s, asked, plan_id, reminders)
+        s.throughout()
+
+
+def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault_event(world):
+    """The transcript is read first (it answers the CGPA request, as shown); the student then says another number in the
+    chat (a conversation candidate: a card opens, the document is the current value); the student's chat answer is the
+    Operator's `profile_conflict` resume, which resolves the card through `ProfileIssueService` (the close hook)."""
+    from app.memory.candidates import MemoryCandidateService
+    from app.memory.profile_issues import ProfileIssueService
+
+    with signed_in(world, germany_student()) as s, level("master"):
+        world.svc.plans.playbooks[("germany_master", 3)] = germany_v3_with_a_gpa_need()
+        vault((s.client, s.who, s.params))
+        s.before = chat_rows(s.who)
+        choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
+        plan_id = s.plan_id()
+        ask = f"provide@fact:{GPA}:stated"
+        assert s.steps()[ask] == "waiting_student"
+        # 1. an upload and confirm answers the request (the document is `shown`, which meets `stated`)
+        doc_id = transcript_read(world, s)
+        assert s.confirm(doc_id).status_code == 200 and s.deliver()["written"] == 1
+        assert len(s.done(ask)) == 1 and s.row_of(GPA, "answered").kind == "provide"
+        assert s.record_with("gpa")["evidence_level"] == "shown" and s.cards() == []
+        # 2. the student says 3.4 in the chat: the Vault keeps the document's value and opens one card
+        with s.who.factory() as db:
+            said = MemoryCandidateService(db).propose(
+                s.id, "student_record", key="education", proposed_value={"result": {"gpa": 3.4}}, confidence=0.9,
+                source_type="conversation", input_channel="conversation",
+                entities={"record_id": s.record_with("gpa")["id"]}, evidence={"quote": "my CGPA is 3.4"})
+            assert MemoryReconciler(db).reconcile(said).outcome == "needs_review"
+            db.commit()
+        (card,) = s.cards()
+        tick(world, world.box.today)
+        asked = s.request(GPA, "which_is_right")
+        current, proposed = asked["choices"]
+        assert (current["value"], current["source"]["kind"], current["source"]["evidence"]) == (3.2, "document", "shown")
+        assert (proposed["value"], proposed["source"]["kind"], proposed["source"]["evidence"]) == (3.4, "vault", "stated")
+        assert s.steps()[WHICH_GPA] == "waiting_student"
+        tick(world, world.box.today + timedelta(days=1))
+        reminders = len(reminders_of(world, asked["task_id"]))
+        # 3. the student answers in the chat: the Operator resolves the card; the hook raises the Vault version
+        with s.who.factory() as db:
+            result = ProfileIssueService(db).resolve(s.id, card.id, "accept_proposed", note="Answered in the chat")
+            assert result["resolved"]
+            db.commit()
+            assert bridge.deliver_pending(db, s.id)["failed"] == 0
+        assert s.record_with("gpa")["result"]["gpa"] == 3.4
+        closed_everywhere(world, s, asked, plan_id, reminders)
         s.throughout()
