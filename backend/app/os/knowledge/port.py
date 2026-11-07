@@ -12,6 +12,7 @@ FactStatus = Literal["confirmed", "unconfirmed", "stale", "verified"]
 STATUSES: tuple[str, ...] = ("confirmed", "unconfirmed", "stale", "verified")
 READ_METHODS: tuple[str, ...] = ("fetch", "render", "ocr", "human", "model")
 _SOURCED = ("confirmed", "verified")
+CONFIRMED_LEVELS: tuple[str, ...] = _SOURCED  # statuses that count as confirmed (a verified fact is confirmed too)
 
 
 @dataclass(frozen=True)

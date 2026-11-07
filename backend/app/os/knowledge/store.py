@@ -9,7 +9,7 @@ from sqlalchemy import Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
-from app.os.knowledge.port import Fact
+from app.os.knowledge.port import CONFIRMED_LEVELS, Fact
 
 T = models.knowledge_facts
 RV = models.fact_revisions
@@ -167,11 +167,11 @@ class SqlKnowledge:
         return row.scope, row.ref, row.field, _fact(row)
 
     def mark_stale(self, fact_id: int) -> bool:
-        """A confirmed fact becomes stale (spec §4.7). False if it was no longer confirmed."""
+        """A confirmed or verified fact becomes stale (spec §4.7, P2-D6). False if it was no longer confirmed."""
         with self.engine.begin() as conn:
             before = self._row(conn, fact_id, lock=True)
             r = conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id,
-                                             T.c.status == "confirmed")
+                                             T.c.status.in_(CONFIRMED_LEVELS))
                              .values(status="stale", updated_at=func.now()).returning(T.c.id))
             if r.first() is None:
                 return False
