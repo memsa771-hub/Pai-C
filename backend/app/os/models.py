@@ -319,11 +319,14 @@ documents = Table(
     Column("confirmed_at", DateTime(timezone=True)),
     Column("deleted_at", DateTime(timezone=True)),
     Column("claimed_by", Text),  # the os.document workflow that claimed it for reading (os_0005)
+    Column("file_ref", Text),  # P1-T7: the Counsellor file that holds the bytes (os_0022); no os_document_files row
     _in("status", DOCUMENT_STATUSES, "ck_os_documents_status"),
     # one live copy of a file per student; a deleted one may be uploaded again
     Index("uq_os_documents_sha", "tenant_id", "student_ref", "sha256", unique=True,
           postgresql_where=text("status <> 'deleted'")),
     Index("ix_os_documents_student", "tenant_id", "student_ref"),
+    Index("uq_os_documents_file_ref", "tenant_id", "file_ref", unique=True,
+          postgresql_where=text("file_ref IS NOT NULL AND status <> 'deleted'")),
 )
 
 document_files = Table(

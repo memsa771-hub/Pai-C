@@ -447,3 +447,18 @@ export const myPlanPkBs = {
   sources: {},
 };
 export const myPlanEmpty = { state: 'empty', source: null, plan_id: null, route_key: null, abroad: null, pages: [], sources: {} };
+
+/** GET /v1/uploads/options with the one upload on (P1-T7); the sentences are the approved ones. */
+export const uploadOptionsOn = {
+  one_upload: true as const,
+  doc_types: [{ key: "passport", label: "Passport" }, { key: "transcript", label: "Transcript" }],
+  text: {
+    type_label: "What is this document?", type_none: "Something else",
+    registered: "Saved. PAI will read it and ask you to check what it found.",
+    consent_needed: "Saved. To let PAI read it, first agree to the pilot terms on your study documents page.",
+    duplicate: "Saved. This file is already in your study documents.",
+    unknown_type: "Saved. PAI cannot read this kind of document yet.",
+    not_readable: "Saved. PAI can read PDF, JPEG, PNG or WebP files only.",
+    not_now: "Saved. PAI cannot read it right now.",
+  },
+};

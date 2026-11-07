@@ -35,6 +35,7 @@ from app.os.api.schemas import (
     ConsentOut,
     CompleteOut,
     ConfirmDocumentIn,
+    VaultCheckOut,
     ConfirmIn,
     ConfirmOut,
     DocumentOut,
@@ -81,10 +82,12 @@ from dataclasses import asdict
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
-from app.os.consent import ConsentStore, current_terms
+from app.os.consent import ConsentStore, current_terms, gate
 from app.os.compiler import CompileError
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
+from app.os.documents import connect_texts
+from app.os.documents.vault_check import compare as vault_compare
 from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
@@ -95,7 +98,7 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
-from app.os.ports import choice_requests
+from app.os.ports import choice_requests, document_files, fact_proposals, student_facts
 from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
@@ -119,9 +122,7 @@ def refusal(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": code, "message": message})
 
 
-def _accepts(svc: Services, terms) -> bool:
-    """Placeholder terms can be agreed to, and count, only in rehearsal mode (Slice 9a spec §3.2)."""
-    return not terms.placeholder or svc.settings.rehearsal
+_accepts = gate.accepts  # placeholder terms count only in rehearsal mode (Slice 9a spec §3.2)
 
 
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
@@ -139,11 +140,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                           svc: Services = Depends(services)) -> str:
         """A dependency, so it runs before the body is validated and before any write or enqueue. Only a new start
         and an upload are refused: the inbox and changes to a running plan keep working (Review Focus 3)."""
-        terms = current_terms(svc.terms_dir)
-        if not _accepts(svc, terms):  # a placeholder row made in a rehearsal never counts outside it
-            raise refusal("terms_not_set", "the pilot terms are not written yet")
-        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version):
-            raise refusal("consent_needed", "Please agree to the pilot terms first.")
+        code = gate.upload_refusal(svc, student)
+        if code is not None:
+            raise refusal(code, gate.MESSAGES[code])
         return student
 
     @router.get("/consent", response_model=ConsentOut)
@@ -385,6 +384,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
                         student: str = Depends(consented_student),
                         svc: Services = Depends(services)) -> dict:
+        # P1-T7: the one upload is POST /v1/files. The body still arrives; this guard only avoids reading it into memory.
+        if document_files.enabled():
+            raise HTTPException(status_code=409, detail=connect_texts.text("use_documents_page"))
         t = svc.document_types.get(doc_type)
         if t is None:
             raise HTTPException(status_code=422, detail=f"unknown document type: {doc_type}")
@@ -409,13 +411,30 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return documents_out(svc.engine, svc.settings.tenant_id, student, svc.document_types)
 
+    @router.get("/documents/{doc_id}/vault-check", response_model=VaultCheckOut)
+    def vault_check(doc_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """Every field with a Vault key compared with the Vault, live (P1-T7, D-y11, R-16). Nothing is stored. Without
+        the one upload or without the host's answer there is nothing to compare with: 404 (no standalone fallback)."""
+        doc = own_document(svc, doc_id, student)
+        t = svc.document_types.get(doc.doc_type)
+        tenant = svc.settings.tenant_id
+        facts = (student_facts.host_facts(student, engine=svc.engine, tenant_id=tenant)
+                 if document_files.enabled() and t is not None else None)
+        if facts is None:
+            raise HTTPException(status_code=404, detail="nothing to compare with")
+        values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                  for f in DocumentStore(svc.engine, tenant).fields(doc_id)}
+        fields = vault_compare(t, values, facts)
+        differs = any(f["outcome"] == "differs" for f in fields)
+        return {"fields": fields, "note": connect_texts.text("vault_differs") if differs else None}
+
     @router.post("/documents/{doc_id}/confirm", response_model=DocumentOut)
     def confirm_doc(doc_id: int, body: ConfirmDocumentIn, student: str = Depends(current_student_ref_for_write),
                     svc: Services = Depends(services)) -> dict:
         doc = own_document(svc, doc_id, student)
         tenant = svc.settings.tenant_id
         try:
-            confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
+            proposal_key = confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
         except NotConfirmable as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except ValueError as e:
@@ -423,7 +442,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
-        return document_out(store, store.get(doc_id), findings, svc.document_types)
+        out = document_out(store, store.get(doc_id), findings, svc.document_types)
+        fact_proposals.notify(proposal_key)  # P1-T7: after the answer is built; the host's sweep is the backup
+        return out
 
     @router.post("/documents/findings/{finding_id}/resolve", response_model=FindingOut)
     def resolve(finding_id: int, body: ResolveIn, student: str = Depends(current_student_ref_for_write),

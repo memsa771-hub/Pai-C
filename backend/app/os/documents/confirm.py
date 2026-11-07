@@ -6,6 +6,7 @@ Profile keys: the cross-check keys (`full_name`, `father_name`, `date_of_birth`)
 open finding covers them, and every other confirmed field as `<doc_type>.<field>`. An empty value is not set.
 """
 
+import logging
 from collections.abc import Mapping
 
 from sqlalchemy import Engine, delete
@@ -15,6 +16,8 @@ from app.os.documents.checks import cross_values
 from app.os.documents.run import compare_documents, forget_document
 from app.os.documents.store import Document, DocumentStore, FindingStore, ProfileStore
 from app.os.documents.types import DocumentType
+
+log = logging.getLogger("app.os.documents.confirm")
 
 CONFIRMABLE = ("read", "needs_student", "confirmed")
 
@@ -28,9 +31,12 @@ def _empty(v) -> bool:
 
 
 def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], variants: list[set[str]],
-                     doc: Document, values: dict) -> None:
+                     doc: Document, values: dict) -> str | None:
     """Every field of the type, no more and no fewer (`ValueError` otherwise). Then the findings are checked again
-    with the confirmed values, and the profile values are set."""
+    with the confirmed values, and the profile values are set. With the host part on (or a document linked to a host
+    file) the type's `fact:` fields are also offered to the Counsellor's Vault as one fact proposal (P1-T7); the
+    return value is that proposal's outbox key, or None. The caller nudges the host with `fact_proposals.notify(key)`
+    after its response is built."""
     if doc.status not in CONFIRMABLE:
         raise NotConfirmable(f"this document is {doc.status}; it can be confirmed once it is read")
     t = types[doc.doc_type]
@@ -50,6 +56,28 @@ def confirm_document(engine: Engine, tenant_id: str, types: Mapping[str, Documen
     for name, v in values.items():
         if not _empty(v):
             profile.set(doc.student_ref, f"{doc.doc_type}.{name}", v, doc.id)
+    return _propose_facts(engine, tenant_id, types, doc, values)
+
+
+def _propose_facts(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], doc: Document,
+                   values: dict) -> str | None:
+    """The fact proposal row for a document the student just confirmed. The confirmation is already stored, so a
+    failure here is logged by class name and never fails it: the sweep's backfill writes the row later."""
+    from app.os.ports import document_files, fact_proposals  # late: the ports import the stores
+
+    # Confirmation runs only in the API, where the host configures `enabled()`: with the part off nothing is written.
+    if not document_files.enabled():
+        return None
+    try:
+        facts = fact_proposals.facts_of(doc, types, values)
+        if not facts:
+            return None
+        stored = DocumentStore(engine, tenant_id).get(doc.id)  # the stored confirmation time makes the key
+        with engine.begin() as conn:
+            return fact_proposals.emit(conn, tenant_id, stored, facts)
+    except Exception as e:  # class name only: no ids, no values
+        log.error("fact proposal could not be written (%s)", type(e).__name__)
+        return None
 
 
 def _resolved_with(engine: Engine, tenant_id: str, doc: Document) -> set[str]:
@@ -70,10 +98,12 @@ def resolve_finding(engine: Engine, tenant_id: str, finding: dict, value) -> dic
 
 
 def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, DocumentType], variants: list[set[str]],
-                    doc: Document, *, client) -> None:
+                    doc: Document, *, client, notify_host: bool = True) -> None:
     """The file and fields go, and so do the profile values taken from them and the document's DBOS workflows
     (their step outputs hold the values read); the row stays as `deleted`. The student's findings are checked
-    again without it."""
+    again without it. A document linked to a host file (P1-T7) also tells the host, last: the host purges the file.
+    The host's answer never undoes the delete (a failed purge is retried by the student); `notify_host=False` is for
+    a delete that came from the host."""
     DocumentStore(engine, tenant_id).delete(doc.id)
     forget_document(client, tenant_id, doc.id)
     from app.os.packs.store import PackFileStore  # imported here: packs read documents, not the other way round
@@ -82,4 +112,14 @@ def delete_document(engine: Engine, tenant_id: str, types: Mapping[str, Document
     P = models.profile_values
     with engine.begin() as conn:
         conn.execute(delete(P).where(P.c.tenant_id == tenant_id, P.c.source_document_id == doc.id))
+    from app.os.ports import fact_proposals  # late: the ports import the stores
+
+    fact_proposals.drop_for_document(engine, tenant_id, doc.id)  # not yet taken by the Vault: never taken now
     compare_documents(engine, tenant_id, doc.student_ref, types, variants)
+    if notify_host and doc.file_ref is not None:
+        from app.os.ports import document_files  # late: that module imports this one
+
+        try:
+            document_files.on_deleted(doc.student_ref, doc.file_ref)
+        except Exception as e:  # class name only: no ids, no values
+            log.error("document file purge failed (%s)", type(e).__name__)

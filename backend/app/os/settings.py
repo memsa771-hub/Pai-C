@@ -20,6 +20,8 @@ class OsSettings:
     email_from: str | None = None  # Slice 9a: the From address for Resend (OS_EMAIL_FROM)
     email_allowlist: frozenset[str] = frozenset()  # Slice 9a: exact addresses, lower-cased; empty = nobody
     student_facts: str | None = None  # P1-T4: the worker's `module.path:callable` (OS_STUDENT_FACTS)
+    document_files: str | None = None  # P1-T7: the worker's `module.path:callable` (OS_DOCUMENT_FILES)
+    documents_enabled: str | None = None  # P1-T7: the worker's gate `module.path:callable` (OS_DOCUMENTS_ENABLED)
     recipient_lookup: str | None = None  # Slice 9b: the worker's `module.path:callable` (OS_RECIPIENT_LOOKUP)
     app_url: str | None = None  # Slice 9b: the student app's base URL for links in emails (OS_APP_URL); None = no link
     worker_id: str | None = None
@@ -102,6 +104,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         email_from=email_from,
         email_allowlist=allowlist,
         student_facts=(env.get("OS_STUDENT_FACTS") or "").strip() or None,
+        document_files=(env.get("OS_DOCUMENT_FILES") or "").strip() or None,
+        documents_enabled=(env.get("OS_DOCUMENTS_ENABLED") or "").strip() or None,
         recipient_lookup=(env.get("OS_RECIPIENT_LOOKUP") or "").strip() or None,
         app_url=(env.get("OS_APP_URL") or "").strip().rstrip("/") or None,
         worker_id=env.get("OS_WORKER_ID") or None,

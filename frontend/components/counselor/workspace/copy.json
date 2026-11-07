@@ -379,7 +379,10 @@
       "Letters"
     ],
     "privacy": "Only you and PAI can see your documents. Nothing is shared with a university.",
-    "backToFolders": "Back to folders"
+    "backToFolders": "Back to folders",
+    "readThis": "Let PAI read this",
+    "readThisType": "What is this file?",
+    "readThisHelp": "Say what this file is, and PAI will read it and ask you to check what it found."
   },
   "settings": {
     "intro": "Your account, how PAI looks and sounds, and your data.",

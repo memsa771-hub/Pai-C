@@ -32,7 +32,8 @@ from app.os.ports import choice_requests as os_choice_requests
 from app.os.ports import escalation as os_escalation
 from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
-from app.os.ports import plan_source, student_facts as os_student_facts
+from app.os.ports import document_files as os_document_files, plan_source, student_facts as os_student_facts
+from app.os.ports import fact_proposals as os_fact_proposals
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
 from app.pai_c.connect.flags import part_on
@@ -216,6 +217,57 @@ def deliver_choice_request_now(key: str) -> None:
         _deliver_choice_request(db, request)
 
 
+def deliver_fact_proposals(db) -> dict:
+    """Hands the pending fact proposals (P1-T7, R-16, D-y9) to the Vault's sink, oldest first. Only while the
+    CONNECT_ONE_UPLOAD part is on. Each row: the sink writes its candidates, the app transaction commits, then the OS
+    row is marked (a crash in between repeats harmlessly: the proposal key makes the repeat a `duplicate`). An error
+    rolls back and leaves the row pending; one failure never stops the others."""
+    from app.pai_c.connect import document_facts  # lazy: Counsellor code
+
+    got = {"written": 0, "duplicate": 0, "refused": 0, "failed": 0}
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return got
+    for proposal in os_fact_proposals.pending():
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+            os_fact_proposals.mark(proposal.key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
+            got[outcome] += 1
+        except ports.OsUnavailable:
+            db.rollback()
+            break
+        except Exception as exc:  # noqa: BLE001  (class name only, no student data; the next sweep tries again)
+            db.rollback()
+            log.error("PAI OS fact proposal could not be delivered: %s", type(exc).__name__)
+            got["failed"] += 1
+            try:  # after MAX_ATTEMPTS the row is set aside, so it cannot starve the newer ones
+                os_fact_proposals.record_failure(proposal.key)
+            except Exception as inner:  # noqa: BLE001
+                log.error("PAI OS fact proposal failure could not be counted: %s", type(inner).__name__)
+    return got
+
+
+def deliver_fact_proposal_now(key: str) -> None:
+    """The post-commit nudge after the student confirmed a document (`mount_os(on_fact_proposal=)`): delivers that one
+    proposal in its own session, so the facts do not wait for the sweep. Never raises past the OS port's guard."""
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return
+    from app.database import new_session
+    from app.pai_c.connect import document_facts
+
+    proposal = next((p for p in os_fact_proposals.pending() if p.key == key), None)
+    if proposal is None:
+        return
+    with new_session() as db:
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        os_fact_proposals.mark(key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
+
+
 def _backfill(db) -> None:
     """A student whose newest decision version is above the one PAI OS holds, and whose newest row has no outbox row
     (the decision was made while the part was off), gets that row now; a delivered row the OS lacks goes back to pending. Only the newest version is queued."""
@@ -389,6 +441,13 @@ def sweep_once(db) -> dict:
         return {"mounted": False}
     delivered = failed = 0
     try:
+        if part_on("CONNECT_ONE_UPLOAD"):
+            try:  # before the pending vault events go out, so the events these proposals raise leave in this sweep
+                os_fact_proposals.backfill()
+                deliver_fact_proposals(db)
+            except Exception as exc:  # noqa: BLE001  (class name only; the rest of the sweep still runs)
+                db.rollback()
+                log.error("PAI OS sweep could not deliver fact proposals: %s", type(exc).__name__)
         handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
         if handoff or facts:
             if handoff:
@@ -473,6 +532,107 @@ def student_facts(student_ref: str) -> dict | None:
 
     with new_session() as db:
         return builder.build(db, workspace_id)
+
+
+def documents_enabled() -> bool:
+    """True when the one upload entry point is on: the CONNECT_ONE_UPLOAD part (P1-T7, R-01). The OS reads it through
+    `mount_os(documents_enabled=)`; it cannot read host flags itself."""
+    return part_on("CONNECT_ONE_UPLOAD")
+
+
+def documents_flag() -> bool:
+    """The plain CONNECT_ONE_UPLOAD flag, for the worker's OS_DOCUMENTS_ENABLED (P1-T7, R-01). Not `part_on`: PAI OS
+    checks the `counsellor` module row itself, and the worker cannot ask the API for it."""
+    return bool(config.CONNECT_ONE_UPLOAD)
+
+
+def document_file_bytes(student_ref: str, file_ref: str) -> bytes:
+    """The bytes of the student's stored file `file_ref`, for the OS reader (P1-T7, D-y6; `mount_os(document_files=)`
+    and the worker's OS_DOCUMENT_FILES). The file must exist, belong to the workspace `student_ref` and be active (not
+    trashed or deleted); anything else is `KeyError`, so another student's bytes are never returned. Opens its own
+    session: PAI OS calls it on its worker thread. A storage failure raises; the port turns it into KeyError."""
+    from app.database import new_session
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref) or record.status != "active":
+            raise KeyError(file_ref)
+        storage_key = record.storage_key
+    return get_file_store().read(storage_key)
+
+
+def register_os_document(student_ref: str, doc_type: str, file_ref: str, filename: str, data: bytes) -> dict:
+    """Makes the stored file an OS document of `doc_type` (P1-T7, R-01): `{"id", "status"}`, or `{"refused": code}`
+    (`not_on`, `unknown_type`, `consent_needed`, `terms_not_set`, `not_readable`, `duplicate`). `not_on` too when PAI
+    OS is not mounted. Any other failure is raised."""
+    try:
+        return os_document_files.register(str(student_ref), doc_type, str(file_ref), filename, data)
+    except ports.OsUnavailable:
+        return {"refused": "not_on"}
+    except os_document_files.Refused as refused:
+        return {"refused": refused.code}
+
+
+def forget_os_document(workspace_id: str, file_id: str) -> bool:
+    """Deletes the OS document linked to a Counsellor file the student trashed or deleted (P1-T7, D-y7). False when
+    there is none and when PAI OS is not mounted. Raises on any other failure (the caller logs it by class name)."""
+    try:
+        return os_document_files.forget(str(workspace_id), str(file_id))
+    except ports.OsUnavailable:
+        return False
+
+
+def document_types() -> list[dict]:
+    """The document types a student can name on upload, `{key, label}` sorted by key (P1-T7, D-y5). `[]` when PAI OS is
+    not mounted, and on any failure (logged)."""
+    try:
+        types = ports.services().document_types
+        return [{"key": k, "label": types[k].label} for k in sorted(types)]
+    except ports.OsUnavailable:
+        return []
+    except Exception:
+        log.exception("document types could not be read; treated as none")
+        return []
+
+
+def _emit_file_deleted(db, workspace, file_id: str, filename: str) -> None:
+    from app.security.event_identity import emit_internal_event
+
+    try:
+        asyncio.run(emit_internal_event(db, workspace, type="workspace.file.deleted", source="system:pai-os",
+                                        target="core", payload={"file_id": file_id, "filename": filename}))
+        db.commit()
+    except Exception as exc:  # noqa: BLE001  (class name only)
+        db.rollback()
+        log.error("the file event of an OS delete could not be emitted: %s", type(exc).__name__)
+
+
+def on_os_document_deleted(student_ref: str, file_ref: str) -> None:
+    """The OS deleted a linked document: purge the Counsellor file the way `purge_trash` does (P1-T7, D-y7): its bytes,
+    its document state, the unindex job and the record. Idempotent: a file that is already gone is a no-op. A failure
+    is raised before the record is deleted, so the OS delete stays `deleted` and the file record stays. Opens its own
+    session: PAI OS calls it on its request thread."""
+    from app.database import new_session
+    from app.documents.service import DocumentArtifactService
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+    from app.routers.files import _enqueue_document_unindex
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref):
+            return
+        get_file_store().delete(record.storage_key)  # a missing object is a no-op in both stores
+        DocumentArtifactService(db).purge_for_files(str(student_ref), [record.id])
+        _enqueue_document_unindex(db, str(student_ref), [record.id])
+        workspace = db.get(Workspace, str(student_ref))
+        filename, record_id = record.filename, record.id
+        db.delete(record)
+        db.commit()
+        if workspace is not None:  # the same file event the trash purge emits; a failure here never undoes the purge
+            _emit_file_deleted(db, workspace, record_id, filename)
 
 
 def counsellor_module_on() -> bool:

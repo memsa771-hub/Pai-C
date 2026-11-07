@@ -267,3 +267,42 @@ async def test_t6_no_adoption_route_effect(monkeypatch):
         assert touched.mock_calls == [] and outbox_count(db) == 0
     expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
     assert json.dumps(walk(), sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+@pytest.mark.req("R-01")
+def test_t7_upload_responses_unchanged(tmp_path, monkeypatch):
+    """P1-T7: with CONNECT_ONE_UPLOAD off every upload, file and delete route answers as it did before the branch (the
+    fixtures were captured from the code before the change; ids and times are masked). A `doc_type` field is ignored,
+    no PAI OS document function is called, and the parse job is still followed by an extract job."""
+    import json
+    from pathlib import Path
+
+    from tests.one_upload_support import jobs, masked, post_base64, post_file, post_folder, run_parse_job, upload_world
+
+    def boom(*args, **kwargs):
+        raise AssertionError("a PAI OS document function was called while the part is off")
+
+    for name in ("document_file_bytes", "register_os_document", "forget_os_document", "document_types",
+                 "on_os_document_deleted", "documents_enabled"):
+        monkeypatch.setattr(bridge, name, boom)
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "t7_upload_responses_before.json").read_text())
+    got = {}
+    with upload_world(tmp_path) as (client, student, auth):
+        plain = post_file(client, student, auth)
+        got["post_plain"] = masked(plain)
+        got["post_typed"] = masked(post_file(client, student, auth, name="typed.pdf", doc_type="transcript"))
+        got["folder_plain"] = masked(post_folder(client, student, auth, name="a.pdf"))
+        got["folder_typed"] = masked(post_folder(client, student, auth, name="b.pdf", doc_type="transcript"))
+        got["base64"] = masked(post_base64(client, student, auth))
+        first = post_file(client, student, auth, name="del.pdf").json()["data"]["id"]
+        got["delete"] = masked(client.delete(f"/v1/files/{first}", headers=auth))
+        second = post_file(client, student, auth, name="trash.pdf").json()["data"]["id"]
+        got["trash"] = masked(client.post("/v1/files/trash", headers=auth,
+                                          json={"network": student.workspace_id, "file_ids": [second]}))
+        assert got == expected
+        assert all("os_document" not in json.dumps(v) for v in got.values())
+        file_id = plain.json()["data"]["id"]
+        assert all("extract" not in payload for _, payload in jobs(student, "document.parse"))
+        assert run_parse_job(student, file_id)["parsed"] is True
+        extract = [p for _, p in jobs(student, "document.extract") if p.get("file_id") == file_id]
+        assert extract == [{"file_id": file_id}]  # today's job, unchanged

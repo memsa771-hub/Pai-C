@@ -856,6 +856,20 @@ class VaultVersion(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
 
 
+class DocumentProposal(Base):
+    """A delivered fact proposal from a confirmed PAI OS document (P1-T7, R-16, D-y9): `key` is the proposal's key,
+    unique, so a repeat delivery proposes nothing. `candidate_ids` are the Vault candidates it made. No file bytes,
+    no values: IDs only."""
+    __tablename__ = "pai_document_proposals"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    key = Column(Text, nullable=False, unique=True)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    file_id = Column(Text, nullable=True)  # the Counsellor file; null for an OS-only document
+    candidate_ids = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+
 class GuardianConsent(Base):
     """One guardian e-mail link (R-10) and what came of it: the audit of the under-18 consent.
 
