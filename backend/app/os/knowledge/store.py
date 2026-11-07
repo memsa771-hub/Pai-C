@@ -73,31 +73,37 @@ class SqlKnowledge:
         self.tenant_id = tenant_id
 
     def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
-                intake_term: str | None, owner_ref: str):
+                intake_term: str | None, owner_ref: str, fallback_previous: bool = False):
+        # P2-D24: with the fallback an earlier year's row is also read; the newest year then the newest id wins, so a
+        # row of the asked year always beats an older one, and a later year is never read.
+        year = T.c.intake_year <= intake_year if fallback_previous else T.c.intake_year == intake_year
         q = select(T).where(
             T.c.tenant_id == self.tenant_id, T.c.scope == scope, T.c.ref.in_(list(refs)),
-            T.c.field.in_(list(fields)), T.c.intake_year == intake_year, T.c.owner_ref == owner_ref,
+            T.c.field.in_(list(fields)), year, T.c.owner_ref == owner_ref,
         )
         if intake_term is not None:
             q = q.where(T.c.intake_term == intake_term)
-        return q.order_by(T.c.id)  # intake_term=None matches every term; on a clash the newest row wins
+        return q.order_by(T.c.intake_year, T.c.id)  # intake_term=None matches every term; on a clash the newest row wins
 
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
-        intake_term: str | None = None, owner_ref: str = "",
+        intake_term: str | None = None, owner_ref: str = "", fallback_previous: bool = False,
     ) -> dict[tuple[str, str], Fact]:
         if not refs or not fields:
             return {}
         with self.engine.connect() as conn:
-            rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref)).all()
+            rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref,
+                                                 fallback_previous)).all()
         return {(r.ref, r.field): _fact(r) for r in rows}
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
-                    intake_term: str | None = None, owner_ref: str = "") -> dict[str, Fact]:
+                    intake_term: str | None = None, owner_ref: str = "",
+                    fallback_previous: bool = False) -> dict[str, Fact]:
         if not fields:
             return {}
         with self.engine.connect() as conn:
-            rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref)).all()
+            rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref,
+                                                 fallback_previous)).all()
         return {r.field: _fact(r) for r in rows}
 
     def _row(self, conn, fact_id: int, lock: bool = False):

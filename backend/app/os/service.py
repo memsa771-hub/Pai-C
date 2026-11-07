@@ -9,6 +9,7 @@ from app.os import models
 from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
+from app.os.intakes import IntakeStore
 from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort
 from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
@@ -71,10 +72,15 @@ class PlanService:
         refs = [p.programme_ref for p in contract.programmes]
         overrides = [*OverrideStore(self.engine, self.kernel.tenant_id).active(plan_id), *extra_overrides]
         student = state.build(self, contract.student_ref) if playbook.declares_needs else None  # P1-T8: gate off = None
+        # P2-D24: while the plan's intake is open and not yet current, a key with no fact for it reads the newest earlier
+        # year's fact, labelled. No registered intake (or none open): the strict read, exactly as before.
+        term = contract.target_intake.term
+        read = ({"intake_term": term, "fallback_previous": True}
+                if IntakeStore(self.engine, self.kernel.tenant_id).fallback_applies(term, year) else {})
         return compile_plan(
             contract, playbook,
-            self.knowledge.route_facts(playbook.key, sorted(route_fields), year),
-            self.knowledge.programme_facts(refs, sorted(programme_fields), year),
+            self.knowledge.route_facts(playbook.key, sorted(route_fields), year, **read),
+            self.knowledge.programme_facts(refs, sorted(programme_fields), year, **read),
             self.today(), self.disabled_types(),
             overrides=overrides, chosen={"visa": self.visa_programme(contract, plan_id, overrides)},
             excluded={"visa": self.not_visa_programmes(contract, plan_id)}, student=student,
