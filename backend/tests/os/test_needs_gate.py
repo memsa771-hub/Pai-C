@@ -185,7 +185,7 @@ def test_impossible_value_is_a_question(world):
 @pytest.mark.req("R-21")
 def test_a_vault_conflict_is_a_question(world):
     world.vault["stu-1"] = facts_of("stu-1", 1, **{"education__matric__marks_obtained": (900, "stated")})
-    fact_questions.configure(conflicts=lambda ref: {"conflicts": [{"ref": "profile_issue:4", "key": OBTAINED}]})
+    fact_questions.configure(conflicts=lambda ref: {"schema": "pai.fact_conflicts.v1", "student_ref": ref, "vault_version": 1, "built_at": "2027-01-10T09:00:00+00:00", "conflicts": [{"ref": "profile_issue:4", "key": OBTAINED, "values": [{"side": "current", "value": 900, "evidence": "stated", "document_ref": None, "as_of": None}, {"side": "proposed", "value": 800, "evidence": "stated", "document_ref": None, "as_of": None}], "answers": ["keep_current", "accept_proposed"]}]})
     got = state.build(world.svc.plans, "stu-1")
     assert (got.questions[f"fact:{OBTAINED}"].origin, got.questions[f"fact:{OBTAINED}"].ref) == ("vault", "profile_issue:4")
     fact_questions.configure(conflicts=lambda ref: None)  # the host's part is off

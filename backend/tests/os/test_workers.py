@@ -178,8 +178,8 @@ def test_fact_questions_port_reads_key_to_ref_and_is_empty_when_unconfigured():
 
     fact_questions.configure()
     assert fact_questions.conflicts("stu-1") == {}
-    fact_questions.configure(conflicts=lambda ref: {"conflicts": [{"ref": "profile_issue:3", "key": "a.b"}]})
-    assert fact_questions.conflicts("stu-1") == {"a.b": "profile_issue:3"}
+    fact_questions.configure(conflicts=lambda ref: {"schema": "pai.fact_conflicts.v1", "student_ref": ref, "vault_version": 1, "built_at": "2027-01-10T09:00:00+00:00", "conflicts": [{"ref": "profile_issue:3", "key": "education.matric.marks_obtained", "values": [{"side": "current", "value": 900, "evidence": "stated", "document_ref": None, "as_of": None}, {"side": "proposed", "value": 800, "evidence": "stated", "document_ref": None, "as_of": None}], "answers": ["keep_current", "accept_proposed"]}]})
+    assert fact_questions.conflicts("stu-1") == {"education.matric.marks_obtained": "profile_issue:3"}
     fact_questions.configure(conflicts=lambda ref: None)
     assert fact_questions.conflicts("stu-1") == {}
     ports.configure(None)  # one reset for every port
