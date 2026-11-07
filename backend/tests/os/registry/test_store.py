@@ -9,7 +9,7 @@ from app.os import models
 from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.registry.store import RegistryError
 
-from .helpers import child, inst, olist, seed_basic, store
+from .helpers import AT, child, inst, olist, seed_basic, store
 
 pytestmark = pytest.mark.req("R-32")
 
@@ -168,3 +168,17 @@ def test_list_progress(engine, clean):
     with pytest.raises(KeyError):
         s.list_progress("inst:one")
     assert [p.list_id for p in s.list_progresses()] == ["list:alpha-list", "list:conflicted"]
+
+
+def test_existence_readers_ignore_a_bodys_rows(engine, clean):
+    """P2-T2 owner semantics: a row a body owns about a programme is not research of the programme."""
+    from tests.os.registry.helpers import put
+    from app.os.knowledge.port import Fact
+    from app.os.knowledge.requests import _facts_for
+    from app.os.knowledge.store import SqlKnowledge
+
+    k = SqlKnowledge(engine, "pai")
+    put(k, "programme", "p1", "pass_mark", Fact(1, "", "", AT, 2027, "unconfirmed", owner_ref="body:central"))
+    assert not _facts_for(engine, "pai", "p1", 2027)
+    put(k, "programme", "p1", "deadline_close", Fact(1, "", "", AT, 2027, "unconfirmed"))
+    assert _facts_for(engine, "pai", "p1", 2027)

@@ -38,3 +38,13 @@ def seed_basic(s: RegistryStore, *, rows=2) -> None:
     s.record(olist(rows=rows), cause="import")
     s.record(inst("one"), cause="import")
     s.record(inst("two", region="sindh"), cause="import")
+
+
+def put(k, scope, ref, field, fact) -> int:
+    """Writes a fact. `verified` only comes through review (T1), so it is written as confirmed, then reviewed."""
+    from dataclasses import replace as _replace
+    if fact.status != "verified":
+        return k.upsert(scope, ref, field, fact)
+    fid = k.upsert(scope, ref, field, _replace(fact, status="confirmed"))
+    k.set_status(fid, "verified", cause="review")
+    return fid

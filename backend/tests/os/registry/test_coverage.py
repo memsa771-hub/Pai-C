@@ -9,7 +9,7 @@ from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.knowledge.store import SqlKnowledge
 from app.os.registry.coverage import coverage_map, summarise
 
-from .helpers import AT, child, inst, olist, store
+from .helpers import AT, child, inst, olist, store, put
 
 pytestmark = pytest.mark.req("R-34")
 URL = "https://admissions.alpha.test/notice"
@@ -40,17 +40,17 @@ def test_nothing_researched_is_listed(engine, world):
 
 def test_one_fact_for_the_intake_is_researched(engine, world):
     _, k = world
-    k.upsert("registry", "inst:one", "programme_detail", fact("unconfirmed"))
-    k.upsert("registry", "inst:two", "deadline_close", fact(year=2026, status="verified"))  # another intake
+    put(k, "registry", "inst:one", "programme_detail", fact("unconfirmed"))
+    put(k, "registry", "inst:two", "deadline_close", fact(year=2026, status="verified"))  # another intake
     assert levels(engine) == {"inst:one": "researched", "inst:two": "listed", "inst:tre": "listed"}
 
 
 def test_verified_needs_every_high_stakes_fact_verified(engine, world):
     _, k = world
-    k.upsert("registry", "inst:one", "deadline_close", fact("verified"))
-    k.upsert("registry", "inst:one", "detail", fact("unconfirmed", fact_class="programme_detail"))  # not high-stakes: may stay unconfirmed
+    put(k, "registry", "inst:one", "deadline_close", fact("verified"))
+    put(k, "registry", "inst:one", "detail", fact("unconfirmed", fact_class="programme_detail"))  # not high-stakes: may stay unconfirmed
     assert levels(engine)["inst:one"] == "verified"
-    k.upsert("registry", "inst:one", "fee_x_unknown_field", fact("confirmed"))  # unclassified: high-stakes (fail safe)
+    put(k, "registry", "inst:one", "fee_x_unknown_field", fact("confirmed"))  # unclassified: high-stakes (fail safe)
     c = coverage_map(engine, "pai", 2027)["inst:one"]
     assert c.level == "researched"
     assert (c.facts, c.high_stakes, c.high_stakes_verified) == (3, 2, 1)
@@ -58,13 +58,13 @@ def test_verified_needs_every_high_stakes_fact_verified(engine, world):
 
 def test_only_non_high_stakes_facts_never_make_verified(engine, world):
     _, k = world
-    k.upsert("registry", "inst:one", "detail", fact("verified", fact_class="programme_detail"))
+    put(k, "registry", "inst:one", "detail", fact("verified", fact_class="programme_detail"))
     assert levels(engine)["inst:one"] == "researched"
 
 
 def test_a_stale_high_stakes_fact_drops_it_back(engine, world):
     _, k = world
-    fid = k.upsert("registry", "inst:one", "deadline_close", fact("verified"))
+    fid = put(k, "registry", "inst:one", "deadline_close", fact("verified"))
     assert levels(engine)["inst:one"] == "verified"
     k.set_status(fid, "stale", cause="monitor")
     assert levels(engine)["inst:one"] == "researched"
@@ -72,7 +72,7 @@ def test_a_stale_high_stakes_fact_drops_it_back(engine, world):
 
 def test_intake_term_filter(engine, world):
     _, k = world
-    k.upsert("registry", "inst:one", "deadline_close", fact("verified", intake_term="autumn"))
+    put(k, "registry", "inst:one", "deadline_close", fact("verified", intake_term="autumn"))
     assert levels(engine, intake_term="autumn")["inst:one"] == "verified"
     assert levels(engine, intake_term="spring")["inst:one"] == "listed"
     assert levels(engine)["inst:one"] == "verified"  # no term given: every term
@@ -85,9 +85,9 @@ def test_programme_and_campus_facts_count_for_the_institution(engine, world):
     ProgrammeStore(engine, "pai").upsert(Programme(ref="p1", route_key="r", university="One", name="Sci", aliases=(),
                                                    start_urls=(), official_domains=()))
     s.link_programme("p1", institution_id="inst:one", campus_id="campus:north")
-    k.upsert("programme", "p1", "deadline_close", fact("verified"))
+    put(k, "programme", "p1", "deadline_close", fact("verified"))
     assert levels(engine)["inst:one"] == "verified"
-    k.upsert("registry", "campus:north", "fee_unknown", fact("confirmed"))
+    put(k, "registry", "campus:north", "fee_unknown", fact("confirmed"))
     assert levels(engine)["inst:one"] == "researched"
     assert levels(engine)["inst:two"] == "listed"
 
@@ -100,19 +100,19 @@ def test_an_admitting_system_and_its_tests_count(engine, world):
     s.record(child("seat_category", "cat", "open", "sys:central-merit"), cause="import")
     s.link("sys:central-merit", "admits", "inst:one")
     s.link("sys:central-merit", "uses_test", "test:alpha-entry")
-    k.upsert("registry", "sys:central-merit", "merit_formula", fact("verified"))
-    k.upsert("registry", "test:alpha-entry", "test_date", fact("verified"))
+    put(k, "registry", "sys:central-merit", "merit_formula", fact("verified"))
+    put(k, "registry", "test:alpha-entry", "test_date", fact("verified"))
     assert levels(engine) == {"inst:one": "verified", "inst:two": "listed", "inst:tre": "listed"}
-    k.upsert("registry", "cat:open", "seat_quota", fact("confirmed"))  # a child of the system
+    put(k, "registry", "cat:open", "seat_quota", fact("confirmed"))  # a child of the system
     assert levels(engine)["inst:one"] == "researched"
-    k.upsert("registry", "body:central", "deadline_close", fact("unconfirmed"))  # the body itself is not counted
+    put(k, "registry", "body:central", "deadline_close", fact("unconfirmed"))  # the body itself is not counted
     assert levels(engine)["inst:two"] == "listed"
 
 
 def test_not_readable_stays_listed(engine, world):
     s, k = world
     s.record(replace(inst("one"), attrs={"not_readable": True}), cause="review")
-    k.upsert("registry", "inst:one", "deadline_close", fact("verified"))
+    put(k, "registry", "inst:one", "deadline_close", fact("verified"))
     c = coverage_map(engine, "pai", 2027)["inst:one"]
     assert c.level == "listed" and c.not_readable
 

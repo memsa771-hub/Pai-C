@@ -12,7 +12,7 @@ from app.os.knowledge.port import Fact
 from app.os.knowledge.store import SqlKnowledge
 from app.os.playbooks import load_playbook_dir
 from app.os.settings import load_settings
-from tests.os.registry.helpers import AT, child, inst, olist, seed_basic, store
+from tests.os.registry.helpers import AT, child, put, seed_basic, store
 from tests.os.test_api import ADMIN, FAKE, TOKEN, as_student
 
 pytestmark = pytest.mark.req("R-32")
@@ -28,8 +28,8 @@ def api(engine, clean, os_db):
     s.record(child("admission_body", "body", "central", None, region="national"), cause="import")
     s.record(child("admission_system", "sys", "central-merit", "body:central"), cause="import")
     s.link("sys:central-merit", "admits", "inst:one")
-    SqlKnowledge(engine, "pai").upsert("registry", "inst:one", "deadline_close",
-                                       Fact({"d": 1}, "q", "https://admissions.alpha.test/n", AT, 2027, "verified"))
+    put(SqlKnowledge(engine, "pai"), "registry", "inst:one", "deadline_close",
+        Fact({"d": 1}, "q", "https://admissions.alpha.test/n", AT, 2027, "verified"))
     app = FastAPI()
     app.include_router(build_router(lambda: services), prefix="/v1/os")
     return TestClient(app)
