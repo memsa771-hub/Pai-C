@@ -10,32 +10,32 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GI-01 | the Directorate of Education (Colleges) Gilgit Balistan supervises college/higher level education in Gilgit-Baltistan. | https://www.doecgb.gov.pk/institutions | `The Directorate of Education (Colleges) Gilgit Balistan is attached Department, facilitating and supervising the College/Higher level Education in Gilgit-Baltistan.` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
-| GI-02 | the examinations site lists the Date Sheet HSSC 1st Annual Examination 2026. | https://examinations.kiu.edu.pk/ | `Date Sheet HSSC 1st Annual Examination 2026` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
+| GI-01 | the Directorate of Education (Colleges) Gilgit Balistan supervises college/higher level education in Gilgit-Baltistan. | https://www.doecgb.gov.pk/institutions | `The Directorate of Education (Colleges) Gilgit Balistan is attached Department, facilitating and supervising the College/Higher level Education in Gilgit-Baltistan.` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: verbatim in visible text; follows | correct: quote found word for word (html, visible text, HTTP 200) |
+| GI-02 | the examinations site lists the Date Sheet HSSC 1st Annual Examination 2026. | https://examinations.kiu.edu.pk/ | `Date Sheet HSSC 1st Annual Examination 2026` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: verbatim in visible text (a news item dated 10 Jun, 2026); follows | correct: quote found word for word (html, visible text, HTTP 200) |
 
 ## How admission works
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GI-04 | each listed college has an 'Apply Online for Admission' link. | https://www.doecgb.gov.pk/institutions | `S.No Institution Name Email Apply Online for Admission` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
+| GI-04 | each listed college has an 'Apply Online for Admission' link. | https://www.doecgb.gov.pk/institutions | `S.No Institution Name Email Apply Online for Admission` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: the quote is the table header row, verbatim; 28 'Apply Online' links in the HTML (27 rows plus one in the menu) | correct: quote found word for word (html, visible text, HTTP 200) |
 
 ## Eligibility rules
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GI-06 | intermediate merit rules, quotas and calendar for GB colleges: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| GI-06 | intermediate merit rules, quotas and calendar for GB colleges: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line | n/a: no URL: gap line |
 
 ## Official lists
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GI-03 | public college list: last serial 27 (count in Lists table). | https://www.doecgb.gov.pk/institutions | `27 Govt. Boys I/C Chatorkhand, Ghizar` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
+| GI-03 | public college list: last serial 27 (count in Lists table). | https://www.doecgb.gov.pk/institutions | `27 Govt. Boys I/C Chatorkhand, Ghizar` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: verbatim; my recount gives serials 1-27 in order ('last serial' from recount, not quote) | correct: quote found word for word (html, visible text, HTTP 200) |
 
 ## Calendar
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GI-05 | Registration Notification of SSC-I for the Session 2026-2028 dated 06 Jul, 2026. | https://examinations.kiu.edu.pk/ | `06 Jul, 2026 Registration Notification of SSC-I for the Session 2026-2028` | 2026-11-07 | curl + HTML text strip (comments removed) | | correct: quote found word for word (html, visible text, HTTP 200) |
+| GI-05 | Registration Notification of SSC-I for the Session 2026-2028 dated 06 Jul, 2026. | https://examinations.kiu.edu.pk/ | `06 Jul, 2026 Registration Notification of SSC-I for the Session 2026-2028` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: verbatim in visible text; the date sits next to the title; follows | correct: quote found word for word (html, visible text, HTTP 200) |
 
 ### Lists table
 
@@ -52,4 +52,4 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 - Lines: 6; cited: 5; gaps: 1.
 - Check 2: correct 5, wrong 0, unclear 0, n/a 1 (run 2026-11-07T20:03:38.600627+00:00).
-- Check 1: not done yet.
+- Check 1 (blind, 2026-11-07): correct 5, wrong 0, unclear 0, n/a 1. Lists recounted: matches.
