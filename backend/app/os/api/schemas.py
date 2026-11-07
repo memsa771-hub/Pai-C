@@ -53,6 +53,28 @@ class InboxOut(BaseModel):
     changes_paused: bool = False  # Slice 7: a person is checking the plan (S7-D9)
 
 
+class RequestNeedOut(BaseModel):
+    kind: Literal["fact", "document"]
+    ref: str
+    evidence: Literal["stated", "shown", "confirmed"]
+
+
+class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes of the student (never a value)
+    id: int
+    task_id: int | None
+    kind: Literal["provide", "which_is_right"]
+    need: RequestNeedOut
+    status: Literal["open", "answered"]
+    due_at: datetime | None
+    due_tz: str | None
+    title: str | None
+    how: str
+
+
+class RequestsOut(BaseModel):
+    requests: list[StudentRequestOut]
+
+
 class CompleteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     payload: dict = {}

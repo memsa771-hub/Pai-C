@@ -9,11 +9,13 @@ from typing import Any
 from sqlalchemy import Connection, func, select
 
 from app.os import models
-from app.os.contracts.plan_view import (ConsentState, DocumentNeed, PlanChange, PlanRoute, PlanStep, PlanViewV1)
+from app.os.contracts.plan_view import (ConsentState, DocumentNeed, PlanChange, PlanRequest, PlanRoute, PlanStep,
+                                        PlanViewV1, StepNeed)
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX
 from app.os.kernel.states import PLAN_CLOSED
 from app.os.playbooks.loader import PlaybookError, select_playbook
 from app.os.ports import document_files
+from app.os.requests import keys, store as request_store
 
 D = models.documents
 P, T, E, R, PR, EV, I, PIN = (models.plans, models.tasks, models.task_edges, models.plan_revisions, models.proposals,
@@ -71,6 +73,21 @@ def _steps(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanStep]:
         blocked_reason=_code(t.blocked_reason, "blocked") if t.blocked_reason else None,
         inbox_kind=t.inbox_kind, programme_ref=t.programme_ref, due_at=t.due_at, due_tz=t.due_tz if t.due_at else None,
         depends_on=deps.get(t.id, []), provisional=t.provisional, estimated=t.estimated, needs=[]) for t in rows]
+
+
+def _needs(step: PlanStep, book: Any) -> list[StepNeed]:
+    """What a step needs (P1-T8, R-17): a playbook step, from the pinned book's template; a step the compiler added for
+    a missing fact or document, from its key. A "result expected" step needs nothing itself."""
+    asked = keys.parse(step.instance_key)
+    if asked is not None:
+        return [StepNeed(kind=asked.need_kind, ref=asked.ref, evidence=asked.level)] if asked.level else []
+    template = next((t for t in getattr(book, "tasks", None) or [] if t.template_key == step.template_key), None)
+    return [StepNeed(kind=n.kind, ref=n.ref, evidence=n.evidence) for n in (template.needs if template else [])]
+
+
+def _requests(rows: list[request_store.Request]) -> list[PlanRequest]:
+    return [PlanRequest(request_id=r.id, need=StepNeed(kind=r.need_kind, ref=r.need_ref, evidence=r.evidence),
+                        status=r.status, due_at=r.due_at, due_tz=r.due_tz) for r in rows]
 
 
 def _changes(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanChange]:
@@ -135,6 +152,7 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
                 .order_by(EV.c.id.desc()).limit(1)).scalar()
             reason = _code((payload or {}).get("reason"))
         changes = _changes(conn, tenant_id, plan.id)
+        requests = _requests(request_store.for_plan(conn, tenant_id, plan.id))
     if plan.status == "done":
         state = "finished"
     elif plan.status == PLAN_CLOSED or decision.status in _CLOSED_STATUSES:
@@ -160,12 +178,14 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
         route_key, book_key = book.key, (book.key, book.version)
     else:
         route_key, book_key = pin.playbook_key, (pin.playbook_key, pin.version)
-    pages = [p.key for p in (getattr(svc.plans.playbooks.get(book_key), "pages", None) or [])]  # D-z6
+    book = svc.plans.playbooks.get(book_key)
+    pages = [p.key for p in (getattr(book, "pages", None) or [])]  # D-z6
+    steps = [s.model_copy(update={"needs": needs}) if (needs := _needs(s, book)) else s for s in steps]
     # consent is the applied row's: the Counsellor holds the newest consent itself and shows it from its own side
     return PlanViewV1(
         student_ref=student_ref, state=state, state_reason=reason, plan_id=plan.id, decision_version=version,
         revision=plan.current_revision,
         route=PlanRoute(route_key=route_key, origin_country=origin, destination_country=destination, level=level,
                         target_intake=intake),
-        pages=pages, consent=_consent(decision.export or {}), steps=steps, requests=[],
+        pages=pages, consent=_consent(decision.export or {}), steps=steps, requests=requests,
         documents_needed=_documents_needed(svc, student_ref, route_key), changes=changes, proposals_waiting=waiting)

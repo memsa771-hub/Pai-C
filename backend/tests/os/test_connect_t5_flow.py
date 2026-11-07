@@ -205,6 +205,32 @@ def test_fake_pakistan_intermediate_route_is_planned(world):
         no_chat(who, before)
 
 
+@pytest.mark.req("R-19")
+def test_flags_off_no_request_rows(world):
+    """P1-T8 Task 3: with the needs gate off a whole flow leaves the request table empty, and the plan view has no
+    needs and no requests on any step (the Germany route and the fake intermediate route)."""
+    svc = world  # noqa: F811
+    from tests.test_roadmap_api import pre_eng
+
+    with germany_student() as (client, who, params), level("master"):
+        vault((client, who, params))
+        data(choose_with(client, params, destination="DE", places=[{"ref": "ovgu-eeit", "rank": 1}], intake=WINTER))
+        assert run_os(svc) == [("planned", None)]
+        view = bridge.plan_view(who.workspace_id)
+        assert view["steps"] and view["requests"] == [] and all(s["needs"] == [] for s in view["steps"])
+    with pre_eng() as (client, who, params), level("intermediate"):
+        vault((client, who, params))
+        data(choose_with(client, params, destination="PK", places=[{"ref": "pk-i1", "rank": 1}], intake=WINTER))
+        assert run_os(svc) == [("planned", None)]
+        view = bridge.plan_view(who.workspace_id)
+        assert view["steps"] and view["requests"] == [] and all(s["needs"] == [] for s in view["steps"])
+        assert not [s for s in view["steps"] if s["template_key"] in ("provide", "which_is_right", "result_expected")]
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(models.student_requests)).scalar() == 0
+        pins = conn.execute(select(models.playbook_pins.c.version)).scalars().all()
+    assert pins and set(pins) == {1}  # the gate off keeps version 1
+
+
 def test_a_route_the_os_cannot_run_keeps_the_labelled_checklist(world):
     svc = world  # noqa: F811
     from tests.test_roadmap_api import pre_eng

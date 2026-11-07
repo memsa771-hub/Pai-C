@@ -35,6 +35,7 @@ STEP_REFUSALS = {  # PAI OS refusals of a tick: (words for the student, HTTP sta
     "not_found": ("No such step on this route", 404), "not_yours": ("No such step on this route", 404),
     "not_waiting": ("This step is not waiting for you, so it cannot be ticked.", 409),
     "review_required": ("Approve the file to finish this step; it cannot be ticked.", 409),
+    "answer_required": ("This step closes by itself when PAI has what it needs.", 409),  # P1-T8: a request is answered, not ticked
     "unavailable": ("PAI could not update your plan just now; try again later.", 503)}
 
 

@@ -9,7 +9,7 @@ from app.os.inbox_actions import StepActionError  # noqa: F401  (the port's erro
 
 
 def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -> Literal["done", "already_done"]:
-    """Raises StepActionError with code not_found, not_yours, not_waiting or review_required."""
+    """Raises StepActionError with code not_found, not_yours, not_waiting, review_required or answer_required."""
     return inbox_actions.complete(ports.services(), student_ref, task_id, payload)
 
 

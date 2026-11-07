@@ -23,7 +23,7 @@ from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
 from app.os.ports import os_events
 from app.os.replan import events as replan_events
-from app.os.requests import keys as request_keys
+from app.os.requests import keys as request_keys, store as request_store
 from app.os.kernel.states import (
     PLAN_CLOSED,
     PLAN_OPEN,
@@ -125,6 +125,7 @@ class Kernel:
                 self._promote(conn, plan_id)
             finally:
                 conn.info.pop(_QUIET, None)
+            request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())  # P1-T8, D-w7
             return PlanRef(plan_id, 1, True)
 
     def revise(self, plan_id: int, cause: str, draft: PlanDraft, based_on: str | None = None) -> int | None:
@@ -222,6 +223,7 @@ class Kernel:
             conn.execute(update(PR).where(PR.c.plan_id == plan_id, PR.c.status == "pending").values(
                 status="expired", answered_at=self.clock()))
             self._event(conn, plan_id, None, "plan_closed", {"number": number, "cause": cause})
+            request_store.sync(conn, self.tenant_id, plan_id, now=self.clock())  # P1-T8: its requests are cancelled
             return number
 
     def pause_plan(self, plan_id: int, reason: str) -> bool:
@@ -518,6 +520,7 @@ class Kernel:
                     citations=list(t.citations), fact_refs=[list(f) for f in t.fact_refs]))
         if d.empty and pin_version is None:
             self._set_risk(conn, plan_id, draft.at_risk)
+            request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())
             return None
         number = conn.execute(select(P.c.current_revision).where(P.c.id == plan_id)).scalar_one() + 1
         for key in d.rechecked:  # the finished check stays as history; its key goes to the fresh task below
@@ -580,6 +583,7 @@ class Kernel:
         self._event(conn, plan_id, None, "plan_revised", {"number": number, "cause": cause, "diff": d.as_json()})
         self._set_risk(conn, plan_id, draft.at_risk)
         self._promote(conn, plan_id)
+        request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())  # P1-T8, D-w7
         return number
 
     def _promote(self, conn: Connection, plan_id: int) -> None:
