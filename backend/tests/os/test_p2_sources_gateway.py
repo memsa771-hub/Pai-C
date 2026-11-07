@@ -57,6 +57,11 @@ def fact(url, status="confirmed"):
     return Fact(value="x", quote="q", url=url, checked_at=T0, intake_year=2027, status=status)
 
 
+def verified(k, fid):
+    k.set_status(fid, "verified", cause="review", actor="tester")  # the only way to `verified` (T1 ruling)
+    return fid
+
+
 # --- without the guard: as before -----------------------------------------------------------------------------------
 
 def test_without_a_guard_nothing_changes(engine, clean, fixture_sites):
@@ -110,7 +115,7 @@ def test_pdf_original_is_kept_with_its_snapshot(engine, clean, fixture_sites):
 def test_spam_fixture_is_refused_and_its_domain_becomes_suspect(engine, clean, fixture_sites):
     k = SqlKnowledge(engine, "pai")
     on_beta = k.upsert("programme", "beta-bs", "deadline", fact("https://beta-college.test/old"))
-    on_beta2 = k.upsert("programme", "beta-bs", "fee", fact("https://admissions.beta-college.test/fees", "verified"))
+    on_beta2 = verified(k, k.upsert("programme", "beta-bs", "fee", fact("https://admissions.beta-college.test/fees")))
     on_alpha = k.upsert("programme", "alpha-bs", "deadline", fact("https://alpha-university.test/d"))
     changed, cases = [], []
     gw, g, _ = build(engine, fixture_sites, after=lambda *a: changed.append(a), hook=cases.append)
