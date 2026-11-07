@@ -55,8 +55,8 @@ class Fact:
 class KnowledgePort(Protocol):
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
-        intake_term: str | None = None, owner_ref: str = "",
+        intake_term: str | None = None, owner_ref: str | None = None,
     ) -> dict[tuple[str, str], Fact]: ...
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
-                    intake_term: str | None = None, owner_ref: str = "") -> dict[str, Fact]: ...
+                    intake_term: str | None = None, owner_ref: str | None = None) -> dict[str, Fact]: ...

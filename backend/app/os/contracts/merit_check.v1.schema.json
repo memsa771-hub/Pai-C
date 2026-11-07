@@ -7,8 +7,16 @@
           "$ref": "#/$defs/IntakeRef"
         },
         "value": {
-          "title": "Value",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
         },
         "list_number": {
           "anyOf": [
@@ -31,7 +39,7 @@
           "enum": [
             "verified",
             "confirmed",
-            "unconfirmed"
+            "not_confirmed"
           ],
           "title": "Level",
           "type": "string"
@@ -42,7 +50,6 @@
       },
       "required": [
         "intake",
-        "value",
         "list_complete",
         "level",
         "source"
@@ -82,7 +89,7 @@
           "enum": [
             "verified",
             "confirmed",
-            "unconfirmed"
+            "not_confirmed"
           ],
           "title": "Level",
           "type": "string"

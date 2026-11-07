@@ -67,11 +67,14 @@ def test_fact_rules():
 
 def test_round_trip_and_filters(engine, clean):
     k = SqlKnowledge(engine, "pai")
-    full = fact("verified", intake_term="fall", owner_ref="body:board", fact_class="deadline", read_method="ocr",
+    full = fact("confirmed", intake_term="fall", owner_ref="body:board", fact_class="deadline", read_method="ocr",
                 language="ur")
     fid = k.upsert("programme", "p", "deadline_close", full)
+    k.set_status(fid, "verified", cause="review", cause_ref="rev:1")
+    full = Fact(**{**full.__dict__, "status": "verified"})
     assert k.get(fid)[3] == Fact(**{**full.__dict__, "id": fid})
-    assert k.programme_facts(["p"], ["deadline_close"], 2027) == {}  # owner rows need their owner
+    assert k.programme_facts(["p"], ["deadline_close"], 2027, owner_ref="") == {}  # '' = general rows only
+    assert k.programme_facts(["p"], ["deadline_close"], 2027)[("p", "deadline_close")].id == fid  # None = any owner
     got = k.programme_facts(["p"], ["deadline_close"], 2027, owner_ref="body:board")
     assert got[("p", "deadline_close")].read_method == "ocr"
     assert k.programme_facts(["p"], ["deadline_close"], 2027, intake_term="spring", owner_ref="body:board") == {}
@@ -135,3 +138,84 @@ def test_migration_up_down_up(os_db, engine, clean):
         assert "os_fact_revisions" not in inspect(engine).get_table_names(schema="os")
     finally:
         run_alembic(["upgrade", "os@head"], os_db)
+
+
+def test_owner_resolution_order(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    general = k.upsert("programme", "p", "f", fact(value="general"))
+    owned = k.upsert("programme", "p", "f", fact(value="board", owner_ref="body:board"))
+    k.upsert("programme", "p", "f", fact(value="other", owner_ref="body:other"))
+    assert k.programme_facts(["p"], ["f"], 2027, owner_ref="body:board")[("p", "f")].id == owned
+    assert k.programme_facts(["p"], ["f"], 2027, owner_ref="body:none")[("p", "f")].id == general
+    assert k.programme_facts(["p"], ["f"], 2027)[("p", "f")].id == general  # any owner: the general row first
+    assert k.route_facts("r", ["f"], 2027) == {}
+
+
+@pytest.mark.req("R-25")
+def test_verified_only_through_review(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    with pytest.raises(ValueError, match="review"):
+        k.upsert("programme", "p", "f", fact("verified"))
+    with pytest.raises(ValueError, match="review"):
+        k.insert_if_absent("programme", "p", "f", fact("verified"))
+    fid = k.upsert("programme", "p", "f", fact())
+    with pytest.raises(ValueError, match="review"):
+        k.confirm(fid, value="v", quote="q", url="https://a.test/x", status="verified")
+    with pytest.raises(ValueError, match="review"):
+        k.set_status(fid, "verified", cause="import")
+    assert k.set_status(fid, "verified", cause="review").verified
+
+
+@pytest.mark.req("R-25")
+@pytest.mark.parametrize("cause", ["research", "import", "monitor"])
+def test_write_on_verified_row(engine, clean, cause):
+    k = SqlKnowledge(engine, "pai")
+    fid = k.upsert("programme", "p", "f", fact())
+    k.set_status(fid, "verified", cause="review")
+    k.upsert("programme", "p", "f", fact(), cause=cause)  # same value and quote: stays verified
+    assert k.get(fid)[3].status == "verified"
+    k.upsert("programme", "p", "f", fact(value="new"), cause=cause, cause_ref="x:1")
+    assert k.get(fid)[3].status == "unconfirmed"
+    last = k.revisions(fid)[-1]
+    assert (last.cause, last.cause_ref, last.before["status"], last.after["status"], last.after["value"]) == (
+        cause, "x:1", "verified", "unconfirmed", "new")
+
+
+def test_mark_stale_handles_verified(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    fid = k.upsert("programme", "p", "f", fact())
+    k.set_status(fid, "verified", cause="review")
+    assert k.mark_stale(fid) and k.get(fid)[3].status == "stale"
+    assert not k.mark_stale(fid)
+
+
+def test_annotate_records_its_cause(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    fid = k.upsert("programme", "p", "f", fact())
+    k.annotate(fid, conflict_note="other value seen", cause="monitor", cause_ref="mon:1", actor="os.monitor")
+    last = k.revisions(fid)[-1]
+    assert (last.action, last.cause, last.cause_ref, last.actor) == ("change", "monitor", "mon:1", "os.monitor")
+
+
+def test_other_tenant_cannot_confirm_or_set_status(engine, clean):
+    fid = SqlKnowledge(engine, "pai").upsert("programme", "p", "f", fact("unconfirmed"))
+    other = SqlKnowledge(engine, "other")
+    with pytest.raises(KeyError):
+        other.confirm(fid, value="x", quote="q", url="https://a.test/x", status="confirmed")
+    with pytest.raises(KeyError):
+        other.set_status(fid, "unconfirmed", cause="manual")
+
+
+def test_upsert_after_lost_insert_race_is_a_change(engine, clean, monkeypatch):
+    k = SqlKnowledge(engine, "pai")
+    k.upsert("programme", "p", "f", fact(value="first"))
+    real = SqlKnowledge._keyed
+    calls = {"n": 0}
+
+    def first_miss(self, conn, *a):  # the first lookup misses, as if a concurrent insert had not committed yet
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(self, conn, *a)
+
+    monkeypatch.setattr(SqlKnowledge, "_keyed", first_miss)
+    fid = k.upsert("programme", "p", "f", fact(value="second"))
+    assert [r.action for r in k.revisions(fid)] == ["insert", "change"]
