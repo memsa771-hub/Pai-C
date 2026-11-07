@@ -550,6 +550,13 @@ def next_consistency_run(now: datetime, hour: int) -> datetime:
     return at if at > now else at + timedelta(days=1)
 
 
+def consistency_due_now(now: datetime, hour: int) -> bool:
+    """Whether today's run time has already passed: a process that starts after `hour`:00 UTC runs today's check at once
+    (the claim lets it run only if no replica finished it). Pure."""
+    now = now.astimezone(timezone.utc)
+    return now >= now.replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
 def consistency_nightly(db, today=None) -> dict | None:
     """One nightly run: the winner of today's claim runs the check and records its counts. None when the job is off or
     another replica holds today's run. The claim is taken after the off check, so an off day is not used up."""
@@ -579,14 +586,20 @@ def _consistency_with_session() -> dict | None:
 def start_consistency() -> asyncio.Task:
     """Started from the app's lifespan only when PAI OS is mounted, beside the sweep. It sleeps until the next
     CONNECT_CONSISTENCY_HOUR_UTC and runs once per date: the run row's unique date lets one replica win."""
+    async def run() -> None:
+        try:
+            await asyncio.to_thread(_consistency_with_session)
+        except Exception:  # noqa: BLE001  (logged; the next start or tomorrow's run tries again)
+            log.exception("PAI OS consistency job failed")
+
     async def loop() -> None:
+        hour = config.CONNECT_CONSISTENCY_HOUR_UTC
+        if consistency_due_now(datetime.now(timezone.utc), hour):
+            await run()  # started after the run time on a day with no finished run (or a dead claim): run today
         while True:
             now = datetime.now(timezone.utc)
-            await asyncio.sleep(max(1.0, (next_consistency_run(now, config.CONNECT_CONSISTENCY_HOUR_UTC) - now).total_seconds()))
-            try:
-                await asyncio.to_thread(_consistency_with_session)
-            except Exception:  # noqa: BLE001  (logged; tomorrow's run tries again)
-                log.exception("PAI OS consistency job failed")
+            await asyncio.sleep(max(1.0, (next_consistency_run(now, hour) - now).total_seconds()))
+            await run()
 
     return asyncio.create_task(loop())
 

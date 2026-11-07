@@ -736,7 +736,7 @@ consistency_cases = Table(
     Column("resolved_at", DateTime(timezone=True)),
     CheckConstraint("rule BETWEEN 1 AND 8", name="ck_os_consistency_cases_rule"),
     _in("status", ("open", "resolved"), "ck_os_consistency_cases_status"),
-    Index("uq_os_consistency_cases_open", "tenant_id", "student_ref", "rule", unique=True,
+    Index("uq_os_consistency_cases_open", "tenant_id", "student_ref", "rule", text("coalesce(plan_id, 0)"), unique=True,
           postgresql_where=text("status = 'open'")),
 )
 

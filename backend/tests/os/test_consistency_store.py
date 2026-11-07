@@ -2,6 +2,8 @@
 
 from datetime import date
 
+from unittest.mock import patch
+
 import pytest
 from sqlalchemy import insert, select
 
@@ -17,10 +19,10 @@ def store(engine, clean):
     return ConsistencyStore(engine, "pai")
 
 
-def _plan(engine, student="stu-1") -> int:
+def _plan(engine, student="stu-1", route="XX") -> int:
     with engine.begin() as conn:
         return conn.execute(insert(models.plans).values(
-            tenant_id="pai", source="counsellor", external_ref=f"j-{student}:XX:master", student_ref=student,
+            tenant_id="pai", source="counsellor", external_ref=f"j-{student}:{route}:master", student_ref=student,
             contract={}, contract_sha256="0" * 64).returning(models.plans.c.id)).scalar_one()
 
 
@@ -35,6 +37,27 @@ def test_open_or_touch_keeps_one_open_case_per_student_and_rule(store):
     store.open_or_touch("stu-1", 3, None, ["plan_not_stopped"])
     store.open_or_touch("stu-2", 2, None, ["contract_hash"])
     assert len(store.list("open")) == 3
+
+
+def test_two_plans_of_one_student_and_rule_are_two_cases(engine, store):
+    one, two = _plan(engine, route="AA"), _plan(engine, route="BB")
+    a, created_a = store.open_or_touch("stu-1", 2, one, ["contract_hash"])
+    b, created_b = store.open_or_touch("stu-1", 2, two, ["export_hash"])
+    assert (created_a, created_b) == (True, True) and a != b
+    assert store.open_or_touch("stu-1", 2, one, ["contract_hash"]) == (a, False)  # each plan's case is touched alone
+    assert store.open_or_touch("stu-1", 2, two, ["export_hash"]) == (b, False)
+    assert sorted((c.plan_id, tuple(c.codes)) for c in store.list("open")) == sorted(
+        [(one, ("contract_hash",)), (two, ("export_hash",))])
+    # a case without a plan is a third key
+    assert store.open_or_touch("stu-1", 2, None, ["x"])[1] is True
+
+
+def test_a_case_another_run_opened_first_is_touched_not_duplicated(engine, store):
+    plan = _plan(engine)
+    first, _ = store.open_or_touch("stu-1", 2, plan, ["a"])
+    with patch.object(ConsistencyStore, "get", wraps=store.get):
+        again, created = store.open_or_touch("stu-1", 2, plan, ["b"])  # the row exists: no second insert
+    assert (again, created) == (first, False) and len(store.list("open")) == 1
 
 
 def test_a_resolved_case_lets_a_new_mismatch_open_a_new_row(store):

@@ -43,8 +43,9 @@ def upgrade() -> None:
         sa.CheckConstraint("status IN ('open', 'resolved')", name="ck_os_consistency_cases_status"),
         schema=S,
     )
-    op.create_index(OPEN_INDEX, CASES, ["tenant_id", "student_ref", "rule"], unique=True, schema=S,
-                    postgresql_where=sa.text("status = 'open'"))
+    # one open case per student, rule AND plan, so two plans never merge into one case (a case without a plan counts as 0)
+    op.create_index(OPEN_INDEX, CASES, ["tenant_id", "student_ref", "rule", sa.text("coalesce(plan_id, 0)")], unique=True,
+                    schema=S, postgresql_where=sa.text("status = 'open'"))
     op.create_table(
         RUNS,
         sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),

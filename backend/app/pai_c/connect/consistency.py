@@ -20,6 +20,7 @@ IN_FLIGHT_SECONDS = 600  # two sweeps of 300 s (D-z2)
 OS_PART_OF_RULE = {1: "CONNECT_HANDOFF", 2: "CONNECT_HANDOFF", 3: "CONNECT_HANDOFF", 4: "CONNECT_ROADMAP_FROM_PLANVIEW",
                    5: "CONNECT_STUDENT_FACTS", 6: "CONNECT_ONE_UPLOAD", 7: "CONNECT_STUDENT_FACTS",
                    8: "CONNECT_HANDOFF"}  # the connection part each rule needs (§1: a rule runs only while its part is on)
+APPLIED_INTAKE = ("planned", "revised", "replaced")  # the OS applied the version to a plan (not held, paused or refused)
 HELD_INTAKE = ("planned", "revised", "replaced", "refused", "held", "paused")  # an intake outcome that settles rule 1
 PLAN_OPEN = ("active", "at_risk", "paused")  # the OS plan statuses still being worked on (app.os.kernel.states)
 PLAN_HELD = (*PLAN_OPEN, "done")  # a finished plan still holds its decision version (rule 1)
@@ -112,30 +113,31 @@ def _key_version(key: str) -> int | None:
     return int(tail) if tail.isdigit() else None
 
 
-def _stage_h(db, workspace_id: str) -> dict[str, set[str]]:
-    """Study field key -> the programme refs of the student's completed programme searches for that field that the
-    Counsellor still serves (a search of a ruled-out, unrestored field is not served: `places.run_is_served`)."""
+def _search_fields(db, workspace_id: str) -> list[tuple[str | None, set[str]]]:
+    """Every completed programme search as `(study field key of its path, the programme refs it found)`, unfiltered."""
     from app.models import ExecutionRun, PaiPossibility
-    from app.pai_c.connect.places import run_is_served
-    from app.pai_c.paths.exclusions import excluded_fields
 
-    excluded = excluded_fields(db, workspace_id)
-    found: dict[str, set[str]] = {}
+    found = []
     runs = db.scalars(select(ExecutionRun).where(ExecutionRun.workspace_id == workspace_id,
                                                   ExecutionRun.task_type == "program_search",
                                                   ExecutionRun.status == "completed")).all()
     for run in runs:
-        if not run_is_served(db, run, excluded):
-            continue
         result = (run.result or {}).get("capability_result") or {}
         refs = {p.get("opportunity_id") for p in result.get("programs", []) if p.get("opportunity_id")}
-        if not refs:
-            continue
-        row = db.get(PaiPossibility, (run.constraints or {}).get("possibility_id"))
-        key = ((row.study_field or {}).get("key") if row is not None else None)
-        if key:
-            found.setdefault(key, set()).update(refs)
+        if refs:
+            row = db.get(PaiPossibility, (run.constraints or {}).get("possibility_id"))
+            found.append(((row.study_field or {}).get("key") if row is not None else None, refs))
     return found
+
+
+def _served_stage_h_fields(db, workspace_id: str, searches) -> tuple[str, ...]:
+    """The fields of the programmes the Counsellor really serves at stage H. The list comes from the served reader
+    itself (`places._stage_h_programs`, what the places endpoint offers), not from the filter it applies, so a leak in
+    that reader shows here."""
+    from app.pai_c.connect.places import _stage_h_programs
+
+    served = {p.get("opportunity_id") for p in _stage_h_programs(db, workspace_id)}
+    return tuple(sorted({key for key, refs in searches if key and refs & served}))
 
 
 def _roadmap_kind(db, row, parts) -> str | None:
@@ -167,8 +169,13 @@ def counsellor_side(db, workspace_id: str) -> CounsellorSide:
 
     rows = db.scalars(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id)
                       .order_by(RouteDecision.decision_version.desc())).all()
-    stage_h = _stage_h(db, workspace_id)
+    searches = _search_fields(db, workspace_id)
     excluded = excluded_fields(db, workspace_id)
+    paths = db.scalars(select(PaiPossibility).where(PaiPossibility.workspace_id == workspace_id)).all()
+    # a field whose path the student restored against the Vault option is theirs again: it is no longer excluded
+    restored = {(p.study_field or {}).get("key") for p in paths
+                if (p.study_field or {}).get("key") in excluded and _restored(p, excluded[p.study_field["key"]])}
+    in_force = {k: v for k, v in excluded.items() if k not in restored}
     newest = None
     if rows:
         row = rows[0]
@@ -176,11 +183,10 @@ def counsellor_side(db, workspace_id: str) -> CounsellorSide:
         newest = DecisionView(
             version=row.decision_version, status=row.status, os_supported=bool(row.os_supported),
             field_key=row.field_key, place_refs=refs, chosen_at=_utc(row.chosen_at),
-            place_fields=tuple(sorted(k for k, programs in stage_h.items() if programs & set(refs))))
+            place_fields=tuple(sorted({k for k, found in searches if k and found & set(refs)})))
     items = db.scalars(select(OsOutbox).where(OsOutbox.workspace_id == workspace_id)
                        .order_by(OsOutbox.created_at, OsOutbox.key)).all()
     vault = db.get(VaultVersion, workspace_id)
-    paths = db.scalars(select(PaiPossibility).where(PaiPossibility.workspace_id == workspace_id)).all()
     path_fields = sorted({(p.study_field or {}).get("key") for p in paths
                           if p.status in _OPEN and (p.study_field or {}).get("key") in excluded
                           and not _restored(p, excluded[(p.study_field or {})["key"]])})
@@ -195,7 +201,7 @@ def counsellor_side(db, workspace_id: str) -> CounsellorSide:
                      for i in items),
         export=decision_record_v2(db, rows[0]) if rows else None,
         vault_version=vault.version if vault is not None else 0,
-        excluded_fields=tuple(sorted(excluded)), stage_h_fields=tuple(sorted(stage_h)),
+        excluded_fields=tuple(sorted(in_force)), stage_h_fields=_served_stage_h_fields(db, workspace_id, searches),
         path_fields=tuple(path_fields), live_file_ids=frozenset(live), trashed_file_ids=frozenset(trashed),
         roadmap_kind=_roadmap_kind(db, rows[0] if rows else None, None))
 
@@ -261,6 +267,12 @@ def _rule2(c, o, mode, now):
                 ("export_hash",) if not plan.export_hash_matches else ())
             if codes:
                 found.append(Finding(2, codes, plan.id))
+        elif (n.status == "chosen" and n.os_supported and plan.decision_version is not None
+              and plan.decision_version < n.version and o.latest_version == n.version
+              and o.intake_status_by_version.get(n.version) in APPLIED_INTAKE
+              and not _in_flight(_decision_row(c, n.version), mode, now)):
+            # the OS applied the newest version, yet this open plan still stands at an older one (a plan left behind)
+            found.append(Finding(2, ("plan_version_stale",), plan.id))
     return found
 
 

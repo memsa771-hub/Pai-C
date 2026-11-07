@@ -57,6 +57,23 @@ def test_one_open_case_per_student_and_rule(engine, clean):
     _case(engine, status="resolved")
 
 
+def test_the_open_case_is_unique_per_plan_too(engine, clean):
+    def plan(route):
+        with engine.begin() as conn:
+            return conn.execute(insert(models.plans).values(
+                tenant_id="pai", source="counsellor", external_ref=f"j:{route}:master", student_ref="stu-1", contract={},
+                contract_sha256="0" * 64).returning(models.plans.c.id)).scalar_one()
+
+    one, two = plan("AA"), plan("BB")
+    _case(engine, plan_id=one)
+    _case(engine, plan_id=two)  # another plan: another case
+    with pytest.raises(IntegrityError):
+        _case(engine, plan_id=one)
+    _case(engine)  # no plan
+    with pytest.raises(IntegrityError):
+        _case(engine)
+
+
 def test_checks_on_rule_and_status(engine, clean):
     for bad in ({"rule": 0}, {"rule": 9}, {"status": "closed"}):
         with pytest.raises(IntegrityError):

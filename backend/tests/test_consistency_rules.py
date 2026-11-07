@@ -73,6 +73,25 @@ def test_a_finished_plan_still_holds_its_decision_version():
     only(run(c, os_(plans=[plan(status="closed")])), 1, "no_plan")  # a closed plan holds nothing
 
 
+def test_an_open_plan_left_at_an_older_version_is_stale():
+    """Rule 2: the OS applied version 2, but an open Counsellor plan still stands at version 1."""
+    c = side(newest=decision(version=2), outbox=(row(1), row(2)))
+    both = os_(latest_version=2, intake_status_by_version={1: "planned", 2: "revised"},
+               plans=[plan(id=7, version=1), plan(id=8, version=2)])
+    got = run(c, both)
+    assert got == [Finding(2, ("plan_version_stale",), 7)]
+    # not a finding while the OS has not applied the newest version (rule 1 owns that), or when it held / refused it
+    assert run(c, os_(latest_version=1, intake_status_by_version={1: "planned"}, plans=[plan(id=7, version=1)]),
+               ).count(Finding(2, ("plan_version_stale",), 7)) == 0
+    for status in ("held", "paused", "refused"):
+        o = os_(latest_version=2, intake_status_by_version={1: "planned", 2: status}, plans=[plan(id=7, version=1)])
+        assert [f for f in run(c, o) if f.rule == 2] == [], status
+    # a closed plan at an older version is the normal result of a replacement
+    closed = os_(latest_version=2, intake_status_by_version={2: "replaced"}, plans=[plan(id=7, status="closed", version=1),
+                                                                               plan(id=8, version=2)])
+    assert run(c, closed) == []
+
+
 def test_a_clean_pair_has_no_finding_in_either_mode():
     c, o = side(), os_()
     assert run(c, o) == [] and run(c, o, "nightly") == []

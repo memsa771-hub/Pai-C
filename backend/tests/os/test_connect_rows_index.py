@@ -45,8 +45,12 @@ def marked() -> dict[str, list[str]]:
 
 
 def node_exists(node: str) -> bool:
+    """A `file::test` node of a marked test, in tests/os or in tests (the same two places `marked` reads)."""
     name, _, test = node.partition("::")
-    tree = ast.parse((ROOT / name).read_text(encoding="utf-8-sig"))
+    path = next((d / name for d in (ROOT, ROOT.parent) if (d / name).exists()), None)
+    if path is None:
+        return False
+    tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     return any(isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name == test for f in ast.walk(tree))
 
 
@@ -59,6 +63,11 @@ def test_every_p1_row_of_master_section_6_has_a_test():
 def test_no_test_claims_a_row_p1_does_not_test():
     assert sorted(set(marked()) - P1_ROWS) == []
     assert not NOT_P1 & set(marked())
+
+
+def test_every_marked_node_resolves_to_a_test():
+    gone = [n for nodes in marked().values() for n in nodes if not node_exists(n)]
+    assert gone == [], f"marked tests that cannot be found: {gone}"
 
 
 def test_the_new_row_tests_are_the_ones_the_index_counts():
