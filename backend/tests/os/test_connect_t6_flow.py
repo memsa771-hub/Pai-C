@@ -40,6 +40,7 @@ from tests.os.test_connect_t5_flow import (  # noqa: F401
 )
 from tests.test_roadmap_api import TOKEN, data
 from tests.test_roadmap_choice_api import choose_with
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-07"), pytest.mark.req("R-08"), pytest.mark.req("R-09"), pytest.mark.req("R-11")]
 
@@ -100,6 +101,7 @@ def places_of_plan(f) -> list[str]:
     return [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
 
 
+@pytest.mark.connect_row("6.5", "6.6")
 def test_6_5_6_6_a_vault_drop_ends_in_a_request_and_version_2_both_sides(world):  # noqa: F811
     """Rows 6.5 and 6.6: marks drop in the Vault -> a pending removal -> accept -> the Counsellor writes version 2 ->
     the OS revises; the proposal is accepted and both sides read version 2 with two places. Then a stale one."""
@@ -160,6 +162,7 @@ def test_6_5_6_6_a_vault_drop_ends_in_a_request_and_version_2_both_sides(world):
             assert places_of_plan(f) == [OVGU]
             assert ledger(f) == {"versions": [1, 2, 3], "app": 3, "os": 3}
             no_chat(f.who, before)
+            assert_consistent(f.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def at_chosen(f) -> None:
@@ -179,6 +182,7 @@ def journey_stage(f) -> str:
         return db.scalar(select(StudentJourney.current_stage).where(StudentJourney.workspace_id == f.ref))
 
 
+@pytest.mark.connect_row("6.12")
 def test_6_12_all_rejected_pauses_the_plan_and_a_new_choice_resumes_it(world):  # noqa: F811
     with patch.object(config, "PAI_OS_SERVICE_TOKEN", SERVICE_TOKEN), \
             patch.object(config, "CONNECT_CONSENT_DRAFT", True, create=True), \
@@ -223,6 +227,7 @@ def test_6_12_all_rejected_pauses_the_plan_and_a_new_choice_resumes_it(world):  
         assert places_of_plan(f) == [OVGU]
         assert ledger(f)["app"] == ledger(f)["os"] == f.versions()[-1]
         no_chat(f.who, before)
+        assert_consistent(f.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def builder(world_, who):
@@ -233,6 +238,7 @@ def builder(world_, who):
     return os_api, {"X-Test-Student": who.workspace_id}
 
 
+@pytest.mark.connect_row("6.13")
 def test_6_13_the_builder_with_the_counsellor_on_writes_the_next_version(world):  # noqa: F811
     with flow(world, [{"ref": OVGU, "rank": 1}]) as f:
         before = chat_rows(f.who)
@@ -248,8 +254,10 @@ def test_6_13_the_builder_with_the_counsellor_on_writes_the_next_version(world):
         assert places_of_plan(f) == [OVGU, BTU_AI]  # the Counsellor's plan, made from the intake
         assert ledger(f) == {"versions": [1, 2], "app": 2, "os": 2}
         no_chat(f.who, before)
+        assert_consistent(f.who.factory)  # the end-of-test check (R-04, R-05)
 
 
+@pytest.mark.connect_row("6.16")
 def test_6_16_a_self_serve_plan_is_adopted_when_the_student_agrees(world):  # noqa: F811
     with germany_student() as (client, who, params), level("master"), \
             patch.object(config, "CONNECT_MY_PLAN", True, create=True):
@@ -281,8 +289,10 @@ def test_6_16_a_self_serve_plan_is_adopted_when_the_student_agrees(world):  # no
         assert chosen(client, params)["plan"]["decision_version"] == 2
         assert bridge.plan_view(who.workspace_id)["decision_version"] == 2
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
+@pytest.mark.connect_row("6.17")
 def test_6_17_with_the_module_off_the_plans_stay_standalone_and_accept_edits_directly(world):  # noqa: F811
     with germany_student() as (client, who, params), level("master"):
         before = chat_rows(who)

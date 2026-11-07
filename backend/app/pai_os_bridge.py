@@ -36,7 +36,9 @@ from app.os.ports import document_files as os_document_files, plan_source, stude
 from app.os.ports import fact_proposals as os_fact_proposals
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
-from app.pai_c.connect.flags import part_on
+from app.pai_c.connect import consistency as consistency_rules
+from app.pai_c.connect.flags import PARTS, part_on
+from app.os.ports import consistency as os_consistency
 
 log = logging.getLogger("app.pai_os_bridge")
 SWEEP_SECONDS = 300
@@ -495,6 +497,109 @@ def start_sweep() -> asyncio.Task:
             except Exception:  # noqa: BLE001  (logged; swept again in 5 minutes)
                 log.exception("PAI OS sweep failed")
             await asyncio.sleep(SWEEP_SECONDS)
+
+    return asyncio.create_task(loop())
+
+
+def consistency_students(db) -> list[str]:
+    """The students the check looks at: Counsellor workspaces with a decision or a Vault version, and every student
+    PAI OS holds a Counsellor plan or intake row for."""
+    from app.models import RouteDecision, VaultVersion
+
+    ours = {str(w) for w in db.scalars(select(RouteDecision.workspace_id).distinct()).all()}
+    ours |= {str(w) for w in db.scalars(select(VaultVersion.workspace_id).where(VaultVersion.version > 0)).all()}
+    return sorted(ours | set(os_consistency.students()))
+
+
+def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: datetime | None = None) -> dict:
+    """The consistency check of master 9.3 rules 1-8 (P1-T10, R-05). Reads both sides, repairs nothing and writes only
+    its own case rows (R-01). `mode` is `nightly` or `settled` (the end-of-test check). A mismatch opens one case for a
+    person when `open_cases`; the same mismatch next time only touches it. Logs carry rule numbers and counts only."""
+    try:
+        ports.services()
+    except ports.OsUnavailable:
+        return {"mounted": False}
+    if not part_on("CONNECT_HANDOFF"):  # also false while the `counsellor` module is off
+        return {"skipped": "off"}
+    now = now or datetime.now(timezone.utc)
+    parts = frozenset(p for p in PARTS if part_on(p))
+    findings: dict[int, int] = {}
+    opened = touched = errors = 0
+    students = consistency_students(db)
+    for student in students:
+        try:
+            side = consistency_rules.counsellor_side(db, student)
+            theirs = os_consistency.side(student, side.export)
+            for f in consistency_rules.check(side, theirs, mode=mode, now=now, parts=parts):
+                findings[f.rule] = findings.get(f.rule, 0) + 1
+                if open_cases:
+                    _, created = os_consistency.open_case(student, f.rule, f.plan_id, list(f.codes))
+                    opened, touched = opened + created, touched + (not created)
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only, no student data)
+            db.rollback()
+            errors += 1
+            log.error("PAI OS consistency check failed for one student: %s", type(exc).__name__)
+    if findings:
+        log.warning("PAI OS consistency (%s): findings per rule %s", mode, dict(sorted(findings.items())))
+    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors}
+
+
+def next_consistency_run(now: datetime, hour: int) -> datetime:
+    """The next time the nightly job is due: `hour`:00 UTC, today if it is still ahead, else tomorrow. Pure."""
+    at = now.astimezone(timezone.utc).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return at if at > now else at + timedelta(days=1)
+
+
+def consistency_due_now(now: datetime, hour: int) -> bool:
+    """Whether today's run time has already passed: a process that starts after `hour`:00 UTC runs today's check at once
+    (the claim lets it run only if no replica finished it). Pure."""
+    now = now.astimezone(timezone.utc)
+    return now >= now.replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
+def consistency_nightly(db, today=None) -> dict | None:
+    """One nightly run: the winner of today's claim runs the check and records its counts. None when the job is off or
+    another replica holds today's run. The claim is taken after the off check, so an off day is not used up."""
+    try:
+        ports.services()
+    except ports.OsUnavailable:
+        return None
+    if not part_on("CONNECT_HANDOFF"):
+        return None
+    day = today or datetime.now(timezone.utc).date()
+    run_id = os_consistency.claim_run(day, "nightly")
+    if run_id is None:
+        return None
+    counts = consistency_run(db, mode="nightly", open_cases=True)
+    os_consistency.finish_run(run_id, {k: ({str(r): n for r, n in v.items()} if isinstance(v, dict) else v)
+                                       for k, v in counts.items()})
+    return counts
+
+
+def _consistency_with_session() -> dict | None:
+    from app.database import SessionLocal
+
+    with SessionLocal() as db:
+        return consistency_nightly(db)
+
+
+def start_consistency() -> asyncio.Task:
+    """Started from the app's lifespan only when PAI OS is mounted, beside the sweep. It sleeps until the next
+    CONNECT_CONSISTENCY_HOUR_UTC and runs once per date: the run row's unique date lets one replica win."""
+    async def run() -> None:
+        try:
+            await asyncio.to_thread(_consistency_with_session)
+        except Exception:  # noqa: BLE001  (logged; the next start or tomorrow's run tries again)
+            log.exception("PAI OS consistency job failed")
+
+    async def loop() -> None:
+        hour = config.CONNECT_CONSISTENCY_HOUR_UTC
+        if consistency_due_now(datetime.now(timezone.utc), hour):
+            await run()  # started after the run time on a day with no finished run (or a dead claim): run today
+        while True:
+            now = datetime.now(timezone.utc)
+            await asyncio.sleep(max(1.0, (next_consistency_run(now, hour) - now).total_seconds()))
+            await run()
 
     return asyncio.create_task(loop())
 

@@ -14,7 +14,7 @@ from tests.os.test_api_visa import api as visa_api  # noqa: F401 - the real DBOS
 from tests.os.test_visa_run import ready_visa
 from tests.os.test_my_plan_api import P, counsellor_plan, make_api, me, self_plan
 
-pytestmark = pytest.mark.req("R-53")
+pytestmark = [pytest.mark.req("R-53"), pytest.mark.standalone]
 
 
 @pytest.fixture

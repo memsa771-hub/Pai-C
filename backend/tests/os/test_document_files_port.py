@@ -126,6 +126,7 @@ def test_file_bytes_reads_through_the_port_with_the_documents_student(engine, cl
     assert host.reads == [("stu-1", "file-1")]
 
 
+@pytest.mark.standalone
 def test_file_bytes_without_an_adapter_is_keyerror(engine, clean):
     store = DocumentStore(engine, "pai")
     doc_id = store.create_ref("stu-1", "transcript", 1, "t.png", "image/png", PNG, "file-1")
@@ -141,6 +142,7 @@ def test_file_bytes_other_tenant_is_keyerror(engine, clean, host):
     assert host.reads == []  # the host is never asked for another tenant's document
 
 
+@pytest.mark.standalone
 def test_file_bytes_standalone_row_reads_os_document_files(engine, clean, host):
     store = DocumentStore(engine, "pai")
     doc_id = store.create("stu-1", "transcript", 1, "t.png", "image/png", PNG)
@@ -287,6 +289,7 @@ def test_a_failing_hook_still_leaves_the_delete_done(mounted, host):
     assert store.get(doc_id).status == "deleted"
 
 
+@pytest.mark.standalone
 def test_a_standalone_delete_does_not_call_the_hook(mounted, host):
     doc_id = DocumentStore(mounted.engine, "pai").create("stu-1", "transcript", 1, "t.png", "image/png", PNG)
     store = DocumentStore(mounted.engine, "pai")
@@ -314,6 +317,7 @@ def test_upload_route_refuses_while_enabled(api, host, fake):
         assert conn.execute(select(func.count()).select_from(models.documents)).scalar() == 0
 
 
+@pytest.mark.standalone
 def test_unconfigured_port_upload_is_todays_route(api):
     data = jpeg(2)
     r = upload(api, data=data)
@@ -325,11 +329,13 @@ def test_unconfigured_port_upload_is_todays_route(api):
         assert conn.execute(select(models.documents.c.file_ref)).scalar() is None
 
 
+@pytest.mark.standalone
 def test_a_port_that_is_configured_but_off_is_todays_route(api, host):
     host.on = False
     assert upload(api).status_code == 201
 
 
+@pytest.mark.standalone
 def test_a_failing_gate_means_off(host):
     def boom():
         raise RuntimeError("x")

@@ -158,14 +158,18 @@ async def lifespan(app: FastAPI):
 
     # PAI OS ↔ Counsellor glue (PAI OS Slice 8): only when PAI OS is mounted.
     os_sweep = None
+    os_consistency = None
     if OS_MOUNTED:
-        from app.pai_os_bridge import start_sweep
+        from app.pai_os_bridge import start_consistency, start_sweep
         os_sweep = start_sweep()
+        os_consistency = start_consistency()  # P1-T10: the nightly consistency job (R-05)
 
     logger.info("LIFESPAN: yielding (startup complete)")
     yield
     if os_sweep is not None:
         os_sweep.cancel()
+    if os_consistency is not None:
+        os_consistency.cancel()
     maintenance_task.cancel()
     try:
         await maintenance_task

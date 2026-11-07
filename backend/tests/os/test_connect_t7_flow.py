@@ -46,6 +46,7 @@ from tests.os.test_connect_t5_flow import (  # noqa: F401
 from tests.os.test_vault_check import by_field
 from tests.test_roadmap_api import data, pre_eng
 from tests.test_roadmap_choice_api import choose_with
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-16"), pytest.mark.req("R-01")]
 
@@ -292,6 +293,7 @@ def reader(world, student):
 TRANSCRIPT_FILE = "b2_transcript.png"  # the sample key: CGPA 3.2 on a scale of 4.0
 
 
+@pytest.mark.connect_row("6.7")
 def test_germany_transcript_from_upload_to_replan(world):
     with signed_in(world, germany_student()) as s, level("master"):
         vault((s.client, s.who, s.params))
@@ -348,6 +350,7 @@ def test_germany_transcript_from_upload_to_replan(world):
         needs = {n["doc_type"]: n["status"] for n in bridge.plan_view(s.id)["documents_needed"]}
         assert needs["transcript"] == "confirmed"
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- 2. R-16: the student said 3.4, the transcript shows 3.2 -----------------------------------------------------------
@@ -398,6 +401,7 @@ def test_a_stated_value_and_a_transcript_value_are_compared_and_never_overwritte
             db.commit()
         assert s.record_with("gpa")["result"]["gpa"] == 3.2
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_a_transcript_value_then_a_different_chat_value_keeps_the_document_visible(world):
@@ -423,6 +427,7 @@ def test_a_transcript_value_then_a_different_chat_value_keeps_the_document_visib
         check = s.vault_check(doc_id).json()
         assert by_field(check)["cgpa"] == "differs" and check["note"]
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- 3. the fake Pakistan intermediate route: per part (R-80) -----------------------------------------------------------
@@ -463,6 +468,7 @@ def test_intermediate_certificate_keeps_the_onboarding_part_and_asks_nothing_in_
         with s.who.factory() as db:
             assert db.scalars(select(ProfileIssue)).all() == []  # nothing is asked
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- 4. a chat attachment ----------------------------------------------------------------------------------------------
@@ -488,6 +494,7 @@ def test_a_chat_attachment_keeps_todays_extraction_and_can_become_an_os_document
         assert [p["file_id"] for _, p in jobs(s.who, "document.extract")] == [file_id]
         assert len([1 for _, p in jobs(s.who, "document.parse") if p.get("file_id") == file_id]) == 1
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_a_typed_file_reaches_done_in_the_chat_context_with_todays_wording(world):
@@ -512,6 +519,7 @@ def test_a_typed_file_reaches_done_in_the_chat_context_with_todays_wording(world
         with s.who.factory() as db:
             line = next(l for l in recent_documents_block(db, s.id).splitlines() if file_id in l)
         assert "in progress" not in line and "finished" in line and "education" in line  # the line counts the fact
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- 5. deletion deletes in both places; the Vault facts stay ------------------------------------------------------------
@@ -547,6 +555,7 @@ def test_deleting_from_either_side_removes_both_and_the_vault_facts_stay(world):
         assert after["result"]["gpa"] == 3.7 and after["evidence_level"] == "shown"
         assert after["evidence"]["file_id"] == first["id"]
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 # --- 6. isolation: every read checks the tenant and the student ------------------------------------------------------
@@ -590,6 +599,7 @@ def test_student_b_cannot_read_confirm_check_or_register_student_as_file(world):
         stray = store.create_ref(b.id, "transcript", 1, "x.pdf", "application/pdf", PDF, again["id"])  # ...B names A's file
         with pytest.raises(KeyError):
             store.file_bytes(stray)
+            assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def world_docs_of(world, ref):
@@ -667,3 +677,4 @@ def test_a_reconfirmation_replaces_the_value_and_another_source_still_conflicts(
             assert [c.status for c in db.scalars(select(MemoryCandidate).where(
                 MemoryCandidate.status == "needs_review")).all()] == ["needs_review"]
         no_chat(s.who, before)
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)

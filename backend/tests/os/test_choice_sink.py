@@ -125,6 +125,7 @@ def standalone_ok(r, api) -> None:
 
 # --- row 6.17: flags off is today -----------------------------------------------------------------------------
 
+@pytest.mark.standalone
 def test_module_off_builder_standalone(api):
     host = Host({"outcome": "written", "decision_version": 2, "code": None})
     connect(host)  # a host that would take it, but the module is off

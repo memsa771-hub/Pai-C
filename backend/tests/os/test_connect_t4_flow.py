@@ -35,6 +35,7 @@ from app.os.replan.rules import rules_for
 from app.os.replan.run import run_replan_job
 from app.pai_c.connect import student_facts as host_facts
 from scripts.counselor_eval_support import StudentSession
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-13"), pytest.mark.req("R-15"), pytest.mark.req("R-16")]
 
@@ -102,6 +103,7 @@ def run_rules(world, plan_id):
     return out
 
 
+@pytest.mark.connect_row("6.8")
 def test_a_vault_write_that_drops_marks_ends_in_a_pending_big_proposal(os_world):
     with StudentSession() as student, student.factory() as db, patch.object(config, "CONNECT_STUDENT_FACTS", True,
                                                                            create=True):
@@ -153,6 +155,7 @@ def test_a_vault_write_that_drops_marks_ends_in_a_pending_big_proposal(os_world)
         assert run_rules(os_world, plan_id) == []
         with os_world.engine.connect() as conn:
             assert conn.execute(select(func.count()).select_from(models.proposals)).scalar() == 3
+            assert_consistent(student.factory, handoff=True)  # the end-of-test check (R-04, R-05)
 
 
 @pytest.mark.req("R-11")

@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     Numeric,
+    SmallInteger,
     Table,
     Text,
     UniqueConstraint,
@@ -716,4 +718,35 @@ consents = Table(
     Column("terms_version", Integer, nullable=False),  # the pilot.vN.md the student agreed to
     Column("agreed_at", DateTime(timezone=True), nullable=False),  # from the shared clock
     UniqueConstraint("tenant_id", "student_ref", "terms_version", name="uq_os_consents_student_version"),
+)
+
+# --- P1-T10: the consistency job's cases and runs (os_0024) ----------------------------------------------------------
+
+consistency_cases = Table(
+    "os_consistency_cases", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("rule", SmallInteger, nullable=False),  # master 9.3 rule 1-8
+    Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="SET NULL")),
+    Column("codes", JSONB, nullable=False, server_default=text("'[]'::jsonb")),  # finding codes: never a value
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("resolution", Text),
+    Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("resolved_at", DateTime(timezone=True)),
+    CheckConstraint("rule BETWEEN 1 AND 8", name="ck_os_consistency_cases_rule"),
+    _in("status", ("open", "resolved"), "ck_os_consistency_cases_status"),
+    Index("uq_os_consistency_cases_open", "tenant_id", "student_ref", "rule", text("coalesce(plan_id, 0)"), unique=True,
+          postgresql_where=text("status = 'open'")),
+)
+
+consistency_runs = Table(
+    "os_consistency_runs", md,
+    _id(), _tenant(),
+    Column("run_date", Date, nullable=False),
+    Column("mode", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("finished_at", DateTime(timezone=True)),
+    Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )

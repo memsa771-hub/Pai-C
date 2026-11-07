@@ -162,6 +162,7 @@ def counsellor(returns):
     return provider, calls
 
 
+@pytest.mark.standalone
 def test_standalone_adapter_builds_facts_from_os_profile_values(engine, clean):
     store = ProfileStore(engine, TENANT)
     store.set("stu-1", "transcript.cgpa", 3.2, None)
@@ -175,6 +176,7 @@ def test_standalone_adapter_builds_facts_from_os_profile_values(engine, clean):
     assert profile_from_facts(facts, TYPES) == {"transcript.cgpa": 3.2, "ielts_trf.overall": 7.0}
 
 
+@pytest.mark.standalone
 def test_get_is_standalone_without_a_counsellor_adapter(mounted):
     own(mounted, transcript__cgpa=3.0)
     got = student_facts.get("stu-1")
@@ -197,6 +199,7 @@ def test_get_falls_back_to_standalone_when_the_host_part_is_off(mounted):
     assert [f.key for f in student_facts.get("stu-1").facts] == ["education.bachelor.gpa"]
 
 
+@pytest.mark.standalone
 def test_configure_is_reset_by_ports_configure(mounted):
     student_facts.configure(counsellor(None)[0])
     ports.configure(None)
