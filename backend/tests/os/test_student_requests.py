@@ -459,7 +459,7 @@ def test_get_requests_lists_own_only(world, api):
     assert mine and theirs and not {r["id"] for r in mine} & {r["id"] for r in theirs}
     one = next(r for r in mine if r["need"]["ref"] == "education.intermediate.marks_obtained")
     assert set(one) == {"id", "task_id", "kind", "need", "status", "due_at", "due_tz", "title", "how",
-                       "choices", "allow_new", "new_label"}
+                       "ref", "choices", "allow_new", "new_label"}
     assert one["choices"] == [] and one["allow_new"] is False and one["new_label"] is None
     assert one["kind"] == "provide" and one["status"] == "open"
     assert one["need"] == {"kind": "fact", "ref": "education.intermediate.marks_obtained", "evidence": "stated"}

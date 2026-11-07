@@ -86,8 +86,14 @@ class World:
         (found,) = [r for r in self.requests() if r["kind"] == kind and r["status"] == "open"]
         return found
 
-    def answer(self, request_id, choice, value=None, student=None):
-        body = {"choice": choice, **({"value": value} if value is not None else {})}
+    def ref_of(self, request_id) -> str:
+        """The question the student sees for a request now (what the client sends back)."""
+        got = self.api.get("/v1/os/requests", headers=self.head)
+        found = [r for r in got.json()["requests"] if r["id"] == request_id] if got.status_code == 200 else []
+        return (found[0]["ref"] if found else None) or "none"
+
+    def answer(self, request_id, choice, value=None, student=None, ref=None):
+        body = {"ref": ref or self.ref_of(request_id), "choice": choice, **({"value": value} if value is not None else {})}
         return self.api.post(f"/v1/os/requests/{request_id}/answer", json=body,
                              headers={"x-test-student": student or self.ws})
 
@@ -101,10 +107,15 @@ class World:
 
 
 @pytest.fixture
-def world(engine, clean, os_db, tmp_path, monkeypatch):
+def books():
+    return BOOKS
+
+
+@pytest.fixture
+def world(engine, clean, os_db, tmp_path, monkeypatch, books):
     fake = FakeClient()
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
-    svc = make_services(settings, engine=engine, playbooks=BOOKS, today=lambda: TODAY, dbos_client=lambda: fake,
+    svc = make_services(settings, engine=engine, playbooks=books, today=lambda: TODAY, dbos_client=lambda: fake,
                         terms_dir=TEST_TERMS)
     SqlKnowledge(engine, TENANT).upsert("programme", "p1", "merit_list_date", Fact(
         {"date": "2027-08-15"}, "q", "https://uni.example/x", CHECKED, 2027, "confirmed"), "manual")
@@ -166,9 +177,12 @@ def test_get_requests_shows_both_values_and_sources_live(world, conflict):
     assert a["allow_new"] is True and a["new_label"] and a["how"]
     current, proposed = a["choices"]
     with world.who.factory() as db:
+        assert a["ref"] == f"profile_issue:{world.card(db).id}"
+    assert [(c["ref"], c["key"]) for c in a["choices"]] == [(a["ref"], OBTAINED)] * 2  # M2: what the student saw
+    with world.who.factory() as db:
         file_id = db.get(MemoryCandidate, world.card(db).candidate_id).evidence["file_id"]
     assert (current["choice"], current["value"], current["label"]) == ("current", 800, "Saved in PAI")
-    assert current["source"]["kind"] == "chat" and current["source"]["evidence"] == "stated"
+    assert current["source"]["kind"] == "vault" and current["source"]["evidence"] == "stated"  # not "chat": unknown
     assert current["source"]["document_ref"] is None and current["source"]["as_of"]
     assert (proposed["choice"], proposed["value"], proposed["label"]) == ("proposed", 760, "From your document")
     assert proposed["source"]["kind"] == "document" and proposed["source"]["evidence"] == "shown"
@@ -189,6 +203,12 @@ def test_get_requests_shows_both_values_and_sources_live(world, conflict):
 
 # --- the answer ----------------------------------------------------------------------------------------------------
 
+def last_written(db):
+    """The newest candidate an OS answer wrote."""
+    return db.scalars(select(MemoryCandidate).where(MemoryCandidate.input_channel == "profile")
+                      .order_by(MemoryCandidate.created_at.desc())).first()
+
+
 def assert_closed(world, plan_id, asked):
     row = world.row(asked["id"])
     assert row.status == "answered" and row.closed_cause == "request_answered"
@@ -203,9 +223,11 @@ def test_answer_proposed_resolves_the_card_and_closes_the_step(world, conflict):
         (row,) = education(db, world.ws)
         assert row["result"]["marks_obtained"] == 760 and row["evidence_level"] == "stated"
         card = world.card(db)
-        assert card.status == "resolved" and card.resolution["action"] == "accept_proposed"
-        candidate = db.get(MemoryCandidate, card.resolution["candidate_id"])
+        assert card.status == "resolved" and card.resolution["action"] == "answered_by_value"
+        candidate = last_written(db)
         assert candidate.source_type == "user_explicit" and candidate.evidence["capture"] == "os_which_is_right"
+        assert candidate.evidence["os_request_id"] == conflict.asked["id"] and candidate.evidence["quote"]  # M4
+        assert candidate.proposed_value["value"] == {"result": {"marks_obtained": 760}}
     assert_closed(world, conflict.plan_id, conflict.asked)
     assert world.steps(conflict.plan_id)["entry_test"] == "waiting_student"  # the step that was paused is the student's again
     assert [r for r in world.requests() if r["kind"] == "which_is_right"][0]["status"] == "answered"
@@ -218,7 +240,8 @@ def test_answer_current_keeps_the_vault_value_and_closes_the_step(world, conflic
     assert got.status_code == 200 and got.json() == {"status": "answered"}
     with world.who.factory() as db:
         assert education(db, world.ws)[0]["result"]["marks_obtained"] == 800
-        assert world.card(db).resolution["action"] == "keep_current"
+        assert world.card(db).resolution["answers"] == {OBTAINED: {"choice": "current",
+                                                                    "request_id": conflict.asked["id"]}}
         assert db.scalar(select(func.count()).select_from(MemoryCandidate)) == before  # nothing was written
     assert_closed(world, conflict.plan_id, conflict.asked)
 
@@ -229,7 +252,7 @@ def test_answer_new_writes_the_typed_value(world, conflict):
     with world.who.factory() as db:
         (row,) = education(db, world.ws)
         assert row["result"] == {"marks_obtained": 770, "marks_total": 1100}
-        assert world.card(db).resolution["action"] == "provide_new"
+        assert world.card(db).resolution["answers"][OBTAINED]["choice"] == "new"
     assert_closed(world, conflict.plan_id, conflict.asked)
 
 
@@ -240,10 +263,10 @@ def test_a_refused_answer_writes_nothing_and_keeps_the_step(world, conflict):
     with world.who.factory() as db:
         assert world.card(db).status == "open" and education(db, world.ws)[0]["result"]["marks_obtained"] == 800
     assert world.row(conflict.asked["id"]).status == "open"
-    assert world.api.post(f"/v1/os/requests/{conflict.asked['id']}/answer", json={"choice": "maybe"},
-                          headers=world.head).status_code == 422
-    assert world.api.post(f"/v1/os/requests/{conflict.asked['id']}/answer", json={"choice": "new", "x": 1},
-                          headers=world.head).status_code == 422
+    ref = conflict.asked["ref"]
+    for body in ({"ref": ref, "choice": "maybe"}, {"ref": ref, "choice": "new", "x": 1}, {"choice": "current"}):
+        assert world.api.post(f"/v1/os/requests/{conflict.asked['id']}/answer", json=body,
+                              headers=world.head).status_code == 422  # a body without `ref` is refused too
 
 
 def test_impossible_value_answer_writes_through_the_reconciler(world):
@@ -264,6 +287,7 @@ def test_impossible_value_answer_writes_through_the_reconciler(world):
         assert row["result"]["marks_obtained"] == 760 and row["evidence_level"] == "stated"
         candidate = db.scalars(select(MemoryCandidate).order_by(MemoryCandidate.created_at.desc())).first()
         assert candidate.evidence["capture"] == "os_which_is_right" and candidate.source_type == "user_explicit"
+        assert candidate.evidence["os_request_id"] == asked["id"] and candidate.evidence["quote"]  # M4: impossible path
     assert world.row(asked["id"]).status == "answered"
     assert not [k for k, s in world.steps(plan_id).items() if k.startswith("which_is_right@") and s != "done"]
 
@@ -372,12 +396,17 @@ def test_finding_answer_uses_resolve_finding_and_never_the_vault(world):
     (one,) = asked  # the route needs the intermediate certificate only; the other paper is not asked about
     assert one["need"] == {"kind": "document", "ref": "hssc_certificate", "evidence": "shown"}
     assert [(c["choice"], c["value"], c["source"]["kind"]) for c in one["choices"]] == [
-        ("current", "Ahmed Khan", "document"), ("proposed", "Rashid Khan", "document")]
+        (f"doc:{a}", "Ahmed Khan", "document"), (f"doc:{b}", "Rashid Khan", "document")]  # each document its own id
+    assert {c["ref"] for c in one["choices"]} == {one["ref"]} and one["ref"].startswith("finding:")
     assert one["allow_new"] is False
+    # review M7: a value that is none of the documents' on an OPEN finding is refused with exactly 422, and nothing is closed
+    assert world.answer(one["id"], "new", "Someone Else").status_code == 422
+    assert FindingStore(world.engine, TENANT).list_open(world.ws) != []
+    assert world.answer(one["id"], "current").status_code == 422  # the old ids are not choices of a finding
     with world.who.factory() as db:
         before = (db.scalar(select(func.count()).select_from(MemoryCandidate)),
                   db.scalar(select(func.count()).select_from(OsOutbox)))
-    got = world.answer(one["id"], "proposed")
+    got = world.answer(one["id"], f"doc:{b}")
     assert got.status_code == 200 and got.json() == {"status": "answered"}
     assert FindingStore(world.engine, TENANT).list_open(world.ws) == []
     from app.os.documents.store import ProfileStore
@@ -389,5 +418,23 @@ def test_finding_answer_uses_resolve_finding_and_never_the_vault(world):
                 db.scalar(select(func.count()).select_from(OsOutbox))) == before
     assert {r["status"] for r in world.requests() if r["kind"] == "which_is_right"} == {"answered"}
     assert not [k for k, s in world.steps(plan_id).items() if k.startswith("which_is_right@") and s != "done"]
-    # a value that is none of the documents' is refused
-    assert world.answer(one["id"], "new", "Someone Else").status_code in (409, 422)
+    assert world.answer(one["id"], f"doc:{b}").status_code == 409  # answered
+
+
+def test_a_finding_with_three_documents_gives_each_its_own_choice(world):
+    """Review M6: the third document is a third choice, never labelled "new" while typing a value is not allowed."""
+    store = DocumentStore(world.engine, TENANT)
+    ids = [store.create(world.ws, t, 1, f"{t}.jpg", "image/jpeg", jpeg(n)) for n, t in zip(
+        (1, 80, 160), ("hssc_certificate", "ssc_certificate", "transcript"))]
+    values = ["Ahmed Khan", "Rashid Khan", "Rasheed Khan"]
+    FindingStore(world.engine, TENANT).replace_open(world.ws, [{"kind": "mismatch", "field": "father_name",
+                                                                "items": list(zip(ids, values))}])
+    world.start()
+    (one,) = [r for r in world.requests() if r["kind"] == "which_is_right"]
+    assert [c["choice"] for c in one["choices"]] == [f"doc:{i}" for i in ids] and one["allow_new"] is False
+    assert [c["value"] for c in one["choices"]] == values and "new" not in {c["choice"] for c in one["choices"]}
+    assert world.answer(one["id"], f"doc:{ids[2]}").status_code == 200
+    from app.os.documents.store import ProfileStore
+
+    (value,) = [v for v in ProfileStore(world.engine, TENANT).all(world.ws) if v["key"] == "father_name"]
+    assert value["value"] == "Rasheed Khan"

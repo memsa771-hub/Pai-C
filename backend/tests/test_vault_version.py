@@ -251,10 +251,7 @@ def test_a_card_that_is_not_about_a_mark_or_a_score_is_never_announced():
                             evidence={"record_type": "identity", "current": {"full_name": "A"}, "proposed": {"full_name": "B"}}))
         db.commit()
         for issue in db.scalars(select(ProfileIssue)).all():
-            try:
-                ProfileIssueService(db).resolve(ws, issue.id, "keep_current")
-            except Exception:  # a legacy card with no candidate data may refuse; the hook is what is asserted
-                db.rollback()
+            assert ProfileIssueService(db).resolve(ws, issue.id, "keep_current")["resolved"] is True  # review M7: no swallow
         db.commit()
         assert version_row(db, ws) is None and events(db, ws) == []
 

@@ -69,7 +69,7 @@ class ChoiceSourceOut(BaseModel):
 class ChoiceOut(BaseModel):  # one value the student can pick for a "which is right" request, read live (never stored)
     ref: str  # the question the student saw (a card, a finding or an impossible value); the answer must name it back
     key: str
-    choice: Literal["current", "proposed", "new"]
+    choice: str  # current | proposed | new, or doc:<id> for a document that holds one of the values
     label: str
     value: str | int | float
     source: ChoiceSourceOut

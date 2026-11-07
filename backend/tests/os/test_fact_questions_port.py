@@ -59,5 +59,5 @@ def test_an_invalid_document_is_not_hidden(configured):
 def test_the_answer_goes_to_the_host_callback(configured):
     seen = []
     fact_questions.configure(None, lambda *a: seen.append(a) or {"status": "resolved"})
-    assert fact_questions.answer("ws-1", "profile_issue:a", "education.bachelor.gpa", "new", "3.3") == {"status": "resolved"}
-    assert seen == [("ws-1", "profile_issue:a", "education.bachelor.gpa", "new", "3.3")]
+    assert fact_questions.answer("ws-1", "profile_issue:a", "education.bachelor.gpa", "new", "3.3", 9) == {"status": "resolved"}
+    assert seen == [("ws-1", "profile_issue:a", "education.bachelor.gpa", "new", "3.3", 9)]  # the OS request, for the evidence
