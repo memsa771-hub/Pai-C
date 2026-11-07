@@ -673,8 +673,9 @@ def list_routes() -> list[dict]:
 
 
 class StepError(Exception):
-    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required or
-    unavailable (PAI OS is not mounted or failed)."""
+    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required,
+    answer_required (a request step closes by the answer, never by a tick) or unavailable
+    (PAI OS is not mounted or failed)."""
 
     def __init__(self, code: str):
         super().__init__(code)

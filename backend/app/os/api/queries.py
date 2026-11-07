@@ -135,6 +135,14 @@ def task_plan_and_template(engine: Engine, tenant_id: str, task_id: int) -> tupl
     return None if row is None else (row.plan_id, row.template_key)
 
 
+def task_owner(engine: Engine, tenant_id: str, task_id: int) -> str | None:
+    """The student a task's plan belongs to, or None when there is no such task."""
+    with engine.connect() as conn:
+        return conn.execute(select(P.c.student_ref).select_from(
+            T.join(P, P.c.id == T.c.plan_id)).where(
+            T.c.tenant_id == tenant_id, T.c.id == task_id)).scalar()
+
+
 def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
     """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), or for a
     programme to take it from (blocked `no_candidate:<name>`: every programme said "not admitted"), each with what

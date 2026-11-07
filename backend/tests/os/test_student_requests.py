@@ -23,6 +23,8 @@ from tests.os.test_api import as_student
 TODAY = datetime(2027, 3, 1).date()
 NOTHING = StudentState()
 TYPED = StudentState(facts={OBTAINED: "stated", TOTAL: "stated"})
+ONLY_TOTAL = StudentState(facts={OBTAINED: "confirmed"})  # asks only for the total
+ALL_CONFIRMED = StudentState(facts={OBTAINED: "confirmed", TOTAL: "confirmed"})  # asks for nothing
 R = models.student_requests
 
 pytestmark = pytest.mark.req("R-19")
@@ -153,6 +155,85 @@ def test_concurrent_revisions_keep_one_open_row(engine, clean, monkeypatch):
     assert store.duplicates(engine, "pai") == []
 
 
+def concurrently(engine, jobs, monkeypatch):
+    """Runs the jobs in threads; each waits at a barrier just before its `sync`, so every transaction has its steps and
+    none has committed. Returns the errors."""
+    from app.os.kernel import kernel as kernel_module
+
+    barrier = threading.Barrier(len(jobs), timeout=10)
+    real = kernel_module.request_store.sync
+
+    def together(*args, **kwargs):
+        barrier.wait()
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(kernel_module.request_store, "sync", together)
+    errors: list[BaseException] = []
+
+    def run(job):
+        try:
+            job()
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    threads = [threading.Thread(target=run, args=(job,)) for job in jobs]
+    [t.start() for t in threads]
+    [t.join(30) for t in threads]
+    return errors
+
+
+def test_opposite_orders_do_not_deadlock(engine, clean, monkeypatch):
+    """Review I1: two plans of one student open the same two facts in opposite orders."""
+    forward = compiled(NOTHING)
+    backward = replace(forward, tasks=tuple(reversed(forward.tasks)))
+    errors = concurrently(engine, [
+        lambda: kernel(engine).create_plan(contract_of("ext-a"), forward),
+        lambda: kernel(engine).create_plan(contract_of("ext-b"), backward)], monkeypatch)
+    assert errors == []
+    assert sorted(view(r) for r in rows(engine)) == [
+        (OBTAINED, "stated", "provide", "open"), (TOTAL, "stated", "provide", "open")]
+    assert store.duplicates(engine, "pai") == []
+
+
+def test_a_removed_step_and_an_added_one_keep_the_open_row(engine, clean, monkeypatch):
+    """Review I2: plan A stops asking for a fact while plan B starts asking for it, at the same moment."""
+    a = kernel(engine).create_plan(contract_of("ext-a"), compiled(NOTHING))
+    b = kernel(engine).create_plan(contract_of("ext-b"), compiled(ONLY_TOTAL))
+    errors = concurrently(engine, [
+        lambda: kernel(engine).revise(a.plan_id, "student_fact_changed", compiled(ONLY_TOTAL)),
+        lambda: kernel(engine).revise(b.plan_id, "student_fact_changed", compiled(NOTHING))], monkeypatch)
+    assert errors == []
+    open_rows = {r.need_ref: r for r in rows(engine) if r.status == "open"}
+    assert sorted(open_rows) == [OBTAINED, TOTAL]  # nothing lost, nothing doubled
+    with engine.connect() as conn:
+        step = conn.execute(select(models.tasks).where(models.tasks.c.id == open_rows[OBTAINED].task_id)).one()
+    assert (open_rows[OBTAINED].plan_id, step.state) == (b.plan_id, "waiting_student")  # B's live step
+    assert store.duplicates(engine, "pai") == []
+
+
+def test_a_row_answered_at_one_level_is_reopened_for_the_other_plan(engine, clean):
+    """Review I3: A needs the marks shown, B needs them stated and holds the row. B's is answered: A gets a row."""
+    k = kernel(engine)
+    b = k.create_plan(contract_of("ext-b"), compiled(NOTHING))
+    a = k.create_plan(contract_of("ext-a"), compiled(TYPED))
+    assert {r.plan_id for r in rows(engine) if r.status == "open"} == {b.plan_id}  # B holds both rows
+    assert k.revise(b.plan_id, "student_fact_changed", compiled(ALL_CONFIRMED)) is not None
+    opened = [r for r in rows(engine) if r.status == "open"]
+    assert [(r.need_ref, r.evidence, r.plan_id) for r in opened] == [(OBTAINED, "shown", a.plan_id)]
+    with engine.connect() as conn:
+        assert [r.id for r in store.for_plan(conn, "pai", a.plan_id)] == [opened[0].id]
+    assert store.duplicates(engine, "pai") == []
+
+
+def test_a_key_in_answered_closes_a_step_that_still_asks(engine, clean):
+    """Review M3: `answered` names a live step's key (an answer that arrived outside the kernel)."""
+    ref = kernel(engine).create_plan(contract(), compiled(NOTHING))
+    with engine.begin() as conn:
+        store.sync(conn, "pai", ref.plan_id, answered=[f"provide@fact:{OBTAINED}:stated"])
+    assert sorted(view(r) for r in rows(engine)) == [
+        (OBTAINED, "stated", "provide", "answered"), (TOTAL, "stated", "provide", "open")]
+
+
 @pytest.mark.req("R-20")
 def test_result_expected_has_no_row_and_its_provide_step_has_one(engine, clean):
     k = kernel(engine)
@@ -213,6 +294,34 @@ def test_request_step_cannot_be_ticked(world, engine):
         assert e.value.code == "answer_required" and e.value.message == texts.text("answer_required")
     with engine.connect() as conn:
         assert conn.execute(select(models.tasks.c.state).where(models.tasks.c.id == tid)).scalar_one() == "waiting_student"
+
+
+@pytest.mark.req("R-18")
+def test_another_students_request_task_is_not_found(world, engine):
+    """Review M1: ownership is checked before the 'answer, not tick' refusal, so it does not tell who asks what."""
+    from app.os.ports import plan_actions
+
+    world.vault["stu-1"] = facts_of("stu-1", 1)
+    tid = request_task(engine, world.svc.plans.start_plan(gate_contract()).plan_id)
+    for call in (lambda: inbox_actions.complete(world.svc, "stu-2", tid),
+                 lambda: plan_actions.complete_step("stu-2", tid)):
+        with pytest.raises(StepActionError) as e:
+            call()
+        assert (e.value.code, e.value.message) == ("not_yours", "inbox item not found")
+
+
+@pytest.mark.req("R-18")
+def test_a_roadmap_tick_of_a_request_step_is_refused_with_the_approved_sentence(world, engine):
+    """Review M2: the Counsellor's tick goes through the bridge; its refusal is 409 with the sentence from texts.yaml."""
+    from app import pai_os_bridge as bridge
+    from app.pai_c.roadmap.decisions import STEP_REFUSALS
+
+    world.vault["stu-1"] = facts_of("stu-1", 1)
+    tid = request_task(engine, world.svc.plans.start_plan(gate_contract()).plan_id)
+    with pytest.raises(bridge.StepError) as e:
+        bridge.complete_step("stu-1", tid)
+    assert e.value.code == "answer_required"
+    assert STEP_REFUSALS[e.value.code] == (texts.text("answer_required"), 409)  # the copy in decisions.py = texts.yaml
 
 
 @pytest.mark.req("R-18")

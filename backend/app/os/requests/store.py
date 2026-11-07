@@ -19,6 +19,7 @@ from app.os.requests import keys
 R, T, P = models.student_requests, models.tasks, models.plans
 _TERMINAL = tuple(s.value for s in TERMINAL)
 ANSWERED, CANCELLED, OPEN = "answered", "cancelled", "open"
+LOCK_CLASS = 7108  # pg_advisory_xact_lock(LOCK_CLASS, hash of tenant and student); 7007 is the per-plan replan lock
 
 
 @dataclass(frozen=True)
@@ -52,28 +53,38 @@ def _request(row) -> Request:
 
 
 def _live_steps(conn: Connection, tenant_id: str, plan_ids: Collection[int]):
-    """The request steps of those plans that are still open: `(task id, plan id, parsed key)`, oldest first."""
+    """The request steps of those plans that are still open: `(task id, plan id, parsed key, instance key)`, oldest
+    first."""
     rows = conn.execute(select(T.c.id, T.c.plan_id, T.c.instance_key).where(
         T.c.tenant_id == tenant_id, T.c.plan_id.in_(list(plan_ids)), T.c.template_key.in_(keys.REQUEST_KINDS),
         T.c.state.not_in(_TERMINAL)).order_by(T.c.id)).all()
-    return [(r.id, r.plan_id, k) for r in rows if (k := keys.parse(r.instance_key)) is not None]
+    return [(r.id, r.plan_id, k, r.instance_key) for r in rows if (k := keys.parse(r.instance_key)) is not None]
+
+
+def _lock_student(conn: Connection, tenant_id: str, student: str) -> None:
+    """One sync per student at a time, until the caller's transaction ends. Every read below happens after this, so a
+    sync sees what the one before it committed (READ COMMITTED), and two plans cannot open facts in opposite orders."""
+    conn.execute(select(func.pg_advisory_xact_lock(LOCK_CLASS, func.hashtext(f"{tenant_id}:{student}"))))
 
 
 def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[str] = (),
          now: datetime | None = None) -> None:
-    """Brings the plan's rows in line with its request steps, in the caller's transaction. Closes first, then opens,
-    so a level change (the "tell us" step done, the "upload" step new) never meets its own unique index.
+    """Brings the student's rows in line with their request steps, in the caller's transaction. Takes the student's
+    lock first. Closes before it opens, so a level change (the "tell us" step done, the "upload" step new) never meets
+    its own unique index.
 
-    1. Close: an open row whose step is gone or finished is `answered` when the step is done (or its key is in
-       `answered`), else `cancelled`. A cancelled row whose fact another open plan of the student still asks for moves
-       to that plan's step instead, so the fact keeps its one open row.
-    2. Open: each unfinished request step without an open row for its fact gets one. A fact whose open row another plan
-       of the student holds is not opened again (the plans share the row)."""
+    1. Close: an open row of the plan whose step is gone or finished is `answered` when the step is done (or its key is
+       in `answered`), else `cancelled`. A cancelled row whose fact another open plan of the student still asks for
+       moves to that plan's step instead, so the fact keeps its one open row.
+    2. Open, student-wide: each unfinished request step of any open plan of the student whose fact has no open row gets
+       one, at that step's level, in (kind, ref) order. A fact whose open row some plan holds is not opened again (the
+       plans share the row), and a row answered at one plan's level is reopened at another plan's level at once."""
     now = now or clock.now()
-    plan = conn.execute(select(P.c.student_ref, P.c.status).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).first()
-    if plan is None:
+    student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
+    if student is None:
         return
-    student, closed_plan = plan.student_ref, plan.status == PLAN_CLOSED
+    _lock_student(conn, tenant_id, student)
+    closed_plan = conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar() == PLAN_CLOSED
     done_keys = set(answered)
     steps = {r.id: r for r in conn.execute(select(T.c.id, T.c.instance_key, T.c.state).where(
         T.c.tenant_id == tenant_id, T.c.plan_id == plan_id, T.c.template_key.in_(keys.REQUEST_KINDS))).all()}
@@ -90,7 +101,7 @@ def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[st
         if outcome == CANCELLED:
             if others is None:
                 others = _live_steps(conn, tenant_id, _other_open_plans(conn, tenant_id, student, plan_id))
-            heir = next(((tid, pid, k) for tid, pid, k in others
+            heir = next(((tid, pid, k) for tid, pid, k, _ in others
                          if (k.need_kind, k.ref) == (row.need_kind, row.need_ref)), None)
             if heir is not None:
                 conn.execute(update(R).where(R.c.id == row.id).values(
@@ -98,18 +109,26 @@ def sync(conn: Connection, tenant_id: str, plan_id: int, answered: Collection[st
                 continue
         cause = "request_answered" if outcome == ANSWERED else ("plan_closed" if closed_plan else "step_removed")
         conn.execute(update(R).where(R.c.id == row.id).values(status=outcome, closed_cause=cause, closed_at=now))
-    if closed_plan:
-        return
     held = {(r.need_kind, r.need_ref) for r in conn.execute(select(R.c.need_kind, R.c.need_ref).where(
         R.c.tenant_id == tenant_id, R.c.student_ref == student, R.c.status == OPEN)).all()}
-    for task_id, _, k in _live_steps(conn, tenant_id, [plan_id]):
-        if (k.need_kind, k.ref) in held:
-            continue
-        held.add((k.need_kind, k.ref))
+    wanted: dict[tuple[str, str], tuple] = {}
+    for task_id, pid, k, instance_key in _live_steps(conn, tenant_id, _open_plans(conn, tenant_id, student)):
+        fact = (k.need_kind, k.ref)
+        if fact in held or (pid == plan_id and instance_key in done_keys):
+            continue  # asked already, or answered just now though its step has not closed
+        if fact not in wanted or (pid == plan_id and wanted[fact][0] != plan_id):  # this plan's step first
+            wanted[fact] = (pid, task_id, k)
+    for fact in sorted(wanted):
+        pid, task_id, k = wanted[fact]
         conn.execute(pg_insert(R).values(
-            tenant_id=tenant_id, student_ref=student, plan_id=plan_id, task_id=task_id, kind=k.template,
+            tenant_id=tenant_id, student_ref=student, plan_id=pid, task_id=task_id, kind=k.template,
             need_kind=k.need_kind, need_ref=k.ref, evidence=k.level, status=OPEN, created_at=now,
-        ).on_conflict_do_nothing())  # another plan opened it a moment ago: the unique index keeps one
+        ).on_conflict_do_nothing())  # the lock makes a clash impossible; the unique index still keeps one
+
+
+def _open_plans(conn: Connection, tenant_id: str, student: str) -> list[int]:
+    return list(conn.execute(select(P.c.id).where(
+        P.c.tenant_id == tenant_id, P.c.student_ref == student, P.c.status.in_(PLAN_OPEN))).scalars().all())
 
 
 def _other_open_plans(conn: Connection, tenant_id: str, student: str, plan_id: int) -> list[int]:
@@ -135,7 +154,7 @@ def for_plan(conn: Connection, tenant_id: str, plan_id: int) -> list[Request]:
     student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
     if student is None:
         return []
-    shared = {(k.need_kind, k.ref) for _, _, k in _live_steps(conn, tenant_id, [plan_id])}
+    shared = {(k.need_kind, k.ref) for _, _, k, _ in _live_steps(conn, tenant_id, [plan_id])}
     rows = conn.execute(_select().where(R.c.tenant_id == tenant_id, R.c.student_ref == student).order_by(R.c.id)).all()
     return [_request(r) for r in rows
             if (r.plan_id == plan_id and r.status in (OPEN, ANSWERED))
