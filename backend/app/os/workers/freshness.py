@@ -47,7 +47,7 @@ def run(service, engine: Engine, now: datetime, ttl_days: int | None = None) -> 
     ttl = ttl_days if ttl_days is not None else service.settings.fact_ttl_days
     anchors = service.anchor_fields()
     with engine.connect() as conn:
-        rows = conn.execute(select(F).where(F.c.tenant_id == kernel.tenant_id, F.c.status == "confirmed")
+        rows = conn.execute(select(F).where(F.c.tenant_id == kernel.tenant_id, F.c.status.in_(("confirmed", "verified")))
                             .order_by(F.c.id)).all()
     knowledge = service.knowledge
     stale = 0
@@ -62,7 +62,7 @@ def run(service, engine: Engine, now: datetime, ttl_days: int | None = None) -> 
             conn.execute(insert(models.events).values(tenant_id=kernel.tenant_id, type="fact_changed", payload={
                 "scope": row.scope, "ref": row.ref, "field": row.field, "intake_year": row.intake_year,
                 "fact_id": row.id, "reason": reason,
-                "old": {"value": row.value, "status": "confirmed"}, "new": {"value": row.value, "status": "stale"}}))
+                "old": {"value": row.value, "status": row.status}, "new": {"value": row.value, "status": "stale"}}))
         after_fact_change(service, kernel, row.scope, row.ref, row.field, row.id, "stale", row.intake_year,
                           complete=False)
     return stale
