@@ -10,7 +10,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Islamabad Cap
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| IB-01 | Merit Determination Criteria: MDCAT of PM&DC 50%, F.Sc(Pre-Medical)/HSSC 40%, SSC 10%. | http://www.szabmu.edu.pk/admission/mbbs-admission | `Merit Determination Criteria MDCAT of PM&DC = 50% F.Sc(Pre-Medical)/HSSC/Equivalent = 40% SSC/Matriculation/Equivalent = 10%` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| IB-01 | Merit Determination Criteria: MDCAT of PM&DC 50%, F.Sc(Pre-Medical)/HSSC 40%, SSC 10%. | http://www.szabmu.edu.pk/admission/mbbs-admission | `Merit Determination Criteria MDCAT of PM&DC = 50% F.Sc(Pre-Medical)/HSSC/Equivalent = 40% SSC/Matriculation/Equivalent = 10%` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: quote found in visible text; 50/40/10 follow | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Eligibility rules
 
@@ -41,7 +41,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Islamabad Cap
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| IB-06 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Air University Islamabad Capital Territory` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| IB-06 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Air University Islamabad Capital Territory` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | correct: quote found word for word in visible HTML text (HTTP 200, 2026-11-07); statement says it is a markup count and the quote is a real visible HEC row, the province label is in the row's li text | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 

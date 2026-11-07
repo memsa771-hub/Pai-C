@@ -16,13 +16,13 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-02 | basic eligibility: minimum sixty five percent marks (65%) in HSSC, F.Sc (Pre-Medical) or equivalent, with a minimum of twelve years of education or as per PMC criteria. | https://www.doecgb.gov.pk/nominations/medical/criteria | `the basic eligibility criteria for admission follows: The applicant shall have passed, obtaining minimum sixty five percent marks (65%) in Higher Secondary School Certificate (HSSC), F.Sc (Pre-Medical) or equivalent examination having a minimum of twelve years of education or as per PMC criteria` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| GB-02 | basic eligibility: minimum sixty five percent marks (65%) in HSSC, F.Sc (Pre-Medical) or equivalent, with a minimum of twelve years of education or as per PMC criteria. | https://www.doecgb.gov.pk/nominations/medical/criteria | `the basic eligibility criteria for admission follows: The applicant shall have passed, obtaining minimum sixty five percent marks (65%) in Higher Secondary School Certificate (HSSC), F.Sc (Pre-Medical) or equivalent examination having a minimum of twelve years of education or as per PMC criteria` | 2026-11-07 | curl + HTML text strip (comments removed) | correct: quote found in visible text; statement follows | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Eligibility rules
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-09 | not eligible: ‘third division’ in the annual system, or less than 50% marks or equivalent for other than annual system, in the required qualification. | https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/ | `Who have got a degree/certificate with ‘third division’ in annual system or ’less than 50% marks or equivalent for other than annual system’ in the required qualification` | 2026-11-07 | curl + HTML text strip (comments removed) | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| GB-09 | not eligible: ‘third division’ in the annual system, or less than 50% marks or equivalent for other than annual system, in the required qualification. | https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/ | `Who have got a degree/certificate with ‘third division’ in annual system or ’less than 50% marks or equivalent for other than annual system’ in the required qualification` | 2026-11-07 | curl + HTML text strip (comments removed) | unclear: quote found in visible text, but 'not eligible' is not in the quote; it comes from the preceding sentence 'The following categories of candidates shall not be eligible for admission:' which the quote omits. Extend the quote to include it | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Seat categories
 
@@ -45,7 +45,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Gilgit-Baltis
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| GB-12 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Karakurum International University Gilgit Baltistan` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | re-check needed | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
+| GB-12 | visible entries carry a province label, e.g. this row; the count in the Lists table is a markup_count (unconfirmed on import). | https://www.hec.gov.pk/english/universities/pages/recognised.aspx | `Karakurum International University Gilgit Baltistan` | 2026-11-07 | markup_count (count from HTML attributes; the quote is a visible row showing the province label) | correct: quote found word for word in visible HTML text (HTTP 200, 2026-11-07); statement says it is a markup count and the quote is a real visible HEC row, the province label is in the row's li text | correct: quote found word for word (html, markup, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ## Calendar
 
