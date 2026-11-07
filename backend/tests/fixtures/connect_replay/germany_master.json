@@ -1,0 +1,1313 @@
+{
+ "id": "germany_master",
+ "name": "Mina (fictional)",
+ "route": "germany_master",
+ "stages": {
+  "A": {
+   "seed": {
+    "fresh": true
+   },
+   "turns": [
+    {
+     "student": "Hello, I need help deciding what to study.",
+     "counselor": {
+      "reply": "Welcome. What brings you here today?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "B": {
+   "seed": {
+    "journey": "DIRECTION",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ]
+    ]
+   },
+   "turns": [
+    {
+     "student": "I like building small circuits at home.",
+     "counselor": {
+      "reply": "What was the last thing you built?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:1",
+         "key": "interest",
+         "value": "building circuits",
+         "evidence": "I like building small circuits at home.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    },
+    {
+     "student": "A phone charger from spare parts.",
+     "counselor": {
+      "reply": "How long did it take you?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:1",
+         "key": "interest",
+         "value": "building circuits",
+         "evidence": "I like building small circuits at home.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:2",
+         "key": "activity",
+         "value": "phone charger",
+         "evidence": "A phone charger from spare parts.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "C": {
+   "seed": {
+    "journey": "DIRECTION",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "notebook": [
+     [
+      "interest",
+      "building circuits"
+     ],
+     [
+      "strength",
+      "patient with detail"
+     ]
+    ]
+   },
+   "turns": [
+    {
+     "student": "Maths is my best subject.",
+     "counselor": {
+      "reply": "So hands-on work and maths both pull you.",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:1",
+         "key": "strength",
+         "value": "maths",
+         "evidence": "Maths is my best subject.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "D": {
+   "seed": {
+    "journey": "DIRECTION",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "notebook": [
+     [
+      "interest",
+      "building circuits"
+     ],
+     [
+      "claim",
+      "can repair a radio"
+     ]
+    ]
+   },
+   "turns": [
+    {
+     "student": "I said I can repair radios, but I only did it once.",
+     "counselor": {
+      "reply": "Thank you for saying that. What happened that time?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:1",
+         "key": "claim",
+         "value": "repaired a radio once",
+         "evidence": "I said I can repair radios, but I only did it once.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    },
+    {
+     "student": "It worked after I replaced a capacitor.",
+     "counselor": {
+      "reply": "That is a real example. Who helped you?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        },
+        {
+         "id": "v1:said:1",
+         "key": "claim",
+         "value": "repaired a radio once",
+         "evidence": "It worked after I replaced a capacitor.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "E": {
+   "seed": {
+    "journey": "MIRROR",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "education": {
+     "group": "pre_engineering",
+     "percent": 78
+    },
+    "notebook": [
+     [
+      "interest",
+      "building circuits"
+     ]
+    ],
+    "mirror_ready": true
+   },
+   "turns": [
+    {
+     "student": "Yes, that sounds like me.",
+     "counselor": {
+      "reply": "Good. Is there a line you would change?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "F": {
+   "seed": {
+    "journey": "PROPOSED",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "education": {
+     "group": "pre_engineering",
+     "percent": 78
+    },
+    "paths": [
+     "electrical_engineering",
+     "computer_engineering",
+     "mbbs"
+    ],
+    "mirror_ready": true
+   },
+   "turns": [
+    {
+     "student": "Show me what I could do.",
+     "counselor": {
+      "reply": "Here are the paths that fit what you told me.",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "G": {
+   "seed": {
+    "journey": "PROPOSED",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "education": {
+     "group": "pre_engineering",
+     "percent": 78
+    },
+    "paths": [
+     "electrical_engineering",
+     "computer_engineering",
+     "mbbs"
+    ],
+    "mirror_ready": true
+   },
+   "turns": [
+    {
+     "student": "Tell me more about electrical engineering.",
+     "counselor": {
+      "reply": "It is about power, circuits and control. Does that match what you build?",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "H": {
+   "seed": {
+    "journey": "PROPOSED",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "education": {
+     "group": "pre_engineering",
+     "percent": 78
+    },
+    "paths": [
+     "electrical_engineering",
+     "computer_engineering",
+     "mbbs"
+    ],
+    "mirror_ready": true
+   },
+   "turns": [
+    {
+     "student": "Where could I study electrical engineering?",
+     "counselor": {
+      "reply": "Let us look at the places for that path.",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  },
+  "I": {
+   "seed": {
+    "journey": "PROPOSED",
+    "vault": [
+     [
+      "identity.date_of_birth",
+      "2000-01-01"
+     ],
+     [
+      "location.current_country",
+      "Pakistan"
+     ],
+     [
+      "preferences.target_countries",
+      [
+       "Germany"
+      ]
+     ]
+    ],
+    "education": {
+     "group": "pre_engineering",
+     "percent": 78
+    },
+    "paths": [
+     "electrical_engineering",
+     "computer_engineering",
+     "mbbs"
+    ],
+    "mirror_ready": true,
+    "choose": {
+     "field": "electrical_engineering",
+     "destination": "DE",
+     "level": "master",
+     "places": [
+      {
+       "ref": "ovgu-eeit",
+       "rank": 1
+      }
+     ],
+     "intake": {
+      "term": "winter",
+      "year": 2027
+     }
+    }
+   },
+   "turns": [
+    {
+     "student": "I chose electrical engineering. What happens now?",
+     "counselor": {
+      "reply": "Your plan is being prepared.",
+      "action": {
+       "type": "none"
+      }
+     },
+     "analyst": {
+      "notebook": {
+       "schema_version": 2,
+       "said": [
+        {
+         "id": "v1:said:0",
+         "key": "stated_goal",
+         "value": "I want to study electrical engineering abroad.",
+         "evidence": "I want to study electrical engineering abroad.",
+         "kind": "said",
+         "confidence": "low",
+         "level": null,
+         "first_seen": "2026-01-01T00:00:00+00:00",
+         "last_confirmed": "2026-01-01T00:00:00+00:00",
+         "status": "active",
+         "vault_fact_ref": null
+        }
+       ],
+       "shown": [],
+       "source": [],
+       "pressures": {
+        "items": [],
+        "people": []
+       },
+       "self": [],
+       "sure": {
+        "score": null,
+        "reason": "",
+        "would_raise": "",
+        "asked_at": null,
+        "history": []
+       },
+       "private_notes": "",
+       "coverage": {
+        "said": true,
+        "shown": false,
+        "source": false,
+        "self": false,
+        "pressures": false,
+        "sure": false
+       },
+       "mirror_ready": false
+      }
+     },
+     "sensitive_flagged_paths": [],
+     "memory": {
+      "candidates": []
+     },
+     "usage": {
+      "counselor": {
+       "model": "gpt-5-mini",
+       "input": 100,
+       "cached_input": 20,
+       "output": 20,
+       "reasoning": 5
+      },
+      "analyst": {
+       "model": "gpt-5-mini",
+       "input": 120,
+       "cached_input": 0,
+       "output": 30,
+       "reasoning": 10
+      },
+      "sensitive": {
+       "model": "gpt-5-mini",
+       "input": 40,
+       "cached_input": 0,
+       "output": 20,
+       "reasoning": 0
+      },
+      "memory_extractor": {
+       "model": "gpt-5-mini",
+       "input": 60,
+       "cached_input": 0,
+       "output": 15,
+       "reasoning": 0
+      }
+     }
+    }
+   ]
+  }
+ }
+}
