@@ -26,7 +26,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Punjab. Famil
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-10 | HED publishes public college lists per division (9 PDFs); counts in the Lists table. | https://hed.punjab.gov.pk/colleges | `The lists of public colleges of Punjab are linked with their respective divisions given in the following:` | 2026-11-07 | curl + HTML text strip | correct: quote on page; page links nine division lists | correct: quote found word for word (html, HTTP 200) |
+| PI-10 | the visible page says to click a link to view Public Colleges (List of Colleges); the nine division pdf links are only in hidden markup. | https://hed.punjab.gov.pk/colleges | `Please click bellow link to view Public Colleges. List of Colleges` | 2026-11-07 | curl + HTML text strip | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 | PI-Lbwp | college list header and first row; the Division column shows BAHAWALPUR. | https://hed.punjab.gov.pk/system/files/Bahawalpur_Colleges_0.pdf | `Division District No 1 GOVT. GRADUATE COLLEGE BAHAWALNAGAR Both BAHAWALPUR BAHAWALNAGAR` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = BAHAWALPUR; 3 pages, 68 rows | correct: quote found word for word (pdf, visible text, HTTP 200); re-run 2026-11-07 after the quote was replaced (header + first row) |
 | PI-Ldgk | college list header and first row; the Division column shows D.G.KHAN. | https://hed.punjab.gov.pk/system/files/DGKhan_Colleges.pdf | `Division District No 1 GOVT. GRADUATE COLLEGE (BOYS) TAUNSA SHARIF, D.G. KHAN Both GRADUATE D.G.KHAN D.G.KHAN` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = D.G.KHAN; 2 pages, 76 rows | correct: quote found word for word (pdf, visible text, HTTP 200); re-run 2026-11-07 after the quote was replaced (header + first row) |
 | PI-Lfsd | college list header and first row; the Division column shows FAISALABAD. | https://hed.punjab.gov.pk/system/files/Faisalabad_Colleges_0.pdf | `Division District No 1 GOVT. ISLAMIA GRADUATE COLLEGE, CHINIOT Both GRADUATE FAISALABAD CHINIOT` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = FAISALABAD; 3 pages, 98 rows | correct: quote found word for word (pdf, visible text, HTTP 200); re-run 2026-11-07 after the quote was replaced (header + first row) |
@@ -57,7 +57,7 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Punjab. Famil
 |---|---|---|---|---|---|---|---|
 | PI-07 | The 2026 OCAS intermediate cycle opened by 23 Sep 2026. | https://ocas.punjab.gov.pk/ | `Sep 23, 2026 OCAS Portal is Live for Intermediate Admissions.` | 2026-11-07 | curl + HTML text strip | correct: highlight on page word for word; "opened by 23 Sep 2026" follows | correct: quote found word for word (html, HTTP 200) |
 | PI-08 | BISE Lahore published the 11th-class registration schedule for session 2026-28 (dates in a linked PDF, not read here). | https://biselahore.com/notifications | `Revised Online Registration / Admission Schedule for Intermediate (11th-Class) Academic Session 2026-28` | 2026-11-07 | curl + HTML text strip | correct: title on page word for word; statement says dates not read, adds nothing | correct: quote found word for word (html, HTTP 200) |
-| PI-09 | BISE Lahore's 2026 exams had first and second annual sittings. | https://biselahore.com/notifications | `Date Sheet Intermediate (Second Annual) Examination 2026` | 2026-11-07 | curl + HTML text strip | wrong: quote is only the Second Annual 2026 date sheet; "first" sitting is not in the quote (a First Annual 2026 title is elsewhere on the page, not quoted) | correct: quote found word for word (html, HTTP 200) |
+| PI-09 | the notifications include the Date Sheet Intermediate (Second Annual) Examination 2026. | https://biselahore.com/notifications | `Date Sheet Intermediate (Second Annual) Examination 2026` | 2026-11-07 | curl + HTML text strip | re-check needed | correct: quote found word for word (html, visible text, HTTP 200); check 2 v2 re-run 2026-11-07 on changed lines only |
 
 ### Lists table (public colleges, HED division PDFs)
 
@@ -67,13 +67,13 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Punjab. Famil
 | dgk | https://hed.punjab.gov.pk/system/files/DGKhan_Colleges.pdf | 2021-11-09 | 76 | 76 | serials agree |
 | fsd | https://hed.punjab.gov.pk/system/files/Faisalabad_Colleges_0.pdf | 2021-11-09 | 98 | 98 | serials agree |
 | grw | https://hed.punjab.gov.pk/system/files/Gujranwala_Division.pdf | 2019-04-10 | 132 | — | no serial numbers in the text layer |
-| lhr | https://hed.punjab.gov.pk/system/files/Lahore_Division_Colleges_0.pdf | 2019-04-16 (modified 2022-06-08) | 108 | 110 | serial and row count differ: a checker must count by hand |
+| lhr | https://hed.punjab.gov.pk/system/files/Lahore_Division_Colleges_0.pdf | 2019-04-16 (modified 2022-06-08) | 110 | 110 | corrected 2026-11-07: gender values in capitals were missed by the first count |
 | mul | https://hed.punjab.gov.pk/system/files/Multan_division_Colleges.pdf | 2019-04-16 | 70 | — | no serial numbers in the text layer |
-| rwp | https://hed.punjab.gov.pk/system/files/Rawalpindi_division_Colleges.pdf | 2019-04-16 | 110 | 111 | serial and row count differ: a checker must count by hand |
+| rwp | https://hed.punjab.gov.pk/system/files/Rawalpindi_division_Colleges.pdf | 2019-04-16 | 111 | 111 | corrected 2026-11-07: gender values in capitals were missed by the first count |
 | swl | https://hed.punjab.gov.pk/system/files/Sahiwal_division_Colleges.pdf | 2019-04-16 | 37 | 37 | serials agree |
 | sgd | https://hed.punjab.gov.pk/system/files/Sargodha_division_Colleges.pdf | 2019-04-16 | 95 | 95 | serials agree |
 
-Sum of rows: **794** public colleges. These PDFs date from 2019–2021, so the list is old; HED gives no newer list on the page. The OCAS 'Participating Colleges' list and the `cis.punjab.gov.pk` college search refused the connection, so they were not read.
+Sum of rows: **797** public colleges (corrected 2026-11-07 from 794). The nine division PDF links sit in hidden markup on the HED colleges page (see PI-10). These PDFs date from 2019–2021, so the list is old; HED gives no newer list on the page. The OCAS 'Participating Colleges' list and the `cis.punjab.gov.pk` college search refused the connection, so they were not read.
 
 ## Gaps
 

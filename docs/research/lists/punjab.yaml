@@ -4,6 +4,7 @@
 region: punjab
 retrieved: 2026-11-07
 lists:
+  # Punjab public colleges total: 797 (corrected 2026-11-07 from 794)
   - id: hed-punjab-boards
     body: HED Punjab
     name: Boards of Intermediate and Secondary Education
@@ -70,11 +71,11 @@ lists:
     institution_type: public_college
     family: intermediate
     date: 2019-04-16   # PDF creation date (metadata); no date printed
-    row_count: 108
+    row_count: 110
     count_quote: null
-    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 110
+    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 110 (case-insensitive)
     read_method: curl + pdftotext (PDF text layer)
-    check2: unclear   # count methods disagree or no serials; count by hand
+    check2: correct   # corrected 2026-11-07: gender values in capitals were missed; now equals the highest serial
   - id: hed-punjab-public-colleges-mul
     body: HED Punjab
     name: List of public colleges, Multan division
@@ -94,11 +95,11 @@ lists:
     institution_type: public_college
     family: intermediate
     date: 2019-04-16   # PDF creation date (metadata); no date printed
-    row_count: 110
+    row_count: 111
     count_quote: null
-    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 111
+    count_method: college lines carrying a gender column (Male/Female/Both); highest serial 111 (case-insensitive)
     read_method: curl + pdftotext (PDF text layer)
-    check2: unclear   # count methods disagree or no serials; count by hand
+    check2: correct   # corrected 2026-11-07: gender values in capitals were missed; now equals the highest serial
   - id: hed-punjab-public-colleges-swl
     body: HED Punjab
     name: List of public colleges, Sahiwal division
