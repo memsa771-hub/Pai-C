@@ -43,6 +43,7 @@ from app.pai_c.connect import student_facts as host_facts
 from app.security import rate_limit
 from app.services import auth_emails
 from scripts.counselor_eval_support import StudentSession
+from tests.os.connect_check import assert_consistent
 from tests.os.test_adoption_flow import own_plan, sources, tasks
 from tests.os.test_connect_t3_flow import (
     events_of,
@@ -146,6 +147,7 @@ def test_a_vault_write_that_dies_before_the_commit_leaves_no_version_and_no_row(
         assert bridge.sweep_once(db)["submitted"] == 0
         assert fact_events(os_world.engine, plan_id) == [1]
         assert count(os_world.engine, models.events, models.events.c.type == "student_fact_changed") == 1
+        assert_consistent(student_.factory, handoff=True)  # the end-of-test check (R-04): both products agree
 
 
 def test_a_committed_vault_write_is_delivered_by_one_sweep_and_recorded_once(os_world):
@@ -161,6 +163,7 @@ def test_a_committed_vault_write_is_delivered_by_one_sweep_and_recorded_once(os_
         assert bridge.sweep_once(db)["submitted"] == 0  # a second sweep finds nothing to do
         assert fact_events(os_world.engine, plan_id) == [1, 2]
         assert [r.status for r in vault_rows(db, ws)] == ["delivered", "delivered"]
+        assert_consistent(student_.factory, handoff=True)
 
 
 def test_a_lost_vault_event_mark_is_a_duplicate_and_one_event(os_world):
@@ -180,6 +183,7 @@ def test_a_lost_vault_event_mark_is_a_duplicate_and_one_event(os_world):
         assert vault_rows(db, ws)[-1].status == "delivered"
         with os_world.engine.connect() as conn:
             assert conn.execute(select(func.count()).select_from(models.vault_events)).scalar_one() == 2
+            assert_consistent(student_.factory, handoff=True)
 
 
 # --- 2. OS event -> notification (T5) --------------------------------------------------------------------------
@@ -205,6 +209,7 @@ def test_a_lost_sent_mark_makes_no_second_notification(world):
             first = bridge.deliver_os_events(db)  # the next sweep sees the event pending again
             bridge.deliver_os_events(db)
         assert first["sent"] >= 1 and notifications(who, "plan_created") == 1  # the dedupe key held
+        assert_consistent(who.factory)
         assert [k for k, _ in bell(who)].count("plan_created") == 1
         assert real is os_events_port.mark_event_delivery
 
@@ -247,6 +252,7 @@ def test_a_guardian_agree_whose_delivery_is_lost_is_delivered_by_the_sweep_once(
         assert public(client, "post", f"{token}/agree") == {"state": "used"}  # a link is single use
         assert run_os_t3(svc) == [] and len(plans_of(svc, who)) == 1
         assert [o[0] for o in outbox(who)] == ["delivered"] * len(outbox(who))
+        assert_consistent(who.factory)
 
 
 def test_a_guardian_withdraw_whose_delivery_is_lost_pauses_the_plan_once(svc, guardian_world):
@@ -267,6 +273,7 @@ def test_a_guardian_withdraw_whose_delivery_is_lost_pauses_the_plan_once(svc, gu
         assert run_os_t3(svc) == [] and events_of(svc, plan.id) == ["plan_paused"]
         assert public(client, "post", f"{withdraw}/withdraw") == {"state": "used"}
         assert plans_of(svc, who)[0].status == "paused" and len(plans_of(svc, who)) == 1
+        assert_consistent(who.factory)
 
 
 # --- 5. Adoption (T6) ------------------------------------------------------------------------------------------
@@ -302,6 +309,7 @@ def test_an_adoption_the_os_cannot_take_writes_nothing_and_can_be_retried(world)
         assert data(posted) == {"state": "linking", "decision_version": 2}
         assert run_os(svc_) == [("revised", None)]
         assert sources(svc_) == {"counsellor": 1} and tasks(svc_, plan_id) == before and versions(who) == [1, 2]
+        assert_consistent(who.factory)
 
 
 def test_an_adoption_whose_delivery_is_lost_is_adopted_once_by_the_sweep(world):
@@ -320,5 +328,6 @@ def test_an_adoption_whose_delivery_is_lost_is_adopted_once_by_the_sweep(world):
         again = client.post("/v1/roadmap/adoption", params=params, headers=TOKEN, json={"plan_id": plan_id})
         assert data(again) == {"state": "linked", "decision_version": 2}  # a repeat after the adoption: no version 3
         assert versions(who) == [1, 2] and run_os(svc_) == []
+        assert_consistent(who.factory)
         with svc_.engine.connect() as conn:
             assert conn.execute(select(models.plans.c.id)).scalars().all() == [plan_id]  # no second plan

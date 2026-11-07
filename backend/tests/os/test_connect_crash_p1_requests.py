@@ -15,6 +15,7 @@ from app import pai_os_bridge as bridge
 from app.models import MemoryCandidate, OsOutbox
 from app.os import models
 from app.os.requests.refresh import refresh
+from tests.os.connect_check import assert_consistent
 from tests.os.test_which_is_right import (  # noqa: F401 - fixtures
     WHICH,
     books,
@@ -54,6 +55,7 @@ def closed_once(world, conflict, before_candidates):
     done = [k for k, s in world.steps(conflict.plan_id).items() if k.startswith(WHICH) and s == "done"]
     assert len(done) == 1 and candidates(world) == before_candidates + 1
     assert refresh(world.svc, world.ws, "test") == 0 and answered_rows(world) == 1  # a repeat changes nothing
+    assert_consistent(world.who.factory, handoff=True)
 
 
 def test_a_crash_after_the_vault_write_is_closed_by_the_vault_event(world, conflict):
@@ -92,3 +94,4 @@ def test_a_repeat_answer_after_the_crash_writes_the_vault_once(world, conflict):
     with world.who.factory() as db:
         (row,) = education(db, world.ws)
         assert row["result"]["marks_obtained"] == 760
+    assert_consistent(world.who.factory, handoff=True)

@@ -354,6 +354,9 @@ class Config:
     CONNECT_STUDENT_FACTS: bool = os.environ.get("CONNECT_STUDENT_FACTS", "false").lower() in ("true", "1", "yes")
     CONNECT_ONE_UPLOAD: bool = os.environ.get("CONNECT_ONE_UPLOAD", "false").lower() in ("true", "1", "yes")
     CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
+    # The hour (UTC, 0-23) at which the nightly Counsellor/PAI OS consistency job runs (P1-T10, R-05). Not a flag: the job
+    # runs only while the OS is mounted, the `counsellor` module is on and CONNECT_HANDOFF is on.
+    CONNECT_CONSISTENCY_HOUR_UTC: int = int(os.environ.get("CONNECT_CONSISTENCY_HOUR_UTC", "21")) % 24
     # Lets unapproved consent texts be used (rehearsal only). Off: consent.ensure_usable() refuses them.
     CONNECT_CONSENT_DRAFT: bool = os.environ.get("CONNECT_CONSENT_DRAFT", "false").lower() in ("true", "1", "yes")
 
