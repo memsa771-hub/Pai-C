@@ -25,8 +25,7 @@ _LOGIN = ("http_401", "http_403")
 def is_not_readable(blocked: str | None) -> bool:
     if not blocked:
         return False
-    return (blocked.startswith("not_readable") or blocked in _LOGIN or blocked == "unreadable_pdf"
-            or blocked.startswith("unsupported:image/"))
+    return blocked.startswith(("not_readable", "unsupported:image/")) or blocked in _LOGIN or blocked == "unreadable_pdf"
 
 
 def machine_status_ceiling(read_method: str | None) -> str:
@@ -67,8 +66,9 @@ class NotReadableStore:
             return list(conn.execute(q))
 
     def set_state(self, url: str, state: str, *, programme_ref: str | None = None, field: str | None = None) -> int:
-        """`collected` (T5, a human supplied the value) or `readable` (a later machine read worked)."""
-        q = update(N).where(N.c.tenant_id == self.tenant_id, N.c.url == url, N.c.state != state).values(state=state)
+        """Closes open rows: `collected` (T5, a human supplied the value) or `readable` (a later machine read worked).
+        A row that is not open is left alone."""
+        q = update(N).where(N.c.tenant_id == self.tenant_id, N.c.url == url, N.c.state == "open").values(state=state)
         if programme_ref is not None:
             q = q.where(N.c.programme_ref == programme_ref)
         if field is not None:
