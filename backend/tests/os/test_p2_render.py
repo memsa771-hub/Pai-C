@@ -109,3 +109,20 @@ def test_rendered_text_has_a_snapshot_marked_render(engine, clean, fixture_sites
     with engine.connect() as conn:
         row = conn.execute(select(models.page_snapshots.c.read_method)).first()
     assert row.read_method == "render"
+
+
+def test_worker_reading_adapters_are_off_unless_switched_on(monkeypatch):
+    from app.os.runner.worker import _reading_adapters
+
+    settings = load_settings({"DATABASE_URL": "x"})
+    for name in ("OS_RENDER", "OS_SCAN_ENGINE"):
+        monkeypatch.delenv(name, raising=False)
+    assert _reading_adapters(settings) == (None, None)
+    monkeypatch.setenv("OS_RENDER", "1")
+    monkeypatch.setenv("OS_SCAN_ENGINE", "no-such-engine")
+    renderer, scanner = _reading_adapters(settings)
+    assert isinstance(renderer, PlaywrightRenderer) and scanner is None
+    monkeypatch.setenv("OS_SCAN_ENGINE", "docling")  # not installed here: left out, with a warning
+    from app.os.knowledge.research.scan import DoclingScanText
+
+    assert (_reading_adapters(settings)[1] is None) == (not DoclingScanText().available())

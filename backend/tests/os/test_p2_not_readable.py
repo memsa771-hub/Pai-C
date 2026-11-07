@@ -4,12 +4,15 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-
 from sqlalchemy import insert
 
 from app.os import models
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
-from app.os.knowledge.research.readability import NotReadableStore, is_not_readable, machine_status_ceiling
+from app.os.knowledge.research.readability import (
+    NotReadableStore,
+    is_not_readable,
+    machine_status_ceiling,
+)
 from app.os.knowledge.research.run import store_research
 from app.os.knowledge.store import SqlKnowledge
 

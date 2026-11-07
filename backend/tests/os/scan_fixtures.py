@@ -76,3 +76,20 @@ def digital_pdf(text: str) -> bytes:
     from tests.os.test_research_pages import minimal_pdf
 
     return minimal_pdf(text)
+
+
+def bakeoff_cases():
+    """The fictional documents the bake-off reads: English and Urdu, as an image and as an image-only PDF, one blurred."""
+    from app.os.knowledge.research.bakeoff import Case
+
+    cases = []
+    for name, data, ctype, lang, lines in (
+        ("en_notice_png", text_png(EN_LINES), "image/png", "en", EN_LINES),
+        ("en_notice_pdf", scan_pdf(EN_LINES), "application/pdf", "en", EN_LINES),
+        ("en_blurred_png", text_png(EN_LINES, noise=True), "image/png", "en", EN_LINES),
+        ("ur_notice_png", text_png(UR_LINES, rtl=True), "image/png", "ur", UR_LINES),
+        ("ur_notice_pdf", scan_pdf(UR_LINES, rtl=True), "application/pdf", "ur", UR_LINES),
+    ):
+        if data is not None:  # an Urdu case needs a font with the glyphs and raqm shaping
+            cases.append(Case(name, data, ctype, lang, tuple(lines[1:] if lang == "en" else lines)))
+    return cases

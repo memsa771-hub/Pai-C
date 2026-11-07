@@ -87,6 +87,28 @@ def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
                        snapshots=SnapshotStore(engine, tenant, max_bytes=settings.page_max_bytes))
 
 
+def _reading_adapters(settings: OsSettings):
+    """P2-T4: the headless renderer (OS_RENDER=1) and the scan engine (OS_SCAN_ENGINE=tesseract|docling). Both off by
+    default, and an engine that is not installed is left out with a warning: reading then behaves as before."""
+    renderer = scanner = None
+    if os.environ.get("OS_RENDER", "").strip() == "1":
+        from app.os.knowledge.research.pages import USER_AGENT
+        from app.os.knowledge.research.render import PlaywrightRenderer
+
+        renderer = PlaywrightRenderer(timeout_s=settings.render_timeout_s, browser_path=settings.render_browser_path,
+                                      user_agent=USER_AGENT)
+    engine = os.environ.get("OS_SCAN_ENGINE", "").strip().lower()
+    if engine:
+        from app.os.knowledge.research.scan import DoclingScanText, TesseractScanText
+
+        candidate = {"tesseract": TesseractScanText, "docling": DoclingScanText}.get(engine)
+        if candidate is None or not candidate().available():
+            log.warning("OS_SCAN_ENGINE=%s is unknown or not installed: scans are not read", engine)
+        else:
+            scanner = candidate()
+    return renderer, scanner
+
+
 def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
     """Registers os.research (readers built once, before launch). False when no model key is set.
 
@@ -114,8 +136,16 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
 
         gateway = OfflinePages()
     else:
-        gateway = PageGateway(engine, settings.tenant_id, settings, sources=_source_guard(settings, engine, kernel))
-    register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles)
+        renderer, scanner = _reading_adapters(settings)
+        gateway = PageGateway(engine, settings.tenant_id, settings, sources=_source_guard(settings, engine, kernel),
+                              renderer=renderer, scanner=scanner)
+    not_readable = None
+    if gateway is not None and (getattr(gateway, "renderer", None) or getattr(gateway, "scanner", None)):
+        from app.os.knowledge.research.readability import NotReadableStore
+
+        not_readable = NotReadableStore(engine, settings.tenant_id)  # P2-T4: only when reading is switched on
+    register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles,
+                      not_readable=not_readable)
     return True
 
 
