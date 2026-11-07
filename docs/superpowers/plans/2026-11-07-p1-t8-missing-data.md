@@ -657,3 +657,6 @@
 - **Ruling problem 10:** approved. The Germany v2 playbook replaces the manual `school_certificates` step with document needs, so there is no duplicate upload step.
 - **Ruling problem 11:** for a missing document, the unanswered ladder ends at a proposal plus a support case for a person: reminders → at risk → proposal → support case. It does NOT escalate the student back to choosing. Other missing facts follow the same rule unless the plan says otherwise. Task 5 must implement and test this.
 - **Ruling problem 12:** approved. Running v1 plans get the needs only through the explicit upgrade proposal, never silently.
+
+### Owner ruling, 2026-11-07 (Task 4 review)
+- A Vault card with more than one differing value (for example marks obtained and marks total) is asked **one value at a time**. Each answer saves only that value. The card stays open until every differing value has an answer. Nothing is saved that the student did not choose.
