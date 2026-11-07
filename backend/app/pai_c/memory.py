@@ -6,6 +6,10 @@ from app.memory.permissions import capabilities_for_agent
 from app.memory.candidates import MemoryCandidateService  # noqa: F401  re-exported for PAI C (P1-T7 fact proposals)
 from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
+from app.memory.vault_view import VaultView  # noqa: F401  re-exported for PAI C (P1-T8 fact conflicts)
+from app.memory.errors import MemoryDataError  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.profile_issues import ProfileIssueService  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.reconciler import MemoryReconciler  # noqa: F401  re-exported for PAI C (P1-T8)
 from app.memory.vault_view import _result_text as result_text, display_text  # noqa: F401  re-exported for PAI C
 from app.memory.student_schema import RECORD_SPECS  # noqa: F401  re-exported for PAI C
 from app.memory.completeness import relevance_version  # noqa: F401  re-exported for PAI C

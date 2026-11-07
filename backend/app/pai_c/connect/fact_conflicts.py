@@ -134,7 +134,7 @@ def _test_entries(issue: ProfileIssue, card: dict, attempts: list[dict]) -> list
 
 
 def _cards(db, workspace_id: str) -> dict[str, dict]:
-    from app.memory.vault_view import VaultView
+    from app.pai_c.memory import VaultView
 
     return {c["id"]: c for c in VaultView(db).build(workspace_id)["conflicts"]}
 
@@ -235,10 +235,7 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None) -
     `current`, `proposed` or `new` (with `value`). Returns `{"status": "resolved"}`, `{"status": "gone"}` (the card is
     closed already: the answer was given elsewhere) or `{"status": "refused", "code": ...}` with code `bad_choice`,
     `not_offered`, `not_a_fact_question`, `new_value_required`, `invalid_value`, `not_typeable` or `not_saved`."""
-    from app.memory.candidates import MemoryCandidateService
-    from app.memory.errors import MemoryDataError
-    from app.memory.profile_issues import ProfileIssueService
-    from app.memory.reconciler import MemoryReconciler
+    from app.pai_c.memory import MemoryCandidateService, MemoryDataError, MemoryReconciler, ProfileIssueService
 
     action = ACTIONS.get(choice)
     if action is None:
