@@ -102,6 +102,7 @@ from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.consistency import add_consistency_routes
 from app.os.api.registry import add_registry_routes
+from app.os.api.imports import add_import_routes
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.ports import choice_requests, document_files, fact_proposals, student_facts
@@ -688,6 +689,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_replan_routes(router, services, require_admin)  # Slice 7 (spec §4)
     add_consistency_routes(router, services, require_admin)  # P1-T10 (R-05)
     add_registry_routes(router, services, require_admin)  # P2-T2 (R-32, R-33, R-34)
+    add_import_routes(router, services, require_admin)  # P2-T6 (R-67, R-68)
     if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
         from app.os.rehearsal.api import add_rehearsal_routes
 

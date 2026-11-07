@@ -15,7 +15,6 @@ lists every row beside the file. Exit code 2 when refused.
 """
 
 import argparse
-from urllib.parse import urlsplit
 import sys
 from pathlib import Path
 
@@ -23,6 +22,7 @@ from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
     build_context,
+    wire_other_tasks,
     plan_file,
     run_import,
     write_report,
@@ -47,25 +47,6 @@ def _list_urls(directory: Path | None, country: str) -> dict[str, str]:
 def _print_counts(counts: dict, out) -> None:
     for sheet, c in counts.items():
         out(f"{sheet}: " + ", ".join(f"{k} {v}" for k, v in c.items()))
-
-
-def _wire_other_tasks(deps: ImportDeps) -> ImportDeps:
-    """Connects the review queue (T5: disputes and attestation) and the allow-list (T3) when their code is present."""
-    try:
-        from app.os.knowledge.review.queue import ReviewQueue
-
-        queue = ReviewQueue(deps.engine, deps.tenant_id, deps.knowledge)
-        deps.disputes, deps.attested = queue, queue.attested
-    except ImportError:
-        pass
-    try:
-        from app.os.knowledge.sources.allowlist import SourceDomains
-
-        domains = SourceDomains(deps.engine, deps.tenant_id)
-        deps.official = lambda url, scope: domains.is_listed(urlsplit(url).hostname or "", scope)
-    except ImportError:
-        pass
-    return deps
 
 
 def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=print) -> int:
@@ -121,7 +102,7 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             deps = ImportDeps(engine, tenant, SqlKnowledge(engine, tenant), RegistryStore(engine, tenant),
                               ProgrammeStore(engine, tenant),
                               fetcher=PageGateway(engine, tenant, settings) if getattr(args, "refetch", False) else None)
-            deps = _wire_other_tasks(deps)
+            deps = wire_other_tasks(deps)
         if args.cmd == "import":
             res = run_import(Path(args.file), deps, mode=OWNER_ACCEPTED if args.owner_accepted else REVIEWERS,
                              actor=args.actor, country=args.country, decision_ref=args.owner_accepted,

@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from urllib.parse import urlsplit
+
 from sqlalchemy import Engine
 
 from app.os.knowledge.port import Fact
@@ -33,7 +35,8 @@ from app.os.knowledge.store import SqlKnowledge
 from app.os.registry.model import KIND_PREFIX, slug
 from app.os.registry.store import RegistryStore
 
-__all__ = ["AlreadyImported", "ImportDeps", "ImportResult", "run_import", "write_report"]
+__all__ = ["AlreadyImported", "ImportDeps", "ImportResult", "build_context", "plan_file", "run_import",
+           "wire_other_tasks", "write_report"]
 REPORT_COLUMNS = ("sheet", "row_id", "source_row", "bucket", "level", "reason", "detail")
 
 
@@ -84,6 +87,25 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
     ctx.list_urls = urls
     return ctx
+
+
+def wire_other_tasks(deps: ImportDeps) -> ImportDeps:
+    """Connects the review queue (T5: disputes and attestation) and the allow-list (T3) when their code is present."""
+    try:
+        from app.os.knowledge.review.queue import ReviewQueue
+
+        queue = ReviewQueue(deps.engine, deps.tenant_id, deps.knowledge)
+        deps.disputes, deps.attested = queue, queue.attested
+    except ImportError:
+        pass
+    try:
+        from app.os.knowledge.sources.allowlist import SourceDomains
+
+        domains = SourceDomains(deps.engine, deps.tenant_id)
+        deps.official = lambda url, scope: domains.is_listed(urlsplit(url).hostname or "", scope)
+    except ImportError:
+        pass
+    return deps
 
 
 def plan_file(path: Path, ctx: PlanContext, fmt: Format | None = None) -> tuple[Batch, list[RowResult]]:
