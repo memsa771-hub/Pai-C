@@ -8,7 +8,7 @@ import yaml
 PATH = Path(__file__).with_name("texts.yaml")
 KEYS = ("how_stated", "how_shown", "how_confirmed", "how_document", "how_which_is_right", "how_impossible",
         "answer_required", "current_label", "proposed_label", "new_label", "unanswered_swap", "unanswered_drop",
-        "unanswered_all", "answer_changed")
+        "unanswered_all", "unanswered_proposed", "answer_changed")
 
 
 def load(path: Path = PATH) -> dict[str, str]:

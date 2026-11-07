@@ -45,6 +45,7 @@ class PlanState:
     playbook_version: int = 1
     below: tuple[str, ...] = ()  # programmes whose eligibility now reads likely_below (set for student_fact_changed)
     held: tuple[str, ...] = ()  # programmes a pending or requested swap or removal already covers (P1-T8, R-22)
+    held_in: tuple[str, ...] = ()  # the programmes those pending or requested swaps bring in
 
 
 @dataclass(frozen=True)
@@ -130,7 +131,7 @@ def _unanswered(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op]:
     if len(affected) == live:
         return [Escalate(reason=text("unanswered_all"))]
     ops: list[Op] = []
-    taken = set(state.programmes)
+    taken = set(state.programmes) | set(state.held_in)
     dropped = sum(1 for p in affected if p in state.held)  # a pending removal may take it: counted, to stay safe
     for ref in (p for p in affected if p not in state.held):
         match = next((s for s in state.suggestions.get(ref, []) if s not in taken), None)
@@ -142,6 +143,8 @@ def _unanswered(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op]:
             ops.append(SwapProgramme(out_ref=ref, in_ref=match, reason=text("unanswered_swap")))
     if live - dropped < cfg.min_programmes:  # R-22: never leave fewer than the minimum
         return [Escalate(reason=text("unanswered_all"))]
+    if not ops:  # every affected place already has a proposal waiting: a person looks for this event too
+        return [Escalate(reason=text("unanswered_proposed"))]
     return ops
 
 

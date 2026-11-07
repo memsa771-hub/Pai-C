@@ -15,5 +15,6 @@ texts:
   new_label: "Neither: I will type the right value"
   unanswered_swap: "A step of this place is still waiting for information from you: a close match is suggested instead."
   unanswered_drop: "A step of this place is still waiting for information from you: removing this place is suggested."
-  unanswered_all: "Information your plan needs has not arrived and every place depends on it; the Counsellor decides with the student."
+  unanswered_all: "Information your plan needs has not arrived, and every place on it depends on it. A person will look at your plan with you. Your plan stays as it is."
+  unanswered_proposed: "PAI has suggested a change to your plan because information it needs has not arrived. A person will also look at your plan with you."
   answer_changed: "This question changed while you were looking at it. Look at it again and choose once more."

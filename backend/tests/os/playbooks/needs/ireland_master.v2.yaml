@@ -38,6 +38,7 @@ tasks:
     inbox_kind: act
     fan_out: programme
     condition: {fact: english_requirement, present: true}
+    anchor: {fact: deadline_close}  # dated like `apply`, so its request has a due date and can go overdue (R-22)
     duration_days: 2
     needs:
       - {fact: test.ielts.score, evidence: shown}

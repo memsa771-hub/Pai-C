@@ -148,14 +148,14 @@ ASK = "provide@fact:test.key.a:shown"  # a request step the compiler added (rout
 C = "prog-c"
 
 
-def ladder(*, needing, programmes=(A, B), suggestions=None, held=(), state_of="waiting_student", **extra) -> PlanState:
+def ladder(*, needing, programmes=(A, B), suggestions=None, held=(), held_in=(), state_of="waiting_student", **extra) -> PlanState:
     """A plan with one request step and steps that hard-depend on it: `needing` maps a step's key to its place."""
     tasks = {ASK: row(ASK, state=state_of, deps=())}
     for key, ref in needing.items():
         tasks[key] = row(key, ref=ref, deps=[(ASK, True)])
     tasks.update(extra)
     return PlanState(plan_id=1, route_key="fake_route", programmes=list(programmes), tasks=tasks,
-                     suggestions=suggestions or {}, playbook_version=2, held=tuple(held))
+                     suggestions=suggestions or {}, playbook_version=2, held=tuple(held), held_in=tuple(held_in))
 
 
 def missing(**kw):
@@ -211,7 +211,9 @@ def test_never_fewer_than_min_programmes_left():
 def test_a_place_with_a_proposal_already_open_is_not_proposed_again():
     got = missing(needing={f"apply@{A}": A, f"apply@{B}": B}, programmes=(A, B, C), held=[A])
     assert [(o.op, o.programme_ref) for o in got] == [("cancel_programme", B)]
-    assert missing(needing={f"apply@{A}": A}, programmes=(A, B, C), held=[A]) == []
+    # every affected place already has a proposal waiting: a person looks at this event too (Ruling problem 11)
+    assert missing(needing={f"apply@{A}": A}, programmes=(A, B, C), held=[A]) == [
+        Escalate(reason=request_texts.text("unanswered_proposed"))]
 
 
 @pytest.mark.req("R-22")
@@ -238,3 +240,17 @@ def test_a_playbook_step_named_like_a_request_is_not_a_request():
     s = state(provide_documents=row("provide_documents", state="waiting_student"))
     got = rules_for(ev("document_missing", instance_key="provide_documents"), s, CFG)
     assert [o.op for o in got] == ["request_from_student"]
+
+
+@pytest.mark.req("R-22")
+def test_a_match_brought_in_by_a_waiting_swap_is_not_offered_again():
+    got = missing(needing={f"apply@{A}": A}, programmes=(A, B, C, "prog-z"), suggestions={A: ["prog-d", "prog-e"]},
+                  held_in=["prog-d"])
+    assert [(o.out_ref, o.in_ref) for o in got] == [(A, "prog-e")]
+
+
+@pytest.mark.req("R-22")
+def test_places_already_taken_out_do_not_count_as_live():
+    # the state the Replanner builds leaves out a place an accepted removal took: only A is live, and it waits
+    got = missing(needing={f"apply@{A}": A}, programmes=(A,))
+    assert got == [Escalate(reason=request_texts.text("unanswered_all"))]

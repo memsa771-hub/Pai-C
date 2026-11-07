@@ -6,6 +6,8 @@ this process) on Postgres; the Vault answers from a dict. Fictional routes, prog
 "close match" list is fixed by the test: how matches are found has its own tests."""
 
 import types as pytypes
+from contextlib import contextmanager
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -18,13 +20,14 @@ from app.os.adapters.counsellor import manifest
 from app.os.api import make_services
 from app.os.contracts.route_contract import RouteContract
 from app.os.knowledge import Fact, SqlKnowledge
-from app.os.outbox import Outbox
 from app.os.playbooks import Playbook
+from app.os.outbox import Outbox
 from app.os.replan import events
 from app.os.replan.apply import ProposalStale, Replanner
 from app.os.replan.config import load_replan_configs
 from app.os.replan.run import generation, register_replan, replan_workflow_id, run_replan_job
 from app.os.replan.store import SupportStore
+from app.os.requests import state as request_state
 from app.os.requests import texts
 from app.os.settings import load_settings
 from app.os.workers import deadline_engine, run_reminders
@@ -38,30 +41,11 @@ pytestmark = pytest.mark.req("R-22")
 
 TENANT, STUDENT = "pai", "stu-1"
 CHECKED = datetime(2026, 10, 17, tzinfo=timezone.utc)
-NEEDS = Path(__file__).parent / "playbooks" / "needs"
 IELTS = "test.ielts.score"
 ENGLISH_ASK = f"provide@fact:{IELTS}:shown"
 MARKS_ASK = "provide@fact:education.intermediate.marks_obtained:stated"
 DUE_PAST = datetime(2027, 7, 20, 8, tzinfo=timezone.utc)  # after every date of the test routes
 T, EV, O = models.tasks, models.events, models.outbox
-
-
-def ireland(*, needs_on: str) -> Playbook:
-    """The fake Ireland v2 playbook with the needs on one step only. The English step is dated like `apply`, so its
-    request has a due date (the shipped fake file leaves it undated). `needs_on` is `english_proof` or `visa`."""
-    data = yaml.safe_load((NEEDS / "ireland_master.v2.yaml").read_text(encoding="utf-8"))
-    for task in data["tasks"]:
-        task.pop("needs", None)
-        if task["template_key"] == "english_proof":
-            task["anchor"] = {"fact": "deadline_close"}
-        if task["template_key"] == needs_on:
-            task["needs"] = [{"fact": IELTS, "evidence": "shown"}]
-    data["asks"] = {IELTS: data["asks"][IELTS]}
-    if needs_on == "visa":  # a route-level step that needs it; the visa is dated back from the deadline too
-        for task in data["tasks"]:
-            if task["template_key"] == "visa":
-                task["depends_on"] = [{"key": "apply"}]
-    return Playbook.model_validate(data)
 
 
 def contract(student=STUDENT, level="master", refs=("ie-p1", "ie-p2", "ie-p3"), source="counsellor") -> RouteContract:
@@ -98,8 +82,15 @@ def build(engine, os_db, monkeypatch, books, seed, suggestions=None):
     manifest.set_enabled(engine, TENANT, True)
     replanner = Replanner(engine, svc.plans, load_replan_configs(), Outbox(engine, TENANT), clock=lambda: box.now,
                           escalations=svc.escalations)
-    matches = suggestions or {}
-    monkeypatch.setattr(Replanner, "_suggestions", lambda self, contract, book, ref: list(matches.get(ref, [])))
+    if suggestions is not None:  # the test fixes the close matches; None leaves the real matching in place
+        monkeypatch.setattr(Replanner, "_suggestions", lambda self, contract, book, ref: list(suggestions.get(ref, [])))
+    real = request_state.build  # the transcript is confirmed, so only the English score is missing on the Ireland route
+
+    def with_transcript(service, student):
+        got = real(service, student)
+        return got if got is None else replace(got, documents={**got.documents, "transcript": "confirmed"})
+
+    monkeypatch.setattr(request_state, "build", with_transcript)
     return pytypes.SimpleNamespace(svc=svc, engine=engine, kb=kb, vault=vault, box=box, replanner=replanner,
                                    settings=settings, hooks=hooks, os_db=os_db)
 
@@ -121,8 +112,7 @@ def seed_inter(kb):
 @pytest.fixture
 def world(engine, clean, os_db, monkeypatch):
     """The fake Ireland route; the English score is asked of ie-p1 and ie-p2 only; ie-p4 is the close match of ie-p1."""
-    books = {**BOOKS, ("ireland_master", 2): ireland(needs_on="english_proof")}
-    w = build(engine, os_db, monkeypatch, books, seed_ireland, {"ie-p1": ["ie-p4"], "ie-p2": []})
+    w = build(engine, os_db, monkeypatch, BOOKS, seed_ireland, {"ie-p1": ["ie-p4"], "ie-p2": []})
     try:
         yield w
     finally:
@@ -139,34 +129,13 @@ def route_world(engine, clean, os_db, monkeypatch):
         ports.configure(None)
 
 
-@pytest.fixture
-def live(world):
+@contextmanager
+def running(w):
     """The os.replan workflow running in this process (DBOS), as the worker runs it."""
     from dbos import DBOS, DBOSClient
 
     from app.os.runner import APP_NAME, dbos_config, default_registry, launch, register_workflow
 
-    reset_dbos_schema(world.os_db)
-    DBOS(config=dbos_config(world.settings, "test-w0"))
-    register_workflow(world.engine, world.settings, default_registry(), world.svc.kernel)
-    register_replan(world.engine, world.settings, world.replanner, None)
-    launch()
-    world.client = DBOSClient(system_database_url=world.os_db, dbos_system_schema=TEST_DBOS_SCHEMA,
-                              application_name=APP_NAME)
-    try:
-        yield world
-    finally:
-        world.client.destroy()
-        DBOS.destroy(destroy_registry=True)
-
-
-@pytest.fixture
-def route_live(route_world):
-    from dbos import DBOS, DBOSClient
-
-    from app.os.runner import APP_NAME, dbos_config, default_registry, launch, register_workflow
-
-    w = route_world
     reset_dbos_schema(w.os_db)
     DBOS(config=dbos_config(w.settings, "test-w0"))
     register_workflow(w.engine, w.settings, default_registry(), w.svc.kernel)
@@ -178,6 +147,41 @@ def route_live(route_world):
     finally:
         w.client.destroy()
         DBOS.destroy(destroy_registry=True)
+
+
+@pytest.fixture
+def live(world):
+    with running(world) as w:
+        yield w
+
+
+@pytest.fixture
+def route_live(route_world):
+    with running(route_world) as w:
+        yield w
+
+
+@pytest.fixture
+def real_live(engine, clean, os_db, monkeypatch):
+    """The Ireland route with the real close-match search: three registered programmes beyond the plan, one of which also
+    asks for the English score."""
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+
+    data = yaml.safe_load((Path(__file__).parent / "playbooks" / "needs" / "ireland_master.v2.yaml").read_text())
+    data.pop("eligibility")  # without grade rules every programme with confirmed facts is a close match
+    books = {**BOOKS, ("ireland_master", 2): Playbook.model_validate(data)}
+    w = build(engine, os_db, monkeypatch, books, seed_ireland)
+    store = ProgrammeStore(engine, TENANT)
+    for ref in ("ie-a-needs-english", "ie-p4"):
+        store.upsert(Programme(ref=ref, route_key="ireland_master", university="Uni X", name=ref, aliases=(),
+                               start_urls=("https://uni.example/x",), official_domains=("uni.example",)))
+    w.kb.upsert("programme", "ie-a-needs-english", "deadline_close", fact({"date": "2027-07-15"}), "manual")
+    w.kb.upsert("programme", "ie-a-needs-english", "english_requirement", fact({"ielts": 6.5}), "manual")
+    try:
+        with running(w) as up:
+            yield up
+    finally:
+        ports.configure(None)
 
 
 # --- helpers ------------------------------------------------------------------------------------------------------
@@ -214,6 +218,25 @@ def sweep(w, now: datetime) -> dict[int, dict]:
     assert run_replan_job(w.replanner, w.client, now) == len(queued)
     return {i: w.client.retrieve_workflow(replan_workflow_id(TENANT, p, i, generation(w.engine, TENANT, p))).get_result()
             for p, i in queued}
+
+
+def counsellor_rows(w, case_id: int) -> list:
+    """The Counsellor escalation rows of one support case. (Other steps of the plan that are overdue still escalate as
+    they did before, so only this case is looked at.)"""
+    with w.engine.connect() as conn:
+        return [r for r in conn.execute(select(O).where(O.c.channel == "counsellor", O.c.template == "escalation"))
+                if r.payload["case_id"] == case_id]
+
+
+def plan_status(w, plan_id) -> str:
+    with w.engine.connect() as conn:
+        return conn.execute(select(models.plans.c.status).where(models.plans.c.id == plan_id)).scalar_one()
+
+
+def ladder_cases(w, plan_id) -> list:
+    """The support cases the unanswered ladder opened (not those of other overdue steps of the plan)."""
+    ours = (texts.text("unanswered_all"), texts.text("unanswered_proposed"))
+    return [c for c in SupportStore(w.engine, TENANT).list() if c.plan_id == plan_id and c.reason in ours]
 
 
 def pending_proposals(w, plan_id):
@@ -328,7 +351,9 @@ def test_overdue_request_on_some_places_proposes_swap_or_drop(live):
     assert swap["in_ref"] == "ie-p4" and swap["reason"] == texts.text("unanswered_swap")
     assert drop["reason"] == texts.text("unanswered_drop")
     assert proposal.event_ids == [missing.id]
-    assert SupportStore(live.engine, TENANT).for_event(missing.id) is None  # a person is called only after the proposal
+    case = SupportStore(live.engine, TENANT).for_event(missing.id)  # the proposal and a person: Ruling problem 11
+    assert case.reason == texts.text("unanswered_proposed") and case.proposal_id == proposal.id
+    assert counsellor_rows(live, case.id) == [] and case.counsellor_status is None  # PAI only: nobody is sent to choose
     assert live.svc.plans._contract(plan_id)[1] == before  # nothing changes until the student accepts
 
 
@@ -337,7 +362,7 @@ def test_the_same_places_are_not_proposed_twice(live):
     sweep(live, DUE_PAST)
     other = live.replanner.proposals.for_plan(plan_id)
     assert len(other) == 1
-    assert live.replanner.held(plan_id) == ("ie-p1", "ie-p2")
+    assert live.replanner.held(plan_id) == (("ie-p1", "ie-p2"), ("ie-p4",))  # the places, and the match brought in
 
 
 def test_ladder_never_leaves_fewer_than_min_programmes(live):
@@ -346,6 +371,7 @@ def test_ladder_never_leaves_fewer_than_min_programmes(live):
     assert pending_proposals(live, plan_id) == []  # no removal is offered: it would leave nothing
     case = SupportStore(live.engine, TENANT).for_event(event_of(live, plan_id, "document_missing", ENGLISH_ASK).id)
     assert case is not None and case.reason == texts.text("unanswered_all")
+    assert counsellor_rows(live, case.id) == [] and case.counsellor_status is None  # no Counsellor row
 
 
 def test_counsellor_plan_drop_becomes_a_choice_request(live):
@@ -375,7 +401,7 @@ def test_a_self_serve_drop_changes_the_plan_when_accepted(live):
 
 # --- rung 4: a support case ---------------------------------------------------------------------------------------
 
-def test_overdue_request_on_every_place_escalates_blocking_gap(route_live):
+def test_overdue_request_on_every_place_opens_a_support_case_and_keeps_the_plan(route_live):
     w = route_live
     plan_id = w.svc.plans.start_plan(contract(level="bachelor", refs=("pk-p1", "pk-p2"), source="counsellor")).plan_id
     with w.engine.begin() as conn:
@@ -383,15 +409,21 @@ def test_overdue_request_on_every_place_escalates_blocking_gap(route_live):
             tenant_id=TENANT, decision_id="d-1", student_ref=STUDENT, journey_id="j-1", export={},
             export_sha256="0" * 64, chosen_at="2027-01-10T09:00:00+05:00", status="planned", plan_id=plan_id,
             decision_version=1))
-    results = sweep(w, datetime(2027, 9, 1, 8, tzinfo=timezone.utc))  # after the merit list of the fake route
+    late = datetime(2027, 9, 1, 8, tzinfo=timezone.utc)  # after the merit list of the fake route
+    results = sweep(w, late)
     missing = event_of(w, plan_id, "document_missing", MARKS_ASK)  # the entry test is route-level
     assert results[missing.id]["status"] == "applied"
     case = SupportStore(w.engine, TENANT).for_event(missing.id)
     assert case is not None and case.reason == texts.text("unanswered_all") and case.plan_id == plan_id
-    with w.engine.connect() as conn:
-        sent = [r.payload for r in conn.execute(select(O).where(O.c.channel == "counsellor", O.c.template == "escalation"))]
-    assert [(p["reason"], p["case_id"]) for p in sent if p["case_id"] == case.id] == [("blocking_gap", case.id)]
-    assert pending_proposals(w, plan_id) == []  # no swap or removal: the Counsellor looks, the student is not sent back
+    assert "Counsellor" not in case.reason  # it reads the same on a self-serve plan
+    assert counsellor_rows(w, case.id) == [] and case.counsellor_status is None  # no row: no pause, no "choose again"
+    assert plan_status(w, plan_id) != "paused" and not w.svc.plans.kernel.changes_paused(plan_id)
+    assert pending_proposals(w, plan_id) == []  # nothing is removed
+    assert [p.programme_ref for p in w.svc.plans._contract(plan_id)[0].programmes] == ["pk-p1", "pk-p2"]
+    step = task(w, plan_id, MARKS_ASK)
+    before = len(reminder_keys(w, step.id))
+    sweep(w, late + timedelta(days=1))  # the reminders go on the next day
+    assert len(reminder_keys(w, step.id)) == before + 1
 
 
 # --- never silent -------------------------------------------------------------------------------------------------
@@ -446,3 +478,70 @@ def test_answer_after_proposal_leaves_the_proposal_to_the_student(live):
     assert [p.programme_ref for p in live.svc.plans._contract(plan_id)[0].programmes] == ["ie-p1", "ie-p2", "ie-p3"]
     with pytest.raises(ProposalStale):
         live.replanner.accept(STUDENT, proposal.id)
+
+
+# --- never silent after the proposal: declined, expired, a place already gone -----------------------------------------
+
+def test_a_declined_proposal_leaves_a_support_case(live):
+    plan_id = start(live, source="self_serve")
+    sweep(live, DUE_PAST)
+    (p,) = pending_proposals(live, plan_id)
+    live.replanner.decline(STUDENT, p.id)
+    later = DUE_PAST + timedelta(days=1)
+    sweep(live, later)
+    never_silent(live, plan_id, later)
+    missing = event_of(live, plan_id, "document_missing", ENGLISH_ASK)
+    assert SupportStore(live.engine, TENANT).for_event(missing.id).reason == texts.text("unanswered_proposed")
+    assert [c.event_ids for c in ladder_cases(live, plan_id)] == [[missing.id]]  # one case per event
+
+
+def test_an_expired_proposal_leaves_a_support_case(live):
+    plan_id = start(live, source="self_serve")
+    sweep(live, DUE_PAST)
+    (p,) = pending_proposals(live, plan_id)
+    later = DUE_PAST + timedelta(days=8)  # past the seven days
+    assert live.replanner.expire_due(later) == 1
+    assert live.replanner.proposals.get(p.id).status == "expired"
+    sweep(live, later)
+    assert never_silent(live, plan_id, later) == 1
+    assert [c.reason for c in ladder_cases(live, plan_id)] == [texts.text("unanswered_proposed")]
+
+
+def test_a_second_overdue_request_with_every_place_held_still_opens_a_case(live):
+    plan_id = start(live, source="self_serve")
+    sweep(live, DUE_PAST)
+    (first,) = pending_proposals(live, plan_id)
+    with live.engine.begin() as conn:  # a second event for the same request, as another due date would give
+        second = events.record(conn, TENANT, plan_id, "document_missing", {"instance_key": ENGLISH_ASK}, "again")
+    results = sweep(live, DUE_PAST + timedelta(minutes=10))
+    assert results[second]["status"] == "applied"  # no second proposal for the places the first one holds
+    assert [p.id for p in pending_proposals(live, plan_id)] == [first.id]
+    assert SupportStore(live.engine, TENANT).for_event(second).reason == texts.text("unanswered_proposed")
+
+
+def test_a_place_an_accepted_removal_took_is_not_live(live, monkeypatch):
+    monkeypatch.setattr(Replanner, "_suggestions", lambda self, c, b, ref: [])
+    plan_id = start(live, source="self_serve")
+    with live.engine.begin() as conn:
+        events.record(conn, TENANT, plan_id, "admission_rejected", {"programme_ref": "ie-p3"}, "rej-ie-p3")
+    sweep(live, DUE_PAST - timedelta(days=200))
+    for p in pending_proposals(live, plan_id):
+        live.replanner.accept(STUDENT, p.id)
+    assert live.replanner.overrides.cancelled(plan_id) == {"ie-p3"}
+    sweep(live, DUE_PAST)
+    missing = event_of(live, plan_id, "document_missing", ENGLISH_ASK)
+    case = SupportStore(live.engine, TENANT).for_event(missing.id)
+    assert case.reason == texts.text("unanswered_all")  # ie-p1 and ie-p2 are all that is left, and both wait
+    assert not [o for p in live.replanner.proposals.for_plan(plan_id) if missing.id in p.event_ids for o in p.ops
+                if o["op"] in ("swap_programme", "cancel_programme")]  # nothing more is taken out
+    assert {p.programme_ref for p in live.svc.plans._contract(plan_id)[0].programmes} >= {"ie-p1", "ie-p2"}
+
+
+def test_a_close_match_that_needs_the_same_data_is_not_proposed(real_live):
+    plan_id = start(real_live, source="self_serve")
+    sweep(real_live, DUE_PAST)
+    missing = event_of(real_live, plan_id, "document_missing", ENGLISH_ASK)
+    (proposal,) = pending_proposals(real_live, plan_id)
+    assert proposal.event_ids == [missing.id]
+    assert [(o["op"], o.get("out_ref") or o["programme_ref"], o.get("in_ref")) for o in proposal.ops] == [
+        ("swap_programme", "ie-p1", "ie-p4"), ("cancel_programme", "ie-p2", None)]  # not ie-a-needs-english, which sorts first
