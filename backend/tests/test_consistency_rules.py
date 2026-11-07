@@ -10,7 +10,13 @@ from sqlalchemy import select
 
 from app.models import OsOutbox, VaultVersion
 from app.pai_c.connect import consistency as cons
-from app.pai_c.connect.consistency import CounsellorSide, DecisionView, Finding, OutboxItem, check
+from app.pai_c.connect.consistency import (
+    CounsellorSide,
+    DecisionView,
+    Finding,
+    OutboxItem,
+    check,
+)
 
 pytestmark = [pytest.mark.req("R-05"), pytest.mark.req("R-04")]
 NOW = datetime(2026, 11, 7, 21, 0, tzinfo=timezone.utc)
@@ -32,13 +38,13 @@ def plan(id=7, status="active", version=1, source="counsellor", reason=None, con
 
 
 def side(**kw):
-    base = dict(workspace_id="ws", newest=decision(), outbox=(row(),), vault_version=0)
+    base = {"workspace_id": "ws", "newest": decision(), "outbox": (row(),), "vault_version": 0}
     return CounsellorSide(**{**base, **kw})
 
 
 def os_(**kw):
-    base = dict(latest_version=1, intake_status_by_version={1: "planned"}, refusal_by_version={}, plans=[plan()],
-                latest_vault_version=0, unprocessed_fact_events=[], needed_file_refs=[], duplicate_requests=[])
+    base = {"latest_version": 1, "intake_status_by_version": {1: "planned"}, "refusal_by_version": {}, "plans": [plan()],
+                "latest_vault_version": 0, "unprocessed_fact_events": [], "needed_file_refs": [], "duplicate_requests": []}
     return NS(**{**base, **kw})
 
 

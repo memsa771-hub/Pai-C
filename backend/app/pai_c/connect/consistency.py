@@ -9,9 +9,10 @@ Modes: `nightly` treats work younger than `IN_FLIGHT_SECONDS` (two sweeps) as in
 check, run just after a sweep) tolerates nothing pending. Only portable SQL here (SQLite in tests, Postgres in prod).
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Literal, Mapping, Protocol, Sequence
+from typing import Any, Literal, Protocol
 
 from sqlalchemy import select
 
@@ -146,7 +147,13 @@ def _roadmap_kind(db, row, parts) -> str | None:
 
 def counsellor_side(db, workspace_id: str) -> CounsellorSide:
     """One student's Counsellor state. Keys, versions, ids and times only. Reads, never writes."""
-    from app.models import FileRecord, OsOutbox, PaiPossibility, RouteDecision, VaultVersion
+    from app.models import (
+        FileRecord,
+        OsOutbox,
+        PaiPossibility,
+        RouteDecision,
+        VaultVersion,
+    )
     from app.pai_c.os_export import decision_record_v2
     from app.pai_c.paths.exclusions import _OPEN, _restored, excluded_fields
 
@@ -225,11 +232,10 @@ def _rule1(c, o, mode, now):
     if latest is not None and latest < n.version:
         return [Finding(1, ("version_behind",))]
     status = o.intake_status_by_version.get(n.version)
-    if latest == n.version and status in HELD_INTAKE:
-        if o.refusal_by_version.get(n.version) or any(
-                p.source == PLAN_SOURCE and p.decision_version == n.version and p.status in PLAN_OPEN
-                for p in o.plans):
-            return []
+    settled = latest == n.version and status in HELD_INTAKE
+    if settled and (o.refusal_by_version.get(n.version) or any(
+            p.source == PLAN_SOURCE and p.decision_version == n.version and p.status in PLAN_OPEN for p in o.plans)):
+        return []
     return [Finding(1, ("no_plan",))]
 
 
