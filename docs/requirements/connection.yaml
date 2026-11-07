@@ -57,8 +57,8 @@ requirements:
   R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: false}
   R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: false}
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
-  R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: false}
-  R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: false}
+  R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: true}
+  R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: true}
   R-32: {title: "Institution registry built only from official lists", phases: [P2], built: false}
   R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: false}
   R-34: {title: "Every institution shows its coverage level", phases: [P2], built: false}

@@ -6,15 +6,21 @@ from sqlalchemy import select
 
 from app.os import clock, models, ports
 from app.os.compiler.compile import needed_fields
+from app.os.contracts.merit_check import MeritCheckV1
 from app.os.contracts.plan_summary import PlanSummaryV1
 from app.os.contracts.plan_view import PlanViewV1
+from app.os.contracts.programme_facts import ProgrammeFactsV1
 from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
+from app.os.contracts.programme_list_v2 import ProgrammeListV2
 from app.os.contracts.route_contract import IntakeRef
 from app.os.kernel.states import PLAN_OPEN
 from app.os.playbooks import newest_plain
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.replan.store import OverrideStore
+from app.os.merit_check import build as build_merit
 from app.os.plan_view import build_plan_view
+from app.os.programme_facts import build as build_programme_facts
+from app.os.programme_list_v2 import build as build_list_v2
 from app.os.summary import build_summary
 
 
@@ -43,6 +49,32 @@ def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
         ProgrammeEntry(programme_ref=p.ref, university=p.university, name=p.name,
                        facts_confirmed=all((p.ref, f) in facts and facts[(p.ref, f)].confirmed for f in fields))
         for p in programmes])
+
+
+def programme_facts(programme_ref: str, intake: IntakeRef) -> ProgrammeFactsV1 | None:
+    """A programme's facts for an intake with their level, source and intake (P2-D27, R-23, R-26, R-48). Another
+    intake's fact is labelled with its own. None when the programme is unknown."""
+    svc = ports.services()
+    return build_programme_facts(svc.engine, svc.settings.tenant_id, svc.knowledge, svc.plans.playbooks,
+                                 programme_ref, intake)
+
+
+def merit_check(student_ref: str, programme_ref: str, intake: IntakeRef, category: str | None = None) -> MeritCheckV1:
+    """The student's merit aggregate from the Vault's marks and a verified formula, or "not confirmed" / "missing"
+    (P2-D26, R-31, R-48). It never predicts a chance."""
+    from app.os.eligibility.facts import current_types
+    from app.os.ports import student_facts
+    from app.os.requests.state import scale_pairs
+
+    svc = ports.services()
+    facts = student_facts.get(student_ref, engine=svc.engine, tenant_id=svc.settings.tenant_id)
+    return build_merit(svc.knowledge, facts, programme_ref, intake, category, scale_pairs(current_types()))
+
+
+def programme_list_v2(route_key: str, intake: IntakeRef) -> ProgrammeListV2:
+    """`programme_list` plus each place's coverage level, region and whether PAI can run it yet (P2-D27, R-34)."""
+    svc = ports.services()
+    return build_list_v2(svc.engine, svc.settings.tenant_id, svc.plans.playbooks, route_key, intake)
 
 
 def routes() -> list[dict]:
