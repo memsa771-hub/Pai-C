@@ -1,0 +1,95 @@
+# The research spreadsheet format (master R-67, §8.6; P2 spec §4.6, P2-D17). One fixed format for every batch: an
+# Institutions sheet, a Programmes sheet (one canonical layout) and a Facts sheet, each with the checker columns, plus a
+# read-only Lists sheet of the allowed values. The Institutions and Facts layouts are those of research batches 1-5
+# (v4); older Programmes layouts are mapped into the canonical one by `legacy/*.yaml` (R-68), never by hand.
+# Everything here is data: vocabularies, mappings and the class of each value column. Nothing country-specific is in code.
+version: 1
+
+checker_columns: [checker1_result, checker1_corrected_value, checker1_corrected_quote, checker1_name, checker1_date,
+                  checker2_approved, checker2_name, checker2_date, checker_note]
+
+sheets:
+  Institutions:
+    key: inst_id
+    required: [inst_id, type, name, region, source_url, source_quote, read_method, retrieved, claude_status]
+    columns: [inst_id, type, name, region, city, sector, discipline, chartered_by, official_url, in_scope, source_url,
+              source_quote, read_method, retrieved, claude_status, claude_note]
+  Programmes:
+    key: programme_id
+    required: [programme_id, inst_id, programme, source_url, retrieved, claude_status]
+    columns: [programme_id, inst_id, campus, programme, level, field, intake, seat_category, seats, closing_merit,
+              closing_scale, test_options, min_ssc, min_hssc, required_subjects, merit_formula, source_url,
+              quote_verbatim, read_method, retrieved, claude_status, claude_note]
+  Facts:
+    key: fact_id
+    required: [fact_id, entity_id, field, value, intake, source_url, quote_verbatim, read_method, retrieved,
+               claude_status]
+    columns: [fact_id, entity_id, field, value, unit, intake, high_stakes, source_url, source_type, quote_verbatim,
+              language, read_method, retrieved, claude_status, claude_note]
+
+# R-67 statuses, fixed
+claude_statuses: [found, unconfirmed, conflict, not_readable, not_found, lead_only, superseded]
+check1_results: [correct, wrong, unclear, not_readable]
+# checker 2 writes yes/no (batches) or approve/reject (queue export); both spellings are accepted
+check2_values: {"yes": "yes", "approve": "yes", "no": "no", "reject": "no"}
+
+# Lists sheet: allowed values shown to people filling the file
+lists_sheet: [claude_statuses, check1_results, check2_values, read_methods, source_types]
+
+# How a free-text read method maps to the Knowledge vocabulary (fetch | render | ocr | human | model). First match
+# wins. `needs_refetch` methods cannot make a fact above `unconfirmed` until the quote is matched on the re-fetched
+# page (R-68, R-72).
+read_methods:
+  - {match: "ocr|scanned|image|machine-read", method: ocr}
+  - {match: "webfetch|model-extracted|search_excerpt|search excerpt", method: model}
+  - {match: "^human|by hand|collected", method: human}
+  - {match: "render|headless|playwright", method: render}
+  - {match: "^fetch|firecrawl|pdf parse|curl|^pdf", method: fetch}
+needs_refetch: [model, ocr]
+# a read method that says the row is not a reading of the official source at all
+lead_read_methods: ["non_official_lead", "not readable"]
+
+source_types:
+  official: [html, pdf, image, official, scan]
+  # R-72: a copy on a secondary site is a lead, never a source
+  not_official: [secondary, social, news, wikipedia, "image (copy of official ad)"]
+# hosts that are never a source (R-72); the allow-list (T3) is the positive check
+not_official_hosts: [wikipedia.org, facebook.com, instagram.com, drive.google.com, educationinkarachi.net, ajkbise.net]
+
+# Intake text -> (term, year). The year is the first year of a session. PROPOSED mapping, for the owner to confirm: an
+# intake text no rule matches is queued ("intake_unresolved"), never guessed.
+intake_patterns:
+  - {regex: '^(fall|spring|summer|autumn|winter)\s+(\d{4})\b', term: "{1}", year: "{2}"}
+  - {regex: '^session\s+(\d{4})\s*-\s*\d{2,4}\b', term: session, year: "{1}"}
+  - {regex: '^(batch|annual)\s+(\d{4})\b', term: "{1}", year: "{2}"}
+  - {regex: '^(\d{4})\s*-\s*\d{2,4}\b', term: session, year: "{1}"}
+  - {regex: '^(\d{4})$', term: "", year: "{1}"}
+
+# Institutions `type` -> registry kind. A type missing here is rejected ("unknown_type"), so the file's owner extends
+# this list on purpose.
+type_kinds:
+  institution: [hec_recognised_university_or_dai, private_medical_college, public_medical_college,
+                private_dental_college, public_dental_college, government_college,
+                public_medical_university_or_college, admitting_university, university]
+  board: [examination_board, exam_board, ibcc_member_not_student_board, technical_board_out_of_scope,
+          foreign_qualification_awarding_body]
+  regulator: [professional_regulator, hec_accreditation_council]
+  admission_body: [admission_body, entry_test_body]
+  admission_system: [admission_system]
+  entry_test: [admission_test]
+
+# Programmes value columns -> the fact they make (field name, class). With a seat category the field is
+# `<field>_<category>`. The class is stored on the fact; high-stakes classes are in fact_classes.yaml.
+programme_facts:
+  seats: {field: seats, fact_class: seat_quota, by_category: true}
+  closing_merit: {field: closing_merit, fact_class: closing_merit, by_category: true, scale: closing_scale}
+  test_options: {field: test_options, fact_class: test_pattern}
+  min_ssc: {field: min_ssc, fact_class: eligibility_threshold}
+  min_hssc: {field: min_hssc, fact_class: eligibility_threshold}
+  required_subjects: {field: required_subjects, fact_class: admission_requirement}
+  merit_formula: {field: merit_formula, fact_class: merit_formula}
+
+# Who the owner-accepted import (P2-D16a) accepts as the two checks, and the provenance it records.
+owner_accepted:
+  checker1: {claude_check_1: ["Claude – check 1", "Claude - check 1"]}
+  checker2: {claude_check_2: ["Claude – check 2 (independent)", "Claude - check 2 (independent)"]}

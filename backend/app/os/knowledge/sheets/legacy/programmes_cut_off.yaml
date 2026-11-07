@@ -1,0 +1,7 @@
+# Batch 3 layout: a cut-off out of 550 and the page status of the programme.
+layout: programmes_cut_off
+sheet: Programmes
+detect: [cut_off_out_of_550, status_on_page]
+note_from: [status_on_page]
+emit:
+  - set: {closing_merit: cut_off_out_of_550, closing_scale: {const: 550}}
