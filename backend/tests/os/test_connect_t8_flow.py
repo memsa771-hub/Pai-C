@@ -104,14 +104,11 @@ class Clock:
     """The one test clock: `today` for the plan service and the deadline engine, `now` for reminders and the replan job."""
 
     def __init__(self, day=date(2027, 1, 20)):
-        self.today = day
-
-    @property
-    def now(self) -> datetime:
-        return datetime.combine(self.today, datetime.min.time(), timezone.utc) + timedelta(hours=8)
+        self.set(day)
 
     def set(self, day: date) -> None:
         self.today = day
+        self.now = datetime.combine(day, datetime.min.time(), timezone.utc) + timedelta(hours=8)
 
 
 def germany_v3_with_a_gpa_need() -> Playbook:
@@ -391,6 +388,13 @@ def sweep_at(world, day: date) -> dict:
     return sweep(world, world.box.now)
 
 
+def tick(world, day: date) -> None:
+    """The clock moves to `day`: the hourly deadline recompute and the reminders (no replan job: no workflow is running)."""
+    world.box.set(day)
+    deadline_engine.run(world.svc.plans, world.engine)
+    run_reminders(world.engine, Outbox(world.engine, TENANT), world.box.now, TENANT)
+
+
 def reminders_of(world, task_id) -> list[str]:
     with world.engine.connect() as conn:
         return [k for k in conn.execute(select(models.outbox.c.idempotency_key).where(
@@ -486,4 +490,128 @@ def test_6_19_germany_v2_asks_for_the_certificates_and_blocks_the_applications(w
         assert s.rows("open") == [] and {r.closed_cause for r in s.rows("answered")} == {"request_answered"}
         assert all(not (s.blocked()[k] or "").startswith("awaiting_fact") for k in apply_keys)
         assert s.view()["requests"] == [r for r in s.view()["requests"] if r["status"] != "open"]
+        s.throughout()
+
+
+@contextmanager
+def reader(world):
+    """The OS document worker, in this process: DBOS on the test schema, the offline reader answering from the committed
+    sample documents, the file read through the host adapter. Swaps the OS's DBOS client for the real one."""
+    from dbos import DBOS, DBOSClient
+
+    from app.os.agents.offline import offline_model
+    from app.os.agents.spec import AGENT_DIR, load_agent_spec
+    from app.os.documents.checks import load_name_variants
+    from app.os.documents.reader import build_readers
+    from app.os.documents.run import register_documents
+    from app.os.documents.types import load_document_types
+    from app.os.kernel import Kernel
+    from app.os.runner import APP_NAME, dbos_config, default_registry, launch, register_workflow
+    from tests.os.conftest import TEST_DBOS_SCHEMA, reset_dbos_schema
+
+    answers = HERE / "rehearsal" / "answers"
+    types, spec = load_document_types(), load_agent_spec(AGENT_DIR / "documents.v1.yaml")
+    reset_dbos_schema(world.os_db)
+    settings = load_settings({"OS_DATABASE_URL": world.os_db, "OS_DBOS_SYSTEM_SCHEMA": TEST_DBOS_SCHEMA,
+                              "OS_MODEL_MODE": "offline", "OS_REHEARSAL": "on", "OS_OFFLINE_ANSWERS_DIR": str(answers)})
+    readers = build_readers(offline_model("documents", answers), types, spec)
+    DBOS(config=dbos_config(settings, "test-w0"))
+    register_workflow(world.engine, settings, default_registry(), Kernel(world.engine, TENANT))
+    register_documents(world.engine, settings, readers, spec, types, load_name_variants())
+    launch()
+    client = DBOSClient(system_database_url=world.os_db, dbos_system_schema=TEST_DBOS_SCHEMA, application_name=APP_NAME)
+    world.fake.client = client
+    try:
+        yield client
+    finally:
+        client.destroy()
+        DBOS.destroy(destroy_registry=True)
+        world.fake.client = FakeClient()
+
+
+# --- rows 6.20 (the mechanism), R-18, R-19: the fake Pakistan intermediate route, version 2 --------------------------
+
+MATRIC = {"qualification_name": "matric", "academic_status": "completed", "institution_name": "Exampleton Model School",
+          "result": {"marks_obtained": 910, "marks_total": 1100}}
+RESULT_DAY = date(2027, 4, 30)  # the test calendar (`needs_seed.yaml`): the fictional matric result day
+
+
+def test_6_20_result_expected_then_provide_then_stated_then_shown(world):
+    with signed_in(world, pre_eng()) as s, level("intermediate"):
+        vault((s.client, s.who, s.params))
+        s.before = chat_rows(s.who)
+        choose(s, world, "PK", ["pk-i1"])
+        plan_id = s.plan_id()
+        obtained, total = f"provide@fact:{MATRIC_MARKS}:stated", f"provide@fact:{MATRIC_TOTAL}:stated"
+        shown = f"provide@fact:{MATRIC_MARKS}:shown"
+        expected = f"result_expected@fact:{MATRIC_MARKS}"
+
+        # 1. before the calendar date: a step that waits for the result, due that day; then a pending provide step
+        # with an open request row (R-20); nothing is asked of the student yet for the marks
+        steps = s.steps()
+        assert steps[expected] == "blocked" and s.blocked()[expected] == f"result_expected:{MATRIC_MARKS}"
+        due = s.step(expected).due_at
+        assert due.date() == RESULT_DAY  # the test calendar's day, in the route's zone
+        assert steps[obtained] == "pending" and steps[total] == "waiting_student"  # the total has no calendar: asked now
+        assert s.step(obtained).due_at is not None
+        assert {r.need_ref for r in s.rows("open")} == {MATRIC_MARKS, MATRIC_TOTAL}  # a row for the pending step too
+        assert s.row_of(MATRIC_MARKS).kind == "provide" and s.row_of(MATRIC_MARKS).evidence == "stated"
+        assert s.row_of(MATRIC_MARKS).task_id == s.step(obtained).id
+        assert steps["admission_form"] == "blocked" and steps[f"merit_list@pk-i1"] == "blocked"
+        # the roadmap shows the result line and the request line, neither tickable
+        road = s.roadmap_steps()
+        assert road[expected]["request"]["kind"] == "result_expected" and road[expected]["tickable"] is False
+        assert road[obtained]["request"]["kind"] == "provide" and road[obtained]["tickable"] is False
+        assert [r["need"]["ref"] for r in s.requests("open")] == sorted([MATRIC_MARKS, MATRIC_TOTAL])  # both listed, with dates
+        # an hourly run before the date asks nothing more and makes no ladder event
+        tick(world, date(2027, 2, 1))
+        assert s.steps()[obtained] == "pending" and os_events(world, plan_id, "document_missing") == []
+
+        # 2. the clock moves past the date: the result step goes, the provide step waits, the student is told
+        tick(world, RESULT_DAY + timedelta(days=2))
+        steps = s.steps()
+        assert expected not in steps or steps[expected] in ("done", "cancelled")
+        assert steps[obtained] == "waiting_student"
+        with world.engine.connect() as conn:
+            told = [r.payload for r in conn.execute(select(models.outbox).where(models.outbox.c.template == "os_event"))]
+        assert any(p["kind"] == "student_needed" and p.get("instance_key") == obtained for p in told)
+        assert len(s.rows("open")) == 2  # still one open row per fact: the same rows, not new ones
+
+        # 3. the student types the marks in chat (the Vault, stated): the stated step is done, its row answered,
+        # the form is no longer blocked; the shown step and its row are open and the merit list stays blocked
+        s.say("education", MATRIC)
+        steps = s.steps()
+        assert obtained not in steps and total not in steps
+        assert len(s.done(obtained)) == 1 and len(s.done(total)) == 1
+        assert {r.need_ref for r in s.rows("answered")} == {MATRIC_MARKS, MATRIC_TOTAL}
+        assert {r.closed_cause for r in s.rows("answered")} == {"request_answered"}
+        assert steps["admission_form"] != "blocked" and not s.blocked()["admission_form"]
+        assert steps[shown] == "waiting_student" and steps["merit_list@pk-i1"] == "blocked"
+        assert s.blocked()["merit_list@pk-i1"].startswith("awaiting_fact:")
+        (only,) = [r for r in s.rows("open")]
+        assert (only.need_ref, only.evidence, only.kind) == (MATRIC_MARKS, "shown", "provide")  # one open row for the fact
+        assert [r["need"]["ref"] for r in s.requests("open")] == [MATRIC_MARKS]
+        # the student has not been asked twice: the stated step is gone from the inbox
+        assert obtained not in {i["instance_key"] for i in s.inbox()["items"]}
+
+        # 4. the student uploads and confirms the matric certificate (the offline reader reads the committed sample):
+        # the Vault holds the fact as shown, the shown step is done and the merit list is ready
+        with reader(world):
+            doc_id = s.upload("b1_ssc_certificate.png", SSC)
+            s.reader_waits_for(doc_id, "read")
+        values = s.fields_of(doc_id)
+        assert (values["marks_obtained"], values["marks_total"]) == (910, 1100)
+        assert s.confirm(doc_id).status_code == 200
+        assert s.deliver()["written"] == 1
+        record = s.record_with("marks_obtained") if False else [r for r in s.records()
+                                                               if (r.get("result") or {}).get("marks_obtained") == 910][0]
+        assert record["evidence_level"] == "shown"
+        assert s.cards() == []  # the same value: nothing to ask
+        assert len(s.done(shown)) == 1 and s.open_steps("provide@") == []
+        assert s.rows("open") == []
+        assert not s.blocked()["merit_list@pk-i1"]  # nothing is awaited from the student's data any more...
+        assert s.steps()["merit_list@pk-i1"] == "blocked"  # ...only the form, which is the student's own step
+        ticked = s.os.post(f"/v1/os/inbox/{s.step('admission_form').id}/complete", json={}, headers=s.me)
+        assert ticked.status_code == 200 and ticked.json() == {"completed": True}
+        assert s.steps()["admission_form"] == "done" and s.steps()["merit_list@pk-i1"] == "waiting_student"
         s.throughout()
