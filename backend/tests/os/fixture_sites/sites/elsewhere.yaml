@@ -1,0 +1,4 @@
+# A fictional site that is on no allow-list (redirect target).
+host: elsewhere.test
+pages:
+  /page: {body: "<html><body>Not an official page.</body></html>"}

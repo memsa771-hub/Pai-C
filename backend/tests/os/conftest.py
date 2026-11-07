@@ -141,3 +141,12 @@ def fresh_db(pg_url: str) -> None:
                 conn.execute(text(f"CREATE SCHEMA {schema}"))
     finally:
         engine.dispose()
+
+
+@pytest.fixture
+def fixture_sites():
+    """P2-T1: fictional official-looking sites on `.test` hosts, served locally (tests/os/fixture_sites)."""
+    from tests.os.fixture_sites.server import FixtureSites
+
+    with FixtureSites() as sites:
+        yield sites
