@@ -187,3 +187,35 @@ def test_mark_stale_handles_verified(engine, clean):
     k.set_status(fid, "verified", cause="review")
     assert k.mark_stale(fid) and k.get(fid)[3].status == "stale"
     assert not k.mark_stale(fid)
+
+
+def test_annotate_records_its_cause(engine, clean):
+    k = SqlKnowledge(engine, "pai")
+    fid = k.upsert("programme", "p", "f", fact())
+    k.annotate(fid, conflict_note="other value seen", cause="monitor", cause_ref="mon:1", actor="os.monitor")
+    last = k.revisions(fid)[-1]
+    assert (last.action, last.cause, last.cause_ref, last.actor) == ("change", "monitor", "mon:1", "os.monitor")
+
+
+def test_other_tenant_cannot_confirm_or_set_status(engine, clean):
+    fid = SqlKnowledge(engine, "pai").upsert("programme", "p", "f", fact("unconfirmed"))
+    other = SqlKnowledge(engine, "other")
+    with pytest.raises(KeyError):
+        other.confirm(fid, value="x", quote="q", url="https://a.test/x", status="confirmed")
+    with pytest.raises(KeyError):
+        other.set_status(fid, "unconfirmed", cause="manual")
+
+
+def test_upsert_after_lost_insert_race_is_a_change(engine, clean, monkeypatch):
+    k = SqlKnowledge(engine, "pai")
+    k.upsert("programme", "p", "f", fact(value="first"))
+    real = SqlKnowledge._keyed
+    calls = {"n": 0}
+
+    def first_miss(self, conn, *a):  # the first lookup misses, as if a concurrent insert had not committed yet
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(self, conn, *a)
+
+    monkeypatch.setattr(SqlKnowledge, "_keyed", first_miss)
+    fid = k.upsert("programme", "p", "f", fact(value="second"))
+    assert [r.action for r in k.revisions(fid)] == ["insert", "change"]
