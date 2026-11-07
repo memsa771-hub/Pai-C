@@ -163,8 +163,20 @@ def world(engine, clean, os_db, tmp_path, monkeypatch):
                                aliases=(), start_urls=(f"https://example.org/{ref}",), official_domains=("example.org",)))
     with engine.begin() as conn:
         conn.execute(insert(models.modules).values(module="counsellor", tenant_id=TENANT, enabled=True))
+    inflate = {"on": False}
+
+    def facts(ref):
+        """The real StudentFacts; with `inflate` on, a mark of 1000 reads 1200 (the Vault itself refuses to hold a mark
+        above its total, so the OS's own check is shown the one way it can arise: a reading the Vault would not accept)."""
+        built = bridge.student_facts(ref)
+        if built and inflate["on"]:
+            for f in built["facts"]:
+                if f["key"] == INTER_MARKS and f["value"] == 1000:
+                    f["value"] = 1200
+        return built
+
     ports.configure(os_svc, choice_enabled=bridge.choice_enabled, choice_sink=bridge.request_choice,
-                    choice_sink_enabled=bridge.choice_enabled, student_facts=bridge.student_facts,
+                    choice_sink_enabled=bridge.choice_enabled, student_facts=facts,
                     document_files=bridge.document_file_bytes, documents_enabled=bridge.documents_enabled,
                     on_document_deleted=bridge.on_os_document_deleted, fact_conflicts=bridge.fact_conflicts,
                     fact_answer=bridge.answer_fact_question)  # no post-commit hooks: the sweeps deliver
@@ -180,7 +192,7 @@ def world(engine, clean, os_db, tmp_path, monkeypatch):
                           clock=lambda: clock.now, escalations=os_svc.escalations)
     try:
         yield SimpleNamespace(svc=os_svc, engine=engine, os_db=os_db, settings=settings, kb=kb, box=clock, fake=fake,
-                              replanner=replanner, books=books, client=None)
+                              replanner=replanner, books=books, client=None, inflate=inflate)
     finally:
         storage._store = previous
         ports.configure(None)
@@ -277,8 +289,8 @@ class Student:
                 models.student_requests.c.student_ref == self.id).order_by(models.student_requests.c.id))
                 if status is None or r.status == status]
 
-    def row_of(self, need_ref, status="open"):
-        (found,) = [r for r in self.rows(status) if r.need_ref == need_ref]
+    def row_of(self, need_ref, status="open", kind=None):
+        (found,) = [r for r in self.rows(status) if r.need_ref == need_ref and (kind is None or r.kind == kind)]
         return found
 
     # -- the Vault
@@ -802,4 +814,50 @@ def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault
             assert bridge.deliver_pending(db, s.id)["failed"] == 0
         assert s.record_with("gpa")["result"]["gpa"] == 3.4
         closed_everywhere(world, s, asked, plan_id, reminders)
+        s.throughout()
+
+
+# --- an impossible value: marks above their total ---------------------------------------------------------------------
+
+
+def test_an_impossible_value_is_asked_and_the_new_value_goes_to_the_vault(world):
+    from app.os.requests import texts
+
+    with signed_in(world, pre_eng()) as s, level("bachelor"):
+        vault((s.client, s.who, s.params))
+        s.before = chat_rows(s.who)
+        (fsc,) = s.records()
+        choose(s, world, "PK", ["pk-p1"])
+        plan_id = s.plan_id()
+        ask = f"provide@fact:{INTER_MARKS}:stated"
+        assert s.steps()[ask] == "waiting_student"  # the marks are not held yet
+        # 1. the student tells PAI 1000 of 1100: the request closes and the entry test is free of it
+        s.say("education", {"result": {"marks_obtained": 1000, "marks_total": 1100}}, entities={"record_id": fsc["id"]})
+        assert len(s.done(ask)) == 1 and s.blocked()["entry_test"] != f"awaiting_fact:{INTER_MARKS}"
+        # 2. the OS reads that mark as 1200 of 1100 (see `facts`): the value cannot be right, so it is asked
+        world.inflate["on"] = True
+        tick(world, world.box.today)
+        which = f"which_is_right@fact:{INTER_MARKS}:stated"
+        assert s.steps()[which] == "waiting_student"
+        assert s.blocked()["entry_test"] == f"which_is_right:{INTER_MARKS}"
+        asked = s.request(INTER_MARKS, "which_is_right")
+        assert asked["choices"] == [] and asked["allow_new"] is True and asked["how"] == texts.text("how_impossible")
+        assert s.answer(asked, "current").status_code == 422  # there is no value to keep: only a new one is taken
+        assert s.answer(asked, "new", "abc").status_code == 422
+        assert s.answer(asked, "new", "9999").status_code == 422  # above the total
+        assert s.row_of(INTER_MARKS).kind == "which_is_right"
+        # 3. a new value: the Vault is updated through the reconciler as the student's explicit word, the step is done
+        got = s.answer(asked, "new", "950")
+        assert got.status_code == 200 and got.json() == {"status": "answered"}
+        record = s.record_with("marks_obtained")
+        assert record["result"]["marks_obtained"] == 950 and record["result"]["marks_total"] == 1100
+        assert record["evidence_level"] == "stated"
+        with s.who.factory() as db:
+            written = db.scalars(select(MemoryCandidate).order_by(MemoryCandidate.created_at.desc())).first()
+            assert written.evidence["capture"] == "os_which_is_right" and written.source_type == "user_explicit"
+            assert written.evidence["os_request_id"] == asked["id"]
+        assert len(s.done(which)) == 1 and which not in s.steps()
+        assert s.row_of(INTER_MARKS, "answered", "which_is_right").closed_cause == "request_answered"
+        assert not any((b or "").startswith("which_is_right:") for b in s.blocked().values())
+        assert s.requests("open", "which_is_right") == []
         s.throughout()
