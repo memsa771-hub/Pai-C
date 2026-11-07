@@ -5,7 +5,8 @@ the steps the compiler has built (after conditions and overrides) and adds, for 
 
 - `provide@<kind>:<ref>:<level>` when it is missing or too weak, dated backwards from the steps that need it. One per
   ref at the lowest unmet level a live step needs, so typing the marks closes "tell us" and then opens "upload";
-- `which_is_right@fact:<ref>:<level>` when the Vault, a document or a limit puts it in question (no provide step then);
+- `which_is_right@<fact|document>:<ref>:<level>` when the Vault, a document or a limit puts it in question (no
+  provide step then; a document is asked the same way as a fact);
 - `result_expected@fact:<ref>` before the provide step while the route's calendar says the result is not out yet.
 
 Every step with an unmet or doubtful need gets a hard edge to that request and a `blocked_reason`
@@ -87,15 +88,13 @@ def expand(insts: dict[str, _Inst], playbook: Playbook, student: StudentState, r
         ask = playbook.asks[ref]
         highest = max((n.evidence for _, n in steps), key=RANK.__getitem__)
         if student.question(kind, ref) is not None:  # two sources disagree, or the value cannot be: ask which (R-21)
-            request = ""
-            if kind == "fact":
-                request = keys.make(keys.WHICH_IS_RIGHT, kind, ref, highest)
-                insts[request] = _request(request, keys.WHICH_IS_RIGHT, "student.choose", "choose",
-                                          ask.which_is_right or "", ask, playbook.default_timezone)
+            request = keys.make(keys.WHICH_IS_RIGHT, kind, ref, highest)  # a fact or a document: both get the step
+            title = ask.which_is_right or getattr(ask, highest)  # a document's ask need not word the question
+            insts[request] = _request(request, keys.WHICH_IS_RIGHT, "student.choose", "choose", title or "", ask,
+                                      playbook.default_timezone)
             link([i for i, _ in steps], request, DOUBT, ref)
             continue
-        if kind == "fact":
-            answered.add(keys.make(keys.WHICH_IS_RIGHT, kind, ref, highest))
+        answered.add(keys.make(keys.WHICH_IS_RIGHT, kind, ref, highest))
         unmet = [(i, n) for i, n in steps if not _met(student, n)]
         answered.update(keys.make(keys.PROVIDE, kind, ref, n.evidence) for _, n in steps if _met(student, n))
         if not unmet:

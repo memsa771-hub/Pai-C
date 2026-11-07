@@ -43,6 +43,7 @@ _EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", 
                 "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
 _STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
 _QUIET = "os_event_quiet"  # conn.info flag: set while a new plan is first promoted
+_ANSWERABLE = frozenset({S.PENDING, S.BLOCKED, S.READY, S.WAITING_STUDENT})  # unstarted or open student steps
 _MUTE = "os_event_mute"  # conn.info flag: the event is recorded but the student is told nothing
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
 
@@ -527,9 +528,20 @@ class Kernel:
         for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
             # Renamed so the key is free: if the task comes back later it is a fresh task (review C2).
-            if key in answered and row.state == S.WAITING_STUDENT:  # P1-T8: the student gave what it asked for
-                self._transition(conn, row, S.DONE, cause="request_answered",
-                                 instance_key=f"{key}{DONE_MARK}{number}")
+            if key in answered and row.kind == "student" and row.state in _ANSWERABLE:
+                # P1-T8: the student gave what it asked for, so the request is done, not cancelled. A step still
+                # pending (behind a "result expected" step) has not been asked yet: it takes the short way through
+                # ready and waiting, under its new key so no "student needed" notice is written for it.
+                renamed = f"{key}{DONE_MARK}{number}"
+                if row.state != S.WAITING_STUDENT:
+                    if row.state != S.READY:
+                        row = self._transition(conn, row, S.READY, cause=cause, instance_key=renamed)
+                        row = self._transition(conn, row, S.WAITING_STUDENT, cause=cause)
+                    else:
+                        row = self._transition(conn, row, S.WAITING_STUDENT, cause=cause, instance_key=renamed)
+                    self._transition(conn, row, S.DONE, cause="request_answered")
+                else:
+                    self._transition(conn, row, S.DONE, cause="request_answered", instance_key=renamed)
             else:
                 self._transition(conn, row, S.CANCELLED, cause=cause,
                                  instance_key=f"{key}{CANCELLED_MARK}{number}")

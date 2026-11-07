@@ -19,7 +19,7 @@ from app.os.documents.store import DocumentStore, FindingStore
 from app.os.knowledge import Fact, SqlKnowledge
 from app.os.outbox import Outbox
 from app.os.playbooks import load_playbook_dir
-from app.os.ports import fact_questions
+from app.os.ports import fact_proposals, fact_questions
 from app.os.replan.apply import Replanner
 from app.os.replan.config import load_replan_configs
 from app.os.replan.events import pending
@@ -271,3 +271,64 @@ def test_refresh_never_raises(world, monkeypatch):
 
     monkeypatch.setattr(world.svc.plans, "recompile", boom)
     assert refresh(world.svc, "stu-1", "document_changed") == 0
+
+
+def test_a_failing_adapter_never_turns_a_saved_document_change_into_an_error(api, world, engine, monkeypatch):
+    """Confirm, resolve and delete answer as they do today when the host's adapter raises (no 500), and the T7
+    proposal nudge still runs on confirm. The log names the error type only."""
+    import logging
+
+    world.vault["stu-1"] = facts_of("stu-1", 1, **{INTER_MARKS: (800, "stated")})
+    world.svc.plans.start_plan(contract())
+    agree(api)
+    doc_id = api.post("/v1/os/documents", data={"doc_type": "hssc_certificate"},
+                      files={"file": ("a.jpg", jpeg(), "image/jpeg")}, headers=as_student()).json()["id"]
+    simulate_read(engine, doc_id, "hssc_certificate", HSSC)
+    other = api.post("/v1/os/documents", data={"doc_type": "ssc_certificate"},
+                     files={"file": ("b.jpg", jpeg(2), "image/jpeg")}, headers=as_student()).json()["id"]
+    nudged = []
+    monkeypatch.setattr(fact_proposals, "notify", lambda key: nudged.append(key))
+    logged = []
+    handler = logging.Handler()
+    handler.emit = lambda record: logged.append(record.getMessage())
+    logging.getLogger("app.os.requests.refresh").addHandler(handler)
+
+    def boom(ref):
+        raise RuntimeError("secret value 123")
+
+    ports.configure(world.svc, student_facts=boom)  # from here on the host's adapter raises
+
+    r = api.post(f"/v1/os/documents/{doc_id}/confirm", json=confirm_body("hssc_certificate", HSSC), headers=as_student())
+    assert r.status_code == 200, r.text
+    assert len(nudged) == 1  # the T7 nudge still ran after the failed refresh
+
+    a, b = (DocumentStore(engine, TENANT).create("stu-1", t, 1, f"{t}.jpg", "image/jpeg", jpeg(n))
+            for t, n in (("hssc_certificate", 7), ("ssc_certificate", 8)))
+    FindingStore(engine, TENANT).replace_open("stu-1", [{"kind": "mismatch", "field": "father_name",
+                                                        "items": [(a, "Ahmed Khan"), (b, "Rashid Khan")]}])
+    [finding] = FindingStore(engine, TENANT).list_open("stu-1")
+    r = api.post(f"/v1/os/documents/findings/{finding['id']}/resolve", json={"value": "Ahmed Khan"},
+                 headers=as_student())
+    assert r.status_code == 200 and r.json()["status"] == "resolved"
+
+    assert api.delete(f"/v1/os/documents/{other}", headers=as_student()).status_code == 204
+    assert len(logged) == 3 and all("RuntimeError" in m for m in logged)
+    assert not [m for m in logged if "secret" in m or "123" in m]
+
+
+def test_admin_upgrade_endpoint_moves_a_v1_plan_to_v2_when_the_gate_is_on(api, world, engine):
+    plan_id = world.svc.plans.start_plan(contract()).plan_id  # the gate was off: v1
+    admin = {"X-OS-Admin-Token": TOKEN}
+    assert api.post(f"/v1/os/plans/{plan_id}/upgrade", headers=admin).status_code == 409  # gate off: nothing newer
+    assert pin(engine, plan_id) == 1
+    world.vault["stu-1"] = facts_of("stu-1", 1)  # now it is on
+    r = api.post(f"/v1/os/plans/{plan_id}/upgrade", headers=admin)
+    assert r.status_code == 200 and r.json()["revision"], r.text
+    assert pin(engine, plan_id) == 2
+    assert f"provide@fact:{INTER_MARKS}:stated" in keys_of(engine, plan_id)
+    again = api.post(f"/v1/os/plans/{plan_id}/upgrade", headers=admin)
+    assert again.status_code == 409 and "nothing newer" in again.json()["detail"]  # never again, never back
+    world.vault.clear()  # the gate goes off: a v2 plan is not sent back to v1
+    assert api.post(f"/v1/os/plans/{plan_id}/upgrade", headers=admin).status_code == 409
+    assert pin(engine, plan_id) == 2
+    assert api.post(f"/v1/os/plans/{plan_id}/upgrade").status_code in (401, 403)  # not without the admin token

@@ -192,6 +192,23 @@ def test_scale_pairs_come_from_document_types_and_limits():
 
 
 @pytest.mark.req("R-21")
+def test_document_conflict_gets_a_which_is_right_step_that_blocks_the_needing_steps():
+    state = StudentState(facts={"education.intermediate.marks_obtained": "stated"},
+                         documents={"hssc_certificate": "confirmed"},
+                         questions={"document:hssc_certificate": QuestionRef("documents", "finding:3")})
+    d = build(state, BS2, level="bachelor")
+    ask, merit_list = task(d, "which_is_right@document:hssc_certificate:shown"), task(d, "merit_list@p1")
+    assert (ask.instance_key, True) in merit_list.depends_on
+    assert merit_list.blocked_reason == "which_is_right:hssc_certificate"
+    assert ask.latest_finish == merit_list.latest_start  # dated backwards from the step it blocks
+    # answered: the conflict goes, the step and the block go, and the question counts as answered
+    done = build(StudentState(facts=state.facts, documents=state.documents), BS2, level="bachelor")
+    assert "which_is_right@document:hssc_certificate:shown" in done.answered
+    assert "which_is_right@document:hssc_certificate:shown" not in keys_of(done)
+    assert task(done, "merit_list@p1").blocked_reason != "which_is_right:hssc_certificate"
+
+
+@pytest.mark.req("R-21")
 def test_mismatch_finding_blocks_steps_needing_those_documents():
     state = StudentState(facts={"education.intermediate.marks_obtained": "stated"},
                          documents={"hssc_certificate": "confirmed"},
@@ -199,7 +216,12 @@ def test_mismatch_finding_blocks_steps_needing_those_documents():
     d = build(state, BS2, level="bachelor")
     assert task(d, "merit_list@p1").blocked_reason == "which_is_right:hssc_certificate"
     assert task(d, "entry_test").blocked_reason is None  # it needs a fact, not that document
-    assert not [k for k in keys_of(d) if "hssc_certificate" in k]  # the finding is answered where it is shown
+    # D-w5 (controller ruling, fix round 1): a document in question gets its which_is_right step too, as a fact does
+    ask = task(d, "which_is_right@document:hssc_certificate:shown")
+    assert (ask.task_type, ask.kind, ask.inbox_kind) == ("student.choose", "student", "choose")
+    assert ask.title  # from the ask, or the ask's own title for the level when the book gives no which_is_right
+    assert not [k for k in keys_of(d) if k.startswith("provide@document:hssc_certificate")]  # none while in question
+    assert not [k for k in d.answered if k.startswith("which_is_right@document:hssc_certificate")]
 
 
 def test_a_step_with_its_own_block_keeps_it():
@@ -241,8 +263,10 @@ def test_germany_v2_needs_ignored_without_student_state_equals_v1_without_school
     assert a.tasks == b.tasks and b.answered == ()
 
 
-def test_compile_without_student_is_todays_compile():
-    """A book without needs ignores any student state, and `student=None` is the default: the draft is the same."""
+def test_student_none_omitted_and_empty_state_compile_the_same_for_books_without_needs():
+    """Only what it says: for a book without needs, omitting `student`, passing None and passing an empty state give
+    one draft with `answered == ()`. It does not prove the draft equals the one the compiler gave before T8; that
+    proof is `test_compiler.py`, `test_golden.py` and `test_kernel.py`, which pass unchanged."""
     germany = load_playbook_dir(PLAYBOOK_DIR)[("germany_master", 1)]
     c = RouteContract.model_validate({
         "contract_version": "1", "source": "self_serve", "external_ref": "g", "student_ref": "stu-1",
@@ -281,3 +305,20 @@ def test_the_request_steps_have_the_asks_citations_when_a_route_requires_them():
     assert all(t.citations for t in asked)
     uncited = {t.instance_key for t in d.tasks if t.kind == "student" and not t.citations}
     assert not uncited & {t.instance_key for t in asked}
+
+
+@pytest.mark.req("R-21")
+def test_a_document_which_is_right_step_has_the_asks_citations():
+    germany = load_playbook_dir(PLAYBOOK_DIR)[("germany_master", 2)]
+    c = RouteContract.model_validate({
+        "contract_version": "1", "source": "self_serve", "external_ref": "g", "student_ref": "stu-1",
+        "origin_country": "PK", "destination_country": "DE", "level": "master",
+        "target_intake": {"term": "winter", "year": 2027},
+        "programmes": [{"programme_ref": "tu-x", "rank": 1}]})
+    state = StudentState(documents={"ssc_certificate": "confirmed", "hssc_certificate": "confirmed"},
+                         questions={"document:ssc_certificate": QuestionRef("documents", "finding:1")})
+    d = compile_plan(c, germany, {}, {}, TODAY, student=state)
+    ask = task(d, "which_is_right@document:ssc_certificate:shown")
+    given = [c.model_dump(mode="json") for c in germany.asks["ssc_certificate"].citations]
+    assert list(ask.citations) == given and given
+    assert ask.title

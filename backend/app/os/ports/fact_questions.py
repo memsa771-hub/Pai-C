@@ -37,9 +37,9 @@ def load(spec: str) -> ConflictsSource:
     try:
         found = getattr(importlib.import_module(module_path), name)
     except (ImportError, AttributeError) as e:
-        raise FactQuestionsSourceError(f"OS_FACT_CONFLICTS {spec!r} cannot be imported ({type(e).__name__})") from None
+        raise FactQuestionsSourceError(f"OS_FACT_CONFLICTS cannot be imported ({type(e).__name__})") from None
     if not callable(found):
-        raise FactQuestionsSourceError(f"OS_FACT_CONFLICTS {spec!r} is not callable")
+        raise FactQuestionsSourceError("OS_FACT_CONFLICTS is not callable")
     return found
 
 

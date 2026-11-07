@@ -113,3 +113,24 @@ def test_same_state_same_draft_makes_no_revision(engine, clean):
     assert k.revise(ref.plan_id, "deadline_recompute", compiled(NOTHING)) is None
     k.revise(ref.plan_id, "student_fact_changed", compiled(TYPED))
     assert k.revise(ref.plan_id, "deadline_recompute", compiled(TYPED)) is None
+
+
+def test_answered_pending_step_closes_as_done(engine, clean):
+    """The student gives the fact before the result date: the provide step behind the "result expected" step is still
+    pending. It closes as done with cause request_answered, as a waiting step does."""
+    from tests.os.test_compile_needs import CALENDAR
+
+    def calendar(state):
+        return compile_plan(contract(), INTER2, CALENDAR, merit(), date(2027, 3, 1), student=state)
+
+    k = kernel(engine)
+    ref = k.create_plan(contract(), calendar(NOTHING))
+    waits = row(engine, ref.plan_id, f"result_expected@fact:{OBTAINED}")
+    asked = row(engine, ref.plan_id, KEY)
+    assert (asked.state, waits.state) == ("pending", "blocked")  # not asked yet: it waits for the result date
+    assert k.revise(ref.plan_id, "student_fact_changed", calendar(TYPED)) is not None
+    closed = row(engine, ref.plan_id, f"{KEY}#d2")
+    assert (closed.id, closed.state) == (asked.id, "done")
+    assert causes(engine, asked.id)[-1] == "request_answered"
+    gone = row(engine, ref.plan_id, f"result_expected@fact:{OBTAINED}#c2")  # the step that waited is cancelled
+    assert (gone.id, gone.state) == (waits.id, "cancelled")

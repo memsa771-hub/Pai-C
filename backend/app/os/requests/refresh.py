@@ -15,18 +15,23 @@ log = logging.getLogger("app.os.requests.refresh")
 
 
 def refresh(svc, student_ref: str, cause: str) -> int:
-    """How many plans were revised. Nothing happens while the needs gate is off. A plan that cannot be recompiled is
-    logged by error type only and left for the hourly recompile: the caller's own change has already been saved."""
+    """How many plans were revised. Nothing happens while the needs gate is off. It never raises: any failure (the host
+    adapter, an invalid facts document, one plan's recompile) is logged by error type only and left for the hourly
+    recompile, because the caller's own change has already been saved."""
     plans = svc.plans
     tenant = plans.kernel.tenant_id
-    if gate.on(student_ref, engine=plans.engine, tenant_id=tenant) is None:
-        return 0
     P = models.plans
-    with plans.engine.connect() as conn:
-        open_plans = conn.execute(select(P.c.id).where(
-            P.c.tenant_id == tenant, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN)).order_by(P.c.id)
-        ).scalars().all()
     revised = 0
+    try:
+        if gate.on(student_ref, engine=plans.engine, tenant_id=tenant) is None:
+            return 0
+        with plans.engine.connect() as conn:
+            open_plans = conn.execute(select(P.c.id).where(
+                P.c.tenant_id == tenant, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN)).order_by(P.c.id)
+            ).scalars().all()
+    except Exception as e:  # noqa: BLE001  (the host's adapter may fail or answer badly: the saved change stands)
+        log.error("recompile after %s failed before it began (%s)", cause, type(e).__name__)
+        return 0
     for plan_id in open_plans:
         try:
             if plans._pinned(plan_id).declares_needs and plans.recompile(plan_id, cause) is not None:
