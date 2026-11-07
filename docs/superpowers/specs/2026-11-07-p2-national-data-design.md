@@ -1,6 +1,6 @@
 # P2: national data system (phase spec)
 
-Status: **draft for owner review** · 2026-11-07 · Owner: MSAQLAIN
+Status: **approved by the owner** (chat, 2026-11-07) · Owner: MSAQLAIN
 Master spec: `docs/superpowers/specs/2026-11-03-pai-connect-design.md` (§2, §3 R-23–R-35, R-42, R-48, R-60–R-69,
 R-71, R-72, R-74–R-76, R-56–R-59; §6 rows 6.10, 6.20, 6.23–6.25; §7, §8, §9, §12 row P2, §13).
 P1 spec: `docs/superpowers/specs/2026-11-04-p1-connection-core-design.md`. P1 handoff: `docs/connect/handoff/p1-handoff.md` (P1 signed off 2026-11-07). Visual overview: https://www.figma.com/board/X25QOs43qaDABBYEmzUPxk
@@ -458,3 +458,12 @@ the dashboard's workload figure replaces them.
 - **Q3, the region order:** yes, as proposed.
 - **Q5, the cost cap:** **US$20** for P2's live calls (not the $25 default).
 - **Q6, starting early:** yes. P1 is now signed off, so nothing waits on it any more.
+
+### 11.2 Owner rulings at approval (chat, 2026-11-07)
+- **The spec is approved and building starts.**
+- **Checkers (Q2): "AI checks are enough."**
+  - For the P2 gate items that ask for two people (items 3, 5 and 7), an independent AI check 1 and AI check 2 count as the two checks, and the owner accepts them. This also covers the `not_readable` collection and the answer keys.
+  - This deviates from master R-25 and R-42, which say "a person checks and a second person approves". It is recorded in the P2 handoff as an owner decision.
+  - The rule that the two checks must be independent stays: check 2 never sees check 1's verdict before it gives its own.
+  - The review queue keeps reviewer identities (P2-D15), so people can take over later without changing the code.
+- **Q4 (the A-level denominator)** takes the default.
