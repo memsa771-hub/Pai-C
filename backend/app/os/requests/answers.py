@@ -41,8 +41,11 @@ class Choices:
 
 def _kind(value: dict) -> str:
     """Where the value comes from. The host says "from a document" or not; it does not say whether a stated value was
-    said in the chat or typed on the profile page, so a stated one is simply "vault" (saved in PAI): never a guess."""
-    return "document" if value.get("document_ref") else "vault"
+    said in the chat or typed on the profile page. So: `document`; else the proposed side is `said` (something the
+    student told PAI, channel unknown: never a guess); else the held value is `vault` (saved in PAI)."""
+    if value.get("document_ref"):
+        return "document"
+    return "said" if value.get("side") == "proposed" else "vault"
 
 
 def seen_token(ref: str, pairs) -> str:
@@ -60,6 +63,8 @@ def question_ref(q: state_mod.QuestionRef) -> str:
 def _from_conflict(conflict, key: str) -> Choices:
     sides = {v.side: v for v in conflict.values}
     labels = {"current": texts.text("current_label"), "proposed": texts.text("proposed_label")}
+    if sides["proposed"].document_ref is None:  # said by the student, not read from a document
+        labels["proposed"] = texts.text("proposed_said_label")
     offered = {_BY_ANSWER[a] for a in conflict.answers}
     seen = seen_token(conflict.ref, [(v.side, v.value) for v in conflict.values])
     out = []

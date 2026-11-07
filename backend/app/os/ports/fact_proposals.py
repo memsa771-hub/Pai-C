@@ -6,14 +6,14 @@ Never a name, a date of birth, a passport value or any field without `fact:`. ID
 
 Gate: the confirmation runs only in the API, where the host configured the port, so `confirm_document` emits only
 while `document_files.enabled()` holds. `pending`, `mark` and `backfill` take no gate: the host's sweep calls them only
-while its part is on, and the OS holds no host flag (the worker never configures `enabled()`). `notify(key)` is the post-commit nudge; the sweep is the backup."""
+while its part is on, and the OS holds no host flag (the host's sweep owns that gate; the worker's `enabled()` is for eligibility). `notify(key)` is the post-commit nudge; the sweep is the backup."""
 
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 
 from pydantic import ValidationError
-from sqlalchemy import Connection, exists, func, select, update
+from sqlalchemy import Connection, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models, ports
@@ -23,11 +23,11 @@ log = logging.getLogger("app.os.ports.fact_proposals")
 
 CHANNEL = "counsellor"
 TEMPLATE = "fact_proposal"
-BACKFILL_INTAKE = ("planned", "revised", "replaced", "paused")  # a Counsellor decision that reached a plan
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _MAX_TEXT = 200
 OUTCOMES = {"written": "sent", "duplicate": "sent", "refused": "skipped", "invalid": "skipped",
             "superseded": "skipped"}
+_SCAN_PAGE = 500  # documents read per page by `backfill`
 MAX_ATTEMPTS = 5  # failed deliveries before a row is set aside as `failed` (it must not starve newer rows)
 
 _on_proposal: Callable[[str], None] | None = None
@@ -162,6 +162,21 @@ def mark(key: str, outcome: str) -> None:
                              payload={**payload, "outcome": outcome}))
 
 
+def drop_for_document(engine, tenant_id: str, doc_id: int) -> int:
+    """A deleted document's proposals that the Vault has not taken yet are set aside (`skipped`, outcome `deleted`), so
+    a document with no file behind it never reaches the Vault after the student deleted it. Facts the Vault already
+    took stay (owner ruling 6). Returns how many rows were set aside."""
+    O = models.outbox
+    with engine.begin() as conn:
+        rows = conn.execute(select(O.c.idempotency_key, O.c.payload).where(
+            O.c.tenant_id == tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE, O.c.status == "pending",
+            O.c.idempotency_key.like(f"{TEMPLATE}:{int(doc_id)}:%")).with_for_update()).all()
+        for key, payload in rows:
+            conn.execute(update(O).where(O.c.tenant_id == tenant_id, O.c.idempotency_key == key).values(
+                status="skipped", sent_at=func.now(), payload={**payload, "outcome": "deleted"}))
+    return len(rows)
+
+
 def notify(key: str | None) -> None:
     """The post-commit nudge. Never raises: the row is stored and the host's sweep delivers it anyway."""
     if key is None or _on_proposal is None:
@@ -173,37 +188,43 @@ def notify(key: str | None) -> None:
 
 
 def backfill(limit: int = 100) -> int:
-    """Emits for confirmed documents of students with a Counsellor decision that reached a plan and no proposal row yet
-    (a crash between the confirmation and the emit, or a document confirmed before the part was on). Returns how many
-    rows were written. Repeating it writes nothing new."""
+    """Emits for every student's confirmed document that has no proposal row for its current confirmation yet (a crash
+    between the confirmation and the emit, or a document confirmed before the part was on): the same students `emit`
+    covers, with no intake condition. The scan is bounded: documents are read in pages of `_SCAN_PAGE` by id, and it
+    stops once `limit` rows are written. Returns how many rows were written. Repeating it writes nothing new."""
     from app.os.documents.store import DocumentStore
 
     svc = ports.services()
     tenant = svc.settings.tenant_id
-    D, O, I = models.documents, models.outbox, models.counsellor_intake
+    D, O = models.documents, models.outbox
     with_facts = [k for k, t in svc.document_types.items() if any(f.fact for f in t.fields)]
     if not with_facts:
         return 0
-    with svc.engine.connect() as conn:
-        due = conn.execute(select(D.c.id, D.c.confirmed_at).where(
-            D.c.tenant_id == tenant, D.c.status == "confirmed", D.c.doc_type.in_(with_facts),
-            D.c.confirmed_at.is_not(None),
-            exists().where(I.c.tenant_id == tenant, I.c.student_ref == D.c.student_ref,
-                           I.c.status.in_(BACKFILL_INTAKE))).order_by(D.c.id)).all()
-        held = set(conn.execute(select(O.c.idempotency_key).where(
-            O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE)).scalars())
-    # the document's CURRENT key: a failed emit of a re-confirmation is recovered even when an older one is on file
-    ids = [doc_id for doc_id, at in due if key_of(doc_id, at) not in held]
-    store, written = DocumentStore(svc.engine, tenant), 0
-    for doc_id in ids:
-        if written >= limit:
-            break
-        doc = store.get(doc_id)
-        if doc is None or doc.status != "confirmed":
-            continue
-        values = {f["field"]: f["value_confirmed"] for f in store.fields(doc_id)}
-        facts = facts_of(doc, svc.document_types, values)
-        with svc.engine.begin() as conn:
-            if emit(conn, tenant, doc, facts) is not None:
-                written += 1
+    store, written, after = DocumentStore(svc.engine, tenant), 0, 0
+    while written < limit:
+        with svc.engine.connect() as conn:
+            due = conn.execute(select(D.c.id, D.c.confirmed_at).where(
+                D.c.tenant_id == tenant, D.c.status == "confirmed", D.c.doc_type.in_(with_facts),
+                D.c.confirmed_at.is_not(None), D.c.id > after).order_by(D.c.id).limit(_SCAN_PAGE)).all()
+            if not due:
+                break
+            after = due[-1][0]
+            # the document's CURRENT key: a failed emit of a re-confirmation is recovered even when an older one is on file
+            keys = {key_of(doc_id, at): doc_id for doc_id, at in due}
+            held = set(conn.execute(select(O.c.idempotency_key).where(
+                O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+                O.c.idempotency_key.in_(list(keys)))).scalars())
+        for key, doc_id in keys.items():
+            if written >= limit:
+                break
+            if key in held:
+                continue
+            doc = store.get(doc_id)
+            if doc is None or doc.status != "confirmed":
+                continue
+            values = {f["field"]: f["value_confirmed"] for f in store.fields(doc_id)}
+            facts = facts_of(doc, svc.document_types, values)
+            with svc.engine.begin() as conn:
+                if emit(conn, tenant, doc, facts) is not None:
+                    written += 1
     return written

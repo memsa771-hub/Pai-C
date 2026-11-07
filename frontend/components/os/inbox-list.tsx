@@ -25,7 +25,7 @@ import {
 import { statusLabel, type FactStatus } from '@/lib/os-programmes';
 import { factLevel, stepLevel, weakerLevel } from '@/lib/os-my-plan';
 import { FactSource } from './fact-source';
-import { sourceParts, typedValue, type OsRequest, type RequestWords } from '@/lib/os-requests';
+import { isNumeric, sourceParts, typedValue, type OsRequest, type RequestWords } from '@/lib/os-requests';
 import copy from '@/components/counselor/workspace/copy.json';
 import { useMyPlan } from './my-plan-context';
 import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os-self-serve';
@@ -59,6 +59,8 @@ const words = copy.connect.requests as RequestWords;
 function WhichIsRight({ request, busy, onAnswer }: { request: OsRequest; busy: boolean; onAnswer?: InboxListProps['onAnswer'] }) {
   const [typed, setTyped] = useState('');
   const id = `new-${request.id}`;
+  const numeric = isNumeric(request);
+  const value = typedValue(typed, numeric);
   return (
     <div className="mt-2 flex flex-col gap-2">
       {request.choices.map((c) => (
@@ -72,11 +74,11 @@ function WhichIsRight({ request, busy, onAnswer }: { request: OsRequest; busy: b
       ))}
       {request.allow_new && (
         <form className="flex flex-wrap items-end gap-2"
-              onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onAnswer?.(request, 'new', typedValue(typed)); }}>
+              onSubmit={(e) => { e.preventDefault(); if (value !== null) onAnswer?.(request, 'new', value); }}>
           <label htmlFor={id} className="w-full text-xs text-muted-foreground">{request.new_label}</label>
-          <input id={id} value={typed} onChange={(e) => setTyped(e.target.value)} inputMode="decimal" disabled={busy}
+          <input id={id} value={typed} onChange={(e) => setTyped(e.target.value)} inputMode={numeric ? "decimal" : "text"} disabled={busy}
                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" />
-          <Button type="submit" size="sm" disabled={busy || !onAnswer || !typed.trim()}>{words.use}</Button>
+          <Button type="submit" size="sm" disabled={busy || !onAnswer || value === null}>{words.use}</Button>
         </form>
       )}
     </div>

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { I18nProvider } from '@/lib/i18n';
 import { workspaceApi } from '@/lib/api';
+import copy from '@/components/counselor/workspace/copy.json';
 import OsInboxPage from '../../app/[workspaceId]/(os)/os-inbox/page';
 
 vi.mock('@/lib/config', () => ({ OS_UI_ENABLED: true, OS_REHEARSAL_UI: false, OS_FROM_STAGE: 'H' }));
@@ -76,8 +77,64 @@ describe('the inbox page and the requests', () => {
 
   it('no requests endpoint means today\'s inbox', async () => {
     vi.mocked(workspaceApi.getOsRequests).mockResolvedValue(null);
+    vi.mocked(workspaceApi.getOsInboxAll).mockResolvedValue({ items: [{ ...step, instance_key: 'x@1' }], notes: [], proposals: [] } as never);
     show();
     expect(await screen.findByRole('button', { name: 'Confirm' })).toBeTruthy();
     expect(screen.queryByText('Two places say different things.')).toBeNull();
+  });
+
+  it('two clicks on the same answer send one, and the old question stays shut until the list is loaded again', async () => {
+    let finish: (v: { status: 'answered' }) => void = () => {};
+    vi.mocked(workspaceApi.answerOsRequest).mockReturnValue(new Promise((r) => { finish = r; }));
+    show();
+    const button = await screen.findByRole('button', { name: /760/ });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: /770/ }));
+    expect(workspaceApi.answerOsRequest).toHaveBeenCalledTimes(1);
+    finish({ status: 'answered' });
+    await waitFor(() => expect(workspaceApi.getOsInboxAll).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect((screen.getByRole('button', { name: /760/ }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('still_open loads the list again', async () => {
+    vi.mocked(workspaceApi.answerOsRequest).mockResolvedValue({ status: 'still_open' } as never);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /760/ }));
+    await waitFor(() => expect(workspaceApi.getOsInboxAll).toHaveBeenCalledTimes(2));
+  });
+
+  it('a question that is gone says so, loads the list again and moves focus to the message', async () => {
+    vi.mocked(workspaceApi.answerOsRequest).mockRejectedValue(new Error('API 404: {"detail":"Not Found"}'));
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /760/ }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(copy.connect.requests.gone);
+    expect(workspaceApi.getOsInboxAll).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+  });
+
+  it('the inbox and its requests are loaded together: a failed requests call leaves today\'s inbox', async () => {
+    vi.mocked(workspaceApi.getOsRequests).mockRejectedValue(new Error('API 500: boom'));
+    vi.mocked(workspaceApi.getOsInboxAll).mockResolvedValue({ items: [{ ...step, instance_key: 'x@1' }], notes: [], proposals: [] } as never);
+    show();
+    expect(await screen.findByRole('button', { name: 'Confirm' })).toBeTruthy();
+  });
+
+  it('a refused Mark as done shows the server sentence', async () => {
+    vi.mocked(workspaceApi.getOsRequests).mockResolvedValue(null);
+    vi.mocked(workspaceApi.completeOsInboxItem).mockRejectedValue(
+      new Error('API 409: {"detail":"This step closes by itself when PAI has what it needs."}'));
+    vi.mocked(workspaceApi.getOsInboxAll).mockResolvedValue({ items: [{ ...step, instance_key: 'x@1', inbox_kind: 'act' }], notes: [], proposals: [] } as never);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as done' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('This step closes by itself when PAI has what it needs.');
+  });
+
+  it('every word the requests screen needs exists in copy.json', () => {
+    const w = copy.connect.requests as Record<string, unknown>;
+    for (const k of ['use', 'kinds', 'levels', 'asOf', 'pending', 'gone', 'unavailable', 'failed']) expect(w[k]).toBeTruthy();
+    expect(Object.keys(w.kinds as object).sort()).toEqual(['document', 'said', 'vault']);
+    expect(Object.keys(w.levels as object).sort()).toEqual(['confirmed', 'shown', 'stated']);
   });
 });

@@ -127,6 +127,8 @@ def test_a_value_is_comparable_only_with_its_scale_on_both_sides():
     assert both["cgpa"] == "same" and both["cgpa_scale"] == "same"
     assert out({"cgpa": 3.5}, education__bachelor__gpa=3.5, education__bachelor__gpa_scale=5)["cgpa"] == "not_compared"
     assert out({"cgpa": 3.5, "cgpa_scale": 5}, education__bachelor__gpa=3.0)["cgpa"] == "not_compared"  # no Vault scale
+    assert out({"cgpa": 3.5, "cgpa_scale": 5})["cgpa"] == "new"  # the Vault holds neither: nothing to disagree with
+    assert out({"cgpa": 3.5}, education__bachelor__gpa_scale=5)["cgpa"] == "new"
     h = TYPES["hssc_certificate"]
     got = {f["field"]: f["outcome"] for f in compare(h, {"marks_obtained": 900}, facts_obj(
         education__intermediate__marks_obtained=900, education__intermediate__marks_total=1100))}

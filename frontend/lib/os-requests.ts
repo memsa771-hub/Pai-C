@@ -19,8 +19,8 @@ export interface OsChoice {
   choice: string;
   label: string;
   value: string | number;
-  /** A stated value is `vault`; the host does not say chat or profile page. */
-  source: { kind: 'vault' | 'document'; evidence: RequestEvidence; document_ref: string | null; as_of: string | null };
+  /** A held value is `vault`; the proposed side with no document is `said` (chat or profile page: the host does not say). */
+  source: { kind: 'vault' | 'document' | 'said'; evidence: RequestEvidence; document_ref: string | null; as_of: string | null };
 }
 
 export interface OsRequest {
@@ -55,36 +55,64 @@ export function asRequests(body: unknown): OsRequest[] | null {
   return Array.isArray(list) ? (list as OsRequest[]) : null;
 }
 
-/** A typed value as the API takes it: a number when it is one, else the text. */
-export function typedValue(text: string): string | number {
+/** A typed value as the API takes it. `numeric` (the values on the question are numbers): plain decimal digits only,
+ * sent as a number; anything else (hex, exponent, spaces inside) is null. Otherwise the trimmed text. Null = not valid. */
+export function typedValue(text: string, numeric = true): string | number | null {
   const t = text.trim();
-  return t !== '' && Number.isFinite(Number(t)) ? Number(t) : t;
+  if (t === '') return null;
+  if (!numeric) return t;
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null;
 }
 
-/** The parts of the line under a value: where it is held, how sure, and since when. Words come from copy.json. */
+/** Whether the right value is a number: the question shows numbers, or shows none (a value above its total). */
+export function isNumeric(request: OsRequest): boolean {
+  return request.choices.length === 0 || request.choices.some((c) => typeof c.value === 'number');
+}
+
+/** The templates of the steps PAI adds for a need (the inbox item carries no template, only its instance key). */
+const REQUEST_PREFIXES = ['provide@', 'which_is_right@', 'result_expected@'];
+
+/** A step that asks for the student's data, from the request when it is there, else from its key: such a step has no
+ * "Mark as done", also when the requests could not be loaded. */
+export function isRequestItem(item: OsInboxItem): boolean {
+  return !!item.request || REQUEST_PREFIXES.some((p) => item.instance_key.startsWith(p));
+}
+
+/** The parts of the line under a value: where it is held (unless the label already says so), how sure, and since when. */
 export function sourceParts(choice: OsChoice, words: RequestWords, locale = 'en-GB'): string[] {
   const { kind, evidence, as_of } = choice.source;
   const date = as_of ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(as_of)) : null;
-  return [words.kinds[kind], evidence !== 'unknown' ? words.levels[evidence] : null, date ? words.asOf.replace('{date}', date) : null]
+  const where = words.kinds[kind];
+  return [where && where.toLowerCase() !== choice.label.trim().toLowerCase() ? where : null,
+    evidence !== 'unknown' ? words.levels[evidence] : null, date ? words.asOf.replace('{date}', date) : null]
     .filter((p): p is string => !!p);
 }
 
 export interface RequestWords {
   use: string;
-  kinds: Record<'vault' | 'document', string>;
+  kinds: Record<'vault' | 'document' | 'said', string>;
   levels: Record<'stated' | 'shown' | 'confirmed', string>;
   asOf: string;
-  changed: string;
+  pending: string;
+  gone: string;
   unavailable: string;
   failed: string;
 }
 
-/** The sentence for a refused answer: the server's `note` (a changed question), the unavailable line, or a plain one.
- * `reload` is true when the student must look at the list again (the question changed or is already answered). */
+/** The sentence for a refused answer: the server's `note` (a changed question, with the approved sentence), the
+ * unavailable line, "gone" for a 404, or the plain one. `reload` is true when the student must look at the list again. */
 export function answerRefusal(err: unknown, words: RequestWords): { text: string | null; reload: boolean } {
   const r = apiRefusal(err);
-  if (r.status === 409 && r.detail === 'answer_changed') return { text: r.note ?? words.changed, reload: true };
+  if (r.status === 409 && r.detail === 'answer_changed') return { text: r.note ?? words.failed, reload: true };
   if (r.status === 409 && (r.detail === 'already_answered' || r.detail === 'answer_elsewhere')) return { text: null, reload: true };
+  if (r.status === 404) return { text: words.gone, reload: true };
+  if (r.status === 422) return { text: r.note ?? words.failed, reload: false };
   if (r.status === 503) return { text: words.unavailable, reload: false };
   return { text: words.failed, reload: false };
+}
+
+/** The server's sentence for a refused "Mark as done" (409, e.g. `answer_required`), else null. */
+export function completeRefusal(err: unknown): string | null {
+  const r = apiRefusal(err);
+  return r.status === 409 && r.detail ? r.detail : null;
 }

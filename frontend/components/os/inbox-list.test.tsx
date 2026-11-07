@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { InboxList } from './inbox-list';
-import { changeLine, completeActions, type OsInboxItem } from '@/lib/os-inbox';
+import { actionHint, changeLine, completeActions, type OsInboxItem } from '@/lib/os-inbox';
+import copy from '@/components/counselor/workspace/copy.json';
 
 const NOW = new Date('2027-03-10T09:00:00Z');
 
@@ -240,7 +241,8 @@ describe('requests in the inbox (P1-T8 Task 6)', () => {
     expect(saved.textContent).toContain('Saved in PAI');
     expect(saved.textContent).toContain('you told PAI');
     expect(doc.textContent).toContain('760');
-    expect(doc.textContent).toContain('Your document');
+    expect(doc.textContent).not.toContain('Your document');  // the label already says it: not said twice
+    expect(doc.textContent?.match(/From your document/g)).toHaveLength(1);
     expect(doc.textContent).toContain('shown in a document');
     expect(doc.textContent).toContain('1 Feb 2027');
     expect(screen.queryByRole('button', { name: 'Mark as done' })).toBeNull();
@@ -277,5 +279,47 @@ describe('requests in the inbox (P1-T8 Task 6)', () => {
     render(<InboxList items={withRequests([item({ id: 42 })], [impossible])} now={NOW} onComplete={() => {}} onAnswer={() => {}} />);
     expect(screen.getByText(impossible.how)).toBeTruthy();
     expect(screen.getByLabelText('Neither: I will type the right value')).toBeTruthy();
+  });
+
+  // req: R-19
+  it('a request step has no Mark as done also when the requests could not be loaded', () => {
+    const ask = item({ id: 50, instance_key: 'provide@fact:education.matric.marks_obtained:stated', inbox_kind: 'provide' });
+    render(<InboxList items={withRequests([ask], null)} now={NOW} onComplete={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Mark as done' })).toBeNull();
+    expect(screen.queryByText(/Uploading alone/)).toBeNull();
+    expect(screen.getByText(copy.connect.requests.pending)).toBeTruthy();
+    expect(completeActions(ask)).toEqual([]);
+    expect(actionHint(ask)).toBe(copy.connect.requests.pending);
+  });
+
+  // req: R-21
+  it('a value the student told PAI is not called saved or a document', () => {
+    const said = request({ ...which, id: 12, task_id: 43, choices: [choice({}), choice({ choice: 'proposed', label: 'What you told PAI', value: 760,
+      source: { kind: 'said', evidence: 'stated', document_ref: null, as_of: null } })] });
+    render(<InboxList items={withRequests([item({ id: 43 })], [said])} now={NOW} onComplete={() => {}} onAnswer={() => {}} />);
+    const b = screen.getByRole('button', { name: /760/ });
+    expect(b.textContent).toContain('What you told PAI');
+    expect(b.textContent).not.toContain('Saved in PAI');
+    expect(b.textContent?.match(/What you told PAI/g)).toHaveLength(1);  // the kind word repeats the label: left out
+  });
+
+  // req: R-21
+  it('only plain decimal digits are sent as a number, and a text value gets a text keyboard', () => {
+    const onAnswer = vi.fn();
+    render(<InboxList items={withRequests([item({ id: 41 })], [which])} now={NOW} onComplete={() => {}} onAnswer={onAnswer} />);
+    const field = screen.getByLabelText('Neither: I will type the right value') as HTMLInputElement;
+    const use = screen.getByRole('button', { name: 'Use this value' }) as HTMLButtonElement;
+    expect(field.getAttribute('inputmode')).toBe('decimal');
+    for (const bad of ['0x2FA', '1e3', '7 70', '--5']) {
+      fireEvent.change(field, { target: { value: bad } });
+      expect(use.disabled).toBe(true);
+    }
+    fireEvent.change(field, { target: { value: '76.5' } });
+    fireEvent.click(use);
+    expect(onAnswer).toHaveBeenCalledWith(which, 'new', 76.5);
+    cleanup();
+    const text = request({ ...which, choices: which.choices.map((c) => ({ ...c, value: 'Grade B' })) });
+    render(<InboxList items={withRequests([item({ id: 41 })], [text])} now={NOW} onComplete={() => {}} onAnswer={onAnswer} />);
+    expect(screen.getByLabelText('Neither: I will type the right value').getAttribute('inputmode')).toBe('text');
   });
 });

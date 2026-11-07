@@ -51,17 +51,18 @@ def _scale_known(doc_type: DocumentType, name: str, values: Mapping[str, Any], h
 def compare(doc_type: DocumentType, values: Mapping[str, Any], facts: StudentFactsV1) -> list[dict]:
     """One `{"field", "outcome"}` per field of the type, in the type's order. `values` holds the confirmed value of each
     field, else the value as read. Outcomes: `same`, `differs`, `new` (the Vault has no value for it), `not_compared`
-    (the field has no Vault key, the document has no value, or the value's scale is missing on either side)."""
+    (the field has no Vault key, the document has no value, or the Vault holds the value but its scale is missing on
+    either side)."""
     held = {f.key: f.value for f in facts.facts if f.evidence != "unknown" and not _empty(f.value)}
     out = []
     for spec in doc_type.fields:
         mine = values.get(spec.name)
         if spec.fact is None or _empty(mine):
             outcome = "not_compared"
+        elif spec.fact not in held:
+            outcome = "new"  # the Vault holds nothing for it, whatever the scale: nothing to disagree with
         elif spec.scale_of is not None and not _scale_known(doc_type, spec.scale_of, values, held):
             outcome = "not_compared"  # a value against another scale or total is not the same fact
-        elif spec.fact not in held:
-            outcome = "new"
         else:
             outcome = "same" if _same(mine, held[spec.fact]) else "differs"
         out.append({"field": spec.name, "outcome": outcome})

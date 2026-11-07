@@ -379,7 +379,10 @@
       "Letters"
     ],
     "privacy": "Only you and PAI can see your documents. Nothing is shared with a university.",
-    "backToFolders": "Back to folders"
+    "backToFolders": "Back to folders",
+    "readThis": "Let PAI read this",
+    "readThisType": "What is this file?",
+    "readThisHelp": "Say what this file is, and PAI will read it and ask you to check what it found."
   },
   "settings": {
     "intro": "Your account, how PAI looks and sounds, and your data.",
@@ -975,10 +978,11 @@
     },
     "requests": {
       "use": "Use this value",
-      "kinds": { "vault": "Saved in PAI", "document": "Your document" },
+      "kinds": { "vault": "Saved in PAI", "document": "From your document", "said": "What you told PAI" },
       "levels": { "stated": "you told PAI", "shown": "shown in a document", "confirmed": "you confirmed it" },
       "asOf": "as of {date}",
-      "changed": "This question changed while you were looking at it. Look at it again and choose once more.",
+      "pending": "This step closes by itself when PAI has what it needs.",
+      "gone": "That question is no longer there. Your list has been updated.",
       "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
       "failed": "That did not save. Please try again."
     },

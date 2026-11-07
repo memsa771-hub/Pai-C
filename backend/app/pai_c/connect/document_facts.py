@@ -130,10 +130,21 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
                 **({"os_document_id": int(match.group(1))} if match else {}),
                 **({"authority": authority, "file_id": file_id, "filename": filename} if file_id else {})}
     candidates, ids = MemoryCandidateService(db), []
-    earlier = _earlier_values(db, workspace_id, match)
+    earlier = _latest_earlier(db, workspace_id, match)
 
-    def propose(key_, value, entities=None, correction=False):
-        if (key_, _flat(value)) in earlier:  # the same confirmed values again: no second set of candidates
+    def propose(key_, value, entities=None, correction=False, current=None):
+        """`current`: the flat value of the record this fact would change, only when that record's evidence names
+        this very OS document. A re-confirm equal to what is pending or current is dropped; a return to an earlier
+        value (900, 910, 900) is not equal to it, so it goes through."""
+        last = earlier.get(_identity(key_, value, entities))
+        flat = _flat(value)
+        if last is not None and last[1] == "pending":  # an earlier confirmation not yet applied is the newest word
+            if last[0] == flat:
+                return
+        elif current is not None:
+            if current == flat:
+                return
+        elif last is not None and last[0] == flat:  # the record cannot be read: the latest earlier proposal decides
             return
         if correction:
             # The Vault's value came from this same document: the student is correcting their own earlier
@@ -160,8 +171,10 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     for family in sorted(education):
         existing = _record_id(records, family)
         if existing:
-            propose("education", {"result": education[family]}, {"record_id": existing},
-                    correction=own(chosen.get(family)))
+            row = chosen.get(family)
+            propose("education", {"result": education[family]}, {"record_id": existing}, correction=own(row),
+                    current=_flat({"result": {f: (row.get("result") or {}).get(f) for f in education[family]}})
+                    if own(row) else None)
         else:
             propose("education", {"qualification_name": _data()["new_record_code"][family],
                                   "result": education[family]})
@@ -169,7 +182,9 @@ def apply(db, proposal: dict) -> tuple[str, list[str]]:
     for code in sorted(tests):
         mine = next((r for r in attempts if own(r) and _test_code(r.get("test_type")) == code), None)
         propose("test_attempt", {"test_type": code, "overall_score": tests[code]},
-                {"record_id": mine["id"]} if mine else None, correction=mine is not None)
+                {"record_id": mine["id"]} if mine else None, correction=mine is not None,
+                current=_flat({"test_type": code, "overall_score": _number(mine.get("overall_score"))})
+                if mine else None)
     db.add(models.DocumentProposal(key=key, workspace_id=workspace_id, file_id=file_id, candidate_ids=ids))
     if not ids:  # every fact was already proposed from this document
         db.flush()
@@ -188,20 +203,30 @@ def _test_code(text) -> str | None:
     return vault_catalog().choice_code("tests", text) or re.sub(r"[^a-z0-9]+", "_", text.casefold()).strip("_") or None
 
 
-def _earlier_values(db, workspace_id: str, match) -> list:
-    """`(candidate key, proposed value)` of every candidate an earlier proposal for the same OS document made."""
+def _identity(key, value, entities) -> tuple:
+    """What a candidate is about: the test, the education record it changes, or the new qualification."""
+    value = value or {}
+    return (key, str(value.get("test_type") or (entities or {}).get("record_id") or value.get("qualification_name")
+                     or ""))
+
+
+def _latest_earlier(db, workspace_id: str, match) -> dict:
+    """`identity -> (flat value, candidate status)` of the most recent candidate an earlier proposal for the same OS
+    document made about that thing. Only the latest counts, so a return to an older value is not a repeat."""
     from app import models
 
     if match is None:
-        return []
+        return {}
     rows = db.scalars(select(models.DocumentProposal).where(
         models.DocumentProposal.workspace_id == workspace_id,
         models.DocumentProposal.key.like(f"fact_proposal:{int(match.group(1))}:%"))).all()
     ids = [i for row in rows for i in (row.candidate_ids or [])]
     if not ids:
-        return []
-    found = db.scalars(select(models.MemoryCandidate).where(models.MemoryCandidate.id.in_(ids))).all()
-    return [(c.key, _flat((c.proposed_value or {}).get("value"))) for c in found]
+        return {}
+    found = db.scalars(select(models.MemoryCandidate).where(models.MemoryCandidate.id.in_(ids))
+                       .order_by(models.MemoryCandidate.created_at, models.MemoryCandidate.id)).all()
+    return {_identity(c.key, (c.proposed_value or {}).get("value"), c.entities):
+            (_flat((c.proposed_value or {}).get("value")), c.status) for c in found}  # later rows replace earlier
 
 
 def _flat(value, path: str = "") -> tuple:
