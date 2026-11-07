@@ -1,0 +1,23 @@
+# H3, Azad Jammu and Kashmir part. Researched by Claude, 2026-11-07. Check 2 v2 recomputed every count.
+region: azad_jammu_and_kashmir
+retrieved: 2026-11-07
+lists:
+  - {id: ajk-hed-postgraduate-colleges, body: HED AJ&K, name: Post Graduate Colleges, url: "https://hed.ajk.gov.pk/post-graduate-colleges/", institution_type: public_college, family: intermediate, date: null, row_count: 14, count_quote: null, count_method: counted table rows (serials 1-14), check2: correct}
+  - {id: ajk-hed-degree-colleges, body: HED AJ&K, name: Degree Colleges, url: "https://hed.ajk.gov.pk/degree-colleges/", institution_type: public_college, family: intermediate, date: null, row_count: 75, count_quote: null, count_method: counted table rows (serials 1-75), check2: correct}
+  - {id: ajk-hed-model-science-colleges, body: HED AJ&K, name: Model Science Colleges, url: "https://hed.ajk.gov.pk/model-science-colleges/", institution_type: public_college, family: intermediate, date: null, row_count: 7, count_quote: null, count_method: counted table rows, check2: correct}
+  - {id: ajk-hed-inter-colleges, body: HED AJ&K, name: Inter Colleges, url: "https://hed.ajk.gov.pk/inter-colleges/", institution_type: public_college, family: intermediate, date: null, row_count: 81, count_quote: null, count_method: counted table rows, check2: correct}
+  - {id: hec-recognised-ajk, body: HEC, name: "Recognised Universities (Province = Azad Jammu & Kashmir)", url: "https://www.hec.gov.pk/english/universities/pages/recognised.aspx", institution_type: university_or_dai, family: bachelor, date: null, row_count: 9, count_quote: null, count_method: "counted list items in the HTML (7 public, 2 private)", check2: correct}
+not_found:
+  - what: JAC 2026-27 MBBS/BDS schedule, eligibility and fees as text
+  - what: Private colleges and A-level schools in AJK (P2 §11 Q4)
+domains:
+  - body: Higher Education Department AJ&K
+    domains: [hed.ajk.gov.pk]
+    evidence: "page header 'Higher Education Department Govt. of Azad Jammu & Kashmir'"
+  - body: Joint Admission Committee AJ&K
+    domains: [jac.ajk.gov.pk]
+    evidence: "page text 'Joint Admission Committee AJ&K Admission portal'"
+  - body: AJK BISE Mirpur
+    domains: [ajkbise.net]
+    status: suspect   # R-71: home page carries injected gambling spam ('situs toto', 'slot gacor') on 2026-11-07
+    note: a person must confirm the board's real domain before anything is taken from it
