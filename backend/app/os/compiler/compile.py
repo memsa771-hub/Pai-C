@@ -14,6 +14,7 @@ from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.knowledge import Fact
 from app.os.playbooks import Playbook, TaskTemplate
+from app.os.requests.state import StudentState
 
 CONFIRM_TYPE = "knowledge.confirm_fact"
 # A derived date's note names its month in English whatever the process locale (strftime's %B follows it).
@@ -60,6 +61,9 @@ class PlanDraft:
     playbook_version: int
     tasks: tuple[DraftTask, ...]
     at_risk: bool
+    # P1-T8: the request keys (`provide@...`, `which_is_right@...`) this draft considers answered, so the kernel closes
+    # a waiting one as done instead of cancelled. Empty for every plan compiled without the student's state.
+    answered: tuple[str, ...] = ()
 
 
 @dataclass
@@ -79,6 +83,10 @@ class _Inst:
     tz: str = ""
     citations: list[dict] = field(default_factory=list)
     fact_refs: list[tuple[str, str, str]] = field(default_factory=list)
+    # a step PAI adds for a missing fact has no template (P1-T8): its words, its template key and its own duration
+    title: str | None = None
+    template: str | None = None
+    days: int | None = None
 
 
 def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
@@ -91,6 +99,9 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
                 target.add(name)
         if t.anchor:  # an anchor on a chosen programme reads that programme's fact (Slice 9 Task 11, F1)
             (programme if t.anchor.programme else target).add(t.anchor.fact)
+    for ask in playbook.asks.values():  # P1-T8: the calendar fact of a result still to come (R-20)
+        if ask.expected:
+            route.add(ask.expected.fact)
     return route, programme
 
 
@@ -213,13 +224,17 @@ def compile_plan(
     overrides: Sequence = (),
     chosen: Mapping[str, str | None] | None = None,
     excluded: Mapping[str, Collection[str]] | None = None,
+    student: StudentState | None = None,
 ) -> PlanDraft:
     """`overrides`: a replan's plan overrides (Slice 7 S7-D5), each with `op`, `target` and `payload`, applied after
     the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored.
     `chosen`: the programme the student chose for a purpose, by the name an `anchor.programme` uses ("visa": the
     programme the visa file is for), or None while there is none (Slice 9 Task 11, F1). `excluded`: by the same name,
     programmes that are never the source while nothing is chosen (e.g. one that said "not admitted" while others
-    did not, or one that did not admit the student while others did)."""
+    did not, or one that did not admit the student while others did).
+    `student`: what the Vault and the documents hold (P1-T8). With it, a playbook's `needs` add the steps that ask for
+    a missing fact or document and block the steps that need it; without it (the default) `needs` are ignored and the
+    draft is exactly what it was before."""
     chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     removed = {o.target for o in overrides if o.op == "cancel_programme"}
@@ -335,6 +350,13 @@ def compile_plan(
 
     _apply_overrides(insts, confirms, overrides)
 
+    answered: tuple[str, ...] = ()
+    if student is not None and playbook.declares_needs:
+        from app.os.compiler import needs  # late: needs reads this module's _Inst
+
+        answered = needs.expand(insts, playbook, student, route_facts, today, playbook.default_timezone,
+                                need_confirm=need_confirm)
+
     for key, (ref, name) in confirms.items():
         insts[key] = _Inst(key=key, tmpl=None, ref=None if ref == route_key else ref, task_type=CONFIRM_TYPE,
                            kind="work", inbox_kind=None, tz=playbook.default_timezone)
@@ -344,6 +366,8 @@ def compile_plan(
     order = _topological(keys, {k: insts[k].deps for k in keys})
 
     def duration(inst: _Inst) -> int:
+        if inst.days is not None:
+            return inst.days
         if inst.tmpl is None:
             return 0
         if inst.tmpl.duration_constant:
@@ -366,9 +390,10 @@ def compile_plan(
     for k in keys:
         inst, n = insts[k], nodes[k]
         t = inst.tmpl
-        title = t.title if t else f"Confirm {inst.fact_refs[0][2]} for {inst.fact_refs[0][1]}"
+        title = t.title if t else inst.title or f"Confirm {inst.fact_refs[0][2]} for {inst.fact_refs[0][1]}"
         tasks.append(DraftTask(
-            instance_key=k, template_key=t.template_key if t else "confirm_fact", task_type=inst.task_type,
+            instance_key=k, template_key=t.template_key if t else inst.template or "confirm_fact",
+            task_type=inst.task_type,
             kind=inst.kind, inbox_kind=inst.inbox_kind, programme_ref=inst.ref, title=title,
             depends_on=tuple(inst.deps), duration_days=n.duration_days, earliest_start=n.earliest_start,
             latest_start=n.latest_start, latest_finish=n.latest_finish, due_tz=inst.tz,
@@ -378,4 +403,4 @@ def compile_plan(
             fact_refs=tuple(dict.fromkeys(inst.fact_refs)),
         ))
     return PlanDraft(playbook_key=playbook.key, playbook_version=playbook.version, tasks=tuple(tasks),
-                     at_risk=any(s < 0 for s in slacks))
+                     at_risk=any(s < 0 for s in slacks), answered=answered)

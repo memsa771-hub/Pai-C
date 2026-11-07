@@ -976,6 +976,16 @@
       "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
       "other": "Your plan could not be kept. Please try again."
     },
+    "requests": {
+      "use": "Use this value",
+      "kinds": { "vault": "Saved in PAI", "document": "From your document", "said": "What you told PAI" },
+      "levels": { "stated": "you told PAI", "shown": "shown in a document", "confirmed": "you confirmed it" },
+      "asOf": "as of {date}",
+      "pending": "This step closes by itself when PAI has what it needs.",
+      "gone": "That question is no longer there. Your list has been updated.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "failed": "That did not save. Please try again."
+    },
     "myPlan": {
       "empty": "Your plan will appear here once you choose a path.",
       "emptyLink": "Go to your journey",

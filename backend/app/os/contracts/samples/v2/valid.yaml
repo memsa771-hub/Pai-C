@@ -10,3 +10,4 @@
 - {file: student_facts.json, contract: student_facts.v1}
 - {file: vault_event.json, contract: vault_event.v1}
 - {file: fact_proposal.json, contract: fact_proposal.v1}
+- {file: fact_conflicts.json, contract: fact_conflicts.v1}

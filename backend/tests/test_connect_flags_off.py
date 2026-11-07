@@ -306,3 +306,24 @@ def test_t7_upload_responses_unchanged(tmp_path, monkeypatch):
         assert run_parse_job(student, file_id)["parsed"] is True
         extract = [p for _, p in jobs(student, "document.extract") if p.get("file_id") == file_id]
         assert extract == [{"file_id": file_id}]  # today's job, unchanged
+
+
+@pytest.mark.req("R-44")
+@pytest.mark.req("R-19")
+def test_t8_plan_steps_unchanged():
+    """P1-T8 Task 6: a plan with no request step (every plan while the needs part is off) answers exactly as before: each
+    step dict equals the one the adapter built before T8 (tests/fixtures/connect/plan_steps_pre_t8.json, captured from
+    commit 7f16bce), and the roadmap bodies equal the fixture captured before the adapter."""
+    import json
+    from pathlib import Path
+
+    from app.pai_c.roadmap import plan_adapter
+    from tests.roadmap_snapshots import walk
+    from tests.test_plan_adapter import STEPS, view_of
+
+    here = Path(__file__).parent / "fixtures" / "connect"
+    before = json.loads((here / "plan_steps_pre_t8.json").read_text())
+    now = json.loads(json.dumps(plan_adapter.steps_of(view_of(STEPS)), default=str, sort_keys=True))
+    assert now == before
+    assert json.dumps(walk(), sort_keys=True) == json.dumps(
+        json.loads((here / "roadmap_pre_adapter.json").read_text()), sort_keys=True)

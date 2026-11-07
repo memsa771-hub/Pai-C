@@ -136,3 +136,121 @@ def test_reprioritise_skips_started_or_dependent_targets():
     moves = [o for o in got if o.op == "reprioritise"]
     assert moves and all(o.before != "language_test" for o in moves)  # never ahead of a step that needs it
     assert got[-1].op == "request_from_student" and replace(s.tasks["certificates"]).critical
+
+
+# --- P1-T8 Task 5 (R-22): the unanswered ladder, rungs 3 and 4 on hand-built plan states ---------------------------
+
+import pytest  # noqa: E402
+
+from app.os.requests import texts as request_texts  # noqa: E402
+
+ASK = "provide@fact:test.key.a:shown"  # a request step the compiler added (route level)
+C = "prog-c"
+
+
+def ladder(*, needing, programmes=(A, B), suggestions=None, held=(), held_in=(), state_of="waiting_student", **extra) -> PlanState:
+    """A plan with one request step and steps that hard-depend on it: `needing` maps a step's key to its place."""
+    tasks = {ASK: row(ASK, state=state_of, deps=())}
+    for key, ref in needing.items():
+        tasks[key] = row(key, ref=ref, deps=[(ASK, True)])
+    tasks.update(extra)
+    return PlanState(plan_id=1, route_key="fake_route", programmes=list(programmes), tasks=tasks,
+                     suggestions=suggestions or {}, playbook_version=2, held=tuple(held), held_in=tuple(held_in))
+
+
+def missing(**kw):
+    return rules_for(ev("document_missing", instance_key=ASK), ladder(**kw), CFG)
+
+
+@pytest.mark.req("R-22")
+def test_request_step_missing_on_some_places_swaps_or_drops_each_place():
+    got = missing(needing={f"apply@{A}": A, f"apply@{B}": B, f"apply@{C}": C}, programmes=(A, B, C, "prog-z"),
+                  suggestions={A: ["prog-d"], B: []})
+    assert got == [SwapProgramme(out_ref=A, in_ref="prog-d", reason=request_texts.text("unanswered_swap")),
+                   CancelProgramme(programme_ref=B, reason=request_texts.text("unanswered_drop")),
+                   CancelProgramme(programme_ref=C, reason=request_texts.text("unanswered_drop"))]
+
+
+@pytest.mark.req("R-22")
+def test_two_places_never_get_the_same_close_match():
+    got = missing(needing={f"apply@{A}": A, f"apply@{B}": B}, programmes=(A, B, C), suggestions={A: ["prog-d"], B: ["prog-d", "prog-e"]})
+    assert [(o.out_ref, o.in_ref) for o in got] == [(A, "prog-d"), (B, "prog-e")]
+
+
+@pytest.mark.req("R-22")
+def test_a_close_match_already_in_the_plan_is_not_offered():
+    got = missing(needing={f"apply@{A}": A}, programmes=(A, B), suggestions={A: [B]})
+    assert [o.op for o in got] == ["cancel_programme"]
+
+
+@pytest.mark.req("R-22")
+def test_every_place_waiting_on_the_request_escalates():
+    got = missing(needing={f"apply@{A}": A, f"apply@{B}": B}, suggestions={A: ["prog-d"], B: ["prog-e"]})
+    assert got == [Escalate(reason=request_texts.text("unanswered_all"))]
+
+
+@pytest.mark.req("R-22")
+def test_a_route_level_step_waiting_on_the_request_escalates():
+    got = missing(needing={"certificates": None}, programmes=(A, B, C))
+    assert got == [Escalate(reason=request_texts.text("unanswered_all"))]
+
+
+@pytest.mark.req("R-22")
+def test_never_fewer_than_min_programmes_left():
+    s = {"needing": {f"apply@{A}": A, f"apply@{B}": B}, "programmes": (A, B, C)}
+    assert [o.op for o in rules_for(ev("document_missing", instance_key=ASK), ladder(**s), CFG)] == [
+        "cancel_programme", "cancel_programme"]  # one place is left: the minimum of 1
+    got = rules_for(ev("document_missing", instance_key=ASK), ladder(**s), ReplanConfig(min_programmes=2))
+    assert got == [Escalate(reason=request_texts.text("unanswered_all"))]  # dropping both would leave 1 < 2
+    swapped = ladder(**s, suggestions={A: ["prog-d"], B: ["prog-e"]})
+    assert [o.op for o in rules_for(ev("document_missing", instance_key=ASK), swapped, ReplanConfig(min_programmes=2))] \
+        == ["swap_programme", "swap_programme"]  # swaps keep the count
+
+
+@pytest.mark.req("R-22")
+def test_a_place_with_a_proposal_already_open_is_not_proposed_again():
+    got = missing(needing={f"apply@{A}": A, f"apply@{B}": B}, programmes=(A, B, C), held=[A])
+    assert [(o.op, o.programme_ref) for o in got] == [("cancel_programme", B)]
+    # every affected place already has a proposal waiting: a person looks at this event too (Ruling problem 11)
+    assert missing(needing={f"apply@{A}": A}, programmes=(A, B, C), held=[A]) == [
+        Escalate(reason=request_texts.text("unanswered_proposed"))]
+
+
+@pytest.mark.req("R-22")
+def test_a_request_step_nobody_waits_on_keeps_the_nudge():
+    got = missing(needing={})
+    assert got == [RequestFromStudent(instance_key=ASK, message=rules.MESSAGE, reason=rules.REASONS["request"])]
+
+
+@pytest.mark.req("R-22")
+def test_a_request_step_that_is_done_does_nothing():
+    assert missing(needing={f"apply@{A}": A}, state_of="done") == []
+
+
+@pytest.mark.req("R-22")
+def test_which_is_right_enters_the_ladder_like_a_provide_step():
+    key = "which_is_right@fact:test.key.a:stated"
+    tasks = {key: row(key, state="waiting_student"), f"apply@{A}": row(f"apply@{A}", ref=A, deps=[(key, True)])}
+    st = PlanState(1, "fake_route", [A, B, C], tasks, {}, 2)
+    got = rules_for(ev("document_missing", instance_key=key), st, CFG)
+    assert [(o.op, o.programme_ref) for o in got] == [("cancel_programme", A)]
+
+
+def test_a_playbook_step_named_like_a_request_is_not_a_request():
+    s = state(provide_documents=row("provide_documents", state="waiting_student"))
+    got = rules_for(ev("document_missing", instance_key="provide_documents"), s, CFG)
+    assert [o.op for o in got] == ["request_from_student"]
+
+
+@pytest.mark.req("R-22")
+def test_a_match_brought_in_by_a_waiting_swap_is_not_offered_again():
+    got = missing(needing={f"apply@{A}": A}, programmes=(A, B, C, "prog-z"), suggestions={A: ["prog-d", "prog-e"]},
+                  held_in=["prog-d"])
+    assert [(o.out_ref, o.in_ref) for o in got] == [(A, "prog-e")]
+
+
+@pytest.mark.req("R-22")
+def test_places_already_taken_out_do_not_count_as_live():
+    # the state the Replanner builds leaves out a place an accepted removal took: only A is live, and it waits
+    got = missing(needing={f"apply@{A}": A}, programmes=(A,))
+    assert got == [Escalate(reason=request_texts.text("unanswered_all"))]

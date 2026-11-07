@@ -121,14 +121,55 @@ class Replanner:
                     and any(op.get("programme_ref") not in firm for op in p.ops):
                 self.proposals.expire_if_pending(p.id)
 
-    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
+    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False,
+              with_held: bool = False, without_need: str | None = None) -> PlanState:
+        """`with_held` is the unanswered ladder's view (P1-T8, R-22): the live places leave out those an accepted removal
+        already took (the contract still lists them), `held` and `held_in` show what proposals wait on, and
+        `without_need` (the request step's key) drops close matches that would wait for the same data."""
         contract, _ = self.plans._contract(plan_id)
         book = self.plans._pinned(plan_id)
         tasks = task_rows(self.engine, self.tenant, plan_id)
-        programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
+        gone = self.overrides.cancelled(plan_id) if with_held else set()
+        programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)
+                      if p.programme_ref not in gone]
         suggestions = {ref: self._suggestions(contract, book, ref) for ref in programmes} if with_suggestions else {}
+        if without_need is not None:
+            suggestions = {ref: [m for m in found if not self._needs_same(plan_id, contract, book, ref, m, without_need)]
+                           for ref, found in suggestions.items()}
+        held, held_in = self.held(plan_id) if with_held else ((), ())
         return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version,
-                         self.below(plan_id) if with_below else ())
+                         self.below(plan_id) if with_below else (), held, held_in)
+
+    def _needs_same(self, plan_id: int, contract, book, out_ref: str, in_ref: str, key: str) -> bool:
+        """Whether the plan, with `in_ref` in the place of `out_ref`, has a step of `in_ref` that hard-depends on the
+        same fact or document as the request step `key`: a close match that waits for the same missing data is no
+        way out. A plan that does not compile with it is not one either."""
+        from app.os.requests import keys
+
+        want = keys.parse(key)
+        swapped = type(contract).model_validate({**contract.model_dump(mode="json"), "programmes": [
+            {**p.model_dump(), "programme_ref": in_ref if p.programme_ref == out_ref else p.programme_ref}
+            for p in contract.programmes]})
+        try:
+            draft = self.plans.compile(swapped, book, plan_id)
+        except CompileError:
+            return True
+        for t in draft.tasks:
+            if t.programme_ref != in_ref:
+                continue
+            for dep, hard in t.depends_on:
+                parsed = keys.parse(dep) if hard else None
+                if parsed is not None and (parsed.need_kind, parsed.ref) == (want.need_kind, want.ref):
+                    return True
+        return False
+
+    def held(self, plan_id: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """(the places, the places brought in) of the swaps and removals that wait for the student (or the Counsellor),
+        so the unanswered ladder does not propose them twice (P1-T8, R-22)."""
+        ops = [op for p in self.proposals.for_plan(plan_id) if p.status in ("pending", "requested") for op in p.ops
+               if op.get("op") in ("swap_programme", "cancel_programme")]
+        out = {op.get("out_ref") or op.get("programme_ref") for op in ops}
+        return tuple(sorted(r for r in out if r)), tuple(sorted(op["in_ref"] for op in ops if op.get("in_ref")))
 
     def _suggestions(self, contract, book, ref: str) -> list[str]:
         """Up to 3 programmes on the route the student likely meets, not in the plan, most confirmed facts first."""

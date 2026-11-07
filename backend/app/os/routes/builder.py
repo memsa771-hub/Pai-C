@@ -19,6 +19,7 @@ from app.os.eligibility.notes import on_profile_change
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import PLAN_OPEN, is_started
 from app.os.knowledge.requests import visible_programmes
+from app.os.playbooks import newest_plain
 from app.os.ports import choice_requests, choice_sink
 from app.os.replan.ops import CancelProgramme, SwapProgramme
 from app.os.replan.lock import plan_lock
@@ -74,10 +75,10 @@ class SwapLimit(NotAllowed):
 
 
 def _route(plans, route_key: str):
-    books = [b for (key, _), b in plans.playbooks.items() if key == route_key]
-    if not books:
+    book = newest_plain(plans.playbooks.values()).get(route_key)
+    if book is None:
         raise NotAllowed(f"unknown route '{route_key}'")
-    return max(books, key=lambda b: b.version)
+    return book
 
 
 def _check_programmes(plans, route_key: str, year: int, refs: list[str]) -> None:

@@ -20,6 +20,7 @@ from app.os.replan.apply import BROKEN_REASON, LIMIT_REASON, REFUSED_REASON
 from app.os.replan.rules import REASONS
 from app.os.replan.run import BUDGET_REASON, INVALID_REASON
 from app.os.replan.store import SupportStore
+from app.os.requests.texts import text as request_text
 
 NOTES_PATH = Path(__file__).with_name("notes.yaml")
 REASON_CODES = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
@@ -28,6 +29,9 @@ _SYSTEM = (LIMIT_REASON, REFUSED_REASON, REASONS["failed"], BUDGET_REASON, INVAL
 # A stale draft (ReplanFailed). A rules hand-over with no Supervisor (HANDOVER_PREFIX) is *not* here: the route
 # problem is still real, so the triggering event decides (final review I1).
 _SYSTEM_PREFIXES = ("The plan kept changing",)
+# The unanswered ladder's support cases (P1-T8, R-22, Ruling problem 11) are for a person at PAI: no Counsellor row,
+# so the plan is not paused and the student is not sent back to choosing.
+_OS_ONLY = (request_text("unanswered_all"), request_text("unanswered_proposed"))
 _BY_EVENT = {"route_invalid": "not_eligible", "admission_rejected": "all_rejected",
              "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap",
              "student_fact_changed": "not_eligible"}  # every place fell below its bar (R-22): the route itself is in doubt
@@ -50,7 +54,7 @@ def reason_for(event_type: str, reason: str) -> str | None:
     """The shared reason for a support case, or None for a system problem (spec §2.5 table)."""
     if reason.startswith(BROKEN_REASON):  # the plan no longer compiles: the route itself does not hold
         return "not_eligible"
-    if reason in _SYSTEM or reason.startswith(_SYSTEM_PREFIXES):
+    if reason in _OS_ONLY or reason in _SYSTEM or reason.startswith(_SYSTEM_PREFIXES):
         return None
     return _BY_EVENT.get(event_type)
 

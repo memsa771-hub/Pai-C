@@ -62,6 +62,22 @@ def test_another_students_step_is_not_yours(os_on, engine):
     assert state(engine, tid) == "waiting_student"
 
 
+@pytest.mark.req("R-18")
+@pytest.mark.parametrize("key", ["provide@fact:education.matric.marks_obtained:stated",
+                                 "which_is_right@document:hssc_certificate:shown"])
+def test_request_step_is_answered_not_ticked(os_on, engine, key):
+    """P1-T8: a step made for a missing or doubtful fact closes when PAI has what it asked for (D-w11)."""
+    from app.os.requests import texts
+
+    p = plan(engine)
+    task(engine, p, key, "waiting_student", kind="student")
+    tid = task_id(engine, p, key)
+    with pytest.raises(StepActionError) as e:
+        plan_actions.complete_step(STUDENT, tid)
+    assert (e.value.code, e.value.message) == ("answer_required", texts.text("answer_required"))
+    assert state(engine, tid) == "waiting_student"
+
+
 def test_work_step_is_not_yours(os_on, engine):
     p = plan(engine)
     task(engine, p, "fetch", "waiting_student", kind="work")

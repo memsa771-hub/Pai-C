@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
 import { useMyPlan } from '@/components/os/my-plan-context';
@@ -15,6 +15,7 @@ import type { OsInboxItem } from '@/lib/os-inbox';
 import { dateFactStatus, type FactStatus } from '@/lib/os-programmes';
 import type { OsChanges, OsProposal } from '@/lib/os-replan';
 import { changeMessage } from '@/lib/os-connect';
+import { answerRefusal, completeRefusal, isRequestItem, withRequests, type OsRequest, type RequestWords } from '@/lib/os-requests';
 import copy from '@/components/counselor/workspace/copy.json';
 import { swapPrompt, type OsNote } from '@/lib/os-self-serve';
 import { usePaiAuth } from '@/lib/pai-auth-context';
@@ -35,16 +36,24 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   const [changes, setChanges] = useState<OsChanges | null>(null);  // Slice 7: suggestions and what changed
   const [sent, setSent] = useState<OsProposal[]>([]);  // P1-T6: requests to the Counsellor and recent expired ones
   const [info, setInfo] = useState<string | null>(null);
+  const answering = useRef(false);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  const [focusAlert, setFocusAlert] = useState(0);  // moves focus to the error after a refused answer
+  const [requests, setRequests] = useState<OsRequest[] | null>(null);  // P1-T8: null = no requests endpoint (today's inbox)
 
   const load = useCallback(async () => {
     let notesFound: OsNote[] = [];
-    try {  // one request feeds the steps, the eligibility notes and the suggestions sent to the Counsellor
-      const inbox = await workspaceApi.getOsInboxAll();
+    // one request feeds the steps, the eligibility notes and the suggestions sent to the Counsellor; the requests come with
+    // it (extra: a 404 or an error leaves today's inbox), and both are set together so a step and its request never mismatch
+    const [inboxResult, requestsResult] = await Promise.allSettled([workspaceApi.getOsInboxAll(), workspaceApi.getOsRequests()]);
+    if (inboxResult.status === 'fulfilled') {
+      const inbox = inboxResult.value;
       setItems(inbox.items);
+      setRequests(requestsResult.status === 'fulfilled' ? requestsResult.value : null);
       setSent(inbox.proposals.filter((p) => p.status === 'requested' || p.status === 'expired'));
       notesFound = inbox.notes;
       setError(null);
-    } catch {
+    } else {
       setSent([]);
       setError('Could not load your next steps. Please try again.');
     }
@@ -78,6 +87,10 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   }, []);
 
   useEffect(() => {
+    if (focusAlert > 0) alertRef.current?.focus();
+  }, [focusAlert]);
+
+  useEffect(() => {
     if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
@@ -93,10 +106,36 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
     try {
       await workspaceApi.completeOsInboxItem(item.id, payload);
       await load();
-    } catch {
-      setError('That did not save. Please try again.');
+    } catch (e) {
+      const said = completeRefusal(e);  // only the approved "closes by itself" sentence is shown; any other 409 keeps today's line
+      setError(said !== null && (isRequestItem(item) || said === copy.connect.requests.pending) ? said : 'That did not save. Please try again.');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const answerRequest = async (request: OsRequest, choice: string, value?: string | number) => {
+    if (answering.current) return;  // one answer at a time: the old question stays here until the list is loaded again
+    answering.current = true;
+    const question = { ref: request.ref ?? request.choices[0]?.ref ?? '', seen: request.seen ?? request.choices[0]?.seen ?? '' };
+    setBusyId(request.task_id);
+    setInfo(null);
+    let message: string | null = null;
+    let reload = true;  // the student looks at the list again: the step closed, or the question changed
+    try {
+      await workspaceApi.answerOsRequest(request.id, choice, question, value);
+    } catch (e) {
+      ({ text: message, reload } = answerRefusal(e, copy.connect.requests as RequestWords));
+    }
+    try {
+      if (reload) await load();
+      if (message) {
+        setError(message);  // after the reload, which clears the old error
+        setFocusAlert((n) => n + 1);
+      }
+    } finally {
+      setBusyId(null);
+      answering.current = false;
     }
   };
 
@@ -160,7 +199,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
   return (
     <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-inbox" title={pageTitle(plan, 'inbox', 'Your next steps')} />
-      {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
+      {error && <p ref={alertRef} tabIndex={-1} role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {info && <p role="status" className="mb-3 break-words text-sm text-muted-foreground">{info}</p>}
       {changes?.changes_paused && <PausedBanner />}
       {sent.length > 0 && (
@@ -188,7 +227,7 @@ export default function OsInboxPage({ params }: { params: Promise<{ workspaceId:
       {items === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <InboxList items={items} now={new Date()} onComplete={complete} busyId={busyId}
+        <InboxList items={withRequests(items, requests)} onAnswer={answerRequest} now={new Date()} onComplete={complete} busyId={busyId}
                    factStatus={factStatus} programmesHref={`/${workspaceId}/os-programmes`} basePath={`/${workspaceId}`}
                    notes={notes} names={names} onSwap={swap} onReadNote={readNote} />
       )}

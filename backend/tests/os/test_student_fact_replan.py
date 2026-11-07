@@ -347,3 +347,97 @@ def test_a_removal_already_requested_from_the_counsellor_is_held_too(world):
         conn.execute(models.proposals.update().where(models.proposals.c.id == first.proposal_id)
                      .values(status="expired"))
     assert world.replanner.below(plan_id) == ("p-hard",)  # an ended request holds nothing
+
+
+# --- P1-T8 Task 2: a missing value is never "below" (R-17), and a need key recompiles the plan (D-w8) ----------------
+
+@pytest.mark.req("R-17")
+def test_eligibility_never_below_for_a_missing_value(needs_world):
+    """On a version 2 plan (the gate is on, the student gave no marks): the programme cards say they need input,
+    never that the student falls short, and a change of the marks key without a value proposes no removal."""
+    from app.os.eligibility.notes import refresh
+
+    w = needs_world
+    w.vault["stu-1"] = StudentFactsV1.model_validate({
+        "schema": "pai.student_facts.v1", "student_ref": "stu-1", "vault_version": 1, "built_at": NOW,
+        "eligible_levels": None, "facts": [{"key": ENTRY, "value": 80, "evidence": "stated", "vault_version": 1}],
+    }).model_dump(by_alias=True)
+    plan_id = start(w)
+    with w.engine.connect() as conn:
+        assert conn.execute(select(models.playbook_pins.c.version).where(
+            models.playbook_pins.c.plan_id == plan_id)).scalar_one() == 2
+    assert task_states(w.engine, plan_id)[f"provide@fact:{MARKS}:stated"] == "waiting_student"  # the needs are live
+    _, cards = refresh(w.svc.plans, "stu-1", plan_id)
+    verdicts = {ln.status for card in cards.values() for ln in card.lines}
+    assert "likely_below" not in verdicts and verdicts & {"needs_input", "unknown"}  # the entry test line still reads
+    student_facts.record_event(vault_event(1, [MARKS]))
+    decision = run_rule(w, plan_id, event_id(w.engine, plan_id))
+    assert decision.status == "applied" and w.replanner.proposals.pending_for("stu-1") == []
+    assert w.replanner.proposals.get(decision.proposal_id).ops == []
+
+
+@pytest.fixture
+def needs_world(engine, clean, os_db):
+    """The fake Pakistan bachelor route with its version 2 (needs) loaded, two programmes with fake merit closings
+    (50 and 80); the Vault answers from a dict."""
+    from tests.os.test_compile_needs import BOOKS
+
+    settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ENABLED": "true"})
+    svc = make_services(settings, engine=engine, playbooks=BOOKS, today=lambda: date(2027, 3, 1))
+    store, kb = ProgrammeStore(engine, TENANT), SqlKnowledge(engine, TENANT)
+    for ref, closing in (("p-easy", 50), ("p-hard", 80)):
+        store.upsert(Programme(ref=ref, route_key="pakistan_bs", university="Uni X", name=ref, aliases=(),
+                               start_urls=("https://uni.example/x",), official_domains=("uni.example",)))
+        for field, value in (("merit_closing", {"aggregate": closing}), ("entry_test_required", {"any_of": []})):
+            kb.upsert("programme", ref, field, Fact(value, "q", "https://uni.example/x", NOW, 2027, "confirmed"),
+                      "manual")
+    vault: dict[str, dict] = {}
+    ports.configure(svc, student_facts=lambda ref: vault.get(ref))
+    eligibility_facts.configure_types(current_types() | {"entry_test": ENTRY_TYPE})
+    manifest.set_enabled(engine, TENANT, True)
+    replanner = Replanner(engine, svc.plans, load_replan_configs(), Outbox(engine, TENANT), clock=lambda: NOW)
+    try:
+        yield pytypes.SimpleNamespace(svc=svc, engine=engine, vault=vault, replanner=replanner)
+    finally:
+        ports.configure(None)
+
+
+def revision_causes(engine, plan_id) -> list[str]:
+    with engine.connect() as conn:
+        return [r.cause for r in conn.execute(select(models.plan_revisions).where(
+            models.plan_revisions.c.plan_id == plan_id).order_by(models.plan_revisions.c.number))]
+
+
+def task_states(engine, plan_id) -> dict[str, str]:
+    with engine.connect() as conn:
+        return {r.instance_key: r.state for r in conn.execute(select(models.tasks).where(
+            models.tasks.c.plan_id == plan_id))}
+
+
+@pytest.mark.req("R-17")
+def test_vault_event_for_a_need_key_recompiles_the_plan(needs_world):
+    w = needs_world
+    w.vault["stu-1"] = {**facts_for("stu-1", 1, 700), "facts": [
+        {"key": ENTRY, "value": 80, "evidence": "stated", "vault_version": 1}]}  # the gate is on, no marks yet
+    plan_id = w.svc.plans.start_plan(contract("stu-1", ("p-easy",))).plan_id
+    asked = f"provide@fact:{MARKS}:stated"
+    assert task_states(w.engine, plan_id)[asked] == "waiting_student"
+    assert task_states(w.engine, plan_id)["entry_test"] == "blocked"
+    w.vault["stu-1"] = facts_for("stu-1", 2, 700)  # the student typed their marks
+    student_facts.record_event(vault_event(2, [MARKS]))
+    assert revision_causes(w.engine, plan_id)[-1] == "student_fact_changed"
+    states = task_states(w.engine, plan_id)
+    assert asked not in states and states[f"{asked}#d2"] == "done"
+    assert states["entry_test"] == "waiting_student"
+    # the same delivery again changes nothing
+    student_facts.record_event(vault_event(2, [MARKS]))
+    assert len(revision_causes(w.engine, plan_id)) == 2
+
+
+def test_a_key_no_step_needs_does_not_recompile(needs_world):
+    w = needs_world
+    w.vault["stu-1"] = facts_for("stu-1", 1, 700)
+    plan_id = w.svc.plans.start_plan(contract("stu-1", ("p-easy",))).plan_id
+    before = len(revision_causes(w.engine, plan_id))
+    student_facts.record_event(vault_event(2, ["test.ielts.score"]))
+    assert len(revision_causes(w.engine, plan_id)) == before

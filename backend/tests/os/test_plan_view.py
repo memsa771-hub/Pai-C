@@ -449,3 +449,103 @@ def test_documents_needed_from_pack_checklist(engine, clean):
         assert build_plan_view(_Svc(engine), STUDENT).documents_needed == []
     finally:
         document_files.configure()
+
+
+# --- P1-T8 Task 3: the plan's requests and what each step needs (R-17, R-19) ------------------------------------------
+
+@pytest.fixture
+def gate_on(monkeypatch):
+    """The needs gate is on (D-w1): the host's StudentFacts adapter answers for the student."""
+    from app.os.requests import gate
+
+    monkeypatch.setattr(gate, "on", lambda *a, **k: object())
+
+
+@pytest.mark.req("R-17")
+def test_plan_view_shows_no_needs_while_the_gate_is_off_even_for_a_v2_plan(engine, clean, monkeypatch):
+    """Final review (D-w1): `steps[].needs` is [] when the gate is off, though the plan is pinned to a version with needs."""
+    from datetime import date
+
+    from app.os.compiler import compile_plan
+    from app.os.requests import gate
+    from app.os.requests.state import StudentState
+    from tests.os.kernel_helpers import kernel
+    from tests.os.test_compile_needs import BOOKS, INTER2, contract, merit
+
+    who = contract().model_copy(update={"student_ref": STUDENT})
+    ref = kernel(engine).create_plan(who, compile_plan(who, INTER2, {}, merit(), date(2027, 3, 1), student=StudentState()))
+    decision(engine, "planned", ref.plan_id)
+    svc = _Svc(engine, books=BOOKS)
+    monkeypatch.setattr(gate, "on", lambda *a, **k: object())
+    assert any(s.needs for s in build_plan_view(svc, STUDENT).steps)  # gate on: the needs are shown
+    monkeypatch.setattr(gate, "on", lambda *a, **k: None)
+    off = build_plan_view(svc, STUDENT)
+    assert off.steps and all(s.needs == [] for s in off.steps)
+
+
+@pytest.mark.req("R-17")
+def test_plan_view_lists_requests_and_step_needs(engine, clean, gate_on):
+    from dataclasses import replace
+    from datetime import date
+
+    from app.os.compiler import compile_plan
+    from app.os.requests.state import StudentState
+    from tests.os.kernel_helpers import kernel
+    from tests.os.test_compile_needs import BOOKS, INTER1, INTER2, OBTAINED, TOTAL, contract, merit
+
+    who = contract().model_copy(update={"student_ref": STUDENT})
+    k = kernel(engine)
+    today = date(2027, 3, 1)
+    ref = k.create_plan(who, compile_plan(who, INTER2, {}, merit(), today, student=StudentState()))
+    decision(engine, "planned", ref.plan_id)
+    svc = _Svc(engine, books=BOOKS)
+
+    v = build_plan_view(svc, STUDENT)
+    assert PlanViewV1.model_validate(v.model_dump(mode="json", by_alias=True)) == v
+    steps = {s.instance_key: s for s in v.steps}
+    form = steps["admission_form"]  # a playbook step: its needs come from the pinned book
+    assert [(n.kind, n.ref, n.evidence) for n in form.needs] == [
+        ("fact", OBTAINED, "stated"), ("fact", TOTAL, "stated")]
+    assert form.blocked_reason == "awaiting_fact" and form.status == "blocked"
+    assert [(n.ref, n.evidence) for n in steps["merit_list@p1"].needs] == [(OBTAINED, "shown")]
+    asked = steps[f"provide@fact:{OBTAINED}:stated"]  # a generated step: its need comes from its key
+    assert [(n.kind, n.ref, n.evidence) for n in asked.needs] == [("fact", OBTAINED, "stated")]
+    assert (asked.status, asked.owner, asked.inbox_kind) == ("waiting_student", "student", "provide")
+    assert sorted((r.need.ref, r.need.evidence, r.status) for r in v.requests) == [
+        (OBTAINED, "stated", "open"), (TOTAL, "stated", "open")]
+    due = {r.need.ref: (r.due_at, r.due_tz) for r in v.requests}
+    assert due[OBTAINED] == (asked.due_at, asked.due_tz) and asked.due_at is not None  # the step's date and zone
+
+    # the student types the marks: that request is answered, the mark sheet is asked next
+    typed = StudentState(facts={OBTAINED: "stated", TOTAL: "stated"})
+    k.revise(ref.plan_id, "student_fact_changed", compile_plan(who, INTER2, {}, merit(), today, student=typed))
+    v = build_plan_view(svc, STUDENT)
+    got = sorted((r.need.ref, r.need.evidence, r.status) for r in v.requests)
+    assert got == [(OBTAINED, "shown", "open"), (OBTAINED, "stated", "answered"), (TOTAL, "stated", "answered")]
+    assert not [s for s in v.steps if "#" in s.instance_key]  # the finished request step is history, not a step
+
+    # a plan on the book without needs: no needs, no requests
+    plan_v1 = k.create_plan(who.model_copy(update={"external_ref": "ext-v1"}), compile_plan(
+        who.model_copy(update={"external_ref": "ext-v1"}), INTER1, {}, merit(), today))
+    decision(engine, "planned", plan_v1.plan_id, version=2, n=2)
+    old = build_plan_view(svc, STUDENT)
+    assert old.plan_id == plan_v1.plan_id and old.requests == [] and all(s.needs == [] for s in old.steps)
+
+
+@pytest.mark.req("R-17")
+def test_result_expected_step_shows_no_need_and_no_request(engine, clean, gate_on):
+    from datetime import date
+
+    from app.os.compiler import compile_plan
+    from app.os.requests.state import StudentState
+    from tests.os.kernel_helpers import kernel
+    from tests.os.test_compile_needs import BOOKS, CALENDAR, INTER2, OBTAINED, contract, merit
+
+    who = contract().model_copy(update={"student_ref": STUDENT})
+    ref = kernel(engine).create_plan(who, compile_plan(who, INTER2, CALENDAR, merit(), date(2027, 3, 1),
+                                                       student=StudentState()))
+    decision(engine, "planned", ref.plan_id)
+    v = build_plan_view(_Svc(engine, books=BOOKS), STUDENT)
+    waits = next(s for s in v.steps if s.template_key == "result_expected")
+    assert waits.needs == [] and waits.blocked_reason == "result_expected"
+    assert [r.need.ref for r in v.requests].count(OBTAINED) == 1  # the provide step behind it is the request

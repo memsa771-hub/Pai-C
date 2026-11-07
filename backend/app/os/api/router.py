@@ -7,7 +7,7 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 
-from datetime import date
+from datetime import date, timedelta
 
 from app.os import clock, my_plan as my_plan_view
 from app.os.ports import my_plan as my_plan_gate
@@ -52,6 +52,9 @@ from app.os.api.schemas import (
     EligibilityOut,
     RequestIn,
     RequestOut,
+    RequestAnswerIn,
+    RequestAnswerOut,
+    RequestsOut,
     RouteProgrammesOut,
     RoutesOut,
     SelfPlanOut,
@@ -84,6 +87,7 @@ from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
 from app.os.consent import ConsentStore, current_terms, gate
 from app.os.compiler import CompileError
+from app.os.service import NothingNewer
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
 from app.os.documents import connect_texts
@@ -104,6 +108,8 @@ from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
 from app.os.playbooks import PlaybookError
+from app.os.requests import answers as request_answers, gate as needs_gate, store as request_store, texts as request_texts
+from app.os.requests.refresh import refresh
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
 log = logging.getLogger(__name__)
@@ -186,6 +192,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             return {"revision": svc.plans.upgrade(plan_id)}
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
+        except NothingNewer as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
 
     def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
         """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
@@ -233,6 +241,58 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             raise HTTPException(status_code=404 if e.code in ("not_found", "not_yours") else 409,
                                 detail=e.message) from None
         return {"completed": done}
+
+    # --- P1-T8: the student's requests (R-19, D-w19). Only while the needs gate is on (D-w1). ---
+
+    @router.get("/requests", response_model=RequestsOut)
+    def requests(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """The student's open requests, and those answered in the last 7 days. The step's title and date, the way it
+        closes in words; never a value. 404 while the gate is off, as if the route did not exist."""
+        tenant = svc.settings.tenant_id
+        if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        found = request_store.open_for(svc.engine, tenant, student, answered_since=clock.now() - timedelta(days=7))
+        asked = request_answers.choices_for(svc, student, found)  # P1-T8: both values, read live from where they are held
+        out = []
+        for r in found:
+            c = asked.get(r.id, request_answers.Choices())
+            out.append({
+                "id": r.id, "task_id": r.task_id, "kind": r.kind,
+                "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
+                "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
+                "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible,
+                                  documents=bool(c.ref and c.ref.startswith("finding:"))),
+                "ref": c.ref, "seen": c.seen, "choices": c.choices, "allow_new": c.allow_new,
+                "new_label": request_texts.text("new_label") if c.allow_new else None})
+        return {"requests": out}
+
+    @router.post("/requests/{request_id}/answer", response_model=RequestAnswerOut)
+    def answer_request(request_id: int, body: RequestAnswerIn, student: str = Depends(current_student_ref_for_write),
+                       svc: Services = Depends(services)) -> dict:
+        """The student's answer to a "which is right" request (D-w13). A Vault conflict is answered through the host's own
+        card resolution, a value above its total by a new value, two documents that differ by `resolve_finding`; then the
+        plan is recomputed, so the step is done before this returns. 404 for another student's request and while the gate
+        is off; 409 `already_answered`, `answer_elsewhere` for a request that asks for information, or `answer_changed` (with
+        a note) when the question is not the one the student saw (`ref`); 503 `counsellor_unavailable` when the host failed."""
+        tenant = svc.settings.tenant_id
+        if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        found = request_store.get(svc.engine, tenant, request_id)
+        if found is None or found.student_ref != student:
+            raise HTTPException(status_code=404, detail="Not Found")
+        if found.status != "open":
+            raise HTTPException(status_code=409, detail="already_answered")
+        if found.kind != "which_is_right":
+            raise HTTPException(status_code=409, detail="answer_elsewhere")  # a provide request closes when PAI has the data
+        try:
+            request_answers.answer(svc, student, found, body.ref, body.seen, body.choice, body.value)
+        except request_answers.AnswerError as e:
+            if e.note:
+                return JSONResponse(status_code=e.status, content={"detail": e.detail, "note": e.note})
+            raise HTTPException(status_code=e.status, detail=e.detail) from None
+        refresh(svc, student, "request_answered")
+        after = request_store.get(svc.engine, tenant, request_id)
+        return {"status": "answered" if after is not None and after.status == "answered" else "still_open"}
 
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
     def confirm(fact_id: int, body: ConfirmIn, svc: Services = Depends(services)) -> dict:
@@ -440,6 +500,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
+        refresh(svc, student, "document_changed")  # P1-T8: a confirmed document may answer a request
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
         out = document_out(store, store.get(doc_id), findings, svc.document_types)
@@ -460,6 +521,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: the resolved value may change eligibility
+        refresh(svc, student, "document_changed")  # P1-T8: a resolved mismatch unblocks the steps it paused
         return finding_out(resolved)
 
     @router.delete("/documents/{doc_id}", status_code=204)
@@ -468,6 +530,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         doc = own_document(svc, doc_id, student)
         delete_document(svc.engine, svc.settings.tenant_id, svc.document_types, svc.name_variants, doc,
                         client=svc.dbos_client())
+        refresh(svc, student, "document_changed")  # P1-T8: a deleted document is asked for again
         return Response(status_code=204)
 
     @router.get("/profile", response_model=ProfileOut)

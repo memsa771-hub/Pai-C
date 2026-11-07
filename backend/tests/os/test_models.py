@@ -50,6 +50,8 @@ def test_os_tables_present():
         "os_vault_events",
         # P1-T6 (os_0021)
         "os_plan_adoptions",
+        # P1-T8 (os_0023)
+        "os_student_requests",
     }
 
 

@@ -199,7 +199,8 @@ def test_a_token_only_caller_cannot_tick_an_os_step():
 
 
 @pytest.mark.parametrize("code,status", [("not_found", 404), ("not_yours", 404), ("not_waiting", 409),
-                                         ("review_required", 409), ("unavailable", 503)])
+                                         ("review_required", 409), ("answer_required", 409),
+                                         ("unavailable", 503)])
 def test_os_refusals_become_http_statuses(code, status):
     with plan_client(view_of(STEPS)) as (client, _, params, fake, _):
         fake.error = code

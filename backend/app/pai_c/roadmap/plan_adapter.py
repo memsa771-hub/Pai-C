@@ -7,12 +7,14 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 from app import pai_os_bridge
+from app.pai_c.connect import request_texts
 from app.pai_c.connect.flags import part_on
 from app.pai_c.roadmap.engine import roadmap_policy
 
 STATUS = {"done": "done", "running": "half", "ready": "half", "waiting_student": "half", "waiting_review": "half",
           "pending": "not", "blocked": "not", "failed": "not"}  # skipped and cancelled steps are not shown
 TICK_KINDS = ("act", "provide")
+REQUESTS = ("provide", "which_is_right", "result_expected")  # the template keys of the steps PAI OS adds for a need (T8)
 STEP_FIELDS = ("due_at", "due_tz", "owner", "provisional", "estimated")
 
 
@@ -97,6 +99,19 @@ def chosen(row, cards: list[dict]) -> dict:
     return chosen_from_plan(row, cards, view)
 
 
+def request_of(step: dict) -> dict | None:
+    """The request a step makes of the student (P1-T8, R-19): `{kind, evidence, text}`, or `{kind, text}` for a step that
+    waits for a result. None for any other step and for an answered one (done). The sentence is `request_texts`' (D-w16)."""
+    kind = step.get("template_key")
+    if kind not in REQUESTS or step["status"] in ("done", "skipped", "cancelled"):
+        return None
+    if kind == "result_expected":
+        return {"kind": kind, "text": request_texts.line_for(kind)}
+    level = next((n["evidence"] for n in step.get("needs") or []), None)
+    line = request_texts.line_for(kind, level)
+    return None if line is None else {"kind": kind, "evidence": level, "text": line}
+
+
 def steps_of(view: dict) -> list[dict]:
     colours = roadmap_policy()["steps"]["colours"]
     out = []
@@ -104,13 +119,14 @@ def steps_of(view: dict) -> list[dict]:
         status = STATUS.get(step["status"])
         if status is None:
             continue
-        tickable = (step["owner"] == "student" and step["status"] == "waiting_student"
+        request = request_of(step)
+        tickable = (step.get("template_key") not in REQUESTS and step["owner"] == "student" and step["status"] == "waiting_student"
                     and step["inbox_kind"] in TICK_KINDS and not step.get("review"))
         out.append({"key": step["instance_key"], "kind": "os", "label_key": "", "values": {}, "status": status,
                     "evidence": None, "rule": None, "manual_done": False, "timing": None,
                     "colour": colours[status], "tickable": tickable, "title": step["title"],
                     **{name: step[name] for name in STEP_FIELDS}, "task_id": step["task_id"],
-                    "review": bool(step.get("review"))})
+                    "review": bool(step.get("review")), **({"request": request} if request else {})})
     return out
 
 

@@ -53,6 +53,62 @@ class InboxOut(BaseModel):
     changes_paused: bool = False  # Slice 7: a person is checking the plan (S7-D9)
 
 
+class RequestNeedOut(BaseModel):
+    kind: Literal["fact", "document"]
+    ref: str
+    evidence: Literal["stated", "shown", "confirmed"]
+
+
+class ChoiceSourceOut(BaseModel):
+    kind: Literal["vault", "document", "said"]  # held value "vault"; its proposed side with no document "said" (chat or profile page: the host does not say which)
+    evidence: Literal["stated", "shown", "confirmed", "unknown"]
+    document_ref: str | None
+    as_of: datetime | None
+
+
+class ChoiceOut(BaseModel):  # one value the student can pick for a "which is right" request, read live (never stored)
+    ref: str  # the question the student saw (a card, a finding or an impossible value); the answer must name it back
+    key: str
+    seen: str  # a short hash of the values on the question; the answer names it back
+    choice: str  # current | proposed | new, or doc:<id> for a document that holds one of the values
+    label: str
+    value: str | int | float
+    source: ChoiceSourceOut
+
+
+class StudentRequestOut(BaseModel):  # P1-T8, D-w19: one request the plan makes of the student
+    id: int
+    task_id: int | None
+    kind: Literal["provide", "which_is_right"]
+    need: RequestNeedOut
+    status: Literal["open", "answered"]
+    due_at: datetime | None
+    due_tz: str | None
+    title: str | None
+    how: str
+    seen: str | None = None
+    ref: str | None = None  # the question as the student sees it now (also when there are no choices to carry it)
+    choices: list[ChoiceOut] = []  # only a "which is right" request that is open
+    allow_new: bool = False  # the student may type the right value
+    new_label: str | None = None  # the words for typing it, when allowed
+
+
+class RequestAnswerIn(BaseModel):  # P1-T8, D-w13 (`AnswerIn` and `AnswerOut` are the statements' models)
+    model_config = ConfigDict(extra="forbid")
+    ref: str  # the `ref` of the choices the student saw: an answer to a question that changed is refused (409)
+    seen: str  # the `seen` of the choices: an answer to values that changed is refused too (409)
+    choice: str = Field(pattern=r"^(current|proposed|new|doc:\d+)$")
+    value: str | int | float | None = None  # needed for "new"
+
+
+class RequestAnswerOut(BaseModel):
+    status: Literal["answered", "still_open"]
+
+
+class RequestsOut(BaseModel):
+    requests: list[StudentRequestOut]
+
+
 class CompleteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     payload: dict = {}

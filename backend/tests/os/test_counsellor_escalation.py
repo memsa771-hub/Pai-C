@@ -268,3 +268,17 @@ def test_no_places_reason_is_a_route_problem_sent_by_its_event(svc):
     escalate(svc, "student_fact_changed", NO_PLACES_REASON)
     (row,) = sent(svc)
     assert row["reason"] == "not_eligible"
+
+
+@pytest.mark.req("R-22")
+@pytest.mark.parametrize("key", ["unanswered_all", "unanswered_proposed"])
+def test_unanswered_ladder_cases_stay_with_pai(svc, key):
+    """P1-T8, Ruling problem 11: a request left unanswered calls a person at PAI, never the Counsellor, so the plan is
+    not paused and the student is not sent back to choosing."""
+    from app.os.requests import texts
+
+    assert reason_for("document_missing", texts.text(key)) is None
+    cid = escalate(svc, "document_missing", texts.text(key))
+    assert sent(svc) == [] and pending_counsellor_escalations() == []  # nothing for the host's glue to deliver or act on
+    case = SupportStore(svc.engine, "pai").get(cid)
+    assert (case.status, case.counsellor_status) == ("open", None)

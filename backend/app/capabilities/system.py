@@ -11,6 +11,7 @@ def load_system_capabilities(registry):
     from app.documents import handlers as documents
     from app.services.operator import run_operator_job
     from app.pai_c.mirror import text_job as mirror_text
+    from app.memory.profile_issues import register_close_hook
     from app.memory.reconciler import register_accept_hook
     from app.pai_c.connect import vault_version
 
@@ -21,6 +22,8 @@ def load_system_capabilities(registry):
     register_accept_hook(paths.after_accept)
     # An accepted write that touches a StudentFacts key raises the student's Vault version (P1-T4, flag-gated).
     register_accept_hook(vault_version.after_accept)
+    # A closed education or test card (keep current writes nothing, so no accept hook fires) is heard the same way (P1-T8).
+    register_close_hook(vault_version.after_issue_closed)
 
     string = {"type": "string"}
     array = {"type": "array"}

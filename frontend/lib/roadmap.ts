@@ -52,6 +52,8 @@ export type RouteStep = {
   due_tz?: string | null;
   provisional?: boolean;
   estimated?: boolean;
+  /** P1-T8: a step that waits for the student's data (it has no tick): what it needs, in the backend's words. */
+  request?: { kind: "provide" | "which_is_right" | "result_expected"; evidence?: "stated" | "shown" | "confirmed"; text: string };
 };
 
 /** The OS plan on a chosen route; absent when the plan view is off. "empty" means PAI is still preparing the plan. */

@@ -14,8 +14,9 @@ from app.os import models
 from app.os.knowledge.research.readings import AgentRuns, cost
 from app.os.replan import events as ev
 from app.os.replan.apply import Replanner, ops_of
-from app.os.replan.rules import Handover, Retry, rules_for
+from app.os.replan.rules import Handover, Retry, is_request_step, rules_for
 from app.os.replan.supervisor import propose
+from app.os.requests.texts import text
 from app.os.settings import OsSettings
 
 REPLAN_WORKFLOW = "os.replan"
@@ -71,8 +72,11 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
 
     def rules(plan_id: int, event_id: int) -> dict:
         e = ev.get(engine, tenant, event_id)
-        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected",
-                                           with_below=e.type == "student_fact_changed"), replanner.config(plan_id))
+        unanswered = e.type == "document_missing" and is_request_step(e.payload.get("instance_key"))  # D-w15 steps 3-4
+        got = rules_for(e, replanner.state(plan_id, with_suggestions=e.type == "admission_rejected" or unanswered,
+                                           with_below=e.type == "student_fact_changed", with_held=unanswered,
+                                           without_need=e.payload.get("instance_key") if unanswered else None),
+                        replanner.config(plan_id))
         if isinstance(got, Handover):
             return {"handover": got.reason}
         if isinstance(got, Retry):
@@ -81,6 +85,12 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
 
     def decide(plan_id: int, event_id: int, source: str, raw_ops: list[dict]) -> dict:
         d = replanner.decide(plan_id, [event_id], source, ops_of(raw_ops))
+        if d.status == "pending" and source == "rules":
+            e = ev.get(engine, tenant, event_id)
+            if e.type == "document_missing" and is_request_step(e.payload.get("instance_key")):
+                # D-w15 step 3, Ruling problem 11: the proposal is the first call to the student; a person looks too, so
+                # a declined or expired proposal never leaves the request unanswered and unseen. One case per event.
+                replanner.support(plan_id, [event_id], text("unanswered_proposed"), d.proposal_id)
         return {"status": d.status, "proposal_id": d.proposal_id}
 
     def support(plan_id: int, event_id: int, reason: str) -> dict:

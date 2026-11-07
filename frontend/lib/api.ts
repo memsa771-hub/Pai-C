@@ -200,6 +200,30 @@ class WorkspaceApi {
     return body.items;
   }
 
+  /** P1-T8: what the plan asks of the student, and the choices of each "which is right" question. A 404 (the part is
+   * off) is `null`: the inbox is today's. Any other error throws. */
+  async getOsRequests(): Promise<import('./os-requests').OsRequest[] | null> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    try {
+      const body = await this.requestJson<{ requests?: import('./os-requests').OsRequest[] }>(`/v1/os/requests?${params}`);
+      return Array.isArray(body.requests) ? body.requests : null;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('API 404:')) return null;
+      throw e;
+    }
+  }
+
+  /** P1-T8: the student's answer to a "which is right" request. `choice` is the choice id (`current`, `proposed`, `new`
+   * or `doc:<id>`); `question` carries the `ref` and `seen` of the choices the student saw (the API requires both). */
+  async answerOsRequest(id: number, choice: string, question: { ref: string; seen: string },
+                        value?: string | number): Promise<{ status: 'answered' | 'still_open' }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/requests/${id}/answer?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ choice, ref: question.ref, seen: question.seen, ...(value === undefined ? {} : { value }) }),
+    });
+  }
+
   /** P1-T9: the student's plan page list. Throws on anything but 200 (404 while the My plan part is off). */
   async getMyPlan(): Promise<import('./os-my-plan').MyPlan> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });

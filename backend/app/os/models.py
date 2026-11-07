@@ -664,6 +664,32 @@ vault_events = Table(
     UniqueConstraint("tenant_id", "student_ref", "vault_version", name="uq_os_vault_events_version"),
 )
 
+# --- P1-T8: one request per student and fact (os_0023) ---------------------------------------------------------------
+
+student_requests = Table(
+    "os_student_requests", md,
+    _id(), _tenant(),
+    Column("student_ref", Text, nullable=False),
+    Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="CASCADE"), nullable=False),
+    Column("task_id", BigInteger, ForeignKey("os.os_tasks.id", ondelete="SET NULL")),
+    Column("kind", Text, nullable=False),  # provide | which_is_right
+    Column("need_kind", Text, nullable=False),  # fact | document
+    Column("need_ref", Text, nullable=False),  # a StudentFacts key or a document type: never a value
+    Column("evidence", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("closed_cause", Text),
+    _created(),
+    Column("closed_at", DateTime(timezone=True)),
+    _in("kind", ("provide", "which_is_right"), "ck_os_student_requests_kind"),
+    _in("need_kind", ("fact", "document"), "ck_os_student_requests_need_kind"),
+    _in("evidence", ("stated", "shown", "confirmed"), "ck_os_student_requests_evidence"),
+    _in("status", ("open", "answered", "cancelled"), "ck_os_student_requests_status"),
+    Index("ix_os_student_requests_plan", "tenant_id", "plan_id"),
+    # R-19, master 9.3 rule 7: one open request per student and fact
+    Index("uq_os_student_requests_open", "tenant_id", "student_ref", "need_kind", "need_ref", unique=True,
+          postgresql_where=text("status = 'open'")),
+)
+
 counsellor_sweep = Table(
     "os_counsellor_sweep", md,
     Column("tenant_id", Text, primary_key=True),

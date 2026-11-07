@@ -7,6 +7,7 @@ from sqlalchemy import Engine, insert, select
 from app.os import models
 from app.os.outbox import Outbox
 from app.os.replan import events
+from app.os.requests import keys
 
 T, P = models.tasks, models.plans
 
@@ -32,14 +33,16 @@ def reminder_slot(now: datetime, due_at: datetime | None, slack_days: int | None
 def run_reminders(engine: Engine, outbox: Outbox, now: datetime, tenant_id: str) -> int:
     with engine.connect() as conn:
         rows = conn.execute(select(T.c.id, T.c.plan_id, T.c.title, T.c.due_at, T.c.due_tz, T.c.slack_days,
-                                   T.c.instance_key, T.c.inbox_kind, P.c.student_ref)
+                                   T.c.instance_key, T.c.inbox_kind, T.c.template_key, P.c.student_ref)
                             .join(P, P.c.id == T.c.plan_id).where(
             T.c.tenant_id == tenant_id, T.c.state == "waiting_student", T.c.due_at.is_not(None),
             P.c.status != "paused",  # a paused plan (consent missing) sends nothing
         ).order_by(T.c.id)).all()
     added = 0
     for r in rows:
-        if r.inbox_kind == "provide" and r.due_at < now:  # Slice 7: a document still missing after its date
+        # Slice 7: a document still missing after its date. P1-T8 (D-w15 step 1): a "which is right" step too, so a
+        # question left open reaches the same ladder as a request for data.
+        if (r.inbox_kind == "provide" or r.template_key == keys.WHICH_IS_RIGHT) and r.due_at < now:
             with engine.begin() as conn:
                 events.record(conn, tenant_id, r.plan_id, "document_missing", {"instance_key": r.instance_key},
                               f"{r.id}:{r.due_at.date().isoformat()}", r.id)
@@ -50,7 +53,9 @@ def run_reminders(engine: Engine, outbox: Outbox, now: datetime, tenant_id: str)
                    "slot": slot}
         if outbox.add(f"reminder:{r.id}:{slot}", "email", r.student_ref, "inbox_reminder", payload):
             added += 1
-            if slot.startswith("esc:"):  # slack is gone: Slice 7's replan acts on this event
+            # slack is gone: Slice 7's replan acts on this event. A request step has its own ladder (`document_missing`,
+            # recorded above), where a person is called only after the proposal: no second, earlier call here (R-22).
+            if slot.startswith("esc:") and r.template_key not in keys.REQUEST_KINDS:
                 with engine.begin() as conn:
                     events.record(conn, tenant_id, r.plan_id, "escalate", {**payload, "instance_key": r.instance_key},
                                   f"{r.id}:{slot}", r.id)

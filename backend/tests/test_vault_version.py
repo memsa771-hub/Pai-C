@@ -169,3 +169,102 @@ def test_a_part_only_edit_names_the_part_keys():
                 "education.intermediate.part2.marks_obtained", "education.intermediate.part2.marks_total"} <= set(keys)
         versions = version_row(db, ws).key_versions
         assert versions["education.intermediate.part1.marks_obtained"] == 2
+
+
+# ---- P1-T8 Task 4: the profile-issue close hook (R-21, R-19: answering anywhere closes it everywhere) ----
+
+
+def conflict_card(db, student):
+    """A bachelor record the student said, a transcript that reads another GPA: an open card on education."""
+    from app.pai_c.connect import document_facts
+    from tests.test_document_facts import add_file, proposal, reconcile_all, stated
+
+    ws = student.workspace_id
+    stated(db, ws, "BS", institution_name="A Uni", academic_status="completed", result={"gpa": 3.4, "gpa_scale": 4})
+    _, ids = document_facts.apply(db, proposal(student, add_file(db, ws), [{"key": "education.bachelor.gpa",
+                                                                          "value": 3.2}], doc_type="transcript"))
+    db.commit()
+    assert reconcile_all(db, ids)[0].outcome == "needs_review"
+    from app.models import ProfileIssue
+
+    return db.scalar(select(ProfileIssue))
+
+
+@pytest.mark.req("R-21")
+def test_keep_current_on_an_education_card_raises_the_version_and_queues_an_event():
+    from app.memory.profile_issues import ProfileIssueService
+    from app.os.contracts.vault_event import VaultEventV1
+
+    with StudentSession() as student, student.factory() as db, facts_flag(), part():
+        ws = student.workspace_id
+        issue = conflict_card(db, student)
+        before = version_row(db, ws).version if version_row(db, ws) else 0
+        assert ProfileIssueService(db).resolve(ws, issue.id, "keep_current")["resolved"] is True
+        db.commit()
+        assert version_row(db, ws).version == before + 1
+        newest = max(events(db, ws), key=lambda r: r.payload["vault_version"])
+        event = VaultEventV1.model_validate(newest.payload)
+        assert event.vault_version == before + 1
+        assert "education.bachelor.gpa" in event.keys
+        assert all(k.startswith("education.bachelor.") for k in event.keys)  # one family only
+
+
+@pytest.mark.req("R-21")
+def test_an_answer_that_writes_is_heard_once_not_twice():
+    """accept_proposed goes through the reconciler, whose accept hook already raised the version."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    with StudentSession() as student, student.factory() as db, facts_flag(), part():
+        ws = student.workspace_id
+        issue = conflict_card(db, student)
+        before = version_row(db, ws).version
+        assert ProfileIssueService(db).resolve(ws, issue.id, "accept_proposed")["resolved"] is True
+        db.commit()
+        assert version_row(db, ws).version == before + 1
+
+
+@pytest.mark.req("R-21")
+def test_close_hook_off_without_connect_student_facts():
+    """Flags-off guard: with the flag off a closed card writes no version and no outbox row."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    with StudentSession() as student, student.factory() as db, facts_flag(False), part():
+        ws = student.workspace_id
+        issue = conflict_card(db, student)
+        assert ProfileIssueService(db).resolve(ws, issue.id, "keep_current")["resolved"] is True
+        db.commit()
+        assert version_row(db, ws) is None and events(db, ws) == []
+
+
+@pytest.mark.req("R-21")
+def test_a_card_that_is_not_about_a_mark_or_a_score_is_never_announced():
+    """A card that is not about a mark or a score (a name, a document owner) is never announced, flag on or off."""
+    from app.memory.profile_issues import ProfileIssueService
+    from app.models import ProfileIssue
+
+    with StudentSession() as student, student.factory() as db, facts_flag(), part():
+        ws = student.workspace_id
+        db.add(ProfileIssue(workspace_id=ws, issue_type="document_owner", affected_type="document", severity="blocking",
+                            summary="owner", evidence={"vault_names": ["A B"], "document_names": ["C D"]}))
+        db.add(ProfileIssue(workspace_id=ws, issue_type="conflicting_record", affected_type="identity",
+                            conflict_kind="value_conflict", severity="blocking", summary="name",
+                            evidence={"record_type": "identity", "current": {"full_name": "A"}, "proposed": {"full_name": "B"}}))
+        db.commit()
+        for issue in db.scalars(select(ProfileIssue)).all():
+            assert ProfileIssueService(db).resolve(ws, issue.id, "keep_current")["resolved"] is True  # review M7: no swallow
+        db.commit()
+        assert version_row(db, ws) is None and events(db, ws) == []
+
+
+@pytest.mark.req("R-21")
+def test_flags_off_profile_issue_resolve_writes_no_vault_event():
+    """Today's app: no flag patched at all. Answering a card (keep current, accept) writes no version and no outbox row."""
+    from app.memory.profile_issues import ProfileIssueService
+
+    assert config.CONNECT_STUDENT_FACTS is False  # the shipped default
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        kept = conflict_card(db, student)
+        assert ProfileIssueService(db).resolve(ws, kept.id, "keep_current")["resolved"] is True
+        db.commit()
+        assert version_row(db, ws) is None and events(db, ws) == []

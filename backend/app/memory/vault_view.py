@@ -36,6 +36,7 @@ from app.models import FileRecord, MemoryCandidate, ProfileIssue, VaultFact, Vau
 
 from .catalog import TypeSpec, vault_catalog
 from .evidence import evidence_level, page_of
+from .issue_answers import answers_of, drop
 from .student_records import ENTITY_MODELS, StudentRecordService
 from .vault import _unwrap, is_guess
 from .vault_items import VaultItemService
@@ -581,6 +582,8 @@ class VaultView:
         elif evidence.get("record_type"):
             form, type_key = "record", evidence.get("record_type")
             current, proposed = evidence.get("current"), evidence.get("proposed")
+            settled = answers_of(issue)  # values answered one by one elsewhere are settled: only the rest is shown
+            current, proposed = drop(current, settled), drop(proposed, settled)
         else:
             form, type_key, current, proposed = "other", None, None, None
 

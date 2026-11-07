@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from sqlalchemy import exists, select
 
 from app.os.kernel.states import PLAN_OPEN
+from app.os.playbooks import newest_plain
 from app.os import models
 from app.os.api.queries import plan_out, removed_programmes
 from app.os.eligibility.evaluate import Card
@@ -19,11 +20,7 @@ G, F, RQ, P = models.programmes, models.knowledge_facts, models.programme_reques
 
 
 def newest_books(plans) -> dict:
-    out = {}
-    for (key, _), book in plans.playbooks.items():
-        if key not in out or book.version > out[key].version:
-            out[key] = book
-    return out
+    return newest_plain(plans.playbooks.values())  # a needs playbook is not listed (P1-T8): the bytes stay the same
 
 
 def routes_out(plans) -> list[dict]:

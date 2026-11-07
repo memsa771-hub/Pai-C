@@ -1,6 +1,6 @@
 """Loads playbook YAML files. Any problem is a PlaybookError naming the file, so startup fails loudly."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import yaml
@@ -61,12 +61,27 @@ def load_playbook_dir(directory: Path = PLAYBOOK_DIR) -> dict[tuple[str, int], P
 
 
 def select_playbook(
-    books: Mapping[tuple[str, int], Playbook], origin: str, destination: str, level: str
+    books: Mapping[tuple[str, int], Playbook], origin: str, destination: str, level: str, *, with_needs: bool = False
 ) -> Playbook:
+    """The newest playbook for the route. A playbook that declares `needs` is chosen only when the caller asks
+    (`with_needs`), and the caller asks only while the student's needs gate is on (P1-T8, D-w3)."""
     matches = [
         b for b in books.values()
         if (b.route.origin, b.route.destination, b.route.level) == (origin, destination, level)
+        and (with_needs or not b.declares_needs)
     ]
     if not matches:
         raise PlaybookError(f"no playbook for {origin}->{destination} {level}")
     return max(matches, key=lambda b: (b.version, b.key))
+
+
+def newest_plain(books: Iterable[Playbook]) -> dict[str, Playbook]:
+    """The newest version of each playbook key, leaving out the ones that declare `needs`: the route listings and the
+    route builder read this, so they stay as they were in every state."""
+    out: dict[str, Playbook] = {}
+    for book in books:
+        if book.declares_needs:
+            continue
+        if book.key not in out or book.version > out[book.key].version:
+            out[book.key] = book
+    return out
