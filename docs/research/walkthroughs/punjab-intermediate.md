@@ -10,54 +10,54 @@ P2 people-lane item H2 (master spec §8.4; P2 spec §6.2). Region: Punjab. Famil
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-01 | Punjab's Higher Education Department (HED) has nine BISEs that examine intermediate classes. | https://hed.punjab.gov.pk/boards | `The Higher Education Department has a network of 09 Boards of Intermediate and Secondary Education to cater to the examination of Intermediate classes in public and private sector colleges across Punjab.` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-02 | The nine boards: Bahawalpur, D.G. Khan, Faisalabad, Gujranwala, Lahore, Multan, Rawalpindi, Sahiwal, Sargodha. | https://hed.punjab.gov.pk/boards | `Bahawalpur D.G. Khan Faisalabad Gujranwala Lahore Multan Rawalpindi Sahiwal Sargodha` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
+| PI-01 | Punjab's Higher Education Department (HED) has nine BISEs that examine intermediate classes. | https://hed.punjab.gov.pk/boards | `The Higher Education Department has a network of 09 Boards of Intermediate and Secondary Education to cater to the examination of Intermediate classes in public and private sector colleges across Punjab.` | 2026-11-07 | curl + HTML text strip | correct: quote on page word for word; statement follows (HTTP 200, 2026-11-07) | correct: quote found word for word (html, HTTP 200) |
+| PI-02 | The nine boards: Bahawalpur, D.G. Khan, Faisalabad, Gujranwala, Lahore, Multan, Rawalpindi, Sahiwal, Sargodha. | https://hed.punjab.gov.pk/boards | `Bahawalpur D.G. Khan Faisalabad Gujranwala Lahore Multan Rawalpindi Sahiwal Sargodha` | 2026-11-07 | curl + HTML text strip | correct: nine names on page in this order; statement follows | correct: quote found word for word (html, HTTP 200) |
 
 ## How admission works
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-03 | HED runs the Online College Admission System (OCAS) for intermediate admission in public colleges. | https://hed.punjab.gov.pk/ocas | `The Higher Education Department has introduced an important service for public sector colleges for the admissions in Intermediate programs (F.A./F.Sc./ICS etc.).` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-04 | OCAS covers 200+ public colleges (as of 2013, per HED). | https://hed.punjab.gov.pk/ocas | `was gradually implemented in 71 and 200+ public sector colleges during 2012 and 2013 respectively.` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-05 | OCAS application fee: Rs 25 per application. | https://ocas.punjab.gov.pk/ | `Nominal application fee (Rs 25 per application)` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-06 | OCAS takes BISE results directly. | https://ocas.punjab.gov.pk/ | `Integration with BISE results, minimizing data entry and reducing errors` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
+| PI-03 | HED runs the Online College Admission System (OCAS) for intermediate admission in public colleges. | https://hed.punjab.gov.pk/ocas | `The Higher Education Department has introduced an important service for public sector colleges for the admissions in Intermediate programs (F.A./F.Sc./ICS etc.).` | 2026-11-07 | curl + HTML text strip | correct: quote on page; "runs" is a light paraphrase of "has introduced a service" | correct: quote found word for word (html, HTTP 200) |
+| PI-04 | OCAS covers 200+ public colleges (as of 2013, per HED). | https://hed.punjab.gov.pk/ocas | `was gradually implemented in 71 and 200+ public sector colleges during 2012 and 2013 respectively.` | 2026-11-07 | curl + HTML text strip | correct: quote on page; statement keeps the "as of 2013" limit | correct: quote found word for word (html, HTTP 200) |
+| PI-05 | OCAS application fee: Rs 25 per application. | https://ocas.punjab.gov.pk/ | `Nominal application fee (Rs 25 per application)` | 2026-11-07 | curl + HTML text strip | correct: quote on page word for word | correct: quote found word for word (html, HTTP 200) |
+| PI-06 | OCAS takes BISE results directly. | https://ocas.punjab.gov.pk/ | `Integration with BISE results, minimizing data entry and reducing errors` | 2026-11-07 | curl + HTML text strip | correct: quote on page word for word | correct: quote found word for word (html, HTTP 200) |
 
 ## Official lists
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-10 | HED publishes public college lists per division (9 PDFs); counts in the Lists table. | https://hed.punjab.gov.pk/colleges | `The lists of public colleges of Punjab are linked with their respective divisions given in the following:` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-Lbwp | HED public college list, bwp division (PDF). | https://hed.punjab.gov.pk/system/files/Bahawalpur_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Ldgk | HED public college list, dgk division (PDF). | https://hed.punjab.gov.pk/system/files/DGKhan_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lfsd | HED public college list, fsd division (PDF). | https://hed.punjab.gov.pk/system/files/Faisalabad_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lgrw | HED public college list, grw division (PDF). | https://hed.punjab.gov.pk/system/files/Gujranwala_Division.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Llhr | HED public college list, lhr division (PDF). | https://hed.punjab.gov.pk/system/files/Lahore_Division_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lmul | HED public college list, mul division (PDF). | https://hed.punjab.gov.pk/system/files/Multan_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lrwp | HED public college list, rwp division (PDF). | https://hed.punjab.gov.pk/system/files/Rawalpindi_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lswl | HED public college list, swl division (PDF). | https://hed.punjab.gov.pk/system/files/Sahiwal_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-Lsgd | HED public college list, sgd division (PDF). | https://hed.punjab.gov.pk/system/files/Sargodha_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | | correct: quote found word for word (pdf, HTTP 200) |
-| PI-14 | Private colleges and A-level schools (board affiliation lists): no official list found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| PI-10 | HED publishes public college lists per division (9 PDFs); counts in the Lists table. | https://hed.punjab.gov.pk/colleges | `The lists of public colleges of Punjab are linked with their respective divisions given in the following:` | 2026-11-07 | curl + HTML text strip | correct: quote on page; page links nine division lists | correct: quote found word for word (html, HTTP 200) |
+| PI-Lbwp | HED public college list, bwp division (PDF). | https://hed.punjab.gov.pk/system/files/Bahawalpur_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = BAHAWALPUR; 3 pages, 68 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Ldgk | HED public college list, dgk division (PDF). | https://hed.punjab.gov.pk/system/files/DGKhan_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = D.G.KHAN; 2 pages, 76 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lfsd | HED public college list, fsd division (PDF). | https://hed.punjab.gov.pk/system/files/Faisalabad_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = FAISALABAD; 3 pages, 98 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lgrw | HED public college list, grw division (PDF). | https://hed.punjab.gov.pk/system/files/Gujranwala_Division.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = GUJRANWALA; 3 pages, 132 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Llhr | HED public college list, lhr division (PDF). | https://hed.punjab.gov.pk/system/files/Lahore_Division_Colleges_0.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = LAHORE; 3 pages, 110 rows (not 108, see Lists table note) | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lmul | HED public college list, mul division (PDF). | https://hed.punjab.gov.pk/system/files/Multan_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = MULTAN; 2 pages, 70 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lrwp | HED public college list, rwp division (PDF). | https://hed.punjab.gov.pk/system/files/Rawalpindi_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = RAWALPINDI; 3 pages, 111 rows (not 110, see Lists table note) | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lswl | HED public college list, swl division (PDF). | https://hed.punjab.gov.pk/system/files/Sahiwal_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = SAHIWAL; 1 page, 37 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-Lsgd | HED public college list, sgd division (PDF). | https://hed.punjab.gov.pk/system/files/Sargodha_division_Colleges.pdf | `College Name` | 2026-11-07 | curl + pdftotext (PDF text layer) | weak quote (column header only); PDF content confirms Division column = SARGODHA; 3 pages, 95 rows | correct: quote found word for word (pdf, HTTP 200) |
+| PI-14 | Private colleges and A-level schools (board affiliation lists): no official list found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote | n/a: no URL: gap line |
 
 ## Documents
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-13 | Documents for intermediate admission: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| PI-13 | Documents for intermediate admission: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote | n/a: no URL: gap line |
 
 ## Rules not found
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-11 | Merit rules for intermediate admission in public colleges: no official source read (college policy page refused the connection). | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
-| PI-12 | Seat categories / quotas for intermediate admission: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | | n/a: no URL: gap line |
+| PI-11 | Merit rules for intermediate admission in public colleges: no official source read (college policy page refused the connection). | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote | n/a: no URL: gap line |
+| PI-12 | Seat categories / quotas for intermediate admission: no official source found. | — | **no official source found** | 2026-11-07 | no official source found | n/a: gap line, no URL or quote | n/a: no URL: gap line |
 
 ## Calendar
 
 | # | Line | Source URL | Verbatim quote | Read | Method | Check 1 | Check 2 |
 |---|---|---|---|---|---|---|---|
-| PI-07 | The 2026 OCAS intermediate cycle opened by 23 Sep 2026. | https://ocas.punjab.gov.pk/ | `Sep 23, 2026 OCAS Portal is Live for Intermediate Admissions.` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-08 | BISE Lahore published the 11th-class registration schedule for session 2026-28 (dates in a linked PDF, not read here). | https://biselahore.com/notifications | `Revised Online Registration / Admission Schedule for Intermediate (11th-Class) Academic Session 2026-28` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
-| PI-09 | BISE Lahore's 2026 exams had first and second annual sittings. | https://biselahore.com/notifications | `Date Sheet Intermediate (Second Annual) Examination 2026` | 2026-11-07 | curl + HTML text strip | | correct: quote found word for word (html, HTTP 200) |
+| PI-07 | The 2026 OCAS intermediate cycle opened by 23 Sep 2026. | https://ocas.punjab.gov.pk/ | `Sep 23, 2026 OCAS Portal is Live for Intermediate Admissions.` | 2026-11-07 | curl + HTML text strip | correct: highlight on page word for word; "opened by 23 Sep 2026" follows | correct: quote found word for word (html, HTTP 200) |
+| PI-08 | BISE Lahore published the 11th-class registration schedule for session 2026-28 (dates in a linked PDF, not read here). | https://biselahore.com/notifications | `Revised Online Registration / Admission Schedule for Intermediate (11th-Class) Academic Session 2026-28` | 2026-11-07 | curl + HTML text strip | correct: title on page word for word; statement says dates not read, adds nothing | correct: quote found word for word (html, HTTP 200) |
+| PI-09 | BISE Lahore's 2026 exams had first and second annual sittings. | https://biselahore.com/notifications | `Date Sheet Intermediate (Second Annual) Examination 2026` | 2026-11-07 | curl + HTML text strip | wrong: quote is only the Second Annual 2026 date sheet; "first" sitting is not in the quote (a First Annual 2026 title is elsewhere on the page, not quoted) | correct: quote found word for word (html, HTTP 200) |
 
 ### Lists table (public colleges, HED division PDFs)
 
@@ -88,4 +88,4 @@ Sum of rows: **794** public colleges. These PDFs date from 2019–2021, so the l
 
 - Lines: 23; cited: 19; gaps: 4.
 - Check 2: correct 19, wrong 0, unclear 0, n/a 4 (run 2026-11-07T19:46:14.935780Z).
-- Check 1: not done yet.
+- Check 1 (blind AI pass, 2026-11-07): correct 18, wrong 1 (PI-09), unclear 0, n/a 4. Hand recount differs from the Lists table for lhr (110, not 108) and rwp (111, not 110); the draft count missed rows whose gender is in capitals (FEMALE, BOTH). Sum 797, not 794. grw 132 and mul 70 confirmed.
