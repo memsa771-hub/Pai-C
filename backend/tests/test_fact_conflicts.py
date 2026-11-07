@@ -221,7 +221,7 @@ def test_answer_proposed_writes_only_that_value_as_the_students_own(student):
         db.commit()
         issue = db.get(ProfileIssue, entry["ref"].partition(":")[2])
         assert issue.status == "resolved" and issue.resolution["action"] == "answered_by_value"
-        assert issue.resolution["answers"] == {GPA: {"choice": "proposed", "request_id": 41}}
+        assert issue.resolution["answers"] == {GPA: {"choice": "proposed", "field": "gpa", "value": 3.2, "request_id": 41}}
         (candidate,) = written(db)
         assert candidate.source_type == "user_explicit" and candidate.evidence["profile_issue_id"] == issue.id
         assert candidate.evidence["os_request_id"] == 41 and candidate.evidence["quote"]  # M4
@@ -241,7 +241,8 @@ def test_answer_current_keeps_the_vault_value_and_writes_nothing(student):
         assert fact_conflicts.answer(db, ws, entry["ref"], GPA, "current") == {"status": "resolved"}
         db.commit()
         issue = db.get(ProfileIssue, entry["ref"].partition(":")[2])
-        assert issue.status == "resolved" and issue.resolution["answers"] == {GPA: {"choice": "current"}}
+        assert issue.status == "resolved" and issue.resolution["answers"] == {
+            GPA: {"choice": "current", "field": "gpa", "value": 3.4}}
         assert written(db) == []
         assert education(db, ws)[0]["result"]["gpa"] == 3.4
         assert db.scalar(select(MemoryCandidate.id).order_by(MemoryCandidate.created_at.desc())) == before
@@ -305,8 +306,9 @@ def test_one_card_with_two_differing_values_is_two_entries_answered_one_at_a_tim
         db.commit()
         issue = db.get(ProfileIssue, ref.partition(":")[2])
         assert issue.status == "resolved" and built(db, ws)["conflicts"] == []
-        assert issue.resolution["answers"] == {MARKS: {"choice": "proposed", "request_id": 5},
-                                               TOTAL: {"choice": "current", "request_id": 6}}
+        assert issue.resolution["answers"] == {
+            MARKS: {"choice": "proposed", "field": "marks_obtained", "value": 760, "request_id": 5},
+            TOTAL: {"choice": "current", "field": "marks_total", "value": 1100, "request_id": 6}}
         assert education(db, ws)[0]["result"] == {"marks_obtained": 760, "marks_total": 1100}
         assert len(written(db)) == 1
 

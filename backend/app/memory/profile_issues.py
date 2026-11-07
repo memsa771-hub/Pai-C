@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.models import MemoryCandidate, ProfileIssue, VaultItem, Workspace
 from .candidates import MemoryCandidateService
 from .errors import MemoryDataError
+from .issue_answers import answers_of, settle_value
 from .reconciler import MemoryReconciler
 from .vault_intake import VaultAssertionService
 
@@ -52,7 +53,7 @@ class ProfileIssueService:
                 ProfileIssue.id == issue_id,
                 ProfileIssue.workspace_id == workspace_id,
                 ProfileIssue.status == "open",
-            ).with_for_update()
+            ).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
 
     def settle(self, issue: ProfileIssue, *, note: str, answers: dict | None = None) -> None:
@@ -115,7 +116,7 @@ class ProfileIssueService:
         if issue.affected_type == "vault_item" and issue.affected_id:
             # Answer about the entry the card names, never a loose look-alike.
             spec["entities"] = {**(spec["entities"] or {}), "item_id": issue.affected_id}
-        proposed_value = value if action == "provide_new" else spec["proposed_value"]
+        proposed_value = value if action == "provide_new" else settle_value(spec["proposed_value"], answers_of(issue))
         candidate = self.candidates.propose(
             workspace_id=workspace_id,
             candidate_type=spec["candidate_type"],
@@ -259,7 +260,9 @@ class ProfileIssueService:
 
     def _closed(self, issue: ProfileIssue) -> None:
         """Tells the registered hooks that the card is closed. A hook runs in a savepoint: its failure is logged by class
-        and never undoes the answer (the Vault version is swept again from the version table)."""
+        and never undoes the answer. What the hook wrote in that savepoint (a Vault version bump, a queued event) is
+        rolled back with it, so nothing is left to sweep; the OS hears the answer from its own recompile, which reads the
+        conflicts live (the answer route recomputes at once, the hourly recompile is the backstop)."""
         if not _CLOSE_HOOKS:
             try:
                 self._load_hooks()

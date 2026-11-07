@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from app.models import MemoryCandidate, ProfileIssue, VaultVersion
+from app.models import ProfileIssue, VaultVersion
 from app.pai_c.connect.student_facts import _num, chosen_education, education_records
 from app.pai_c.connect.vault_version import key_map
 
@@ -148,8 +148,12 @@ def _open_issues(db, workspace_id: str) -> list[ProfileIssue]:
 
 def _card_entries(issue: ProfileIssue, card: dict, chosen: dict, attempts: list[dict]) -> list[tuple[str, dict, dict]]:
     """`(key, current side, proposed side)` for each key the card still differs on."""
-    return (_education_entries(issue, card, chosen) if issue.affected_type == "education"
-            else _test_entries(issue, card, attempts))
+    from app.pai_c.memory import issue_answers
+
+    answered = issue_answers.answers_of(issue)  # a value answered one by one is not asked again
+    found = (_education_entries(issue, card, chosen) if issue.affected_type == "education"
+             else _test_entries(issue, card, attempts))
+    return [e for e in found if e[0] not in answered]
 
 
 def _attempts(db, workspace_id: str) -> list[dict]:
@@ -274,26 +278,29 @@ def _raw(row: dict, field: str):
     return node
 
 
-def _put(proposed: dict, field: str, raw) -> dict:
-    """A copy of the card's proposed record whose `field` holds `raw` (so the card no longer differs on it)."""
-    out = {**proposed}
-    if field in ("level", "overall_score"):
-        out["qualification_name" if field == "level" else field] = raw
-        return out
-    result = out["result"] = dict(out.get("result") or {})
-    *parents, leaf = field.split(".")
-    for part in parents:
-        result = result[part] = dict(result.get(part) or {})
-    result[leaf] = raw
-    return out
-
-
 def _level_place(db, workspace_id: str, key: str, proposed: dict) -> tuple[str, dict, str] | None:
     """The qualification name of the card's proposed record, as a record value (the level has no typed value)."""
     family = key.partition(".")[2].partition(".")[0]
     row = chosen_education(education_records(db, workspace_id)).get(family)
     name = proposed.get("qualification_name")
     return ("education", {"qualification_name": name}, row["id"]) if row is not None and name else None
+
+
+def _loose(a, b) -> bool:
+    if _num(a) is not None and _num(b) is not None:
+        return _num(a) == _num(b)
+    return str(a).strip().casefold() == str(b).strip().casefold()
+
+
+def _differs(proposed, live, here: tuple, skip: set) -> bool:
+    """True when the card's proposed record names a value the saved record does not hold, on any field but the
+    answered ones."""
+    if here in skip or proposed in (None, ""):
+        return False
+    if isinstance(proposed, dict):
+        have = live if isinstance(live, dict) else {}
+        return any(_differs(v, have.get(k), (*here, k), skip) for k, v in proposed.items())
+    return live in (None, "") or not _loose(proposed, live)
 
 
 def _write(db, workspace_id: str, issue: ProfileIssue, kind: str, record_value: dict, record_id: str, action: str,
@@ -327,7 +334,8 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None, r
     answered), `{"status": "gone"}` (the card is closed already: the answer was given elsewhere) or
     `{"status": "refused", "code": ...}` with code `bad_choice`, `not_offered`, `not_a_fact_question`,
     `new_value_required`, `invalid_value`, `not_typeable` or `not_saved`."""
-    from app.pai_c.memory import MemoryCandidateService, MemoryDataError, MemoryReconciler, ProfileIssueService
+    from app.pai_c.memory import (MemoryCandidateService, MemoryDataError, MemoryReconciler, ProfileIssueService,
+                                  issue_answers)
 
     action = ACTIONS.get(choice)
     if action is None:
@@ -354,8 +362,8 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None, r
                       ) if issue_id else None
     if issue is None:
         return {"status": "refused", "code": "not_a_fact_question"}
-    if issue.status != "open":
-        return {"status": "gone"}  # answered on the Vault page or in the chat while the student was looking
+    if issue.status != "open" or key in issue_answers.answers_of(issue):
+        return {"status": "gone"}  # answered on the Vault page, in the chat, or here already
     asked = next((c for c in _entries(db, workspace_id) if c["ref"] == ref and c["key"] == key), None)
     if asked is None:
         return {"status": "refused", "code": "not_a_fact_question"}  # a name card, or no longer a question about this fact
@@ -371,6 +379,9 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None, r
     locked = service.lock_open(workspace_id, issue_id)  # workspace before issue: the Vault's lock order
     if locked is None:
         return {"status": "gone"}  # closed by another answer between the read and the lock
+    asked = next((c for c in _entries(db, workspace_id) if c["ref"] == ref and c["key"] == key), None)
+    if asked is None or key in issue_answers.answers_of(locked):
+        return {"status": "gone"}  # another answer took this value between the read and the lock: it stands
     proposed = dict((locked.evidence or {}).get("proposed") or {})
     record_id = (locked.evidence or {}).get("record_id") or locked.affected_id
     if action == "accept_proposed":
@@ -383,26 +394,20 @@ def answer(db, workspace_id: str, ref: str, key: str, choice: str, value=None, r
             return {"status": "refused", "code": "not_typeable"}
     if place is not None and _write(db, workspace_id, locked, *place, action, request_id) is None:
         return {"status": "refused", "code": "invalid_value"}
-    # the card now agrees with the record on this key, whichever side the student chose
     row = _held(db, workspace_id, key, record_id)
     if row is None:
         return {"status": "refused", "code": "not_saved"}
-    answers = {**((locked.evidence or {}).get("os_answers") or {}),
-               key: {"choice": choice, **({"request_id": request_id} if request_id is not None else {})}}
-    agreed = _raw(row, field)
-    locked.evidence = {**(locked.evidence or {}), "proposed": _put(proposed, field, agreed), "os_answers": answers}
-    original = db.get(MemoryCandidate, locked.candidate_id) if locked.candidate_id else None
-    if original is not None and original.status in ("pending", "needs_review") and isinstance(
-            original.proposed_value, dict):
-        wrapped = set(original.proposed_value) == {"value"}  # the proposal the Vault page would apply is narrowed too
-        body = original.proposed_value["value"] if wrapped else original.proposed_value
-        if isinstance(body, dict):
-            narrowed = _put(body, field, agreed)
-            original.proposed_value = {"value": narrowed} if wrapped else narrowed
+    # The card and the document's reading stay exactly as they were. The answer is noted apart: the key is not asked
+    # again, and a later "accept" applies the saved value for it, never the one the student did not choose.
+    answers = {**issue_answers.answers_of(locked),
+               key: {"choice": choice, "field": field, "value": _raw(row, field),
+                     **({"request_id": request_id} if request_id is not None else {})}}
+    locked.evidence = {**(locked.evidence or {}), issue_answers.KEY: answers}
     db.flush()
     card = _cards(db, workspace_id).get(locked.id)
     left = _card_entries(locked, card, chosen_education(education_records(db, workspace_id)),
                          _attempts(db, workspace_id)) if card is not None else []
-    if not left:
+    # Close only when nothing else of the proposed record differs either (a name, a date): the rest is the Vault page's.
+    if not left and not _differs(proposed, row, (), issue_answers.paths(answers)):
         service.settle(locked, note="Answered in PAI OS, one value at a time.", answers=answers)
     return {"status": "resolved"}

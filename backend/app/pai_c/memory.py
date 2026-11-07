@@ -476,3 +476,5 @@ class MemoryService:
             result = retriever._fallback(workspace_id, query, kinds, None,
                 top_k or config.PAI_SEMANTIC_RECALL_TOP_K, ("session_summary",))
         return [{"id": item.id, "kind": item.kind, "text": item.text} for item in result.ordered]
+
+from app.memory import issue_answers  # noqa: E402,F401  re-exported for PAI C (P1-T8: per-value answers on a card)
