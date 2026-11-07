@@ -314,6 +314,7 @@ def test_unconfigured_port_keeps_direct_edit(engine, clean, os_db):
         ports.configure(None)
 
 
+@pytest.mark.standalone
 def test_module_off_no_choice_request_rows(engine, clean, os_db):
     w = make_world(engine, os_db, module=False)
     try:

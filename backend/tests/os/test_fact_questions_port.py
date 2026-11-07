@@ -34,6 +34,7 @@ def test_conflicts_are_validated_and_read_by_key(configured):
     assert [v.value for v in found.values] == [3.4, 3.2] and fact_questions.conflict_for("ws-1", "x.y") is None
 
 
+@pytest.mark.standalone
 def test_unconfigured_or_none_means_no_conflicts_and_no_answer(configured):
     assert fact_questions.conflicts("ws-1") == {} and fact_questions.read("ws-1") is None
     assert fact_questions.answer("ws-1", "profile_issue:a", "education.bachelor.gpa", "current") is None
