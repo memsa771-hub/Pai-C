@@ -93,7 +93,7 @@ Code limits and known gaps:
 - **Registry (T2):** which kind a parent may have is chosen per kind table by the agent; the final review is to check it.
 - **Intakes (T8):** the Counsellor adapter maps an intake error to `route_not_supported` (an approximation); the upgrade route has no handler for the new value error (no current path reaches it).
 - **Consistency job:** rules 9 to 12 read PAI OS alone, per student with an open plan, and run inside the connection's job (they are off when the connection is off); rule 13 is P4 (R-70).
-- Marking a request in the Counsellor spec text: the queue export skips an item that has no registry entity, and says so (the second result and the `X-Items-Without-Row` header).
+- The queue export (R-69) writes only items whose fact belongs to a registry entity or to a programme placed under one; the other items are listed in the second result and in the `X-Items-Without-Row` header, not dropped silently.
 
 ## 5. Flags and settings added in P2
 
