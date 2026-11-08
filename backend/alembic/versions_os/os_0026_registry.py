@@ -23,6 +23,7 @@ KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test
          "seat_category", "calendar", "official_list")
 STATUSES = ("active", "closed", "merged", "renamed")
 CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+REVISION_KINDS = ("entity", "link", "programme")
 PROGRAMME_COLUMNS = ("institution_id", "campus_id", "level", "field", "family", "region")
 
 
@@ -73,6 +74,8 @@ def upgrade() -> None:
         sa.Column("tenant_id", sa.Text, nullable=False),
         sa.Column("registry_id", sa.BigInteger, sa.ForeignKey(f"{S}.os_registry.id", ondelete="RESTRICT"),
                   nullable=False),
+        sa.Column("kind", sa.Text, nullable=False, server_default="entity"),
+        sa.Column("subject", sa.Text),
         sa.Column("action", sa.Text, nullable=False),
         sa.Column("before", JSONB),
         sa.Column("after", JSONB, nullable=False),
@@ -80,6 +83,7 @@ def upgrade() -> None:
         sa.Column("cause_ref", sa.Text),
         sa.Column("actor", sa.Text),
         sa.Column("at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        _in("kind", REVISION_KINDS, "ck_os_registry_revisions_kind"),
         _in("action", ("insert", "change", "status", "undo"), "ck_os_registry_revisions_action"),
         _in("cause", CAUSES, "ck_os_registry_revisions_cause"),
         schema=S,

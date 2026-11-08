@@ -22,12 +22,33 @@ class OfficialListError(ValueError):
     pass
 
 
-def _day(value: Any, where: str) -> datetime:
+def _date(value: Any, field: str, where: str) -> date:
+    """A date as the YAML reader gives it, or as text `YYYY-MM-DD` (a quoted date stays text)."""
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=UTC)
+        return value.date()
     if isinstance(value, date):
-        return datetime(value.year, value.month, value.day, tzinfo=UTC)
-    raise OfficialListError(f"{where}: 'retrieved' must be a date")
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value.strip())
+        except ValueError:
+            pass
+    raise OfficialListError(f"{where}: '{field}' must be a date (YYYY-MM-DD)")
+
+
+def _day(value: Any, where: str) -> datetime:
+    if isinstance(value, datetime) and value.tzinfo:
+        return value
+    d = _date(value, "retrieved", where)
+    return datetime(d.year, d.month, d.day, tzinfo=UTC)
+
+
+def _count_confirmed(item: dict, count: int | None) -> bool:
+    """The page's count is confirmed only when the check agreed AND the count was not a markup count nor flagged
+    unconfirmed on import AND there is a count (R-35a)."""
+    method = str(item.get("count_method") or "").strip().lower()
+    return (item.get("check2") == "correct" and count is not None and not method.startswith("markup_count")
+            and "unconfirmed on import" not in method)
 
 
 def parse_official_lists(data: dict, *, country: str) -> list[RegistryEntry]:
@@ -54,8 +75,8 @@ def parse_official_lists(data: dict, *, country: str) -> list[RegistryEntry]:
                 raise OfficialListError(f"{where}: row_count must be a whole number or null")
             attrs: dict[str, Any] = {k: item[k] for k in _ATTRS if item.get(k) is not None}
             attrs["row_count"] = count
-            attrs["date"] = item["date"].isoformat() if item.get("date") else None
-            attrs["count_confirmed"] = item.get("check2") == "correct"
+            attrs["date"] = _date(item["date"], "date", where).isoformat() if item.get("date") else None
+            attrs["count_confirmed"] = _count_confirmed(item, count)
             extra = {k: v for k, v in item.items() if k not in _KNOWN}
             if extra:
                 attrs["extra"] = extra
