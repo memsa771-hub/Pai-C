@@ -156,15 +156,16 @@ class PageGateway:
     # --- public -------------------------------------------------------------------------------------
 
     def fetch(self, url: str, own_domains: Sequence[str], shared_domains: Sequence[str],
-              scope: "Scope | None" = None) -> Page:
+              scope: "Scope | None" = None, refresh: bool = False) -> Page:
         """`scope` (region and family, or route) is used only with a source guard: a domain on the reviewed
-        allow-list for that scope is official too, besides the lists the caller passes."""
+        allow-list for that scope is official too, besides the lists the caller passes. `refresh` skips the cache and
+        reads the page again (season monitoring, P2-T7)."""
         guard = self.sources
         if guard is not None and guard.is_suspect(url):  # before the cache: nothing is taken from a suspect domain
             return Page(url=url, blocked="suspect_domain", fetched_at=self.clock())  # not cached: the state can change
         if guard is not None and urlsplit(url).scheme.lower() != "https":  # review I6: https only with the guard
             return Page(url=url, blocked="insecure_scheme", fetched_at=self.clock())
-        cached = self._cached(url)
+        cached = None if refresh else self._cached(url)
         if cached is not None and not (guard is not None and (cached.blocked or "").startswith(
                 ("integrity:", "tls_", "suspect_domain"))):
             return cached  # (a cached integrity block is read again once the domain is active: only approvers get it so)
@@ -251,10 +252,10 @@ class PageGateway:
         return replace(page, snapshot_id=got.snapshot_id)
 
     def fetch_or_record(self, url: str, own_domains: Sequence[str], shared_domains: Sequence[str],
-                        scope: "Scope | None" = None) -> Page:
+                        scope: "Scope | None" = None, refresh: bool = False) -> Page:
         """For callers outside a DBOS step: one try, and a transient failure is recorded as a blocked page."""
         try:
-            return self.fetch(url, own_domains, shared_domains, scope)
+            return self.fetch(url, own_domains, shared_domains, scope, refresh)
         except TransientFetchError as e:
             return self.record_failure(url, str(e))
 

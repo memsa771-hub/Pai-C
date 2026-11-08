@@ -239,6 +239,8 @@ knowledge_facts = Table(
     Column("fact_class", Text),
     Column("read_method", Text),
     Column("language", Text),
+    # P2-T7 (os_0030): why a fact that went back to unconfirmed is being checked again (monitor or a student report).
+    Column("recheck_reason", Text),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
                      name="uq_os_knowledge_facts"),
     _in("scope", FACT_SCOPES, "ck_os_knowledge_facts_scope"),
@@ -246,6 +248,8 @@ knowledge_facts = Table(
     _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
     _in("read_method", READ_METHODS, "ck_os_knowledge_facts_read_method"),
     CheckConstraint("language ~ '^[a-z]{2,3}$'", name="ck_os_knowledge_facts_language"),
+    CheckConstraint("recheck_reason IS NULL OR recheck_reason IN ('monitor', 'report')",
+                    name="ck_os_knowledge_facts_recheck"),
 )
 
 # P2-D9: append-only history of every fact insert, change, status change and undo, with its cause.
@@ -1023,6 +1027,30 @@ source_files = Table(
     Column("content", LargeBinary, nullable=False),
     _created(),
     UniqueConstraint("tenant_id", "snapshot_id", name="uq_os_source_files_snapshot"),
+)
+
+# P2-T7 (os_0030, P2 §4.7, P2-D22): what students reported, and one row per monitoring run.
+fact_reports = Table(
+    "os_fact_reports", md,
+    _id(), _tenant(),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT"), nullable=False),
+    Column("student_ref", Text, nullable=False),
+    Column("reason", Text, nullable=False),  # a code from monitor/config.yaml
+    Column("detail", Text),  # the student's words: only the review item shows them, never another student
+    Column("review_item_id", BigInteger, ForeignKey("os.os_review_items.id", ondelete="RESTRICT")),
+    _created(),
+    Index("ix_os_fact_reports_student", "tenant_id", "student_ref", "created_at"),
+    Index("ix_os_fact_reports_fact", "tenant_id", "fact_id"),
+)
+
+monitor_runs = Table(
+    "os_monitor_runs", md,
+    _id(), _tenant(),
+    Column("run_date", Date, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("finished_at", DateTime(timezone=True)),
+    Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    UniqueConstraint("tenant_id", "run_date", name="uq_os_monitor_runs_day"),
 )
 
 # P2-T8 (os_0029): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).

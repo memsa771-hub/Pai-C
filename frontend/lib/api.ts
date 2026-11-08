@@ -616,6 +616,18 @@ class WorkspaceApi {
     return body.cases;
   }
 
+  /** PAI OS: the approved sentences for reporting a fact as wrong (P2-T7). */
+  async getOsReportTexts(): Promise<unknown> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/report/texts?${params}`);
+  }
+
+  /** PAI OS: report the facts behind a source line as wrong (P2-T7, R-28). */
+  async reportOsSource(url: string, reason: string, text: string | null): Promise<{ status: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/sources/report?${params}`, { method: 'POST', body: JSON.stringify({ url, reason, text }) });
+  }
+
   /**
    * PAI OS review queue (P2-T5): a reviewer's own token goes in its own header, never in a URL. A 401 means a wrong
    * reviewer token, so it never signs the user out.

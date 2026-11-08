@@ -1,0 +1,12 @@
+# Season monitoring and student reports as data (P2-D21, P2-D22). No country, board or institution names belong here.
+version: 1
+# A fact is monitored while it is at one of these levels.
+monitored_statuses: [confirmed, verified]
+# A page that answers with one of these codes is gone: the facts it backed go back to unconfirmed. Any other failure
+# (a timeout, a server error, a block by robots.txt or by the source guard) changes nothing: it is not a change of the page.
+gone_http: [404, 410]
+# Reasons a student can give for a report. The labels the student sees are in texts.yaml (approved sentences).
+report_reasons: [wrong_date, wrong_amount, page_changed, other]
+# A student may report this many different facts in 24 hours; the same fact again joins its open item.
+max_reported_facts_per_day: 5
+report_text_max_chars: 1000

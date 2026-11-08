@@ -114,6 +114,10 @@ class ProgrammeStore:
             rows = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id).order_by(T.c.ref)).all()
         return with_own_pages([_programme(r) for r in rows])
 
+    def all(self) -> list[Programme]:
+        """Every programme of the tenant, with its own pages."""
+        return self._all()
+
     def get(self, ref: str) -> Programme | None:
         """The programme with its own pages (start URLs no other programme of the tenant uses)."""
         return next((p for p in self._all() if p.ref == ref), None)

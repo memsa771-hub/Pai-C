@@ -183,7 +183,7 @@ def drop_domain_facts(engine: Engine, tenant_id: str, knowledge: SqlKnowledge, d
                 if r is None or r.status == "unconfirmed":
                     continue
                 knowledge.set_status(fid, "unconfirmed", cause="monitor", cause_ref=f"source:{domain}",
-                                     actor="source_guard")
+                                     actor="source_guard", recheck="monitor")  # the steps it dates wait (P2-D20)
                 dropped.append(fid)
                 if after_change is not None:
                     after_change(r.scope, r.ref, r.field, fid, "unconfirmed", r.intake_year)

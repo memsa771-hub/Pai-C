@@ -164,6 +164,23 @@ class ReviewQueue:
                 voided += 1
         return voided
 
+    def void_verify(self, fact_id: int, conn=None) -> int:
+        """Closes the fact's open verify item as void: the fact went back to unconfirmed (monitoring, a report), so
+        the checks given so far no longer stand. `sync` opens a new one when the fact is confirmed again."""
+        with self.knowledge._tx(conn) as c:
+            return c.execute(update(I).where(I.c.tenant_id == self.tenant_id, I.c.fact_id == fact_id,
+                                             I.c.kind == "verify", I.c.status == "open")
+                             .values(status="closed", resolution="void", closed_at=func.now())).rowcount
+
+    def note_report(self, item_id: int, entry: dict) -> None:
+        """Adds one student report (reason code, their words, when) to a `report` item. The words stay here: only
+        reviewers read them, never another student."""
+        with self.engine.begin() as conn:
+            payload = conn.execute(select(I.c.payload).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
+                                   .with_for_update()).scalar_one()
+            conn.execute(update(I).where(I.c.id == item_id).values(
+                payload={**payload, "reports": [*payload.get("reports", []), entry]}))
+
     def sync(self, *, high_stakes_only: bool | None = None, batch_ref: str | None = None) -> int:
         """Voids stale items, then opens a verify item for every fact that can be checked and has none: confirmed
         facts, and machine or hand readings still waiting for their comparison with the original. Returns how many

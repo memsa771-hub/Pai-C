@@ -11,6 +11,7 @@ from typing import Any, Literal, Protocol
 FactStatus = Literal["confirmed", "unconfirmed", "stale", "verified"]
 STATUSES: tuple[str, ...] = ("confirmed", "unconfirmed", "stale", "verified")
 READ_METHODS: tuple[str, ...] = ("fetch", "render", "ocr", "human", "model")
+RECHECK_REASONS: tuple[str, ...] = ("monitor", "report")  # why an unconfirmed fact is being checked again (P2-D20)
 _SOURCED = ("confirmed", "verified")
 CONFIRMED_LEVELS: tuple[str, ...] = _SOURCED  # statuses that count as confirmed (a verified fact is confirmed too)
 
@@ -32,6 +33,9 @@ class Fact:
     fact_class: str | None = None  # a key of knowledge/fact_classes.yaml; None = look up by field
     read_method: str | None = None
     language: str | None = None
+    # Set when monitoring or a student report took a confirmed fact back to unconfirmed; the plan then holds the steps it
+    # dates (`fact_rechecking`). Cleared when the fact is confirmed or verified again.
+    recheck: str | None = None
 
     def __post_init__(self) -> None:
         if self.status not in STATUSES:
@@ -40,6 +44,8 @@ class Fact:
             raise ValueError(f"{self.status} fact needs a quote and url")
         if self.checked_at.tzinfo is None:
             raise ValueError("checked_at must be timezone-aware")
+        if self.recheck is not None and self.recheck not in RECHECK_REASONS:
+            raise ValueError(f"unknown recheck reason '{self.recheck}'")
         if self.read_method is not None and self.read_method not in READ_METHODS:
             raise ValueError(f"unknown read method '{self.read_method}'")
 
