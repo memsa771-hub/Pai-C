@@ -89,19 +89,33 @@ def _revise(conn, tenant_id: str, fact_id: int, before, after, cause: str, cause
     conn.execute(RV.insert().values(tenant_id=tenant_id, fact_id=fact_id, action=action, before=old, after=new,
                                     cause=cause, cause_ref=cause_ref, actor=actor))
     if old is not None and any(old[k] != new[k] for k in _CONTENT):
-        _void_reviews(conn, tenant_id, fact_id, except_item)
+        _void_reviews(conn, tenant_id, fact_id, except_item, after)
 
 
-def _void_reviews(conn, tenant_id: str, fact_id: int, except_item: int | None) -> None:
+def _void_reviews(conn, tenant_id: str, fact_id: int, except_item: int | None, after) -> None:
     """A fact whose reading changed leaves no open verify item: its checks were of another reading (I3). Items a
     reviewer holds locked right now are skipped (no waiting, so no deadlock); their checks carry a digest and are
-    voided when they are applied."""
+    voided when they are applied, or by the queue's sweep. A fact that can still be checked gets a fresh verify item in
+    the same transaction (the author of the old item stays barred from checking the new reading)."""
+    from app.os.knowledge.review.policy import load_policy
+
     q = select(RI.c.id).where(RI.c.tenant_id == tenant_id, RI.c.fact_id == fact_id, RI.c.kind == "verify",
                               RI.c.status == "open")
     if except_item is not None:
         q = q.where(RI.c.id != except_item)
-    conn.execute(update(RI).where(RI.c.id.in_(q.with_for_update(skip_locked=True)))
-                 .values(status="closed", resolution="void", closed_at=func.now()))
+    voided = conn.execute(update(RI).where(RI.c.id.in_(q.with_for_update(skip_locked=True)))
+                          .values(status="closed", resolution="void", closed_at=func.now())
+                          .returning(RI.c.batch_ref, RI.c.payload)).all()
+    checkable = after.status == "confirmed" or (
+        after.status == "unconfirmed" and after.read_method in load_policy().compare_with_original)
+    if voided and checkable:
+        old = voided[0]
+        author = (old.payload or {}).get("author_ref")
+        conn.execute(RI.insert().values(
+            tenant_id=tenant_id, kind="verify", fact_id=fact_id, subject="", field=after.field,
+            intake_term=after.intake_term, intake_year=after.intake_year, owner_ref=after.owner_ref,
+            payload={"author_ref": author} if author else {}, batch_ref=old.batch_ref,
+            dedupe_key=f"verify:{fact_id}", opened_by="review"))
 
 
 class SqlKnowledge:

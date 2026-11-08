@@ -34,9 +34,9 @@ def api(engine, clean, os_db):
     c = TestClient(app)
     store = ReviewerStore(engine, "pai")
     c.tokens = {}
-    for ref, role, kind in (("ai_check_1", "checker", "ai"), ("ai_check_2", "approver", "ai"),
-                            ("amina", "checker", "person"), ("owner", "admin", "person")):
-        c.tokens[ref] = {REVIEWER_HEADER: store.add(ref, ref, role, kind)[1]}
+    for ref, role, kind, ident in (("ai_check_1", "checker", "ai", "model-a"), ("ai_check_2", "approver", "ai", "model-b"),
+                                   ("amina", "checker", "person", None), ("owner", "admin", "person", None)):
+        c.tokens[ref] = {REVIEWER_HEADER: store.add(ref, ref, role, kind, identity=ident)[1]}
     c.kb = SqlKnowledge(engine, "pai")
     c.fact = c.kb.upsert("programme", "p1", "deadline_close",
                          Fact({"date": "2027-07-15", "tz": "Europe/Berlin"}, QUOTE, URL, AT, 2027, "confirmed"))
@@ -178,8 +178,12 @@ def test_admin_audit_shows_identities_and_reviewers_do_not(api):
              json={"step": "check", "outcome": "correct"})
     admin_reviewer = api.get(f"/v1/os/review/items/{item}", headers=api.tokens["owner"]).json()
     assert admin_reviewer["reviews"] == []  # an admin reviewer has no view into open reviews
+    assert api.get(f"/v1/os/admin/review/items/{item}/audit", headers=ADMIN).status_code == 409  # open: refused
+    api.post(f"/v1/os/review/items/{item}/review", headers=api.tokens["ai_check_2"],
+             json={"step": "approve", "outcome": "approve"})
     audit = api.get(f"/v1/os/admin/review/items/{item}/audit", headers=ADMIN).json()
-    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [("ai_check_1", "ai_check_1")]
+    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [
+        ("ai_check_1", "model-a"), ("ai_check_2", "model-b")]
     assert api.get(f"/v1/os/admin/review/items/{item}/audit", headers=api.tokens["owner"]).status_code == 401
     assert api.get("/v1/os/admin/review/items/999/audit", headers=ADMIN).status_code == 404
 

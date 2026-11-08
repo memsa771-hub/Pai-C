@@ -10,7 +10,8 @@
 
 Roles: checker (gives the `check` step), approver (the `approve` step), admin (either, and sees all reviews).
 Kinds: person, ai. Identity: the person, or for an AI check the model and prompt behind the ref (default: the ref).
-Two checks of one fact need two distinct identities, so give separate AI checks separate model or prompt identities. Which kinds count towards `verified` is the review policy file, not this script.
+Two checks of one fact need two distinct identities, so give separate AI checks separate model or prompt identities.
+`--identity` is required for kind ai; it is compared ignoring case and spaces around it. Which kinds count towards `verified` is the review policy file, not this script.
 `add` and `rotate` print the token once. It is stored hashed and cannot be shown again; give it to the reviewer
 over a private channel. Needs OS_DATABASE_URL (or DATABASE_URL) and optionally OS_TENANT_ID. Exit code 2 when refused.
 """
@@ -45,6 +46,10 @@ def main(argv: list[str] | None = None, engine=None, tenant_id: str | None = Non
     try:
         if args.cmd == "add":
             r, token = store.add(args.ref, args.name, args.role, args.kind, args.identity)
+            if r.identity == r.ref:
+                print(f"warning: the identity of {r.ref} is its ref. If another reviewer is the same person or the "
+                      "same model and prompt, give both the same --identity so they do not count as two checks.",
+                      file=sys.stderr)
             out(f"added {r.ref} ({r.role}, {r.kind}). Token (shown once): {token}")
         elif args.cmd == "list":
             for r in store.list():

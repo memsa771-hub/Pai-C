@@ -58,7 +58,9 @@ class ReviewerStore:
             raise ReviewerError(f"kind must be one of {models.REVIEWER_KINDS}")
         if not display_name.strip():
             raise ReviewerError("display name is required")
-        identity = (identity or ref).strip()
+        if kind == "ai" and not (identity or "").strip():
+            raise ReviewerError("an AI reviewer needs an identity: the model and prompt behind it")
+        identity = (identity or ref).strip().casefold()  # "Model-A " and "model-a" are one identity
         if not identity:
             raise ReviewerError("identity is required")
         token = TOKEN_PREFIX + secrets.token_urlsafe(32)

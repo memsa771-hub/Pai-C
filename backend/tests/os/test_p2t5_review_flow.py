@@ -25,10 +25,11 @@ class Setup:
         self.changes: list[tuple] = []
         self.q = self.queue()
         self.r = {}
-        for ref, role, kind in (("ai_check_1", "checker", "ai"), ("ai_check_2", "approver", "ai"),
-                                ("amina", "checker", "person"), ("bilal", "approver", "person"),
-                                ("owner", "admin", "person")):
-            self.r[ref], _ = self.reviewers.add(ref, ref.title(), role, kind)
+        for ref, role, kind, ident in (("ai_check_1", "checker", "ai", "model-a/prompt-1"),
+                                       ("ai_check_2", "approver", "ai", "model-b/prompt-2"),
+                                       ("amina", "checker", "person", None), ("bilal", "approver", "person", None),
+                                       ("owner", "admin", "person", None)):
+            self.r[ref], _ = self.reviewers.add(ref, ref.title(), role, kind, identity=ident)
 
     def queue(self, policy=None) -> ReviewQueue:
         return ReviewQueue(self.engine, "pai", self.kb, policy=policy,
@@ -131,9 +132,13 @@ def test_a_reviewer_sees_no_other_review_before_giving_their_own_admins_too(s):
         assert "matches the page" not in repr(before)
         assert [f["uploaded_by"] for f in before["files"]] == [None]  # who is reviewing is hidden too
     assert s.q.detail(item, s.r["ai_check_1"])["files"][0]["uploaded_by"] == "ai_check_1"
-    audit = s.q.audit(item)  # the separate admin-token view
-    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [("ai_check_1", "ai_check_1")]
+    with pytest.raises(ReviewError) as e:  # the admin-token view is not a way round the blindness
+        s.q.audit(item)
+    assert e.value.status == 409
     s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
+    audit = s.q.audit(item)
+    assert [(r["reviewer"], r["identity"]) for r in audit["reviews"]] == [
+        ("ai_check_1", "model-a/prompt-1"), ("ai_check_2", "model-b/prompt-2")]
     after = s.q.detail(item, s.r["ai_check_2"])
     assert [r["reviewer"] for r in after["reviews"]] == ["ai_check_1", "ai_check_2"]
     assert after["my_review"] == {"step": "approve", "outcome": "approve"}
@@ -326,7 +331,8 @@ def test_a_changed_fact_voids_its_open_item_at_the_moment_of_the_change(s):
     with pytest.raises(ReviewError) as e:
         s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
     assert e.value.status == 409
-    assert s.q.sync() == 1  # the changed reading gets a fresh item
+    [fresh] = [i for i in s.q.list_items(kind="verify") if i.id != item]  # the writer opened the replacement
+    assert fresh.fact_id == fid and s.q.sync() == 0
 
 
 @pytest.mark.req("R-25")
@@ -342,9 +348,10 @@ def test_every_part_of_the_reading_voids_the_item(s, change):
 
 
 @pytest.mark.req("R-25")
-def test_a_writer_that_gets_in_before_the_lock_voids_the_decision(s, monkeypatch):
-    """The race (I2): another writer changes the reading just before the review takes the fact's lock. The review
-    works on the locked row, sees the new reading, and verifies nothing."""
+def test_an_item_a_writer_skipped_while_locked_is_voided_by_its_digest(s, monkeypatch):
+    """Another writer changes the reading while the review holds the item locked, so the store's void skips the item
+    (SKIP LOCKED). The review works on the locked fact row, sees the new reading in the digest check, voids the item
+    and verifies nothing."""
     fid = s.fact()
     item, _ = s.q.open_verify(fid)
     s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
@@ -360,7 +367,7 @@ def test_a_writer_that_gets_in_before_the_lock_voids_the_decision(s, monkeypatch
 
     monkeypatch.setattr(s.kb, "locked", racing)
     r = s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
-    assert r["item_status"] == "closed" and r["fact_status"] == "confirmed"
+    assert (r["item_status"], r["resolution"], r["fact_status"]) == ("closed", "void", "confirmed")
     assert s.kb.get(fid)[3].value == {"date": "2027-10-01"}
 
 
@@ -381,7 +388,7 @@ def test_set_status_and_revise_check_the_digest_on_the_locked_row(s):
 @pytest.mark.req("R-42")
 def test_two_checks_need_two_distinct_identities(s):
     """M1: two refs that are one model (or one person) are not two checks."""
-    twin, _ = s.reviewers.add("ai_check_3", "AI check 3", "approver", "ai", identity="ai_check_1")
+    twin, _ = s.reviewers.add("ai_check_3", "AI check 3", "approver", "ai", identity="  MODEL-A/Prompt-1 ")
     item, _ = s.q.open_verify(s.fact())
     s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
     with pytest.raises(ReviewError) as e:
@@ -390,7 +397,10 @@ def test_two_checks_need_two_distinct_identities(s):
     assert s.q.get_item(item).status == "open"
     s.q.submit_review(item, s.r["ai_check_2"], "approve", "approve")
     assert s.q.get_item(item).resolution == "verified"
+    assert twin.identity == "model-a/prompt-1"  # stripped and case-folded
     assert s.reviewers.add("x1", "X", "checker")[0].identity == "x1"  # default: the ref
+    with pytest.raises(ReviewerError):  # an AI reviewer must name the model and prompt behind it
+        s.reviewers.add("ai_check_4", "AI 4", "checker", "ai")
 
 
 @pytest.mark.req("R-25")
@@ -480,3 +490,59 @@ def test_revise_cannot_set_verified_and_a_changed_verified_reading_drops(s):
     assert s.status(fid) == "verified"
     s.kb.revise(fid, value={"date": "2027-09-01"}, quote="Apply by 1 September 2027", cause="research")
     assert s.status(fid) == "unconfirmed" and s.kb.revisions(fid)[-1].before["status"] == "verified"
+
+
+@pytest.mark.req("R-25")
+def test_a_replacement_item_keeps_the_author_bar_and_the_batch(s):
+    fid = s.fact()
+    item, _ = s.q.open_item("verify", dedupe_key=f"verify:{fid}", fact_id=fid, batch_ref="b7",
+                            payload={"author_ref": "amina"})
+    s.kb.revise(fid, value={"date": "2027-09-01"}, quote="Apply by 1 September 2027", cause="research")
+    [fresh] = [i for i in s.q.list_items(kind="verify") if i.id != item]
+    assert (fresh.batch_ref, fresh.payload.get("author_ref")) == ("b7", "amina")
+    with pytest.raises(ReviewError) as e:
+        s.q.submit_review(fresh.id, s.r["amina"], "check", "correct")
+    assert e.value.status == 403
+
+
+@pytest.mark.req("R-25")
+def test_no_replacement_when_the_fact_can_no_longer_be_checked(s):
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.kb.revise(fid, value={"date": "2027-09-01"}, quote="Apply by 1 September 2027", status="unconfirmed",
+                cause="research")
+    assert s.q.get_item(item).resolution == "void" and s.q.list_items(kind="verify") == []
+
+
+@pytest.mark.req("R-25")
+def test_joining_an_item_a_writer_skipped_voids_it(s, engine):
+    """The SKIP LOCKED gap: the writer skipped a locked item. The next open_item that joins it re-runs the check."""
+    from sqlalchemy import update
+
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
+    with engine.begin() as conn:  # the content changes but the writer did not void the item (it was locked)
+        conn.execute(update(models.knowledge_facts).where(models.knowledge_facts.c.id == fid)
+                     .values(quote="Apply by 1 September 2027"))
+    again, created = s.q.open_verify(fid)
+    assert s.q.get_item(item).resolution == "void" and not created
+    s.q.sync()
+    [fresh] = s.q.list_items(kind="verify")
+    assert fresh.id != item
+
+
+@pytest.mark.req("R-25")
+def test_sync_sweeps_stale_items_and_includes_readings_waiting_for_comparison(s, engine):
+    from sqlalchemy import update
+
+    fid = s.fact()
+    item, _ = s.q.open_verify(fid)
+    s.q.submit_review(item, s.r["ai_check_1"], "check", "correct")
+    with engine.begin() as conn:
+        conn.execute(update(models.knowledge_facts).where(models.knowledge_facts.c.id == fid)
+                     .values(quote="Apply by 1 September 2027"))
+    ocr = s.fact("fee", status="unconfirmed", value=100, read_method="ocr", ref="p2")
+    assert s.q.sync() == 2  # a fresh item for the changed reading, and one for the OCR reading
+    assert s.q.get_item(item).resolution == "void"
+    assert {i.fact_id for i in s.q.list_items(kind="verify")} == {fid, ocr}

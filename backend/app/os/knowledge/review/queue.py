@@ -128,7 +128,11 @@ class ReviewQueue:
                                                           I.c.dedupe_key == dedupe_key, I.c.status == "open")
                                      .with_for_update()).first()
                 if open_row is not None:
-                    c.execute(update(I).where(I.c.id == open_row.id).values(join_count=I.c.join_count + 1))
+                    old = c.execute(select(I.c.payload).where(I.c.id == open_row.id)).scalar() or {}
+                    c.execute(update(I).where(I.c.id == open_row.id).values(
+                        join_count=I.c.join_count + 1, payload={**(payload or {}), **old}))  # what it had wins
+                    if kind == "verify":  # a writer may have skipped this item while it was locked
+                        self._void_stale(c, open_row.id)
                     return open_row.id, False
                 try:
                     with c.begin_nested():
@@ -142,12 +146,36 @@ class ReviewQueue:
         return self.open_item("verify", dedupe_key=f"verify:{fact_id}", fact_id=fact_id, batch_ref=batch_ref,
                               opened_by=opened_by, payload={"author_ref": author_ref} if author_ref else {})
 
+    def _void_stale(self, conn, item_id: int | None = None) -> int:
+        """Closes (as void) open verify items with a review of another reading than the fact has now. A writer skips an
+        item a reviewer holds locked (see the store's `_void_reviews`); this catches it afterwards. Returns how many."""
+        q = select(I.c.id, I.c.fact_id).where(I.c.tenant_id == self.tenant_id, I.c.kind == "verify",
+                                              I.c.status == "open")
+        if item_id is not None:
+            q = q.where(I.c.id == item_id)
+        voided = 0
+        for it in conn.execute(q.with_for_update(skip_locked=True)).all():
+            fact = self.knowledge.locked(conn, it.fact_id)[3]
+            digests = {r.fact_digest for r in conn.execute(select(RV.c.fact_digest).where(RV.c.item_id == it.id))}
+            if digests and digests != {fact_digest(fact)}:
+                conn.execute(update(I).where(I.c.id == it.id).values(status="closed", resolution="void",
+                                                                       closed_at=func.now()))
+                voided += 1
+        return voided
+
     def sync(self, *, high_stakes_only: bool | None = None, batch_ref: str | None = None) -> int:
-        """Opens a verify item for every confirmed fact that has none. Returns how many were opened."""
+        """Voids stale items, then opens a verify item for every fact that can be checked and has none: confirmed
+        facts, and machine or hand readings still waiting for their comparison with the original. Returns how many
+        were opened."""
         only_high = self.policy.sync_high_stakes_only if high_stakes_only is None else high_stakes_only
+        with self.engine.begin() as conn:
+            self._void_stale(conn)
+        compare = list(self.policy.compare_with_original)
         with self.engine.connect() as conn:
             rows = conn.execute(select(F.c.id, F.c.field, F.c.fact_class).where(
-                F.c.tenant_id == self.tenant_id, F.c.status == "confirmed").order_by(F.c.id)).all()
+                F.c.tenant_id == self.tenant_id,
+                (F.c.status == "confirmed") | ((F.c.status == "unconfirmed") & F.c.read_method.in_(compare)),
+            ).order_by(F.c.id)).all()
         opened = 0
         for r in rows:
             if only_high and not is_high_stakes(fact_class(r.field, r.fact_class)):
@@ -241,8 +269,11 @@ class ReviewQueue:
         return out
 
     def audit(self, item_id: int) -> dict:
-        """Every review of an item with the reviewer's identity, for the admin token (not for a reviewer's screen)."""
+        """Every review of a closed item with the reviewer's identity, for the admin token (not for a reviewer's screen).
+        An open item is refused: the admin token must not become a way to read check 1 before check 2 is given."""
         item = self.get_item(item_id)
+        if item.status != "closed":
+            raise _no("an open item has no audit view: its reviews stay hidden until it is closed")
         return {"item": item, "reviews": self._entries(self._reviews(item_id), identity=True),
                 "files": self.files_for(item_id)}
 

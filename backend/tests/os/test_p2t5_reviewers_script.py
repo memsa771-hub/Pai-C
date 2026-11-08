@@ -43,3 +43,14 @@ def test_refusals_exit_2(engine, clean, capsys):
     assert run(engine, "disable", "--ref", "nobody")[0] == 2
     assert run(engine, "rotate", "--ref", "nobody")[0] == 2
     assert "refused" in capsys.readouterr().err
+
+
+def test_ai_reviewer_needs_an_identity_and_a_person_equal_to_ref_gets_a_warning(engine, clean, capsys):
+    assert run(engine, "add", "--ref", "ai_x", "--name", "AI X", "--role", "checker", "--kind", "ai")[0] == 2
+    assert "identity" in capsys.readouterr().err
+    assert run(engine, "add", "--ref", "amina", "--name", "Amina", "--role", "checker")[0] == 0
+    assert "warning: the identity of amina is its ref" in capsys.readouterr().err
+    assert run(engine, "add", "--ref", "ai_y", "--name", "AI Y", "--role", "checker", "--kind", "ai",
+               "--identity", " Model-Y/P1 ")[0] == 0
+    assert "warning" not in capsys.readouterr().err
+    assert run(engine, "list")[1][-1].split("\t")[4] == "model-y/p1"
