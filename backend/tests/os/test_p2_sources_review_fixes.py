@@ -18,12 +18,17 @@ from app.os.knowledge.sources.allowlist import (
     load_allowlist,
     resolve_claims,
 )
-from app.os.knowledge.sources.integrity import Previous, check_page, is_tls_failure, load_config
+from app.os.knowledge.sources.integrity import (
+    Previous,
+    check_page,
+    is_tls_failure,
+    load_config,
+)
 from app.os.knowledge.sources.suspect import SourceGuard
 from app.os.knowledge.store import SqlKnowledge
 from app.os.settings import load_settings
 from tests.os.fixture_sites.server import Resource
-from tests.os.test_p2_sources_gateway import ALPHA, FIX, NORTH, build, fact, rows
+from tests.os.test_p2_sources_gateway import ALPHA, FIX, NORTH, build, fact
 
 pytestmark = pytest.mark.req("R-24", "R-71")
 ON = lambda url: "own.test" in url
@@ -78,7 +83,7 @@ def test_c2_a_regulator_list_page_is_a_baseline_not_a_flood(engine, clean, fixtu
     insts = [f"inst{i}.test" for i in range(35)]
     links = "".join(f"<a href='https://{h}/'>Institution {i}</a>" for i, h in enumerate(insts))
     fixture_sites.set_page(reg, "/recognised", f"<html><body><h1>Recognised institutions</h1>{links}</body></html>")
-    gw, g, clock = build(engine, fixture_sites)
+    gw, g, _ = build(engine, fixture_sites)
     page = gw.fetch(fixture_sites.url(reg, "/recognised"), [], [], NORTH)
     assert page.ok and g.domains.state_of(reg).state == "active"
     assert g.snapshots.get(page.snapshot_id).flagged is None  # the baseline
@@ -232,7 +237,7 @@ def test_i5_only_certificate_verification_failures_count():
 # --- I6: https only with the guard ----------------------------------------------------------------------------
 
 def test_i6_http_is_refused_with_the_guard(engine, clean, fixture_sites):
-    gw, g, _ = build(engine, fixture_sites)
+    gw, _, _ = build(engine, fixture_sites)
     fixture_sites.requests.clear()
     assert gw.fetch(f"http://{ALPHA}/admissions/notice", [], [], NORTH).blocked == "insecure_scheme"
     assert fixture_sites.requests == []
