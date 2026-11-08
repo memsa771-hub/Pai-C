@@ -9,7 +9,7 @@ from app.os import models
 from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
-from app.os.intakes import IntakeStore
+from app.os.intakes import IntakeNotOpen, IntakeStore
 from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort, merit
 from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
@@ -78,9 +78,11 @@ class PlanService:
         student = state.build(self, contract.student_ref) if playbook.declares_needs else None  # P1-T8: gate off = None
         # P2-D24: while the plan's intake is open and not yet current, a key with no fact for it reads the newest earlier
         # year's fact, labelled. No registered intake (or none open): the strict read, exactly as before.
+        # The fallback reads one earlier year: the year of the intake this one was opened from, else the year before.
         term = contract.target_intake.term
-        read = ({"intake_term": term, "fallback_previous": True}
-                if IntakeStore(self.engine, self.kernel.tenant_id).fallback_applies(term, year) else {})
+        source = IntakeStore(self.engine, self.kernel.tenant_id).fallback_year(term, year)
+        read = ({"intake_term": term, "fallback_previous": True, "fallback_year": source}
+                if source is not None else {})
         return compile_plan(
             contract, playbook,
             self.knowledge.route_facts(playbook.key, sorted(route_fields), year, **read),
@@ -131,6 +133,9 @@ class PlanService:
         `with_needs`: the student's needs gate is on, so a playbook that declares `needs` may be chosen (P1-T8); left
         out, the gate is asked."""
         existing = self._existing_plan(contract)
+        term, year = _intake_of(contract)
+        if existing is None and not IntakeStore(self.engine, self.kernel.tenant_id).plannable(term, year):  # R-63
+            raise IntakeNotOpen(f"the {term} {year} intake is not open for planning yet")
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
             self.playbooks, contract.origin_country, contract.destination_country, contract.level,
             with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract)))
@@ -198,6 +203,10 @@ class PlanService:
                                  with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract))
         if version is not None:
             newest = self.playbooks[(newest.key, version)]
+            applies = newest.applies_to  # R-65: a version for other intakes is never forced onto this plan
+            if applies is not None and not applies.covers(*_intake_of(contract)):
+                raise ValueError(f"playbook {newest.key}@{version} does not cover the {_intake_of(contract)[0]} "
+                                 f"{_intake_of(contract)[1]} intake of plan {plan_id}")
         else:  # the newest the gate lets through may be older than the pin (a v2 plan, the gate off): never go back
             pinned = self._pinned(plan_id)
             if newest.key == pinned.key and newest.version <= pinned.version:

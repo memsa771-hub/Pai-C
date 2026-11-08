@@ -20,6 +20,10 @@ class IntakeError(ValueError):
     pass
 
 
+class IntakeNotOpen(IntakeError):
+    """R-63: the intake is registered, but only as planned or closed."""
+
+
 @dataclass(frozen=True)
 class Intake:
     id: int
@@ -119,6 +123,19 @@ class IntakeStore:
         region of it is current yet. No registered intake: no fallback (today's behaviour)."""
         states = self._states(term, year)
         return "open" in states and "current" not in states
+
+    def fallback_year(self, term: str, year: int) -> int | None:
+        """The one earlier year the fallback may read for plans of this intake: the year of the intake it was opened
+        from when that is set, else `year - 1`. None when the fallback does not apply. Several open regions of one
+        (term, year): the newest of their source years."""
+        if not self.fallback_applies(term, year):
+            return None
+        O = T.alias("opened_from")
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(O.c.year).select_from(
+                T.outerjoin(O, and_(O.c.id == T.c.opened_from_id, O.c.tenant_id == T.c.tenant_id))).where(
+                T.c.tenant_id == self.tenant_id, T.c.term == term, T.c.year == year, T.c.state == "open")).all()
+        return max(r.year if r.year is not None else year - 1 for r in rows)
 
     def _states(self, term: str, year: int) -> set[str]:
         with self.engine.connect() as conn:

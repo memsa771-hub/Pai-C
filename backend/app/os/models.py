@@ -38,7 +38,8 @@ FACT_SOURCES = ("seed", "manual", "research")
 FACT_STATUSES = ("confirmed", "unconfirmed", "stale", "verified")  # P2-D6: `verified` is confirmed + two reviews
 READ_METHODS = ("fetch", "render", "ocr", "human", "model")  # P2-D11/D18: how the fact's source text was read
 REVISION_ACTIONS = ("insert", "change", "status", "undo")
-REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover",
+                    "backfill")
 
 md = OsBase.metadata
 
