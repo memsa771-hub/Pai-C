@@ -32,10 +32,12 @@ def upgrade() -> None:
         sa.Column("decision_ref", sa.Text),
         sa.Column("batch_ref", sa.Text, nullable=False, server_default=""),
         sa.Column("actor", sa.Text, nullable=False),
+        sa.Column("note_actor", sa.Text),  # a name typed in the form; `actor` is the identity behind the admin token
         sa.Column("status", sa.Text, nullable=False, server_default="running"),
         sa.Column("counts", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("programmes_created", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
         sa.Column("report_path", sa.Text),
+        sa.Column("report_csv", sa.Text),  # the report of every row, kept with the log (durable)
         sa.Column("error", sa.Text),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
@@ -46,9 +48,9 @@ def upgrade() -> None:
         sa.CheckConstraint("mode <> 'owner_accepted' OR decision_ref IS NOT NULL", name="ck_os_imports_decision"),
         schema=S,
     )
-    # the same file cannot be imported twice at once: undo it first (a failed or undone import may be repeated)
+    # the same file cannot be imported twice: undo the first (a failed import may have loaded rows, so it stays live)
     op.create_index("uq_os_imports_live", "os_imports", ["tenant_id", "sha256"], unique=True, schema=S,
-                    postgresql_where=sa.text("status IN ('running', 'done')"))
+                    postgresql_where=sa.text("status IN ('running', 'done', 'failed')"))
 
 
 def downgrade() -> None:

@@ -19,7 +19,14 @@ FORM = {"country": COUNTRY, "actor": "dev", "owner_accepted": "chat 2026-11-07"}
 
 
 @pytest.fixture
-def api(engine, clean, os_db):
+def api(engine, clean, os_db, monkeypatch):
+    from tests.os.sheets.helpers import FakeDisputes
+
+    def wired(deps):  # the real allow-list and review queue are T3 and T5: fakes stand in
+        deps.official, deps.disputes = (lambda url, scope: True), FakeDisputes()
+        return deps
+
+    monkeypatch.setattr("app.os.api.imports.wire_other_tasks", wired)
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
     services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1))
     load_list(engine)
@@ -58,11 +65,14 @@ def test_validate_import_list_and_undo(api, tmp_path):
     iid = body["import_id"]
     assert api.post(BASE, data=FORM, files=upload(path), headers=ADMIN).status_code == 409
     one = api.get(f"{BASE}/{iid}", headers=ADMIN).json()
-    assert (one["status"], one["mode"], one["decision_ref"], one["actor"]) == ("done", "owner_accepted",
-                                                                                "chat 2026-11-07", "dev")
+    # the actor is the identity behind the admin token; the name typed in the form is only a note beside it
+    assert (one["status"], one["mode"], one["decision_ref"], one["actor"], one["note_actor"]) == (
+        "done", "owner_accepted", "chat 2026-11-07", "admin", "dev")
+    rep = api.get(f"{BASE}/{iid}/report", headers=ADMIN)  # the report outlives the temp file it was written beside
+    assert rep.status_code == 200 and rep.text == body["report_csv"] and "unknown_region" in rep.text
     assert [i["id"] for i in api.get(BASE, headers=ADMIN).json()["imports"]] == [iid]
     u = api.post(f"{BASE}/{iid}/undo", data={"actor": "admin"}, headers=ADMIN)
-    assert u.status_code == 200 and u.json() == {"facts": 1, "registry": 1, "programmes": 0}
+    assert u.status_code == 200 and u.json() == {"facts": 1, "registry": 1, "programmes": 0, "links": 0}
     assert api.post(f"{BASE}/{iid}/undo", data={"actor": "admin"}, headers=ADMIN).status_code == 409
     assert api.post(f"{BASE}/999/undo", data={"actor": "admin"}, headers=ADMIN).status_code == 404
     assert api.get(f"{BASE}/999", headers=ADMIN).status_code == 404
@@ -77,4 +87,5 @@ def test_bad_requests(api, tmp_path):
     wb.save(tmp_path / "empty.xlsx")
     r = api.post(BASE, data=FORM, files=upload(tmp_path / "empty.xlsx"), headers=ADMIN)
     assert r.status_code == 422 and "Institutions" in r.json()["detail"]
+    assert api.get(f"{BASE}/999/report", headers=ADMIN).status_code == 404
     assert api.post(BASE + "/validate", data={"country": "ZZ"}, files=upload(path), headers=ADMIN).status_code == 422

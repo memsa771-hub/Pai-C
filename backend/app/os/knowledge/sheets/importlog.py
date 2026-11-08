@@ -25,10 +25,12 @@ class ImportRecord:
     decision_ref: str | None
     batch_ref: str
     actor: str
+    note_actor: str | None
     status: str
     counts: dict
     programmes_created: list
     report_path: str | None
+    report_csv: str | None
     error: str | None
     started_at: datetime
     finished_at: datetime | None
@@ -37,8 +39,8 @@ class ImportRecord:
 
 
 def _rec(r) -> ImportRecord:
-    return ImportRecord(r.id, r.file_name, r.sha256, r.mode, r.decision_ref, r.batch_ref, r.actor, r.status, r.counts,
-                        r.programmes_created, r.report_path, r.error, r.started_at, r.finished_at, r.undone_at,
+    return ImportRecord(r.id, r.file_name, r.sha256, r.mode, r.decision_ref, r.batch_ref, r.actor, r.note_actor,
+                        r.status, r.counts, r.programmes_created, r.report_path, r.report_csv, r.error, r.started_at, r.finished_at, r.undone_at,
                         r.undone_by)
 
 
@@ -52,12 +54,12 @@ class ImportLog:
         self.engine, self.tenant_id = engine, tenant_id
 
     def start(self, *, file_name: str, sha256: str, mode: str, decision_ref: str | None, batch_ref: str,
-              actor: str) -> int:
+              actor: str, note_actor: str | None = None) -> int:
         try:
             with self.engine.begin() as conn:
                 return conn.execute(T.insert().values(
                     tenant_id=self.tenant_id, file_name=file_name, sha256=sha256, mode=mode, decision_ref=decision_ref,
-                    batch_ref=batch_ref, actor=actor).returning(T.c.id)).scalar_one()
+                    batch_ref=batch_ref, actor=actor, note_actor=note_actor).returning(T.c.id)).scalar_one()
         except IntegrityError as e:
             if "uq_os_imports_live" in str(e.orig):
                 raise AlreadyImported(f"{file_name} (sha256 {sha256[:12]}) is already imported; undo it first") from e
@@ -65,7 +67,7 @@ class ImportLog:
 
     def finish(self, import_id: int, *, status: str, counts: dict[str, Any] | None = None,
                programmes_created: list[str] | None = None, report_path: str | None = None,
-               error: str | None = None) -> None:
+               report_csv: str | None = None, error: str | None = None) -> None:
         values: dict[str, Any] = {"status": status, "finished_at": func.now(), "error": error}
         if counts is not None:
             values["counts"] = counts
@@ -73,13 +75,18 @@ class ImportLog:
             values["programmes_created"] = programmes_created
         if report_path is not None:
             values["report_path"] = report_path
+        if report_csv is not None:
+            values["report_csv"] = report_csv
         with self.engine.begin() as conn:
             conn.execute(update(T).where(T.c.id == import_id, T.c.tenant_id == self.tenant_id).values(**values))
 
-    def mark_undone(self, import_id: int, by: str) -> None:
-        with self.engine.begin() as conn:
-            conn.execute(update(T).where(T.c.id == import_id, T.c.tenant_id == self.tenant_id).values(
-                status="undone", undone_at=func.now(), undone_by=by))
+    def mark_undone(self, import_id: int, by: str, conn=None) -> None:
+        """Inside the undo's own transaction when `conn` is given, so the log never disagrees with the data."""
+        if conn is None:
+            with self.engine.begin() as own:
+                return self.mark_undone(import_id, by, own)
+        conn.execute(update(T).where(T.c.id == import_id, T.c.tenant_id == self.tenant_id).values(
+            status="undone", undone_at=func.now(), undone_by=by))
 
     def get(self, import_id: int) -> ImportRecord | None:
         with self.engine.connect() as conn:

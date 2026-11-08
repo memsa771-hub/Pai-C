@@ -6,6 +6,7 @@ Every revision an import writes carries `cause_ref = import-<id>` so undo can fi
 `set_status(..., cause="review")`, as everywhere (T1); the owner-accepted mode records who accepted it (P2-D16a)."""
 
 import csv
+import io
 import json
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -30,11 +31,12 @@ from app.os.knowledge.sheets.plan import (
 )
 from app.os.knowledge.sheets.ports import Disputes, Fetcher
 from app.os.knowledge.sheets.reader import Batch, read_batch
+from app.os.knowledge.sheets.safe import safe_cell
 from app.os.knowledge.store import SqlKnowledge
 from app.os.registry.model import KIND_PREFIX, slug
 from app.os.registry.store import RegistryStore
 
-__all__ = ["AlreadyImported", "ImportDeps", "ImportResult", "build_context", "plan_file", "run_import",
+__all__ = ["AlreadyImported", "ImportDeps", "ImportRefused", "ImportResult", "build_context", "plan_file", "run_import",
            "wire_other_tasks", "write_report"]
 REPORT_COLUMNS = ("sheet", "row_id", "source_row", "bucket", "level", "reason", "detail")
 
@@ -74,18 +76,25 @@ def _registry_lookup(registry: RegistryStore):
     return lookup
 
 
+class ImportRefused(ValueError):
+    """The import cannot run safely as set up (a port it needs is not connected). Nothing is logged or loaded."""
+
+
 def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref: str, family: str,
-                  list_urls: dict[str, str] | None = None, require_list: bool = True) -> PlanContext:
+                  list_urls: dict[str, str] | None = None, require_list: bool = True,
+                  decision_ref: str | None = None, fmt: Format | None = None) -> PlanContext:
     from app.os.knowledge.regions import countries
 
     if country not in countries():
         raise ValueError(f"no region vocabulary for country '{country}' (known: {countries()})")
-    ctx = PlanContext(country=country, mode=mode, batch_ref=batch_ref, family=family, require_list=require_list)
+    ctx = PlanContext(country=country, mode=mode, batch_ref=batch_ref, family=family, require_list=require_list,
+                      decision_ref=decision_ref, fmt=fmt or load_format())
     urls: dict[str, str] = dict(list_urls or {})
     if deps is not None:
         for e in deps.registry.list(kind="official_list", limit=100_000):
             urls.setdefault(norm_url(e.source_url), e.entity_id)
         ctx.attested, ctx.official = deps.attested, deps.official
+        ctx.cap_without_allow_list = deps.official is None  # no allow-list connected: nothing above `unconfirmed`
         ctx.existing_institutions = _registry_lookup(deps.registry)
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
         ctx.existing_region = lambda rid: getattr(deps.registry.get(rid), "region", None)
@@ -124,13 +133,19 @@ def _jsonable(o: Any) -> Any:
     return str(o)
 
 
+def report_text(results: list[RowResult]) -> str:
+    """Every row with its fate, as CSV (P2 spec §4.6 step 4): nothing fails silently. Cells that start like a formula
+    are neutralised (the report is opened in a spreadsheet)."""
+    buf = io.StringIO(newline="")
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(REPORT_COLUMNS)
+    for r in results:
+        w.writerow([safe_cell(c) for c in (r.sheet, r.row_id, r.src_row, r.bucket, r.level or "", r.reason, r.detail)])
+    return buf.getvalue()
+
+
 def write_report(results: list[RowResult], path: Path) -> Path:
-    """Every row with its fate, as CSV (P2 spec §4.6 step 4): nothing fails silently."""
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(REPORT_COLUMNS)
-        for r in results:
-            w.writerow([r.sheet, r.row_id, r.src_row, r.bucket, r.level or "", r.reason, r.detail])
+    path.write_text(report_text(results), encoding="utf-8", newline="")
     return path
 
 
@@ -196,19 +211,27 @@ def _write_fact(deps: ImportDeps, res: RowResult, spec: dict, import_id: int, mo
 
 def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: str, decision_ref: str | None = None,
                batch_ref: str | None = None, family: str = "", route_key: str = "registry",
-               report_path: Path | None = None) -> ImportResult:
-    """The real import. Refuses an owner-accepted import without its decision reference, and a file already imported."""
+               report_path: Path | None = None, note_actor: str | None = None,
+               fmt: Format | None = None) -> ImportResult:
+    """The real import. Refuses: an owner-accepted import without its decision reference; a file already imported
+    (done, or failed and not undone); rows that need a review item when no review queue is connected. With no allow-list
+    connected, no row goes above `unconfirmed`. `actor` is the identity that runs it, `note_actor` a typed name."""
     if mode not in (OWNER_ACCEPTED, REVIEWERS):
         raise ValueError(f"unknown import mode '{mode}'")
     if mode == OWNER_ACCEPTED and not (decision_ref or "").strip():
         raise ValueError("the owner-accepted import needs the owner's decision reference (--owner-accepted <ref>)")
     path = Path(path)
     batch_ref = batch_ref or path.stem
-    ctx = build_context(deps, country=country, mode=mode, batch_ref=batch_ref, family=family)
-    batch, results = plan_file(path, ctx)
+    ctx = build_context(deps, country=country, mode=mode, batch_ref=batch_ref, family=family,
+                        decision_ref=decision_ref, fmt=fmt)
+    batch, results = plan_file(path, ctx, fmt)
+    n_queued = sum(1 for r in results if r.bucket == "queued")
+    if n_queued and deps.disputes is None:
+        raise ImportRefused(f"{n_queued} rows need a review item but the review queue is not connected; "
+                            "nothing was imported")
     log = ImportLog(deps.engine, deps.tenant_id)
     import_id = log.start(file_name=path.name, sha256=batch.sha256, mode=mode, decision_ref=decision_ref,
-                          batch_ref=batch_ref, actor=actor)
+                          batch_ref=batch_ref, actor=actor, note_actor=note_actor)
     created: list[str] = []
     queued = 0
     try:
@@ -236,11 +259,16 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                                             batch_ref=batch_ref, opened_by="import")
                     queued += 1
         counts = summarise(results)
+        text = report_text(results)
         default_report = path / "import-report.csv" if path.is_dir() else path.with_name(path.stem + ".import-report.csv")
-        rp = write_report(results, report_path or default_report)
-        log.finish(import_id, status="done", counts=counts, programmes_created=created, report_path=str(rp))
+        try:
+            rp = write_report(results, report_path or default_report)
+        except OSError:  # the copy beside the file is a convenience; the log keeps the report
+            rp = None
+        log.finish(import_id, status="done", counts=counts, programmes_created=created,
+                   report_path=str(rp) if rp else None, report_csv=text)
     except Exception as e:
-        log.finish(import_id, status="failed", error=f"{type(e).__name__}: {e}"[:2000])
+        log.finish(import_id, status="failed", error=f"{type(e).__name__}: {e}"[:2000], programmes_created=created)
         raise
     return ImportResult(import_id, False, results, counts, rp, created, queued, batch.layouts)
 

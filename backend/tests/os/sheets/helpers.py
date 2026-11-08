@@ -86,10 +86,24 @@ def workbook(tmp: Path, institutions=(), facts=(), programmes=(), name="batch.xl
 
 def deps(engine, **kw) -> ImportDeps:
     d = ImportDeps(engine, "pai", SqlKnowledge(engine, "pai"), RegistryStore(engine, "pai"),
-                   ProgrammeStore(engine, "pai"))
+                   ProgrammeStore(engine, "pai"), official=lambda url, scope: True)
     for k, v in kw.items():
         setattr(d, k, v)
     return d
+
+
+def waiver_fmt(path):
+    """The format with `path` among the files the §11.3 waiver covers (by sha256): the five real v4 files are not ours."""
+    import copy
+    from dataclasses import replace as _replace
+
+    from app.os.knowledge.sheets.format import load_format
+    from app.os.knowledge.sheets.reader import file_sha256
+
+    fmt = load_format()
+    raw = copy.deepcopy(fmt.raw)
+    raw["owner_accepted"]["refetch_waiver"]["files"]["test-batch.xlsx"] = file_sha256(path)
+    return _replace(fmt, raw=raw)
 
 
 def load_list(engine, **kw) -> None:

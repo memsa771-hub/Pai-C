@@ -1,11 +1,13 @@
 """Writes an empty batch file (the template) and the review queue's export in the same format (P2 spec §4.6; master
 R-67, R-69; P2-D17). The `Lists` sheet is read-only help: the allowed status, check and read-method values."""
 
+import io
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from app.os.knowledge.sheets.format import Format, load_format
+from app.os.knowledge.sheets.safe import safe_cell
 
 
 def _lists(fmt: Format) -> list[tuple[str, list[str]]]:
@@ -21,8 +23,7 @@ def _lists(fmt: Format) -> list[tuple[str, list[str]]]:
     ]
 
 
-def write_workbook(path: Path, rows: dict[str, Iterable[dict[str, Any]]] | None = None, fmt: Format | None = None) -> Path:
-    """An .xlsx with the Institutions, Programmes and Facts sheets (header and the given rows) and the Lists sheet."""
+def _workbook(rows: dict[str, Iterable[dict[str, Any]]] | None, fmt: Format | None):
     import openpyxl
 
     fmt = fmt or load_format()
@@ -34,15 +35,28 @@ def write_workbook(path: Path, rows: dict[str, Iterable[dict[str, Any]]] | None 
         ws.append(list(cols))
         ws.freeze_panes = "A2"
         for r in (rows or {}).get(name, ()):
-            ws.append([r.get(c) for c in cols])
+            ws.append([safe_cell(r.get(c)) for c in cols])  # a formula-like cell is neutralised
     ws = wb.create_sheet("Lists")
     lists = _lists(fmt)
     ws.append([title for title, _ in lists])
     for i in range(max(len(v) for _, v in lists)):
         ws.append([v[i] if i < len(v) else None for _, v in lists])
+    return wb
+
+
+def write_workbook(path: Path, rows: dict[str, Iterable[dict[str, Any]]] | None = None,
+                   fmt: Format | None = None) -> Path:
+    """An .xlsx with the Institutions, Programmes and Facts sheets (header and the given rows) and the Lists sheet."""
     path = Path(path)
-    wb.save(path)
+    _workbook(rows, fmt).save(path)
     return path
+
+
+def workbook_bytes(rows: dict[str, Iterable[dict[str, Any]]] | None = None, fmt: Format | None = None) -> bytes:
+    """The same workbook in memory (the API serves it without a temp file)."""
+    buf = io.BytesIO()
+    _workbook(rows, fmt).save(buf)
+    return buf.getvalue()
 
 
 def write_template(path: Path) -> Path:

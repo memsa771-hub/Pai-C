@@ -5,6 +5,13 @@
 # Everything here is data: vocabularies, mappings and the class of each value column. Nothing country-specific is in code.
 version: 1
 
+# Caps on what a file may be, checked before and while reading it (a returned file is not trusted)
+limits:
+  max_file_bytes: 20971520
+  max_uncompressed_bytes: 209715200
+  max_rows_per_sheet: 20000
+  max_columns: 80
+
 checker_columns: [checker1_result, checker1_corrected_value, checker1_corrected_quote, checker1_name, checker1_date,
                   checker2_approved, checker2_name, checker2_date, checker_note]
 
@@ -60,7 +67,8 @@ not_official_hosts: [wikipedia.org, facebook.com, instagram.com, drive.google.co
 # rejected, and so are the facts and programmes of those rows. Spellings as the batches write them, any case.
 out_of_scope_regions: [Australia, Switzerland, United Kingdom, United States of America]
 
-# Intake text -> (term, year). The year is the first year of a session. PROPOSED mapping, for the owner to confirm: an
+# Intake text -> (term, year). The year is the first year of a session. PROPOSED mapping, for the owner to confirm (listed
+# in the T6 report): an
 # intake text no rule matches is queued ("intake_unresolved"), never guessed.
 intake_patterns:
   - {regex: '^(fall|spring|summer|autumn|winter)\s+(\d{4})\b', term: "{1}", year: "{2}"}
@@ -96,7 +104,15 @@ programme_facts:
 # Who the owner-accepted import (P2-D16a) accepts as the two checks, and the provenance it records.
 owner_accepted:
   # owner ruling, P2 spec §11.3: a model- or image-read row that both AI checks accepted is `verified` without a
-  # re-fetch. Only in this mode; the reviewers mode keeps the re-fetch. Recorded in each fact's provenance.
-  refetch_waiver: "P2 spec §11.3"
+  # re-fetch. Only in this mode, only for these five files (by sha256) and only with a decision reference; the reviewers
+  # mode and every other file keep the re-fetch. Recorded in each fact's provenance.
+  refetch_waiver:
+    ref: "P2 spec §11.3"
+    files:
+      PAI-Research-Batch1-National-v4.xlsx: 580e43f78ce188e2e520bc7af52988f856873c9fcd378b7ca932a96c59bf965d
+      PAI-Research-Batch2-Punjab-v4.xlsx: 6c8cd6ba3836e55a6f25d547818ba1aa1fd0869d7913e1ee63921956a2c6a8e7
+      PAI-Research-Batch3-Sindh-v4.xlsx: 42bea7f67c19f7ca6f7cf57f7f74a439d136087c97eb51234ec9940767010357
+      PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx: 9410984a619eaeda85b2847be35122a764ab6a00a257cbb35fe9c7229987cc3f
+      PAI-Research-Batch5-Universities-BS-v4.xlsx: e629b9c3287469dae61b3b02a100f5a0326ca7ccc549e088270c6a9dc533d4af
   checker1: {claude_check_1: ["Claude – check 1", "Claude - check 1"]}
   checker2: {claude_check_2: ["Claude – check 2 (independent)", "Claude - check 2 (independent)"]}

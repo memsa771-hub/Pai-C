@@ -11,7 +11,7 @@ from app.os.knowledge.sheets.importer import run_import
 from app.os.knowledge.sheets.undo import undo_import
 from app.os.registry.store import RegistryStore
 
-from .helpers import COUNTRY, checks, deps, inst, load_list, prog, workbook
+from .helpers import COUNTRY, checks, deps, inst, load_list, prog, waiver_fmt, workbook
 
 pytestmark = pytest.mark.req("R-67")
 E = "inst:t-inst-001"
@@ -64,10 +64,11 @@ def test_a_legacy_punjab_style_sheet_imports_into_the_canonical_programme(engine
     ws.append(["PB-1", "T-INST-001", "Test MBBS", "Session 2025-26", "313", "325", "94.8", "https://a.alpha.test/closing",
                "https://a.alpha.test/seats", "| 1 | Test College 1 | 313 |", "2026-11-03", "found", None, "correct",
                "Claude – check 1", "yes", "Claude – check 2 (independent)"])
-    path = tmp_path / "punjab.xlsx"
+    path = tmp_path / "test-batch.xlsx"
     wb.save(path)
     d = deps(engine)
-    res = do_import(engine, path, d)
+    res = run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref="ref-1",
+                     fmt=waiver_fmt(path))
     assert res.layouts == {"Programmes": "programmes_seats_closing"}
     f = facts(engine)
     assert f["seats_open_merit"].status == "verified" and f["seats_open_merit"].quote == "| 1 | Test College 1 | 313 |"

@@ -14,7 +14,7 @@ from app.os.knowledge.sheets.plan import (
 )
 from tests.os.registry.helpers import LIST_URL
 
-from .helpers import C1, C2, COUNTRY, checks, fact, inst, prog, workbook
+from .helpers import C1, C2, COUNTRY, checks, fact, inst, prog, waiver_fmt, workbook
 
 pytestmark = pytest.mark.req("R-68")
 LISTS = {LIST_URL.lower(): "list:alpha-list"}
@@ -24,8 +24,13 @@ def ctx(**kw) -> PlanContext:
     return PlanContext(country=COUNTRY, list_urls=dict(LISTS), **kw)
 
 
-def plan(tmp_path, institutions=(), facts=(), programmes=(), **kw):
-    _, results = plan_file(workbook(tmp_path, institutions, facts, programmes), ctx(**kw))
+def plan(tmp_path, institutions=(), facts=(), programmes=(), waiver=False, **kw):
+    """`waiver=True`: the file is one the §11.3 waiver covers (the real five are not ours), with a decision reference."""
+    path = workbook(tmp_path, institutions, facts, programmes)
+    if waiver:
+        kw["fmt"] = waiver_fmt(path)
+        kw.setdefault("decision_ref", "chat 2026-11-07")
+    _, results = plan_file(path, ctx(**kw))
     return {(r.sheet, r.row_id): r for r in results}
 
 
@@ -161,7 +166,7 @@ def test_fact_rows_become_buckets_with_reasons(tmp_path):
         fact(9, e, field_="h", quote_verbatim=None), fact(10, e), fact(11, e, field_="i", source_type="social"),
         fact(12, e, field_="j", read_method="webfetch (model-extracted)"), fact(13, e, field_="k", language="Urdu"),
         fact(14, e, field_="l", chk=checks("correct", "no")),
-    ])
+    ], waiver=True)
     got = {k[1]: (v.bucket, v.reason) for k, v in rows.items() if k[0] == "Facts"}
     assert got["T-F-001"] == ("accepted", "both_checks")
     assert got["T-F-002"] == ("unconfirmed", "check_unclear_or_missing")
@@ -217,3 +222,61 @@ def test_summary_counts(tmp_path):
     s = summarise(results)
     assert s["Institutions"]["accepted"] == 1 and s["Institutions"]["rejected"] == 1 and s["Institutions"]["verified"] == 1
     assert s["Facts"]["accepted"] == 1
+
+
+def test_the_waiver_needs_a_listed_file_and_a_decision_reference(tmp_path):
+    model = {"read_method": "webfetch (model-extracted)"}
+    cases = {
+        "other file": plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", **model)]),
+        "no decision": plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", **model)], waiver=True, decision_ref=""),
+    }
+    for name, rows in cases.items():
+        r = rows[("Facts", "T-F-001")]
+        assert r.needs_refetch and "refetch_waived" not in r.payload["provenance"], name
+    ok = plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", **model)], waiver=True)[("Facts", "T-F-001")]
+    assert not ok.needs_refetch and ok.payload["provenance"]["refetch_waived"] == "P2 spec §11.3"
+
+
+def test_the_five_real_v4_files_are_the_listed_ones():
+    from app.os.knowledge.sheets.format import load_format
+
+    files = load_format().raw["owner_accepted"]["refetch_waiver"]["files"]
+    assert sorted(files) == [f"PAI-Research-Batch{n}-{name}-v4.xlsx" for n, name in (
+        (1, "National"), (2, "Punjab"), (3, "Sindh"), (4, "KP-Bal-ICT-AJK-GB"), (5, "Universities-BS"))]
+    assert all(len(h) == 64 for h in files.values())
+
+
+def test_a_missing_read_method_is_never_assumed_to_be_fetch(tmp_path):
+    rows = plan(tmp_path, [inst(1)], programmes=[prog(1, "T-INST-001", read_method=None)])
+    r = rows[("Programmes", "T-PRG-001")]
+    assert r.bucket == "accepted" and r.needs_refetch and r.payload["read_method"] is None
+    waived = plan(tmp_path, [inst(1)], programmes=[prog(1, "T-INST-001", read_method=None)], waiver=True)
+    w = waived[("Programmes", "T-PRG-001")]
+    assert not w.needs_refetch and w.payload["provenance"]["refetch_waived"] == "P2 spec §11.3"
+    single = plan(tmp_path, [inst(1)], programmes=[prog(1, "T-INST-001", read_method=None, **checks("correct", None))],
+                  waiver=True)
+    assert single[("Programmes", "T-PRG-001")].needs_refetch  # only rows both AI checks accepted are waived
+
+
+def test_a_fact_attaches_only_to_a_programme_that_was_loaded(tmp_path):
+    rows = plan(tmp_path, [inst(1)], [
+        fact(1, "T-PRG-001", field_="a"),  # loaded
+        fact(2, "T-PRG-002", field_="b"),  # its row was queued (intake unresolved)
+        fact(3, "T-PRG-003", field_="c"),  # its row was rejected (institution unknown)
+        fact(4, "T-PRG-009", field_="d"),  # nowhere
+    ], [prog(1, "T-INST-001"), prog(2, "T-INST-001", intake="whenever"), prog(3, "T-INST-404")])
+    got = {k[1]: v.reason for k, v in rows.items() if k[0] == "Facts"}
+    assert got == {"T-F-001": "both_checks", "T-F-002": "programme_not_loaded", "T-F-003": "programme_not_loaded",
+                   "T-F-004": "entity_unknown"}
+    existing = plan(tmp_path, [inst(1)], [fact(1, "T-PRG-777", field_="a")], existing_programmes=lambda ref: True)
+    assert existing[("Facts", "T-F-001")].reason == "both_checks"  # a programme that already exists is fine
+
+
+def test_a_programme_row_with_no_value_column_is_rejected(tmp_path):
+    rows = plan(tmp_path, [inst(1)], programmes=[prog(1, "T-INST-001", seats=None, seat_category=None)])
+    assert rows[("Programmes", "T-PRG-001")].reason == "no_value"
+
+
+def test_a_rejected_row_does_not_shadow_a_later_valid_one(tmp_path):
+    rows = plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", language="Urdu"), fact(2, "T-INST-001")])
+    assert rows[("Facts", "T-F-001")].reason == "bad_language" and rows[("Facts", "T-F-002")].bucket == "accepted"

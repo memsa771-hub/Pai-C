@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.os import models
-from app.os.knowledge.sheets.importer import AlreadyImported, run_import
+from app.os.knowledge.sheets.importer import AlreadyImported, ImportRefused, run_import
 from app.os.knowledge.sheets.importlog import ImportLog
 from app.os.registry.store import RegistryStore
 
@@ -25,6 +25,7 @@ from .helpers import (
     fact,
     inst,
     load_list,
+    waiver_fmt,
     workbook,
 )
 
@@ -33,9 +34,11 @@ DECISION = "owner chat 2026-11-07"
 E = "inst:t-inst-001"
 
 
-def imp(tmp_path, d, institutions, facts=(), programmes=(), **kw):
-    path = workbook(tmp_path, institutions, facts, programmes)
-    return run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref=DECISION, **kw)
+def imp(tmp_path, d, institutions, facts=(), programmes=(), waiver=False, **kw):
+    path = workbook(tmp_path, institutions, facts, programmes, name="test-batch.xlsx" if waiver else "batch.xlsx")
+    fmt = waiver_fmt(path) if waiver else None
+    return run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref=DECISION, fmt=fmt,
+                      **kw)
 
 
 def fact_row(engine, field):
@@ -97,10 +100,20 @@ def test_queued_rows_open_review_items_and_are_not_loaded(engine, clean, tmp_pat
         assert conn.execute(select(models.knowledge_facts.c.field)).scalars().all() == []
 
 
-def test_without_a_queue_the_rows_are_still_reported(engine, clean, tmp_path):
+def test_without_a_review_queue_an_import_with_queued_rows_is_refused_and_leaves_nothing(engine, clean, tmp_path):
     load_list(engine)
-    res = imp(tmp_path, deps(engine), [inst(1, chk=checks("correct", "no"))])
-    assert res.queued_items == 0 and res.counts["Institutions"]["queued"] == 1
+    with pytest.raises(ImportRefused, match="review queue is not connected"):
+        imp(tmp_path, deps(engine), [inst(1), inst(2, chk=checks("correct", "no"))])
+    assert ImportLog(engine, "pai").list() == [] and RegistryStore(engine, "pai").get(E) is None
+    imp(tmp_path, deps(engine), [inst(1)])  # nothing queued: it needs no queue
+
+
+def test_without_an_allow_list_nothing_goes_above_unconfirmed(engine, clean, tmp_path):
+    load_list(engine)
+    res = imp(tmp_path, deps(engine, official=None), [inst(1)], [fact(1, "T-INST-001")])
+    assert fact_row(engine, "deadline_close").status == "unconfirmed"
+    assert RegistryStore(engine, "pai").get(E).attrs["trust"] == "unconfirmed"
+    assert {r.reason for r in res.rows} == {"allow_list_not_connected"}
 
 
 def test_report_log_and_second_import_refused(engine, clean, tmp_path):
@@ -167,11 +180,20 @@ def rev_import(tmp_path, d, institutions, facts=()):
 
 def test_owner_accepted_model_read_rows_are_verified_without_refetch_and_the_waiver_is_recorded(engine, clean, tmp_path):
     load_list(engine)
-    res = imp(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="webfetch (model-extracted)")])
+    res = imp(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="webfetch (model-extracted)")],
+              waiver=True)
     row = fact_row(engine, "deadline_close")
     assert row.status == "verified" and row.read_method == "model"
     assert row.evidence[0]["refetch_waived"] == "P2 spec §11.3" and row.evidence[0]["decision_ref"] == DECISION
     assert [r.reason for r in res.rows if r.sheet == "Facts"] == ["both_checks"]
+
+
+def test_the_waiver_is_only_for_the_listed_files(engine, clean, tmp_path):
+    load_list(engine)
+    res = imp(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="webfetch (model-extracted)")])
+    assert fact_row(engine, "deadline_close").status == "unconfirmed"  # another file: the re-fetch is needed
+    assert [r.reason for r in res.rows if r.sheet == "Facts"] == ["refetch_not_run"]
+    assert "refetch_waived" not in (fact_row(engine, "deadline_close").evidence[0])
 
 
 def test_reviewer_mode_model_read_rows_stay_unconfirmed_until_the_quote_matches_on_a_refetched_page(engine, clean,

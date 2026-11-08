@@ -52,6 +52,9 @@ class PlanContext:
     existing_region: Callable[[str], str | None] = lambda registry_id: None  # registry id -> region code
     region_lookup: Callable[[str], str | None] = lambda registry_id: None  # set by the plan: file first, then database
     require_list: bool = True  # False only for a dry run that asks "what if every list were loaded"
+    cap_without_allow_list: bool = False  # real imports: with no allow-list connected nothing is above `unconfirmed`
+    decision_ref: str | None = None  # the owner's decision reference (owner-accepted mode)
+    batch_sha: str = ""  # sha256 of the file being planned; set by plan_batch
     fmt: Format = field(default_factory=load_format)
 
 
@@ -176,15 +179,23 @@ def _cap(result: RowResult, url: str, region: str | None, quote: str | None, ctx
         return
     if not quote:
         _lower(result, "no_quote")
+    elif ctx.official is None and ctx.cap_without_allow_list:
+        _lower(result, "allow_list_not_connected")  # no allow-list to check the source against: never above this
     elif ctx.official is not None and not ctx.official(url, _scope(region, ctx)):
         _lower(result, "source_not_on_allow_list")
-    elif read_method in ctx.fmt.needs_refetch:
-        if ctx.mode == OWNER_ACCEPTED and result.level == "verified":
+    elif read_method is None or read_method in ctx.fmt.needs_refetch:  # a missing read method is never assumed fetch
+        if waiver_applies(ctx) and result.level == "verified":
             # owner ruling P2 spec §11.3: both AI checks accepted it, so no re-fetch; the waiver is on the record
             prov = result.payload.setdefault("provenance", {})
-            prov["refetch_waived"] = ctx.fmt.raw["owner_accepted"]["refetch_waiver"]
+            prov["refetch_waived"] = ctx.fmt.raw["owner_accepted"]["refetch_waiver"]["ref"]
         else:
             result.needs_refetch = True
+
+
+def waiver_applies(ctx: PlanContext) -> bool:
+    """The §11.3 waiver: owner-accepted mode, a decision reference, and one of the five v4 files (by sha256)."""
+    files = set(ctx.fmt.raw["owner_accepted"]["refetch_waiver"]["files"].values())
+    return ctx.mode == OWNER_ACCEPTED and bool((ctx.decision_ref or "").strip()) and ctx.batch_sha in files
 
 
 def _lower(result: RowResult, reason: str) -> None:
@@ -283,13 +294,6 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext) -> t
     return None, ""
 
 
-def _fact_key_seen(seen: set, key: tuple) -> bool:
-    if key in seen:
-        return True
-    seen.add(key)
-    return False
-
-
 def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list[RowResult]) -> list[RowResult]:
     fmt = ctx.fmt
     abroad = {res.row_id for res in institutions if res.reason in ("out_of_scope", "out_of_scope_region")}
@@ -332,10 +336,11 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         problem, detail = _programme_row(r, rid, res, chk, ctx, inst_registry_id, seen_keys, seen_programmes)
         if problem:
             res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
-        else:
-            programme_refs.add(rid)
+        elif res.bucket in ("accepted", "unconfirmed"):
+            programme_refs.add(rid)  # only a programme that is actually loaded can carry facts
+    in_file = _all_programme_ids(batch)
     for r in batch.sheets.get("Facts", []):
-        out.append(_fact_row(r, ctx, inst_registry_id, programme_refs | _all_programme_ids(batch), seen_keys,
+        out.append(_fact_row(r, ctx, inst_registry_id, (programme_refs, in_file), seen_keys,
                              abroad | skipped_programmes))
     return out
 
@@ -353,8 +358,8 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
         return "institution_not_loaded", str(inst_id)
     url, quote = _text(r.get("source_url")), _text(r.get("quote_verbatim"))
     rm_text = _text(r.get("read_method"))
-    rm = fmt.read_method(rm_text) if rm_text else "fetch"
-    if rm is None:
+    rm = fmt.read_method(rm_text) if rm_text else None  # a missing read method is not assumed to be fetch
+    if rm_text and rm is None:
         return "unknown_read_method", str(rm_text)
     prob = _source_problem(url, None, rm, ctx)
     if prob:
@@ -364,6 +369,8 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
         return "bad_date", str(r.get("retrieved"))
     if not _text(r.get("programme")):
         return "missing_name", ""
+    if not any(_text(r.get(col)) for col in fmt.raw["programme_facts"]):
+        return "no_value", ""
     intake_text = _text(r.get("intake"))
     parsed = fmt.intake(intake_text)
     if parsed is None:
@@ -372,7 +379,7 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
         return None, ""
     term, year = parsed
     category = slug(_text(r.get("seat_category")) or "").replace("-", "_") if _text(r.get("seat_category")) else ""
-    facts = []
+    facts, keys = [], []
     for col, spec in fmt.raw["programme_facts"].items():
         v = _text(r.get(col))
         if v is None:
@@ -382,19 +389,20 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
         if spec.get("scale") and _text(r.get(spec["scale"])):
             value["scale"] = _text(r.get(spec["scale"]))
         key = ("programme", rid, name, term, year)
-        if key in seen_keys:
+        if key in seen_keys or key in keys:
             return "duplicate_key", f"{rid} {name} {intake_text}"
-        seen_keys.add(key)
+        keys.append(key)
         facts.append({"field": name, "value": value, "fact_class": spec["fact_class"]})
     res.payload = {"row": r, "provenance": chk.provenance, "inst_registry_id": reg_id, "term": term, "year": year,
                    "facts": facts, "read_method": rm, "checked_at": checked, "url": url, "quote": quote,
                    "programme_new": rid not in seen_programmes, "region": ctx.region_lookup(reg_id)}
     seen_programmes.add(rid)
     _cap(res, url, res.payload["region"], quote, ctx, rm)
+    seen_keys.update(keys)  # registered only once the row has passed every check
     return None, ""
 
 
-def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: set[str], seen_keys,
+def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: tuple[set[str], set[str]], seen_keys,
               out_of_scope: set[str]) -> RowResult:
     fmt = ctx.fmt
     rid = _text(r.get("fact_id")) or ""
@@ -438,8 +446,11 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
     value = _text(r.get("value"))
     if value is None:
         return "no_value", ""
-    if entity in programme_ids or ctx.existing_programmes(entity):
+    loaded, in_file = programme_ids
+    if entity in loaded or (entity not in in_file and ctx.existing_programmes(entity)):
         scope, ref = "programme", entity
+    elif entity in in_file:
+        return "programme_not_loaded", entity  # a fact is never attached to a programme that was not loaded
     else:
         ref = inst_registry_id(entity)
         if ref is None:
@@ -469,7 +480,7 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
         return None, ""
     term, year = parsed
     key = (scope, ref, field_name, term, year)
-    if _fact_key_seen(seen_keys, key):
+    if key in seen_keys:
         return "duplicate_key", f"{entity} {field_name} {intake_text}"
     unit = _text(r.get("unit"))
     res.payload = {"row": r, "provenance": chk.provenance, "scope": scope, "ref": ref, "field": field_name,
@@ -479,11 +490,13 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
     region = ctx.region_lookup(ref) if scope == "registry" else None
     res.payload["region"] = region
     _cap(res, url, region, quote, ctx, rm)
+    seen_keys.add(key)  # registered only once the row has passed every check
     return None, ""
 
 
 def plan_batch(batch: Batch, ctx: PlanContext) -> list[RowResult]:
     """Every row of every sheet with its decision, institutions first (programmes and facts need them)."""
+    ctx.batch_sha = batch.sha256
     inst = plan_institutions(batch, ctx)
     return inst + plan_programmes_and_facts(batch, ctx, inst)
 

@@ -6,13 +6,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Response
 
 from app.os.api.services import Services
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
+    ImportRefused,
     build_context,
     plan_file,
     run_import,
@@ -21,16 +22,19 @@ from app.os.knowledge.sheets.importer import (
 from app.os.knowledge.sheets.importlog import ImportLog
 from app.os.knowledge.sheets.plan import OWNER_ACCEPTED, REVIEWERS, summarise
 from app.os.knowledge.sheets.reader import SheetError
-from app.os.knowledge.sheets.template import write_template
+from app.os.knowledge.sheets.template import workbook_bytes
 from app.os.knowledge.sheets.undo import UndoRefused, undo_import
 from app.os.registry.store import RegistryStore
 
 MAX_BYTES = 20 * 1024 * 1024
+# The admin token is the only identity this API carries, so it is the actor on every import and revision. A name typed
+# in the form is kept beside it as `note_actor`, never as the actor.
+ADMIN_ACTOR = "admin"
 
 
 def record_out(r) -> dict:
     return {"id": r.id, "file_name": r.file_name, "sha256": r.sha256, "mode": r.mode, "decision_ref": r.decision_ref,
-            "batch_ref": r.batch_ref, "actor": r.actor, "status": r.status, "counts": r.counts,
+            "batch_ref": r.batch_ref, "actor": r.actor, "note_actor": r.note_actor, "status": r.status, "counts": r.counts,
             "programmes_created": r.programmes_created, "error": r.error, "started_at": r.started_at.isoformat(),
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
             "undone_at": r.undone_at.isoformat() if r.undone_at else None, "undone_by": r.undone_by}
@@ -65,11 +69,9 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
         return path
 
     @router.get("/admin/imports/template", dependencies=[Depends(require_admin)])
-    def template() -> FileResponse:
-        path = Path(tempfile.mkdtemp()) / "pai-research-batch-template.xlsx"
-        write_template(path)
-        return FileResponse(path, filename=path.name,
-                            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    def template() -> Response:
+        return Response(workbook_bytes(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": 'attachment; filename="pai-research-batch-template.xlsx"'})
 
     @router.post("/admin/imports/validate", dependencies=[Depends(require_admin)])
     async def validate(country: str = Form(...), family: str = Form(""), file: UploadFile = File(...),
@@ -85,7 +87,8 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
         return {"counts": summarise(results), "rows": [row_out(r) for r in results if r.bucket != "accepted"]}
 
     @router.post("/admin/imports", dependencies=[Depends(require_admin)])
-    async def import_file(country: str = Form(...), actor: str = Form(...), owner_accepted: str | None = Form(None),
+    async def import_file(country: str = Form(...), actor: str | None = Form(None),
+                          owner_accepted: str | None = Form(None),
                           reviewers: bool = Form(False), batch_ref: str | None = Form(None), family: str = Form(""),
                           refetch: bool = Form(False), file: UploadFile = File(...),
                           svc: Services = Depends(services)) -> dict:
@@ -95,14 +98,25 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
             path = await save(file, Path(tmp))
             try:
                 res = run_import(path, make_deps(svc, refetch), mode=OWNER_ACCEPTED if owner_accepted else REVIEWERS,
-                                 actor=actor, country=country, decision_ref=owner_accepted, batch_ref=batch_ref,
-                                 family=family)
+                                 actor=ADMIN_ACTOR, note_actor=actor, country=country, decision_ref=owner_accepted,
+                                 batch_ref=batch_ref, family=family)
             except AlreadyImported as e:
+                raise HTTPException(status_code=409, detail=str(e)) from e
+            except ImportRefused as e:
                 raise HTTPException(status_code=409, detail=str(e)) from e
             except (SheetError, ValueError) as e:
                 raise HTTPException(status_code=422, detail=str(e)) from e
-            report = Path(res.report_path).read_text(encoding="utf-8") if res.report_path else ""
-        return {"import_id": res.import_id, "counts": res.counts, "queued_items": res.queued_items, "report_csv": report}
+        rec = ImportLog(svc.engine, svc.settings.tenant_id).get(res.import_id)
+        return {"import_id": res.import_id, "counts": res.counts, "queued_items": res.queued_items,
+                "report_csv": rec.report_csv or ""}
+
+    @router.get("/admin/imports/{import_id}/report", dependencies=[Depends(require_admin)])
+    def report(import_id: int, svc: Services = Depends(services)) -> Response:
+        rec = ImportLog(svc.engine, svc.settings.tenant_id).get(import_id)
+        if rec is None or rec.report_csv is None:
+            raise HTTPException(status_code=404, detail="no report for this import")
+        return Response(rec.report_csv, media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="import-{import_id}-report.csv"'})
 
     @router.get("/admin/imports", dependencies=[Depends(require_admin)])
     def listing(svc: Services = Depends(services)) -> dict:
@@ -116,13 +130,13 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
         return record_out(rec)
 
     @router.post("/admin/imports/{import_id}/undo", dependencies=[Depends(require_admin)])
-    def undo(import_id: int, actor: str = Form(...), svc: Services = Depends(services)) -> dict:
+    def undo(import_id: int, actor: str | None = Form(None), svc: Services = Depends(services)) -> dict:
         try:
-            r = undo_import(svc.engine, svc.settings.tenant_id, import_id, actor=actor)
+            r = undo_import(svc.engine, svc.settings.tenant_id, import_id, actor=ADMIN_ACTOR)
         except KeyError:
             raise HTTPException(status_code=404, detail="import not found") from None
         except UndoRefused as e:
             raise HTTPException(status_code=409, detail={"message": str(e), "conflicts": e.conflicts}) from e
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e)) from e
-        return {"facts": r.facts, "registry": r.registry, "programmes": r.programmes}
+        return {"facts": r.facts, "registry": r.registry, "programmes": r.programmes, "links": r.links}
