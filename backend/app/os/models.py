@@ -460,7 +460,10 @@ pages = Table(
     Column("links", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     Column("blocked", Text),
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("read_method", Text, nullable=False, server_default="fetch"),  # P2-T4 (os_0030): how the text was read
+    Column("language", Text),  # P2-T4: set only for a script the data maps to a language
     UniqueConstraint("tenant_id", "url", name="uq_os_pages_url"),
+    _in("read_method", ("fetch", "render", "ocr", "human"), "ck_os_pages_read_method"),
 )
 
 research_runs = Table(
@@ -960,7 +963,7 @@ consistency_runs = Table(
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
 
-# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0027) ---------------------------------
+# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0030) ---------------------------------
 
 SOURCE_TIERS = ("regulator", "board", "admission_body", "institution")
 SOURCE_STATES = ("active", "suspect")
@@ -1009,7 +1012,7 @@ page_snapshots = Table(
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
     _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),
-    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,3}$'", name="ck_os_page_snapshots_language"),
+    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,4}$'", name="ck_os_page_snapshots_language"),
     Index("ix_os_page_snapshots_url", "tenant_id", "url", "fetched_at"),
 )
 
@@ -1058,4 +1061,26 @@ fact_slots = Table(
     Column("fact_class", Text),
     _created(),
     UniqueConstraint("tenant_id", "intake_id", "scope", "ref", "field", "owner_ref", name="uq_os_fact_slots_key"),
+)
+
+# --- P2-T4: sources that could not be read, waiting for a human to collect the value (os_0030) -----------------------
+
+NOT_READABLE_STATES = ("open", "collected", "readable")
+
+# R-72: `field = ''` is the source itself; one more row per field the source should have answered. T5's `collect`
+# review item reads the open rows; a later successful read marks them `readable`.
+not_readable = Table(
+    "os_not_readable", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("reason", Text, nullable=False),  # not_readable:render | not_readable:ocr | http_401 | unreadable_pdf ...
+    Column("programme_ref", Text, nullable=False, server_default=""),
+    Column("field", Text, nullable=False, server_default=""),
+    Column("intake_year", Integer, nullable=False, server_default="0"),
+    Column("snapshot_id", BigInteger),
+    Column("state", Text, nullable=False, server_default="open"),
+    Column("first_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", "programme_ref", "field", "intake_year", name="uq_os_not_readable"),
+    _in("state", NOT_READABLE_STATES, "ck_os_not_readable_state"),
 )
