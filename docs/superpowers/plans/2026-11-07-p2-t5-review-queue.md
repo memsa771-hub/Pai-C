@@ -36,3 +36,6 @@ Tests: `tests/os/test_p2t5_{verified_consumers,review_flow,review_api,reviewers_
 
 ## Verification (after the review fixes)
 tests/os 2418 passed; legacy 2560 passed; vitest 590 passed; next build ok; tach, freeze, one alembic head, traceability ok.
+
+## Round 2
+Audit only for closed items; a writer that voids a verify item opens the replacement in the same transaction; open_item joining and sync sweep void items whose reviews no longer match the fact (SKIP LOCKED gap); sync includes ocr/human readings awaiting comparison; identity is stripped and case-folded, required for kind ai, with a warning when it equals the ref. tests/os 2423 passed; legacy 2560 passed.
