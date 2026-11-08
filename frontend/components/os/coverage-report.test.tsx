@@ -24,7 +24,8 @@ const report = (over: Partial<OsCoverage> = {}): OsCoverage => ({
            hs_verified: 3, hs_not_confirmed: 1, hs_missing: 2, not_readable: 1 }],
   suspect_domains: ['odd.alpha.test'], open_review_items: { verify: 2 },
   workload: { institutions: 2, high_stakes_facts: 6, high_stakes_per_institution: 3, not_verified: 3, checks_needed: 12,
-              checks_left: 6, rows_per_hour: null, hours_left: null, days_left: null },
+              checks_left: 6, reviewers_active: 0, rows_per_reviewer_day: null, rows_per_hour: null, work_hours_per_day: 6,
+              reviewer_hours_left: null, team_days_left: null },
   ...over,
 });
 
@@ -62,8 +63,9 @@ describe('helpers', () => {
     expect(listProgress({ list_id: 'l', name: 'n', region: null, published: null, loaded: 3, count_confirmed: false }))
       .toBe('3 loaded, no published count');
     expect(workloadLine({ institutions: 1, high_stakes_facts: 1, high_stakes_per_institution: 1, not_verified: 4,
-                          checks_needed: 2, checks_left: 8, rows_per_hour: 2, hours_left: 2, days_left: 0.3 }))
-      .toBe('4 rows left, 8 checks; about 2 h at 2 rows/h (0.3 working days)');
+                          checks_needed: 2, checks_left: 8, reviewers_active: 2, rows_per_reviewer_day: 12,
+                          rows_per_hour: 2, work_hours_per_day: 6, reviewer_hours_left: 2, team_days_left: 0.2 }))
+      .toBe('4 rows left, 8 checks; measured 12 rows per reviewer-day (about 2 rows/h, assuming 6 h a day); about 0.2 working days for 2 reviewer(s)');
   });
 
   it('reads the failing items out of a refused call', () => {
@@ -71,5 +73,15 @@ describe('helpers', () => {
     expect(failingFromError(new Error(`API 409: ${body}`))).toHaveLength(1);
     expect(failingFromError(new Error('API 500: boom'))).toEqual([]);
     expect(failingFromError('x')).toEqual([]);
+  });
+});
+
+describe('flags', () => {
+  it('names the current-intake reading and the new item codes', () => {
+    render(<CoverageReport report={report({ readings: [{ gate: 'e', title: 'Current', green: false, checked: 1,
+      items: [{ code: 'gate_turned_red', subject: 'intake 1', detail: '2 item(s) fail since the gate passed' }] }] })}
+      busy={false} refused={null} onMakeCurrent={vi.fn()} />);
+    expect(screen.getByText(/Current intake stays green/)).toBeTruthy();
+    expect(screen.getByText(/Current intake no longer passes its gate: intake 1/)).toBeTruthy();
   });
 });

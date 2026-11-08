@@ -25,7 +25,7 @@ def api(engine, clean, os_db):
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
     services = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: date(2027, 3, 1))
     s = store(engine)
-    s.record(olist(rows=1), cause="import")
+    s.record(olist(rows=1, date="2026-10-01"), cause="import")
     s.record(inst("one", attrs={"first_live": ["fall:2027"]}), cause="import")
     ProgrammeStore(engine, "pai").upsert(Programme(ref="p-one", route_key="r", university="U", name="p", aliases=(),
                                                    start_urls=(), official_domains=()))
@@ -48,11 +48,11 @@ def test_admin_only(api):
 def test_coverage_report_shape(api):
     body = api.get(BASE + "/coverage", params={"intake": api.intake.id}, headers=ADMIN).json()
     assert body["intake"]["state"] == "open" and body["green"] is False
-    assert [r["gate"] for r in body["readings"]] == ["a", "b", "c", "d"]
+    assert [r["gate"] for r in body["readings"]] == ["a", "b", "c", "d", "e"]
     b = next(r for r in body["readings"] if r["gate"] == "b")
     assert not b["green"] and {i["code"] for i in b["items"]} == {"missing"}
     assert body["rows"][0]["institution_type"] == "university" and body["rows"][0]["institutions"] == 1
-    assert set(body["workload"]) >= {"checks_left", "rows_per_hour", "hours_left"}
+    assert set(body["workload"]) >= {"checks_left", "rows_per_hour", "reviewer_hours_left", "rows_per_reviewer_day"}
     assert api.get(BASE + "/coverage", params={"intake": 9999}, headers=ADMIN).status_code == 404
     assert [i["id"] for i in api.get(BASE + "/intakes", headers=ADMIN).json()["intakes"]] == [api.intake.id]
 

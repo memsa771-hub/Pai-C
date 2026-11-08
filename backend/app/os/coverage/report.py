@@ -1,5 +1,14 @@
 """The coverage report of one intake and the launch-gate reading (P2 spec §4.9; master R-34, R-35, R-66).
 
+Two different questions are asked here and must not be mixed up:
+- the *coverage level* of an institution (T2, R-34) reads the facts that are the institution's OWN (its, its campuses' and
+  its programmes' general rows): `verified` needs those, whoever else holds a copy of the same value;
+- the *floor reading* (R-35b) asks whether the facts a student needs are verified wherever their owner keeps them, so no value has to
+  be copied onto an institution: the facts of the admission systems that admit it (with their tests, categories and
+  calendars) and the rows an owning body holds about its programmes count, by the same ownership resolution as the level
+  (`registry.coverage.ownership`). A floor field is chosen by fact CLASS (`floor_classes`), so a fact with an explicit class
+  under another field name is not missed; `floor_fields` only names the keys to mark `missing` when nothing is held.
+
 An intake is a region, family, term and year (`os_intakes`). The report shows, per institution type: the official lists
 (the denominator), how many institutions are listed / researched / verified, and the high-stakes facts verified, not
 confirmed and missing. Four readings (R-35 a to d) are green or red, each red with its failing items. Everything is
@@ -16,12 +25,13 @@ from app.os.coverage import expected, workload
 from app.os.intakes.rollover import slot_report
 from app.os.intakes.store import Intake, IntakeError, IntakeStore
 from app.os.knowledge.fact_classes import UNCLASSIFIED, fact_class, is_high_stakes
-from app.os.registry.coverage import coverage_map
+from app.os.knowledge.sources.allowlist import SourceDomains
+from app.os.registry.coverage import coverage_map, ownership
 from app.os.registry.model import NATIONAL
 from app.os.registry.store import RegistryStore
 
 R, F, P, SD, RI = models.registry, models.knowledge_facts, models.programmes, models.source_domains, models.review_items
-GATES = ("a", "b", "c", "d")
+GATES = ("a", "b", "c", "d", "e")
 
 
 @dataclass(frozen=True)
@@ -82,11 +92,25 @@ def _high(field_: str, explicit: str | None) -> bool:
         return is_high_stakes(UNCLASSIFIED)
 
 
+def _class_of(field_: str, explicit: str | None) -> str:
+    try:
+        return fact_class(field_, explicit)
+    except ValueError:
+        return UNCLASSIFIED
+
+
+def _host(url: str) -> str:
+    from urllib.parse import urlparse
+
+    return (urlparse(url).hostname or "").lower()
+
+
 def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Report:
     intake = IntakeStore(engine, tenant_id).by_id(intake_id)
     if intake is None:
         raise IntakeError(f"no intake {intake_id}")
     exp = expected.for_family(intake.family)
+    floor_classes = set(exp.floor_classes)
     nationwide = intake.region == NATIONAL
     with engine.connect() as conn:
         q = select(R).where(R.c.tenant_id == tenant_id, R.c.kind == "institution", R.c.status == "active")
@@ -102,41 +126,62 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
     for p in progs:
         if p.family == intake.family and p.institution_id in insts:
             prog_refs[p.institution_id].append(p.ref)
-    with engine.connect() as conn:
-        campuses = conn.execute(select(R.c.entity_id, R.c.parent_id).where(
-            R.c.tenant_id == tenant_id, R.c.kind == "campus", R.c.parent_id.in_(list(insts) or [""]))).all()
-    campus_of = {c.entity_id: c.parent_id for c in campuses}
-    owner_of: dict[tuple[str, str], str] = {("registry", i): i for i in insts}
-    owner_of.update({("registry", c): i for c, i in campus_of.items()})
-    owner_of.update({("programme", ref): i for i, refs in prog_refs.items() for ref in refs})
 
-    # the institution's own, general (owner '') facts of this intake that are high-stakes: scope/ref/field -> row
-    held: dict[str, dict[tuple[str, str, str], object]] = defaultdict(dict)
-    if owner_of:
+    owned: dict = {}
+    own: set = set()
+    rows_by_ref: dict[tuple[str, str], list] = defaultdict(list)  # every fact of the intake, any owner
+    if insts:
         with engine.connect() as conn:
-            for scope in ("registry", "programme"):
-                refs = [r for (s, r) in owner_of if s == scope]
-                if not refs:
-                    continue
+            owned, own = ownership(conn, tenant_id, insts)
+            by_scope: dict[str, list[str]] = defaultdict(list)
+            for scope, ref in owned:
+                by_scope[scope].append(ref)
+            for scope, refs in by_scope.items():
                 for f in conn.execute(select(F).where(
-                        F.c.tenant_id == tenant_id, F.c.scope == scope, F.c.ref.in_(refs), F.c.intake_year == intake.year,
-                        F.c.intake_term == intake.term, F.c.owner_ref == "").order_by(F.c.id)):
-                    if _high(f.field, f.fact_class):
-                        held[owner_of[(scope, f.ref)]][(scope, f.ref, f.field)] = f
-    slot_keys: dict[str, set] = defaultdict(set)
+                        F.c.tenant_id == tenant_id, F.c.scope == scope, F.c.ref.in_(refs),
+                        F.c.intake_year == intake.year, F.c.intake_term == intake.term).order_by(F.c.id)):
+                    rows_by_ref[(scope, f.ref)].append(f)
+    # an institution's own refs in this family: itself, its campuses, its family's programmes
+    mine: dict[str, set] = {i: {("registry", i)} for i in insts}
+    for (scope, ref), who in owned.items():
+        if (scope, ref) in own:
+            for i in who:
+                if scope == "programme" and ref not in prog_refs.get(i, ()):
+                    continue  # a programme of another family is not this intake's
+                mine[i].add((scope, ref))
+    shared_regs = {i: {ref for (scope, ref), who in owned.items() if scope == "registry" and i in who} for i in insts}
+
+    held: dict[str, dict] = defaultdict(dict)  # the institution's own general high-stakes facts: key -> row
+    own_any: dict[str, list] = defaultdict(list)  # own facts of any owner whose class is a floor class
+    for i in insts:
+        for scope, ref in mine[i]:
+            for f in rows_by_ref.get((scope, ref), ()):
+                if f.owner_ref == "" and _high(f.field, f.fact_class):
+                    held[i][(scope, ref, f.field)] = f
+                if _class_of(f.field, f.fact_class) in floor_classes:
+                    own_any[i].append(f)
+    owner_of = {(s, r): i for i in insts for (s, r) in mine[i]}
+    slot_floor: dict[str, set] = defaultdict(set)
     for slot in slot_report(engine, tenant_id, intake.id):
         owner = owner_of.get((slot.scope, slot.ref))
-        if owner and slot.owner_ref == "" and _high(slot.field, slot.fact_class):
-            slot_keys[owner].add((slot.scope, slot.ref, slot.field))
+        if owner and _class_of(slot.field, slot.fact_class) in floor_classes:
+            slot_floor[owner].add((slot.scope, slot.ref, slot.field))
 
-    def floor_keys(inst: str) -> set:
-        targets = [("programme", ref) for ref in prog_refs.get(inst, [])] or [("registry", inst)]
-        return {(s, r, f) for s, r in targets for f in exp.floor_fields}
+    def required(i: str) -> set:
+        targets = [("programme", ref) for ref in prog_refs.get(i, [])] or [("registry", i)]
+        keys = {(s, r, f) for s, r in targets for f in exp.floor_fields}  # absent expected keys: marked missing
+        keys |= {(f.scope, f.ref, f.field) for f in own_any[i]}
+        return keys | slot_floor[i]
 
-    def floor_met(inst: str, key: tuple) -> bool:
-        """A floor field is met by the programme's own verified fact, or by a verified fact of its institution."""
-        ok = lambda k: getattr(held[inst].get(k), "status", None) == "verified"
-        return ok(key) or ok(("registry", inst, key[2]))
+    def best(i: str, key: tuple) -> str | None:
+        """`verified` when the field is verified wherever its owner keeps it: on the key's own entity (any owner) or
+        on an institution-level, campus or shared registry entity; else the best other status; None when absent."""
+        scope, ref, field_ = key
+        rank = {"verified": 3, "confirmed": 2, "unconfirmed": 1, "stale": 0}
+        found = [f for f in rows_by_ref.get((scope, ref), ()) if f.field == field_]
+        for r in shared_regs[i] | {x for s, x in mine[i] if s == "registry"}:
+            found += [f for f in rows_by_ref.get(("registry", r), ()) if f.field == field_]
+        return max((f.status for f in found), key=lambda st: rank.get(st, 0), default=None)
 
     cov = coverage_map(engine, tenant_id, intake.year, intake_term=intake.term,
                        region=None if nationwide else intake.region)
@@ -148,35 +193,43 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
         row.institutions += 1
         setattr(row, level, getattr(row, level) + 1)
         row.not_readable += bool(r.attrs.get("not_readable"))
-        keys = floor_keys(i) | slot_keys[i] | set(held[i])
-        for key in sorted(keys):
-            got = held[i].get(key)
-            if got is None and key in floor_keys(i) and key[0] == "programme" and floor_met(i, key):
-                row.hs_verified += 1
-            elif got is None:
+        req = required(i)
+        for key in sorted(req):
+            st = best(i, key)
+            if st is None:
                 row.hs_missing += 1
-            elif got.status == "verified":
+            elif st == "verified":
+                row.hs_verified += 1
+            else:
+                row.hs_not_confirmed += 1
+        for key, f in sorted(held[i].items()):  # the other own high-stakes facts
+            if key in req:
+                continue
+            if f.status == "verified":
                 row.hs_verified += 1
             else:
                 row.hs_not_confirmed += 1
 
-    # lists: the regional ones and the national ones, per institution type (R-35a)
+    # (a) the denominator: the regional and national official lists, per institution type
     reg = RegistryStore(engine, tenant_id)
     wanted_types = sorted({*by_type, *exp.institution_types} - {""})
     entries = {e.entity_id: e for e in reg.list(kind="official_list", limit=10_000)}
     progress = [p for p in reg.list_progresses() if p.list_id in entries]
-    a = Reading("a", "Denominator: one official list per region and institution type, 100% loaded")
+    a = Reading("a", "Denominator: official lists per region and institution type, dated, 100% loaded")
     for t in wanted_types:
         lists = [p for p in progress if entries[p.list_id].institution_type == t
                  and entries[p.list_id].region in (intake.region, NATIONAL, None)
                  and entries[p.list_id].attrs.get("family") in (None, "", intake.family)]
         row = by_type.setdefault(t, TypeRow(t))
         row.lists = [{"list_id": p.list_id, "name": p.name, "region": p.region, "published": p.published,
-                      "loaded": p.loaded, "count_confirmed": p.count_confirmed} for p in lists]
+                      "loaded": p.loaded, "count_confirmed": p.count_confirmed,
+                      "date": entries[p.list_id].attrs.get("date")} for p in lists]
         a.checked += 1
         if not lists:
             a.items.append(Item("no_list", t, "no official list for this institution type"))
-        for p in lists:
+        for p in lists:  # several lists for one type are fine: each has to be dated, confirmed and complete
+            if not entries[p.list_id].attrs.get("date"):
+                a.items.append(Item("no_date", p.list_id, "the list has no date"))
             if not p.count_confirmed or p.published is None:
                 a.items.append(Item("count_unconfirmed", p.list_id, "the published count is not confirmed"))
             elif p.over:
@@ -189,25 +242,29 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
     term_year = f"{intake.term}:{intake.year}"
     b = Reading("b", "Verified floor: deadlines, merit formulas, thresholds of first-live institutions")
     for i, r in insts.items():
-        live = r.attrs.get("first_live") or []
-        if term_year not in live:
+        if term_year not in (r.attrs.get("first_live") or []):
             continue
         b.checked += 1
-        for key in sorted(floor_keys(i) | slot_keys[i]):
-            if key in floor_keys(i) and floor_met(i, key):
+        for key in sorted(required(i)):
+            st = best(i, key)
+            if st == "verified":
                 continue
-            got = held[i].get(key)
-            if got is None:
+            if st is None:
                 b.items.append(Item("missing", f"{i} {key[1]} {key[2]}"))
-            elif got.status != "verified":
-                b.items.append(Item("not_verified", f"{i} {key[1]} {key[2]}", got.status))
+            else:
+                b.items.append(Item("not_verified", f"{i} {key[1]} {key[2]}", st))
 
-    c_read = Reading("c", "Everything else high-stakes is verified or not confirmed with the official link")
+    sources = SourceDomains(engine, tenant_id)
+    c_read = Reading("c", "Everything else high-stakes is verified or not confirmed with a listed official link")
     for i in insts:
         for key, f in sorted(held[i].items()):
             c_read.checked += 1
-            if f.status != "verified" and not (f.url.strip() and f.quote.strip()):
+            if f.status == "verified":
+                continue
+            if not (f.url.strip() and f.quote.strip()):
                 c_read.items.append(Item("no_link", f"{i} {key[1]} {key[2]}", "not confirmed and no official link"))
+            elif (st := sources.state_of(_host(f.url))) is not None and st.state == "suspect":
+                c_read.items.append(Item("suspect_domain", f"{i} {key[1]} {key[2]}", f"{st.domain} is suspect"))
 
     d = Reading("d", "No online information: stays listed, offered only as 'PAI can't run this place yet'")
     for i, r in insts.items():
@@ -215,6 +272,14 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
             d.checked += 1
             if cov[i].level != "listed":
                 d.items.append(Item("not_verified", i, f"level {cov[i].level} for a place with no official information"))
+
+    # (e) an intake that is already current must stay green; it is flagged, never reverted by itself
+    e = Reading("e", "A current intake keeps passing its gate (flagged, not reverted)")
+    if intake.state == "current":
+        e.checked = 1
+        failing = sum(len(r.items) for r in (a, b, c_read, d))
+        if failing:
+            e.items.append(Item("gate_turned_red", f"intake {intake.id}", f"{failing} item(s) fail since the gate passed"))
 
     with engine.connect() as conn:
         suspect = [s.domain for s in conn.execute(select(SD.c.domain, SD.c.region, SD.c.family).where(
@@ -228,4 +293,4 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
     total_hs = sum(r.hs_verified + r.hs_not_confirmed + r.hs_missing for r in by_type.values())
     left = sum(r.hs_not_confirmed + r.hs_missing for r in by_type.values())
     load = workload.estimate(engine, tenant_id, now, institutions=len(insts), high_stakes_facts=total_hs, not_verified=left)
-    return Report(intake, [by_type[k] for k in sorted(by_type)], [a, b, c_read, d], suspect, opens, load)
+    return Report(intake, [by_type[k] for k in sorted(by_type)], [a, b, c_read, d, e], suspect, opens, load)

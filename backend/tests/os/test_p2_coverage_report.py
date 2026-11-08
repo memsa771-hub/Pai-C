@@ -34,7 +34,7 @@ def programme(engine, s, ref, institution, family="undergrad"):
 @pytest.fixture
 def world(engine, clean):
     s = store(engine)
-    s.record(olist(rows=2), cause="import")
+    s.record(olist(rows=2, date="2026-10-01"), cause="import")
     s.record(inst("one", attrs={"first_live": ["fall:2027"]}), cause="import")
     s.record(inst("two"), cause="import")
     programme(engine, s, "p-one", "inst:one")
@@ -63,20 +63,21 @@ def test_rows_count_levels_lists_and_high_stakes(engine, world):
     assert (row.institution_type, row.institutions) == ("university", 2)
     assert (row.verified, row.researched, row.listed) == (1, 1, 0)
     assert row.lists == [{"list_id": "list:alpha-list", "name": "Alpha recognised institutions", "region": "national",
-                          "published": 2, "loaded": 2, "count_confirmed": True}]
+                          "published": 2, "loaded": 2, "count_confirmed": True,
+                          "date": "2026-10-01"}]
     assert row.hs_verified == 3 and row.hs_not_confirmed == 1 and row.hs_missing == 2  # p-two: 1 held, 2 floor missing
-    assert rep.workload.not_verified == 3 and rep.workload.hours_left is None  # nobody has reviewed yet
+    assert rep.workload.not_verified == 3 and rep.workload.reviewer_hours_left is None  # nobody has reviewed yet
 
 
 def test_gate_a_the_denominator(engine, world):
     s, k, intake = world  # noqa: RUF059
     assert readings(engine, intake)[1]["a"].green
-    s.record(olist(rows=3), cause="import")  # the list now says 3, 2 are loaded
+    s.record(olist(rows=3, date="2026-10-01"), cause="import")  # the list now says 3, 2 are loaded
     a = readings(engine, intake)[1]["a"]
     assert [(i.code, i.subject) for i in a.items] == [("list_incomplete", "list:alpha-list")] and not a.green
-    s.record(olist(rows=2, count_confirmed=False), cause="import")
+    s.record(olist(rows=2, date="2026-10-01", count_confirmed=False), cause="import")
     assert readings(engine, intake)[1]["a"].items[0].code == "count_unconfirmed"
-    s.record(replace(olist(rows=2), institution_type="college"), cause="import")  # the list is for another type
+    s.record(replace(olist(rows=2, date="2026-10-01"), institution_type="college"), cause="import")  # the list is for another type
     assert readings(engine, intake)[1]["a"].items[0].code == "no_list"
 
 
@@ -103,13 +104,14 @@ def test_gate_b_is_also_met_by_a_verified_fact_of_the_institution(engine, world)
 
 def test_gate_b_reads_the_rollover_slots(engine, world):
     s, k, intake = world  # noqa: RUF059
-    put(k, "programme", "p-one", "fee", fact(term="fall", year=2026))  # last year's high-stakes key
+    put(k, "programme", "p-one", "extra_deadline", fact(term="fall", year=2026, fact_class="deadline"))  # last year's key
+    put(k, "programme", "p-one", "fee", fact(term="fall", year=2026))  # high-stakes, but not on the floor (class fee)
     verify_floor(k)
     prev = IntakeStore(engine, "pai").create("punjab", "undergrad", "fall", 2026, state="open")  # noqa: F841
     res = rollover(engine, "pai", region="punjab", family="undergrad", term="fall", year=2027)
     assert res.slots_added >= 1
     items = readings(engine, intake)[1]["b"].items
-    assert [(i.code, i.subject) for i in items] == [("missing", "inst:one p-one fee")]
+    assert [(i.code, i.subject) for i in items] == [("missing", "inst:one p-one extra_deadline")]
 
 
 def test_gate_c_not_confirmed_must_carry_the_official_link(engine, world):
@@ -165,7 +167,7 @@ def test_workload_uses_the_measured_review_rate(engine, world):
     rep = report.build(engine, "pai", intake.id, NOW)
     assert rep.workload.not_verified == 3 and rep.workload.checks_left == 6
     assert rep.workload.checks_needed == round(rep.workload.institutions * rep.workload.high_stakes_per_institution) * 2
-    # three rows verified by review on one day = 3 rows over 6 work hours
+    # three rows verified by review on one day by one (unrecorded) reviewer = 3 rows per reviewer-day
     for f in FLOOR:
         fid = k.upsert("programme", "p-two", f, replace(fact("confirmed"), intake_term="fall"))
         k.set_status(fid, "verified", cause="review")
@@ -174,10 +176,10 @@ def test_workload_uses_the_measured_review_rate(engine, world):
     from app.os.coverage import workload
     with engine.begin() as conn:
         conn.execute(text("UPDATE os.os_fact_revisions SET at = :at WHERE cause = 'review'"), {"at": NOW})
-    assert workload.measured_rows_per_hour(engine, "pai", NOW) == pytest.approx(
-        conn_count(engine) / 6)  # one worked day
+    assert workload.measured_rows_per_reviewer_day(engine, "pai", NOW) == pytest.approx(
+        conn_count(engine))  # one anonymous reviewer, one day
     # nothing measured in the window: no rate, no hours
-    assert workload.measured_rows_per_hour(engine, "pai", datetime(2028, 6, 1, tzinfo=UTC)) is None
+    assert workload.measured_rows_per_reviewer_day(engine, "pai", datetime(2028, 6, 1, tzinfo=UTC)) is None
 
 
 def conn_count(engine) -> int:

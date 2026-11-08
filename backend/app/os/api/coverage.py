@@ -53,3 +53,5 @@ def add_coverage_routes(router: APIRouter, services: Callable[[], Services], req
             return intake_out(gate.pass_gate(svc.engine, tenant, intake_id, clock.now()))
         except gate.GateRed as e:
             raise HTTPException(status_code=409, detail={"message": str(e), "failing": e.failing}) from None
+        except IntakeError as e:  # it changed between the check and the lock
+            raise HTTPException(status_code=409, detail={"message": str(e), "failing": []}) from None

@@ -31,14 +31,23 @@ export default function OsCoveragePage({ params }: { params: Promise<{ workspace
   async function signIn() {
     workspaceApi.configure(workspaceId, '');
     setBusy(true);
+    setReport(null);
+    let list: OsIntake[];
     try {
-      const list = await workspaceApi.getOsIntakes(token);
-      setIntakes(list);
-      setError(null);
-      if (list[0]) { setSelected(list[0].id); await loadReport(token, list[0].id); }
+      list = await workspaceApi.getOsIntakes(token);
     } catch {
       setIntakes(null);
       setError('Could not load the intakes. Check the admin token and try again.');
+      setBusy(false);
+      return;
+    }
+    setIntakes(list);
+    setError(null);
+    try {
+      if (list[0]) { setSelected(list[0].id); await loadReport(token, list[0].id); }
+    } catch {
+      // the token worked (the intakes came back): say that the report is what failed
+      setError('The admin token works, but the coverage report could not be loaded. Pick the intake again to retry.');
     } finally {
       setBusy(false);
     }
@@ -47,8 +56,9 @@ export default function OsCoveragePage({ params }: { params: Promise<{ workspace
   async function pick(id: number) {
     setSelected(id);
     setRefused(null);
+    setReport(null);  // never leave another intake's report on screen while this one loads or fails
     setBusy(true);
-    try { await loadReport(token, id); setError(null); } catch { setError('Could not load the coverage report.'); }
+    try { await loadReport(token, id); setError(null); } catch { setError('The admin token works, but the coverage report could not be loaded.'); }
     finally { setBusy(false); }
   }
 
