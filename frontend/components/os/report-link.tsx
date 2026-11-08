@@ -8,7 +8,7 @@ let cached: Promise<OsReportTexts | null> | null = null;
 
 /** The approved sentences, asked for once. An answer that is not the texts (the part is off) leaves the link out. */
 function loadTexts(): Promise<OsReportTexts | null> {
-  cached ??= workspaceApi.getOsReportTexts().then(asReportTexts).catch(() => null);
+  cached ??= Promise.resolve().then(() => workspaceApi.getOsReportTexts()).then(asReportTexts).catch(() => null);
   return cached;
 }
 

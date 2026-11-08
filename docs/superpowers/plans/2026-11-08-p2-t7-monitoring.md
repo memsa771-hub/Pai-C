@@ -29,3 +29,6 @@ Spec: P2 §4.7, P2-D20, P2-D21, P2-D22. Branch `pc/p2-t7-monitoring` from the in
 `knowledge/research/pages.py` (`refresh`); `knowledge/sources/suspect.py` (marker); `api/queries.py` (waiting text);
 `my_plan.py` (`fact_ids`). Frontend: `lib/os-report.ts`, `components/os/report-link.tsx`, `fact-source.tsx`.
 Tests: `tests/os/monitor/` (windows, run proof with the fixture server, reports API proof, compiler block, migration, texts).
+
+## Verification
+tests/os 2660 passed; legacy 2560 passed; vitest 593 passed; next build ok; tach, freeze, one alembic head (os_0030), traceability ok.
