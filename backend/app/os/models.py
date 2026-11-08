@@ -970,7 +970,7 @@ consistency_cases = Table(
     "os_consistency_cases", md,
     _id(), _tenant(),
     Column("student_ref", Text, nullable=False),
-    Column("rule", SmallInteger, nullable=False),  # master 9.3 rule 1-8
+    Column("rule", SmallInteger, nullable=False),  # master 9.3 rule 1-12
     Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="SET NULL")),
     Column("codes", JSONB, nullable=False, server_default=text("'[]'::jsonb")),  # finding codes: never a value
     Column("status", Text, nullable=False, server_default="open"),
@@ -978,7 +978,7 @@ consistency_cases = Table(
     Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("resolved_at", DateTime(timezone=True)),
-    CheckConstraint("rule BETWEEN 1 AND 8", name="ck_os_consistency_cases_rule"),
+    CheckConstraint("rule BETWEEN 1 AND 12", name="ck_os_consistency_cases_rule"),  # 9-12: P2-T12 (os_0033)
     _in("status", ("open", "resolved"), "ck_os_consistency_cases_status"),
     Index("uq_os_consistency_cases_open", "tenant_id", "student_ref", "rule", text("coalesce(plan_id, 0)"), unique=True,
           postgresql_where=text("status = 'open'")),
