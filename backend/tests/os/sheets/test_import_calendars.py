@@ -124,3 +124,101 @@ def test_undoing_the_import_closes_the_calendar_and_withdraws_its_dates(engine, 
     assert RegistryStore(engine, "pai").get(CAL).status == "closed"
     f = d.knowledge.registry_facts([CAL], ["result_date"], 2027, intake_term="winter")[(CAL, "result_date")]
     assert f.status == "stale" and f.value is None
+
+
+# --- every fact an import writes, and every fact an undo changes back, tells the plans (row 6.10) --------------------
+
+
+def programme_rows():
+    from .helpers import prog
+
+    return [inst(3)], [prog(1, "T-INST-003", programme_id="p1")]
+
+
+def merit_fact(day: str):
+    return fact(7, "p1", field_="merit_list_date", value=day, intake="Winter 2027")
+
+
+def import_programme_date(d, tmp, name, day):
+    institutions, programmes = programme_rows()
+    path = workbook(tmp, institutions, [merit_fact(day)], programmes, name=name)
+    return run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref="ref-1")
+
+
+def test_a_programme_fact_written_by_an_import_moves_the_plan_that_uses_it(engine, world):
+    svc, d, tmp = world
+    plan = svc.start_plan(contract(), with_needs=True).plan_id
+    first = task(engine, plan, "merit_list@p1")
+    import_programme_date(d, tmp, "a.xlsx", "2027-08-15")
+    after_first = task(engine, plan, "merit_list@p1")
+    assert after_first.due_at != first.due_at  # the date arrived and the plan took it without anyone recompiling it
+    import_programme_date(d, tmp, "b.xlsx", "2027-09-20")  # the corrected batch moves the date
+    after_second = task(engine, plan, "merit_list@p1")
+    assert after_second.due_at > after_first.due_at and after_second.due_at.date() >= date(2027, 9, 20)
+
+
+def test_the_hook_is_called_for_every_scope_after_the_fact_is_stored(engine, world):
+    _, d, tmp = world
+    seen = []
+
+    def hook(scope, ref, field, fid, status, year):  # the fact is already in the database when the hook runs
+        seen.append((scope, ref, field, status, year, d.knowledge.get(fid)[3].status))
+
+    d.on_fact_change = hook
+    institutions, programmes = programme_rows()
+    path = workbook(tmp, [*institutions, *rows()], [merit_fact("2027-08-15"), date_fact("2031-05-20")], programmes)
+    run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref="ref-1")
+    assert sorted(seen) == [
+        ("programme", "p1", "merit_list_date", "verified", 2027, "verified"),
+        ("programme", "p1", "seats_open_merit", "verified", 2026, "verified"),
+        ("registry", CAL, "result_date", "verified", 2027, "verified"),
+    ]
+
+
+def test_an_undo_tells_the_plans_for_each_fact_it_changes_back(engine, world):
+    from app.os.knowledge.sheets.undo import undo_import
+
+    svc, d, tmp = world
+    plan = svc.start_plan(contract(), with_needs=True).plan_id
+    base = task(engine, plan, "merit_list@p1").due_at
+    res = import_programme_date(d, tmp, "a.xlsx", "2027-08-15")
+    moved = task(engine, plan, "merit_list@p1").due_at
+    assert moved != base
+    seen = []
+    plans_hook = plan_hook(svc, svc.kernel)
+
+    def hook(scope, ref, field, fid, status, year):
+        seen.append((scope, ref, field, status, year))
+        plans_hook(scope, ref, field, fid, status, year)
+
+    undo_import(engine, "pai", res.import_id, actor="admin", on_fact_change=hook)
+    assert sorted(seen) == [("programme", "p1", "merit_list_date", "stale", 2027),
+                            ("programme", "p1", "seats_open_merit", "stale", 2026)]
+    assert task(engine, plan, "merit_list@p1").due_at != moved  # the withdrawn date no longer dates the step
+
+
+def test_a_plan_that_cannot_follow_is_reported_and_the_import_still_completes(engine, world):
+    _, d, tmp = world
+
+    def broken(*a):
+        raise RuntimeError("cannot recompile")
+
+    d.on_fact_change = broken
+    res = import_programme_date(d, tmp, "a.xlsx", "2027-08-15")
+    assert len(res.hook_errors) == 2 and "cannot recompile" in res.hook_errors[0]
+    from app.os.knowledge.sheets.importlog import ImportLog
+
+    rec = ImportLog(engine, "pai").get(res.import_id)
+    assert rec.status == "done" and "2 plan revisions failed" in rec.error  # kept in the log, not hidden
+    assert d.knowledge.programme_facts(["p1"], ["merit_list_date"], 2027, intake_term="winter")  # the fact is stored
+
+
+def test_only_iso_dates_are_kept_in_the_shape_the_compiler_reads(engine, world):
+    _, d, tmp = world
+    institutions, programmes = programme_rows()
+    odd = fact(8, "p1", field_="pass_date", value="Jun 13, 2027", intake="Winter 2027")
+    path = workbook(tmp, institutions, [merit_fact("2027-08-15"), odd], programmes)
+    run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref="ref-1")
+    got = d.knowledge.programme_facts(["p1"], ["merit_list_date", "pass_date"], 2027, intake_term="winter")
+    assert got[("p1", "merit_list_date")].value == {"value": "2027-08-15", "unit": "date", "date": "2027-08-15"}
+    assert got[("p1", "pass_date")].value == {"value": "Jun 13, 2027", "unit": "date"}  # never guessed

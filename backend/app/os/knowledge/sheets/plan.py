@@ -518,7 +518,13 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
         res.detail = str(intake_text)
         return None, ""
     term, year = parsed
-    fact_value: dict = {"value": value, "unit": _text(r.get("unit"))}
+    unit = _text(r.get("unit"))
+    fact_value: dict = {"value": value, "unit": unit}
+    if (unit or "").lower() == "date":  # an ISO date is also kept in the shape the plan compiler reads; other spellings stay text
+        try:
+            fact_value["date"] = date.fromisoformat(value).isoformat()
+        except ValueError:
+            pass
     calendar_class = None
     meta = ctx.meta(ref) if scope == "registry" else None
     if meta and meta["kind"] == "calendar":  # a date of an official calendar (P2-T11): its field, date and zone are checked

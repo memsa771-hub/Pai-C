@@ -53,9 +53,10 @@ class ImportDeps:
     disputes: Disputes | None = None
     attested: Any = None  # (reviewer ref, batch ref) -> bool  (ReviewQueue.attested)
     official: Any = None  # (url, scope) -> bool  (allow-list; None = not checked)
-    # (scope, ref, field, fact id, status, intake year) -> None, called after a registry fact is written so the plans that
-    # use it follow it (row 6.10, P2-T11). `plan_hook(plans, kernel)` builds it from the plan service.
+    # (scope, ref, field, fact id, status, intake year) -> None, called after each fact is written (and committed), so the
+    # plans that use it follow it (row 6.10). `plan_hook(plans, kernel)` builds it from the plan service.
     on_fact_change: Any = None
+    hook_errors: list = field(default_factory=list)  # plan revisions that failed after a fact was stored (per run)
 
 
 @dataclass
@@ -68,6 +69,7 @@ class ImportResult:
     programmes_created: list[str] = field(default_factory=list)
     queued_items: int = 0
     layouts: dict[str, str] = field(default_factory=dict)
+    hook_errors: list[str] = field(default_factory=list)
 
 
 def _info(e) -> dict | None:
@@ -240,8 +242,11 @@ def _write_fact(deps: ImportDeps, res: RowResult, spec: dict, import_id: int, mo
     if res.level == "verified":
         who = f"owner-accepted:{decision_ref}" if mode == OWNER_ACCEPTED else actor
         deps.knowledge.set_status(fid, "verified", cause="review", cause_ref=cref, actor=who)
-    if spec["scope"] == "registry" and deps.on_fact_change is not None:  # the plans that use it follow (row 6.10)
-        deps.on_fact_change("registry", spec["ref"], spec["field"], fid, res.level or status, p["year"])
+    if deps.on_fact_change is not None:  # after the commit: the plans that use the fact follow it (row 6.10)
+        try:
+            deps.on_fact_change(spec["scope"], spec["ref"], spec["field"], fid, res.level or status, p["year"])
+        except Exception as e:  # noqa: BLE001  (the fact is stored; a plan that cannot follow is reported, not hidden)
+            deps.hook_errors.append(f"{spec['scope']}:{spec['ref']}:{spec['field']}: {type(e).__name__}: {e}")
     return fid
 
 
@@ -270,6 +275,7 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                           batch_ref=batch_ref, actor=actor, note_actor=note_actor)
     created: list[str] = []
     queued = 0
+    deps.hook_errors = []
     try:
         from app.os.knowledge.sheets.refetch import Refetcher
 
@@ -301,12 +307,15 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
             rp = write_report(results, report_path or default_report)
         except OSError:  # the copy beside the file is a convenience; the log keeps the report
             rp = None
+        problems = (f"{len(deps.hook_errors)} plan revisions failed after their fact was stored: "
+                    + "; ".join(deps.hook_errors))[:2000] if deps.hook_errors else None
         log.finish(import_id, status="done", counts=counts, programmes_created=created,
-                   report_path=str(rp) if rp else None, report_csv=text)
+                   report_path=str(rp) if rp else None, report_csv=text, error=problems)
     except Exception as e:
         log.finish(import_id, status="failed", error=f"{type(e).__name__}: {e}"[:2000], programmes_created=created)
         raise
-    return ImportResult(import_id, False, results, counts, rp, created, queued, batch.layouts)
+    return ImportResult(import_id, False, results, counts, rp, created, queued, batch.layouts,
+                        list(deps.hook_errors))
 
 
 def _load_institution(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None,

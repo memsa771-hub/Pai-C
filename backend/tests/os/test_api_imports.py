@@ -105,3 +105,15 @@ def test_the_api_import_tells_the_plans_about_a_calendar_date(api, tmp_path, mon
     assert r.status_code == 200, r.text
     assert [(s[0], s[1], s[2], s[4], s[5]) for s in seen] == [("registry", "cal:alpha-results", "result_date",
                                                                "verified", 2027)]
+
+
+def test_the_api_undo_tells_the_plans_for_each_fact_it_changes_back(api, tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr("app.os.api.imports.plan_hook", lambda plans, kernel: lambda *a: seen.append(a))
+    path = workbook(tmp_path, [inst(1)], [fact(1, "T-INST-001")])
+    iid = api.post(BASE, data=FORM, files=upload(path), headers=ADMIN).json()["import_id"]
+    assert [(s[0], s[1], s[2]) for s in seen] == [("registry", "inst:t-inst-001", "deadline_close")]  # the import told them
+    seen.clear()
+    assert api.post(f"{BASE}/{iid}/undo", data={"actor": "admin"}, headers=ADMIN).status_code == 200
+    assert [(s[0], s[1], s[2], s[4], s[5]) for s in seen] == [("registry", "inst:t-inst-001", "deadline_close",
+                                                               "stale", 2027)]
