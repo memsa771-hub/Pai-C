@@ -67,3 +67,11 @@ def test_merit_fields_are_high_stakes_classes():
 
     for field in ("merit_formula", "closing_merit"):
         assert is_high_stakes(fact_class(field))
+
+
+def test_reserved_prefixes_are_documented_and_enforced():
+    assert "Reserved names" in merit.__doc__
+    with pytest.raises(MeritShapeError):
+        merit.check_value("merit_formula_any_category", {"parts": []})
+    with pytest.raises(MeritShapeError):
+        merit.check_value("closing_merit_any_category", "text")

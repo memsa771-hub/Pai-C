@@ -89,10 +89,31 @@ def test_missing_mark_names_the_part(k):
     assert [(m.key, m.evidence) for m in got.marks_used] == [(P1V, "shown"), (P2V, "unknown")]
 
 
-def test_an_impossible_mark_counts_as_missing_not_computed(k):
+def test_an_impossible_mark_is_not_confirmed_and_an_absent_one_is_missing(k):
+    """The reason a part is not known sits in the contract's own words (M1): absent = missing; held but unusable =
+    not_confirmed, and the marks the Vault holds are shown."""
     put(k, "merit_formula", FORMULA, verified=True)
     bad = {**FULL, P2V: (1200, "stated")}  # above its total
-    assert build(k, student(**bad), "p1", INTAKE, None, PAIRS).status == "missing"
+    got = build(k, student(**bad), "p1", INTAKE, None, PAIRS)
+    assert got.status == "not_confirmed" and got.aggregate is None
+    assert {p.name: p.status for p in got.parts} == {"part_one": "known", "part_two": "not_confirmed"}
+    assert next(m for m in got.marks_used if m.key == P2V).value == 1200
+    both = student(**{P2V: (1200, "stated"), P2T: (1100, "shown")})  # part one absent, part two impossible
+    mixed = build(k, both, "p1", INTAKE, None, PAIRS)
+    assert mixed.status == "missing" and {p.name: p.status for p in mixed.parts} == {
+        "part_one": "missing", "part_two": "not_confirmed"}
+
+
+def test_two_different_totals_are_not_guessed(k):
+    put(k, "merit_formula", FORMULA, verified=True)
+    pairs = [*PAIRS, (P1V, "education.other.marks_total")]
+    two = {**FULL, "education.other.marks_total": (1000, "shown")}  # P1 now has totals 1100 and 1000
+    got = build(k, student(**two), "p1", INTAKE, None, pairs)
+    assert got.status == "not_confirmed" and got.parts[0].status == "not_confirmed" and got.aggregate is None
+    same = {**FULL, "education.other.marks_total": (1100, "shown")}  # the same total twice is one total
+    assert build(k, student(**same), "p1", INTAKE, None, pairs).status == "computed"
+    only_other = {k_: v for k_, v in two.items() if k_ != P1T}  # one of them held: that one is used
+    assert build(k, student(**only_other), "p1", INTAKE, None, pairs).status == "computed"
 
 
 def test_category_formula_and_fallback_to_the_general_one(k):
@@ -101,8 +122,10 @@ def test_category_formula_and_fallback_to_the_general_one(k):
     put(k, "merit_formula_open_seats", other, verified=True)
     cat = build(k, student(**FULL), "p1", INTAKE, "open_seats", PAIRS)
     assert cat.formula.total == 100 and cat.aggregate == pytest.approx(900 / 1100 * 100, abs=1e-5)
+    assert cat.category == "open_seats"
     general = build(k, student(**FULL), "p1", INTAKE, "other_seats", PAIRS)
     assert general.formula.total == 1000
+    assert general.category is None  # M3: the general formula answered, so the answer names no category
 
 
 def test_closing_merits_by_year_with_levels_and_lists(k):
@@ -130,3 +153,16 @@ def test_there_is_no_chance_or_prediction_field():
     names = " ".join(MeritCheckV1.model_json_schema()["properties"]) + str(MeritCheckV1.model_json_schema())
     for word in ("chance", "probab", "predict", "likel"):
         assert word not in names.lower()
+
+
+def test_a_closing_merit_with_no_recorded_term_says_so(k):
+    later = IntakeRef(term="fall", year=2028)
+    put(k, "closing_merit", {"value": 700.0, "list_number": 1, "list_complete": True}, year=2027, term="", verified=True)
+    got = build(k, student(**FULL), "p1", later, None, PAIRS)
+    assert [(c.intake.term, c.intake.year) for c in got.closing_merits] == [("unrecorded", 2027)]  # not guessed (M2)
+
+
+def test_the_year_floor_comes_from_the_contract():
+    from app.os.knowledge import merit
+
+    assert merit.intake_year_floor() == 2025

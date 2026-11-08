@@ -3,7 +3,10 @@
 A formula is a fact of field `merit_formula` (class `merit_formula`); a past closing merit is a fact of field
 `closing_merit`. When the value depends on a seat category the field carries the category's slug as a suffix
 (`merit_formula_<slug>`), because a fact is keyed by field. Both classes are high-stakes: a value is shown as fact only
-when `verified` (knowledge/display.py)."""
+when `verified` (knowledge/display.py).
+
+Reserved names (M7): every field that equals `merit_formula` or `closing_merit`, or starts with `merit_formula_` or
+`closing_merit_`, is a merit field. Its value must have the shape below, and nothing else may use these names."""
 
 import re
 from dataclasses import dataclass
@@ -12,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+UNRECORDED_TERM = "unrecorded"  # IntakeRef needs a term: a fact whose term was never recorded says so, it is not guessed
 MERIT_FILE = Path(__file__).with_name("merit.yaml")
 
 
@@ -22,6 +26,20 @@ class MeritShapeError(ValueError):
 @cache
 def _config() -> dict:
     return yaml.safe_load(MERIT_FILE.read_text(encoding="utf-8"))
+
+
+def intake_year_floor() -> int:
+    """The earliest year an IntakeRef can name, read from the contract itself (not written again here)."""
+    from annotated_types import Ge
+
+    from app.os.contracts.route_contract import IntakeRef
+
+    return next(m.ge for m in IntakeRef.model_fields["year"].metadata if isinstance(m, Ge))
+
+
+def term_of(recorded: str) -> str:
+    """The term to print for a fact: its own, or `unrecorded` when it never had one."""
+    return recorded or UNRECORDED_TERM
 
 
 def history_years() -> int:

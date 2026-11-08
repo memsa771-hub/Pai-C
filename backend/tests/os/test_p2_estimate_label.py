@@ -18,18 +18,53 @@ pytestmark = pytest.mark.req("R-30")
 DIRS = [PLAYBOOK_DIR, FAKE, FAKE / "needs"]
 
 
+def _durations(book) -> set[str]:
+    """Every constant a step uses as a duration or lead time, or names in a note."""
+    from app.os.playbooks.models import placeholders
+
+    out = set()
+    for t in book.tasks:
+        out |= {n for n in (t.lead_time.constant if t.lead_time else None, t.duration_constant) if n}
+        for note in t.anchor.notes() if t.anchor else ():
+            out |= placeholders(note or "") & set(book.constants)
+    return out
+
+
 def test_every_duration_without_an_official_source_is_marked_estimate():
-    """Data audit over every shipped and fake playbook: a constant a step uses as its lead time has either a cited
-    figure or `estimate: true`. None is neither."""
+    """Data audit over every shipped and fake playbook, by all three uses (duration, lead time, note placeholder)."""
     seen = 0
     for directory in DIRS:
         for book in load_playbook_dir(directory).values():
-            for t in book.tasks:
-                if t.lead_time and t.lead_time.constant:
-                    const = book.constants[t.lead_time.constant]
-                    seen += 1
-                    assert const.estimate or const.citations, f"{book.key} v{book.version}: {t.lead_time.constant}"
-    assert seen >= 1  # the audit looked at something
+            for name in _durations(book):
+                seen += 1
+                const = book.constants[name]
+                assert const.estimate or const.citations, f"{book.key} v{book.version}: {name}"
+    assert seen >= 4  # the audit looked at the shipped durations
+
+
+def _with_constant(use: str) -> dict:
+    data = IE.model_dump(mode="json", by_alias=True, exclude_none=True)
+    data["constants"] = {"wait": {"value": 30}}  # neither cited nor an estimate
+    if use == "lead_time":
+        data["tasks"][0]["lead_time"] = {"constant": "wait"}
+    elif use == "duration_constant":
+        data["tasks"][1].pop("duration_days", None)
+        data["tasks"][1]["duration_constant"] = "wait"
+    else:
+        data["tasks"][0]["anchor"]["note"] = "About {wait} days"
+    return data
+
+
+@pytest.mark.parametrize("use", ["lead_time", "duration_constant", "note"])
+def test_an_unsourced_unflagged_duration_is_refused(use):
+    """The guard is a validator, not only a test: such a playbook cannot load (R-30)."""
+    with pytest.raises(ValueError, match="estimate"):
+        Playbook.model_validate(_with_constant(use))
+    data = _with_constant(use)
+    data["constants"]["wait"]["estimate"] = True  # flagged: loads
+    Playbook.model_validate(data)
+    data["constants"]["wait"] = {"value": 30, "citations": [{"source": "S1", "url": "https://rules.alpha.test/x"}]}
+    Playbook.model_validate(data)  # cited: loads
 
 
 def _book(estimate: bool, cited: bool) -> Playbook:

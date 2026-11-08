@@ -16,6 +16,10 @@ from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import newest_plain
 
 K = models.knowledge_facts
+# Coverage counts real fact rows only (M8): a row with no value is a placeholder, and rows that come from an import line
+# which only names a lead or was rejected or superseded are not facts. Today's table cannot hold those statuses; the
+# set keeps the rule if a later task adds them.
+NOT_FACT_STATUSES = frozenset({"lead_only", "rejected", "superseded", "not_found"})
 
 
 def build(engine: Engine, tenant_id: str, books, route_key: str, intake: IntakeRef) -> ProgrammeListV2:
@@ -29,7 +33,10 @@ def build(engine: Engine, tenant_id: str, books, route_key: str, intake: IntakeR
             K.c.tenant_id == tenant_id, K.c.scope == "programme", K.c.ref.in_([p.ref for p in programmes] or [""]),
             K.c.intake_year == intake.year, K.c.intake_term.in_([intake.term, ""])).order_by(K.c.id)).all()
     held: dict[tuple[str, str], object] = {}
-    for r in rows:  # one row per (programme, field): the asked term beats an unrecorded one, then the newest
+    for r in rows:
+        if r.value is None or r.status in NOT_FACT_STATUSES:
+            continue
+        # one row per (programme, field): the asked term beats an unrecorded one, then the newest
         key = (r.ref, r.field)
         if key not in held or (r.intake_term == intake.term) >= (held[key].intake_term == intake.term):
             held[key] = r

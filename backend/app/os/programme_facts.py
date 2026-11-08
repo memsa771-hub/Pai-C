@@ -14,7 +14,6 @@ from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import newest_plain
 
 K = models.knowledge_facts
-_FLOOR = 2025  # IntakeRef's earliest year
 
 
 def _fields(engine: Engine, tenant_id: str, books, programme_ref: str, route_key: str, year: int) -> list[str]:
@@ -36,14 +35,10 @@ def build(engine: Engine, tenant_id: str, knowledge: KnowledgePort, books, progr
     fields = _fields(engine, tenant_id, books, programme_ref, programme.route_key, intake.year)
     found = knowledge.programme_facts([programme_ref], fields, intake.year, intake_term=intake.term,
                                       fallback_previous=True)
-    # rows whose term was never recorded count for the asked year (the strict-term read leaves them out)
-    for key, fact in knowledge.programme_facts([programme_ref], fields, intake.year, fallback_previous=True).items():
-        if key not in found and fact.intake_term == "":
-            found[key] = fact
     entries = []
     for field in fields:
         fact = found.get((programme_ref, field))
-        if fact is not None and fact.intake_year < _FLOOR:
+        if fact is not None and fact.intake_year < merit.intake_year_floor():
             fact = None  # older than a labelled intake can be
         shown = display(fact, field, intake_year=intake.year, intake_term=intake.term)
         high = shown.high_stakes
@@ -58,7 +53,7 @@ def build(engine: Engine, tenant_id: str, knowledge: KnowledgePort, books, progr
         entries.append(FactEntry(
             field=field, fact_class=cls, high_stakes=high, level=shown.level,
             value=fact.value if shown.show_value else None, source=source,
-            fact_intake=IntakeRef(term=fact.intake_term or intake.term, year=fact.intake_year),
-            other_intake=shown.other_intake, owner_ref=fact.owner_ref or None, read_method=fact.read_method,
+            fact_intake=IntakeRef(term=merit.term_of(fact.intake_term), year=fact.intake_year),
+            other_intake=shown.other_intake or fact.intake_term == "", owner_ref=fact.owner_ref or None, read_method=fact.read_method,
             language=fact.language))
     return ProgrammeFactsV1(programme_ref=programme_ref, route_key=programme.route_key, intake=intake, facts=entries)

@@ -134,3 +134,18 @@ def test_programme_list_v2_coverage_levels(world):
     assert {p.programme_ref: p.facts_confirmed for p in v1.programmes} == {
         p.programme_ref: p.facts_confirmed for p in got.programmes}
     assert plan_query.programme_list_v2("no_route", INTAKE).programmes == []
+
+
+def test_programme_facts_with_an_unrecorded_term_say_so(world):
+    put(world, "ie-1", "deadline_close", {"date": "2027-07-15"}, term="", verified=True)
+    dl = entry(plan_query.programme_facts("ie-1", INTAKE), "deadline_close")
+    assert dl.fact_intake.term == "unrecorded" and dl.fact_intake.year == 2027 and dl.other_intake  # not guessed (M2)
+    assert dl.level == "verified"
+
+
+def test_coverage_counts_only_real_fact_rows(world):
+    put(world, "ie-2", "deadline_close", None, status="unconfirmed")  # a placeholder row: no value found
+    put(world, "ie-3", "deadline_close", {"date": "2027-07-15"}, status="unconfirmed")
+    by = {p.programme_ref: p for p in plan_query.programme_list_v2("ireland_master", INTAKE).programmes}
+    assert by["ie-2"].coverage_level == "listed" and by["ie-2"].not_run_yet
+    assert by["ie-3"].coverage_level == "researched"
