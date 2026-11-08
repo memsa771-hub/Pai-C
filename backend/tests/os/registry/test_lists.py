@@ -105,3 +105,31 @@ def test_load_records_lists_and_is_repeatable(engine, clean, tmp_path):
     assert s.list_progress("list:alpha-recognised").published == 12
     assert load_official_lists(s, path, country="PK", cause_ref="imp-2") == 3
     assert [r.action for r in s.revisions("list:alpha-recognised")] == ["insert"]  # unchanged: no new revision
+
+
+def test_count_is_confirmed_only_when_the_method_and_the_count_support_it():
+    """I-4: a markup count, a count 'unconfirmed on import' or no count is never confirmed, whatever check2 says."""
+    d = data()
+    base = d["lists"][0]
+    ok = {**base, "id": "ok"}
+    markup = {**base, "id": "markup", "count_method": "markup_count of list items"}
+    unconfirmed = {**base, "id": "unconf", "count_method": "counted list items (Unconfirmed on import)"}
+    no_count = {**base, "id": "nocount", "row_count": None}
+    d["lists"] = [ok, markup, unconfirmed, no_count]
+    got = {e.entity_id: e.attrs["count_confirmed"] for e in parse_official_lists(d, country="PK")}
+    assert got == {"list:ok": True, "list:markup": False, "list:unconf": False, "list:nocount": False}
+
+
+def test_dates_may_be_text():
+    d = data()
+    d["retrieved"] = "2026-11-07"
+    d["lists"][1]["date"] = "2026-05-19"
+    a, b, _ = parse_official_lists(d, country="PK")
+    assert a.checked_at == datetime(2026, 11, 7, tzinfo=UTC) and b.attrs["date"] == "2026-05-19"
+    d["lists"][1]["date"] = "19 May"
+    with pytest.raises(OfficialListError, match="alpha-campuses"):
+        parse_official_lists(d, country="PK")
+    d["lists"][1]["date"] = "2026-05-19"
+    d["retrieved"] = "yesterday"
+    with pytest.raises(OfficialListError, match="retrieved"):
+        parse_official_lists(d, country="PK")

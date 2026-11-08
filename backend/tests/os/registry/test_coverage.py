@@ -84,7 +84,7 @@ def test_programme_and_campus_facts_count_for_the_institution(engine, world):
              cause="import")
     ProgrammeStore(engine, "pai").upsert(Programme(ref="p1", route_key="r", university="One", name="Sci", aliases=(),
                                                    start_urls=(), official_domains=()))
-    s.link_programme("p1", institution_id="inst:one", campus_id="campus:north")
+    s.link_programme("p1", institution_id="inst:one", campus_id="campus:north", cause="import")
     put(k, "programme", "p1", "deadline_close", fact("verified"))
     assert levels(engine)["inst:one"] == "verified"
     put(k, "registry", "campus:north", "fee_unknown", fact("confirmed"))
@@ -92,21 +92,58 @@ def test_programme_and_campus_facts_count_for_the_institution(engine, world):
     assert levels(engine)["inst:two"] == "listed"
 
 
-def test_an_admitting_system_and_its_tests_count(engine, world):
-    s, k = world
+def shared_world(s):
     s.record(child("admission_body", "body", "central", None, region="national"), cause="import")
     s.record(child("admission_system", "sys", "central-merit", "body:central"), cause="import")
     s.record(child("entry_test", "test", "alpha-entry", "body:central"), cause="import")
     s.record(child("seat_category", "cat", "open", "sys:central-merit"), cause="import")
-    s.link("sys:central-merit", "admits", "inst:one")
-    s.link("sys:central-merit", "uses_test", "test:alpha-entry")
+    s.link("sys:central-merit", "admits", "inst:one", cause="import")
+    s.link("sys:central-merit", "uses_test", "test:alpha-entry", cause="import")
+
+
+def test_an_admitting_system_and_its_tests_count_as_researched(engine, world):
+    """P2 review I-2: shared facts (system, tests, categories, calendars) count toward `researched` only."""
+    s, k = world
+    shared_world(s)
     put(k, "registry", "sys:central-merit", "merit_formula", fact("verified"))
     put(k, "registry", "test:alpha-entry", "test_date", fact("verified"))
-    assert levels(engine) == {"inst:one": "verified", "inst:two": "listed", "inst:tre": "listed"}
-    put(k, "registry", "cat:open", "seat_quota", fact("confirmed"))  # a child of the system
-    assert levels(engine)["inst:one"] == "researched"
+    assert levels(engine) == {"inst:one": "researched", "inst:two": "listed", "inst:tre": "listed"}
+    c = coverage_map(engine, "pai", 2027)["inst:one"]
+    assert (c.facts, c.high_stakes, c.high_stakes_verified, c.shared_facts) == (2, 0, 0, 2)
+    put(k, "registry", "inst:one", "deadline_close", fact("verified"))  # one of its own high-stakes facts
+    assert levels(engine)["inst:one"] == "verified"
+    put(k, "registry", "cat:open", "seat_quota", fact("confirmed"))  # a shared high-stakes fact does not gate it
+    assert levels(engine)["inst:one"] == "verified"
     put(k, "registry", "body:central", "deadline_close", fact("unconfirmed"))  # the body itself is not counted
     assert levels(engine)["inst:two"] == "listed"
+
+
+def test_shared_verified_facts_alone_never_make_an_institution_verified(engine, world):
+    s, k = world
+    shared_world(s)
+    for ref, field in (("sys:central-merit", "merit_formula"), ("test:alpha-entry", "test_date"),
+                       ("cat:open", "seat_quota")):
+        put(k, "registry", ref, field, fact("verified"))
+    assert levels(engine)["inst:one"] == "researched"
+    put(k, "registry", "inst:one", "deadline_close", fact("confirmed"))  # own, not verified yet
+    assert levels(engine)["inst:one"] == "researched"
+
+
+def test_a_bodys_row_about_a_programme_or_campus_is_not_research_of_it(engine, world):
+    """P2 review I-1: only general rows (owner_ref '') count for the institution's own programmes and campuses."""
+    s, k = world
+    s.record(child("campus", "campus", "north", "inst:one", list_ids=("list:alpha-list",), region="punjab"),
+             cause="import")
+    ProgrammeStore(engine, "pai").upsert(Programme(ref="p1", route_key="r", university="One", name="Sci", aliases=(),
+                                                   start_urls=(), official_domains=()))
+    s.link_programme("p1", institution_id="inst:one", cause="import")
+    put(k, "programme", "p1", "pass_mark", fact("verified", owner_ref="body:central"))
+    put(k, "registry", "campus:north", "fee_x", fact("verified", owner_ref="body:central"))
+    assert levels(engine)["inst:one"] == "listed"
+    put(k, "programme", "p1", "deadline_close", fact("verified"))
+    assert levels(engine)["inst:one"] == "verified"
+    c = coverage_map(engine, "pai", 2027)["inst:one"]
+    assert (c.facts, c.high_stakes) == (1, 1)
 
 
 def test_not_readable_stays_listed(engine, world):

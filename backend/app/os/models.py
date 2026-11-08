@@ -45,6 +45,7 @@ REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "e
 REGISTRY_STATUSES = ("active", "closed", "merged", "renamed")
 REGISTRY_LINK_RELS = ("uses_test", "has_category", "admits")
 REGISTRY_LINK_TO = ("registry", "programme")
+REGISTRY_REVISION_KINDS = ("entity", "link", "programme")  # what a registry revision is about (subject says which)
 
 md = OsBase.metadata
 
@@ -293,6 +294,8 @@ registry_revisions = Table(  # append only, like os_fact_revisions (P2-D9)
     "os_registry_revisions", md,
     _id(), _tenant(),
     Column("registry_id", BigInteger, ForeignKey("os.os_registry.id", ondelete="RESTRICT"), nullable=False),
+    Column("kind", Text, nullable=False, server_default="entity"),  # entity | link | programme (what was changed)
+    Column("subject", Text),  # link: 'rel:to_kind:to_id'; programme: its ref; entity: NULL
     Column("action", Text, nullable=False),
     Column("before", JSONB),
     Column("after", JSONB, nullable=False),
@@ -300,6 +303,7 @@ registry_revisions = Table(  # append only, like os_fact_revisions (P2-D9)
     Column("cause_ref", Text),
     Column("actor", Text),
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    _in("kind", REGISTRY_REVISION_KINDS, "ck_os_registry_revisions_kind"),
     _in("action", REVISION_ACTIONS, "ck_os_registry_revisions_action"),
     _in("cause", REVISION_CAUSES, "ck_os_registry_revisions_cause"),
     Index("ix_os_registry_revisions_entity", "tenant_id", "registry_id", "id"),

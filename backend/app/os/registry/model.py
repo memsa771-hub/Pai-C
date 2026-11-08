@@ -25,6 +25,21 @@ REGION_REQUIRED = ("regulator", "board", "admission_body", "institution", "campu
 NEEDS_PARENT = ("campus",)
 NO_QUOTE_NEEDED = ("official_list",)  # a list is the source itself; its count may come with no quote (R-35a)
 
+NATIONAL = "national"  # the region code (regions.yaml) of a list or body that serves every region
+# Which kind an entity of a kind may sit under (`parent_id`); () = no parent. A campus needs one (NEEDS_PARENT).
+ALLOWED_PARENTS: dict[str, tuple[str, ...]] = {
+    "regulator": (), "board": ("regulator",), "admission_body": ("regulator", "board"),
+    "admission_system": ("admission_body", "board", "regulator"),
+    "entry_test": ("admission_body", "admission_system", "board"),
+    "institution": ("institution",), "campus": ("institution",), "seat_category": ("admission_system",),
+    "calendar": ("admission_system", "admission_body", "institution"), "official_list": (),
+}
+# Which kind may replace an entity of a kind when it is merged or renamed (`successor_id`): the same kind.
+ALLOWED_SUCCESSORS: dict[str, tuple[str, ...]] = {kind: (kind,) for kind in KIND_PREFIX}
+# Causes an institution or a campus may be recorded with: they come from lists, review, research, monitoring and the
+# yearly rollover, never from a guess, a seed or a hand edit (R-32).
+CAUSES_OF_INSTITUTIONS = ("import", "review", "research", "monitor", "rollover")
+
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _DOMAIN = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
 _TYPE = re.compile(r"^[a-z][a-z0-9_]*$")

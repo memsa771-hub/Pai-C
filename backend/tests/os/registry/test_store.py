@@ -94,10 +94,10 @@ def test_systems_tests_categories_and_what_they_admit(engine, clean):
     s.record(child("seat_category", "cat", "open-merit", "sys:central-merit"), cause="import")
     s.record(child("calendar", "cal", "central-2027", "sys:central-merit"), cause="import")
     assert [e.entity_id for e in s.children("sys:central-merit")] == ["cat:open-merit", "cal:central-2027"]
-    s.link("sys:central-merit", "uses_test", "test:alpha-entry")
-    s.link("sys:central-merit", "uses_test", "test:alpha-entry")  # again: no second edge
-    s.link("sys:central-merit", "has_category", "cat:open-merit")
-    s.link("sys:central-merit", "admits", "inst:one")
+    s.link("sys:central-merit", "uses_test", "test:alpha-entry", cause="import")
+    s.link("sys:central-merit", "uses_test", "test:alpha-entry", cause="import")  # again: no second edge
+    s.link("sys:central-merit", "has_category", "cat:open-merit", cause="import")
+    s.link("sys:central-merit", "admits", "inst:one", cause="import")
     assert [(l.rel, l.to_id) for l in s.links_from("sys:central-merit")] == [
         ("uses_test", "test:alpha-entry"), ("has_category", "cat:open-merit"), ("admits", "inst:one")]
     assert [l.from_id for l in s.links_to("inst:one")] == ["sys:central-merit"]
@@ -110,15 +110,15 @@ def test_link_rules(engine, clean):
     s.record(child("admission_system", "sys", "central-merit", None), cause="import")
     s.record(child("entry_test", "test", "alpha-entry", None), cause="import")
     with pytest.raises(RegistryError, match="seat_category"):  # a test is not a seat category
-        s.link("sys:central-merit", "has_category", "test:alpha-entry")
+        s.link("sys:central-merit", "has_category", "test:alpha-entry", cause="import")
     with pytest.raises(RegistryError, match="admission_system"):
-        s.link("inst:one", "uses_test", "test:alpha-entry")
+        s.link("inst:one", "uses_test", "test:alpha-entry", cause="import")
     with pytest.raises(RegistryError, match="exist"):
-        s.link("sys:central-merit", "admits", "inst:ghost")
+        s.link("sys:central-merit", "admits", "inst:ghost", cause="import")
     with pytest.raises(RegistryError, match="exist"):
-        s.link("sys:central-merit", "admits", "no-such-programme", to_kind="programme")
+        s.link("sys:central-merit", "admits", "no-such-programme", to_kind="programme", cause="import")
     with pytest.raises(ValueError, match="rel"):
-        s.link("sys:central-merit", "owns", "inst:one")
+        s.link("sys:central-merit", "owns", "inst:one", cause="import")
 
 
 @pytest.mark.req("R-33")
@@ -132,19 +132,19 @@ def test_programmes_link_to_institution_and_campus(engine, clean):
                         aliases=(), start_urls=(), official_domains=()))
     assert ps.get("p1").institution_id is None
     s.link_programme("p1", institution_id="inst:one", campus_id="campus:north", level="bachelor", field="science",
-                     family="bachelor", region="punjab")
+                     family="bachelor", region="punjab", cause="import")
     p = ps.get("p1")
     assert (p.institution_id, p.campus_id, p.level, p.field, p.family, p.region) == (
         "inst:one", "campus:north", "bachelor", "science", "bachelor", "punjab")
     assert s.programmes_of("inst:one") == ["p1"] and s.programmes_of("inst:two") == []
     with pytest.raises(RegistryError, match="programme"):
-        s.link_programme("ghost", institution_id="inst:one")
+        s.link_programme("ghost", institution_id="inst:one", cause="import")
     with pytest.raises(RegistryError, match="institution"):
-        s.link_programme("p1", institution_id="inst:ghost")
+        s.link_programme("p1", institution_id="inst:ghost", cause="import")
     with pytest.raises(RegistryError, match="campus"):  # the campus belongs to another institution
-        s.link_programme("p1", institution_id="inst:two", campus_id="campus:north")
+        s.link_programme("p1", institution_id="inst:two", campus_id="campus:north", cause="import")
     with pytest.raises(ValueError, match="region"):
-        s.link_programme("p1", institution_id="inst:one", region="narnia")
+        s.link_programme("p1", institution_id="inst:one", region="narnia", cause="import")
     # a re-seed of the programme (the old way) leaves the registry columns alone
     ps.upsert(Programme(ref="p1", route_key="fam_route", university="One Test University", name="Test Science 2",
                         aliases=(), start_urls=(), official_domains=()))
@@ -182,3 +182,136 @@ def test_existence_readers_ignore_a_bodys_rows(engine, clean):
     assert not _facts_for(engine, "pai", "p1", 2027)
     put(k, "programme", "p1", "deadline_close", Fact(1, "", "", AT, 2027, "unconfirmed"))
     assert _facts_for(engine, "pai", "p1", 2027)
+
+
+# --- review fixes (P2-T2 review) -------------------------------------------------------------------------------------
+
+
+def test_link_writes_a_revision_with_cause_and_snapshot(engine, clean):
+    """I-3: a link is a change of the registry; it is kept with its cause, actor and before/after."""
+    s = store(engine)
+    seed_basic(s)
+    s.record(child("admission_system", "sys", "central-merit", None), cause="import")
+    s.record(child("entry_test", "test", "alpha-entry", None), cause="import")
+    before = len(s.revisions("sys:central-merit"))
+    s.link("sys:central-merit", "uses_test", "test:alpha-entry", cause="research", cause_ref="run-4", actor="job")
+    s.link("sys:central-merit", "uses_test", "test:alpha-entry", cause="research")  # again: nothing new
+    revs = s.revisions("sys:central-merit")
+    assert len(revs) == before + 1
+    r = revs[-1]
+    assert (r.kind, r.subject, r.cause, r.cause_ref, r.actor) == ("link", "uses_test:registry:test:alpha-entry",
+                                                                  "research", "run-4", "job")
+    assert r.before == {"links": []} and r.after == {"links": ["uses_test:registry:test:alpha-entry"]}
+    assert all(x.kind == "entity" for x in revs[:before])
+
+
+def test_link_programme_writes_a_revision_and_does_not_clear_silently(engine, clean):
+    s = store(engine)
+    seed_basic(s)
+    ps = ProgrammeStore(engine, "pai")
+    ps.upsert(Programme(ref="p1", route_key="r", university="One", name="Sci", aliases=(), start_urls=(),
+                        official_domains=()))
+    s.link_programme("p1", institution_id="inst:one", level="bachelor", field="science", cause="import",
+                     cause_ref="imp-3", actor="job")
+    r = [x for x in s.revisions("inst:one") if x.kind == "programme"][-1]
+    assert (r.subject, r.cause, r.cause_ref, r.actor) == ("p1", "import", "imp-3", "job")
+    assert r.before["institution_id"] is None and r.after["institution_id"] == "inst:one"
+    assert r.after["level"] == "bachelor"
+    # a column left out stays; an explicit None is refused unless clear=True
+    s.link_programme("p1", institution_id="inst:one", family="bachelor", cause="import")
+    assert ps.get("p1").level == "bachelor" and ps.get("p1").family == "bachelor"
+    with pytest.raises(RegistryError, match="clear"):
+        s.link_programme("p1", institution_id="inst:one", level=None, cause="import")
+    assert ps.get("p1").level == "bachelor"
+    s.link_programme("p1", institution_id="inst:one", level=None, clear=True, cause="review")
+    assert ps.get("p1").level is None and ps.get("p1").field == "science"
+    # moving to another institution is a revision on both
+    s.link_programme("p1", institution_id="inst:two", cause="review")
+    assert [x.subject for x in s.revisions("inst:one") if x.kind == "programme"][-1] == "p1"
+    assert s.revisions("inst:two")[-1].kind == "programme"
+    n = len(s.revisions("inst:two"))
+    s.link_programme("p1", institution_id="inst:two", cause="review")  # nothing changed: no revision
+    assert len(s.revisions("inst:two")) == n
+
+
+def test_causes_of_institutions_and_campuses_are_narrowed(engine, clean):
+    s = store(engine)
+    s.record(olist(), cause="seed")  # a list may still come from any listed cause
+    for bad in ("seed", "manual", "report"):
+        with pytest.raises(ValueError, match="cause"):
+            s.record(inst("one"), cause=bad)
+    for ok in ("import", "review", "research", "monitor", "rollover"):
+        s.record(inst(f"i-{ok}"), cause=ok)
+    s.record(inst("one"), cause="import")
+    with pytest.raises(ValueError, match="cause"):
+        s.link_programme("p1", institution_id="inst:one", cause="manual")
+
+
+def test_a_list_must_be_of_the_institutions_region_or_national(engine, clean):
+    s = store(engine)
+    s.record(olist("south-list", region="sindh"), cause="import")
+    s.record(olist(), cause="import")  # national
+    with pytest.raises(RegistryError, match="region"):
+        s.record(inst("one", region="punjab", lists=("list:south-list",)), cause="import")
+    s.record(inst("two", region="sindh", lists=("list:south-list",)), cause="import")
+    s.record(inst("tre", region="punjab", lists=("list:alpha-list",)), cause="import")
+
+
+def test_parent_and_successor_kinds_follow_the_table(engine, clean):
+    s = store(engine)
+    seed_basic(s)
+    s.record(child("admission_body", "body", "central", None, region="national"), cause="import")
+    with pytest.raises(RegistryError, match="parent"):  # a seat category sits under a system, not a body
+        s.record(child("seat_category", "cat", "open", "body:central"), cause="import")
+    with pytest.raises(RegistryError, match="parent"):  # an official list has no parent
+        s.record(replace(olist("child-list"), parent_id="body:central"), cause="import")
+    with pytest.raises(RegistryError, match="successor"):  # an institution is replaced by an institution
+        s.record(replace(inst("one"), status="merged", successor_id="list:alpha-list"), cause="review")
+    s.record(replace(inst("one"), status="merged", successor_id="inst:two"), cause="review")
+
+
+def test_search_text_is_literal(engine, clean):
+    s = store(engine)
+    seed_basic(s)
+    s.record(replace(inst("one"), name="100% Merit_College"), cause="review")
+    assert s.list(q="%") == [s.get("inst:one")]
+    assert s.list(q="t_c") == [s.get("inst:one")]
+    assert s.list(q="t%c") == []
+    assert s.list(q="_") == [s.get("inst:one")]
+
+
+def test_the_first_insert_writes_one_revision_even_when_racing(engine, clean):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    s = store(engine)
+    s.record(olist(), cause="import")
+    for n in range(6):
+        entry = inst(f"race{n}")
+        barrier = Barrier(6)
+
+        def go(i, entry=entry, barrier=barrier):
+            barrier.wait()
+            return s.record(replace(entry, name=f"Race {n} writer {i}"), cause="import", actor=f"w{i}").action
+
+        with ThreadPoolExecutor(6) as pool:
+            list(pool.map(go, range(6)))
+        revs = s.revisions(entry.entity_id)
+        assert [r.action for r in revs].count("insert") == 1 and revs[0].action == "insert"
+        assert all(a.after == b.before for a, b in zip(revs, revs[1:]))  # an unbroken chain
+
+
+def test_replanner_confirmed_ignores_a_bodys_rows(engine, clean):
+    """M-3: `confirmed` asks for research's own (general) rows, as the existence readers do."""
+    from app.os.knowledge.port import Fact
+    from app.os.knowledge.store import SqlKnowledge
+    from app.os.replan.apply import Replanner
+    from tests.os.registry.helpers import put
+
+    r = object.__new__(Replanner)  # `confirmed` reads only the engine and the tenant
+    r.engine, r.tenant = engine, "pai"
+    k = SqlKnowledge(engine, "pai")
+    put(k, "programme", "p1", "pass_mark", Fact(1, "q", "https://a.test/x", AT, 2027, "confirmed", owner_ref="body:central"))
+    assert not r.confirmed("p1", 2027)
+    put(k, "programme", "p1", "deadline_close", Fact(1, "q", "https://a.test/x", AT, 2027, "confirmed"))
+    assert r.confirmed("p1", 2027)

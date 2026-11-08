@@ -40,6 +40,8 @@ def add_registry_routes(router: APIRouter, services: Callable[[], Services], req
             raise HTTPException(status_code=422, detail=f"kind must be one of {list(models.REGISTRY_KINDS)}")
         if status is not None and status not in models.REGISTRY_STATUSES:
             raise HTTPException(status_code=422, detail=f"status must be one of {list(models.REGISTRY_STATUSES)}")
+        if region is not None and not known_region(region):
+            raise HTTPException(status_code=422, detail="unknown region code")
         found = store(svc).list(kind=kind, region=region, parent_id=parent_id, status=status, list_id=list_id, q=q,
                                 limit=limit, offset=offset)
         return {"entities": [entity_out(e) for e in found]}
@@ -56,13 +58,15 @@ def add_registry_routes(router: APIRouter, services: Callable[[], Services], req
             "links_out": [asdict(link) for link in s.links_from(entity_id)],
             "links_in": [asdict(link) for link in s.links_to(entity_id)],
             "programmes": s.programmes_of(entity_id) if e.kind == "institution" else [],
-            "revisions": [{"id": r.id, "action": r.action, "cause": r.cause, "cause_ref": r.cause_ref,
+            "revisions": [{"id": r.id, "kind": r.kind, "subject": r.subject, "action": r.action, "cause": r.cause, "cause_ref": r.cause_ref,
                            "actor": r.actor, "at": r.at.isoformat(), "before": r.before, "after": r.after}
                           for r in s.revisions(entity_id)],
         }
 
     @router.get("/admin/registry/lists", dependencies=[Depends(require_admin)])
     def lists(region: str | None = None, svc: Services = Depends(services)) -> dict:
+        if region is not None and not known_region(region):
+            raise HTTPException(status_code=422, detail="unknown region code")
         return {"lists": [progress_out(p) for p in store(svc).list_progresses(region)]}
 
     @router.get("/admin/registry/coverage", dependencies=[Depends(require_admin)])

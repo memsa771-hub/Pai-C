@@ -27,7 +27,7 @@ def api(engine, clean, os_db):
     seed_basic(s, rows=3)
     s.record(child("admission_body", "body", "central", None, region="national"), cause="import")
     s.record(child("admission_system", "sys", "central-merit", "body:central"), cause="import")
-    s.link("sys:central-merit", "admits", "inst:one")
+    s.link("sys:central-merit", "admits", "inst:one", cause="import")
     put(SqlKnowledge(engine, "pai"), "registry", "inst:one", "deadline_close",
         Fact({"d": 1}, "q", "https://admissions.alpha.test/n", AT, 2027, "verified"))
     app = FastAPI()
@@ -81,3 +81,9 @@ def test_coverage(api):
     assert r["summary"] == {"listed": 1, "researched": 0, "verified": 0}
     assert api.get(BASE + "/coverage", headers=ADMIN).status_code == 422  # the intake year is required
     assert api.get(BASE + "/coverage", params={"intake_year": 2027, "region": "narnia"}, headers=ADMIN).status_code == 422
+
+
+def test_unknown_region_is_refused_on_entities_and_lists(api):
+    for path in ("/entities", "/lists"):
+        assert api.get(BASE + path, params={"region": "narnia"}, headers=ADMIN).status_code == 422
+        assert api.get(BASE + path, params={"region": "sindh"}, headers=ADMIN).status_code == 200
