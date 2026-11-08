@@ -834,7 +834,7 @@ page_snapshots = Table(
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
     _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),
-    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,3}$'", name="ck_os_page_snapshots_language"),
+    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,4}$'", name="ck_os_page_snapshots_language"),
     Index("ix_os_page_snapshots_url", "tenant_id", "url", "fetched_at"),
 )
 

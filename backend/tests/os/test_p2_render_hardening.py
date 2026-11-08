@@ -10,8 +10,14 @@ from pathlib import Path
 import pytest
 
 from app.os.knowledge.research.pages import PageGateway
-from app.os.knowledge.research.render import (PlaywrightRenderer, RenderFailed, RenderLimits, SubLimits, browser_args,
-                                              find_browser)
+from app.os.knowledge.research.render import (
+    PlaywrightRenderer,
+    RenderFailed,
+    RenderLimits,
+    SubLimits,
+    browser_args,
+    find_browser,
+)
 from app.os.settings import load_settings
 from tests.os.test_p2_render import ALPHA, OWN
 
@@ -143,7 +149,6 @@ def test_nothing_is_requested_after_the_deadline_and_the_browser_is_killed(engin
     def slow(u, lim):
         calls.append(u)
         time.sleep(4)  # the first answer already uses the whole deadline
-        return None
 
     start = time.monotonic()
     with pytest.raises(RenderFailed, match="deadline"):

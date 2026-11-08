@@ -114,3 +114,27 @@ def test_docling_adapter_reports_unavailable_without_the_package():
     assert not DoclingScanText().available()
     with pytest.raises(ScanFailed):
         DoclingScanText().scan(b"x")
+
+
+def test_a_page_over_the_pixel_cap_is_refused_before_it_is_drawn():
+    pdf = fx.scan_pdf(fx.EN_LINES)
+    with pytest.raises(ScanFailed, match="over the limit"):
+        rasterise_pdf(pdf, 5, max_pixels=1000)
+    assert len(rasterise_pdf(pdf, 5, max_pixels=25_000_000)) == 1
+    engine = FixedScanText("text")
+    with pytest.raises(ScanFailed, match="over the limit"):
+        scan_document(engine, pdf, "application/pdf", max_pixels=1000)
+    with pytest.raises(ScanFailed, match="over the limit"):
+        scan_document(engine, fx.text_png(fx.EN_LINES), "image/png", max_pixels=1000)  # image files too
+    with pytest.raises(ScanFailed, match="image"):
+        scan_document(engine, b"not an image", "image/png")
+    assert engine.calls == []
+
+
+def test_tesseract_runs_with_one_thread_and_the_set_timeout(tmp_path):
+    cmd = _fake_tesseract(tmp_path, "import os; print(os.environ.get('OMP_THREAD_LIMIT'))")
+    assert TesseractScanText(cmd).scan(b"x").text == "1"
+    assert TesseractScanText().timeout_s == 180.0
+    slow = _fake_tesseract(tmp_path, "import time; time.sleep(5)")
+    with pytest.raises(ScanFailed, match="TimeoutExpired"):
+        TesseractScanText(slow, timeout_s=0.5).scan(b"x")

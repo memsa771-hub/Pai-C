@@ -1,5 +1,6 @@
 """P2-T4: not_readable marking, the OCR status ceiling, read_method and language on researched facts (R-72, R-29)."""
 
+import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -59,10 +60,10 @@ def _store(engine, verdicts, read_info=None, unreadable=(), nr=None, ref="p1"):
     kernel = SimpleNamespace(tenant_id="pai")
     with engine.begin() as conn:
         run_id = conn.execute(insert(models.research_runs).values(
-            tenant_id="pai", programme_ref=ref, intake_year=2027, workflow_id=f"w-{ref}-{read_info}").returning(
+            tenant_id="pai", programme_ref=ref, intake_year=2027, workflow_id=f"w-{ref}-{read_info}-{time.monotonic()}").returning(
             models.research_runs.c.id)).scalar_one()
     counts = store_research(engine, service, kernel, run_id, ref, 2027, PROFILE, verdicts, NOW, read_info, unreadable, nr)
-    return counts, SqlKnowledge(engine, "pai").programme_facts([ref], ["deadline_close"], 2027)[(ref, "deadline_close")]
+    return counts, SqlKnowledge(engine, "pai").programme_facts([ref], ["deadline_close"], 2027).get((ref, "deadline_close"))
 
 
 def test_a_fact_read_by_ocr_stays_unconfirmed_with_its_read_method(engine, clean):
@@ -92,3 +93,55 @@ def test_unreadable_pages_mark_only_fields_without_a_confirmed_fact(engine, clea
     assert "tuition_fee_non_eu_eur" in fields
     _store(engine, _verdict(URL), None, bad, None, ref="p3")  # no store given: nothing written (flags off)
     assert nr.open_rows(programme_ref="p3") == []
+
+
+# --- review fixes ---------------------------------------------------------------------------------------------------
+
+def test_a_script_tag_is_kept_off_the_fact(engine, clean):
+    _, fact = _store(engine, _verdict(URL), {URL: {"read_method": "render", "language": "arab"}})
+    assert fact.language is None and fact.read_method == "render"  # facts take language codes only, never a script tag
+
+
+def test_open_fields_come_from_what_is_stored_after_the_ocr_cap(engine, clean):
+    nr = NotReadableStore(engine, "pai", clock=lambda: NOW)
+    bad = [{"url": "https://www.alpha-university.test/scan.pdf", "reason": "not_readable:ocr"}]
+    # the verdict says confirmed, the OCR cap stores it unconfirmed: the field still needs a person
+    _store(engine, _verdict(URL), {URL: {"read_method": "ocr", "language": None}}, bad, nr)
+    assert "deadline_close" in {r.field for r in nr.open_rows(programme_ref="p1")}
+
+
+def test_a_confirmed_stored_fact_is_not_asked_of_a_person_even_if_this_verdict_is_weaker(engine, clean):
+    nr = NotReadableStore(engine, "pai", clock=lambda: NOW)
+    _store(engine, _verdict(URL), None)  # a confirmed fact is stored
+    bad = [{"url": "https://www.alpha-university.test/scan.pdf", "reason": "not_readable:ocr"}]
+    _store(engine, _verdict(URL, "unconfirmed"), None, bad, nr)  # a later, weaker verdict does not replace it
+    assert "deadline_close" not in {r.field for r in nr.open_rows(programme_ref="p1")}
+
+
+def test_a_later_successful_read_closes_the_rows_per_field_once_a_fact_exists(engine, clean):
+    nr = NotReadableStore(engine, "pai", clock=lambda: NOW)
+    scan = "https://www.alpha-university.test/scan.pdf"
+    _store(engine, {}, None, [{"url": scan, "reason": "not_readable:render"}], nr)  # nothing readable, nothing stored
+    open_now = {r.field for r in nr.open_rows(programme_ref="p1")}
+    assert "deadline_close" in open_now and "" in open_now
+    # next run: the page reads, and a fact for one field exists
+    _store(engine, _verdict(URL), {scan: {"read_method": "fetch", "language": None}}, (), nr)
+    still = {r.field for r in nr.open_rows(programme_ref="p1")}
+    assert "deadline_close" not in still  # that field has its fact
+    assert "" not in still  # the source was read
+    assert "tuition_fee_non_eu_eur" in still  # a field with no fact yet stays open
+
+
+def test_the_strictest_read_method_wins_when_a_url_was_read_two_ways():
+    from app.os.knowledge.research.pages import Page
+    from app.os.knowledge.research.readability import merge_read_info
+
+    a = Page(url="https://x.test/a", final_url="https://x.test/b", text="one", read_method="fetch")
+    b = Page(url="https://x.test/b", text="two", read_method="ocr")
+    c = Page(url="https://x.test/c", text="three", read_method="render")
+    d = Page(url="https://x.test/d", text="", blocked="not_readable:ocr", read_method="ocr")
+    info = merge_read_info([a, b, c, d])
+    assert info["https://x.test/b"]["read_method"] == "ocr"  # a's final URL is b: the stricter one is kept
+    assert info["https://x.test/a"]["read_method"] == "fetch" and info["https://x.test/c"]["read_method"] == "render"
+    assert "https://x.test/d" not in info
+    assert merge_read_info([b, a])["https://x.test/b"]["read_method"] == "ocr"  # the order does not matter

@@ -8,8 +8,8 @@ import io
 import re
 import unicodedata
 from functools import cache
-from pathlib import Path
 from html.parser import HTMLParser
+from pathlib import Path
 from urllib.parse import urldefrag, urljoin
 
 import yaml

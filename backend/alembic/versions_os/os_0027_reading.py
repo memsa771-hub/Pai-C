@@ -23,6 +23,10 @@ N = "os_not_readable"
 
 
 def upgrade() -> None:
+    # script tags (four letters, e.g. `arab`) are allowed where a page or snapshot has no language evidence (T4 review)
+    op.drop_constraint("ck_os_page_snapshots_language", "os_page_snapshots", schema=S)
+    op.create_check_constraint("ck_os_page_snapshots_language", "os_page_snapshots",
+                               "language IS NULL OR language ~ '^[a-z]{2,4}$'", schema=S)
     op.add_column("os_pages", sa.Column("read_method", sa.Text, nullable=False, server_default="fetch"), schema=S)
     op.add_column("os_pages", sa.Column("language", sa.Text), schema=S)
     op.create_check_constraint("ck_os_pages_read_method", "os_pages",
@@ -52,6 +56,11 @@ def downgrade() -> None:
         raise RuntimeError("os_0027 downgrade refused: os_not_readable holds rows (no silent loss)")
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_pages WHERE read_method <> 'fetch' LIMIT 1")).first():
         raise RuntimeError("os_0027 downgrade refused: cached pages record how they were read")
+    if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_page_snapshots WHERE length(language) = 4 LIMIT 1")).first():
+        raise RuntimeError("os_0027 downgrade refused: snapshots carry script tags")
+    op.drop_constraint("ck_os_page_snapshots_language", "os_page_snapshots", schema=S)
+    op.create_check_constraint("ck_os_page_snapshots_language", "os_page_snapshots",
+                               "language IS NULL OR language ~ '^[a-z]{2,3}$'", schema=S)
     op.drop_table(N, schema=S)
     op.drop_constraint("ck_os_pages_read_method", "os_pages", schema=S)
     op.drop_column("os_pages", "language", schema=S)

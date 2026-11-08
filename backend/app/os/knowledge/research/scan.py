@@ -192,7 +192,7 @@ def scan_document(scanner: ScanText, data: bytes, content_type: str, *, max_page
                 check_pixels(img.width, img.height, max_pixels)
         except ScanFailed:
             raise
-        except Exception as e:  # noqa: BLE001  (an image we cannot open is an image we cannot read)
+        except Exception as e:
             raise ScanFailed(f"image: {type(e).__name__}") from e
         images = [data]
     else:

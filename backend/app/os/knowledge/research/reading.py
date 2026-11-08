@@ -12,7 +12,11 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from app.os.knowledge.research.readability import annotate_snapshot
-from app.os.knowledge.research.render import RenderFailed, SubLimits, looks_like_js_shell
+from app.os.knowledge.research.render import (
+    RenderFailed,
+    SubLimits,
+    looks_like_js_shell,
+)
 from app.os.knowledge.research.scan import ScanFailed, scan_document
 from app.os.knowledge.research.text import detect_language, html_to_text
 

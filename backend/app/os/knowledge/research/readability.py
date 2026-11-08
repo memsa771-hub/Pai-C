@@ -34,6 +34,24 @@ def machine_status_ceiling(read_method: str | None) -> str:
     return "confirmed" if read_method in (None, "fetch", "render", "model") else "unconfirmed"
 
 
+# How much a machine may be trusted with the text, least to most strict (see `machine_status_ceiling`).
+STRICTNESS = {"fetch": 0, "model": 0, "render": 1, "ocr": 2, "human": 3}
+
+
+def merge_read_info(pages) -> dict[str, dict]:
+    """URL -> {read_method, language} for the pages that were read. A URL can be the address of one page and the final
+    address of another, read two ways: the strictest read method is kept, so an OCR text is never treated as fetched."""
+    out: dict[str, dict] = {}
+    for p in pages:
+        if not p.ok:
+            continue
+        info = {"read_method": p.read_method, "language": p.language}
+        for u in (p.url, p.final_url):
+            if u and STRICTNESS.get(info["read_method"], 0) > STRICTNESS.get(out.get(u, {}).get("read_method"), -1):
+                out[u] = info
+    return out
+
+
 class NotReadableStore:
     def __init__(self, engine: Engine, tenant_id: str, clock: Callable[[], datetime] = shared_clock.now) -> None:
         self.engine, self.tenant_id, self.clock = engine, tenant_id, clock
@@ -64,6 +82,13 @@ class NotReadableStore:
             q = q.where(N.c.programme_ref == programme_ref)
         with self.engine.connect() as conn:
             return list(conn.execute(q))
+
+    def close_field(self, programme_ref: str, field: str, intake_year: int, state: str = "readable") -> int:
+        """A fact now exists for the field: its open rows (any source) are closed."""
+        q = update(N).where(N.c.tenant_id == self.tenant_id, N.c.programme_ref == programme_ref, N.c.field == field,
+                            N.c.intake_year == intake_year, N.c.state == "open").values(state=state)
+        with self.engine.begin() as conn:
+            return conn.execute(q).rowcount
 
     def set_state(self, url: str, state: str, *, programme_ref: str | None = None, field: str | None = None) -> int:
         """Closes open rows: `collected` (T5, a human supplied the value) or `readable` (a later machine read worked).

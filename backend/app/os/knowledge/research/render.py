@@ -199,7 +199,7 @@ class PlaywrightRenderer:
 
             with sync_playwright() as p:
                 return p.chromium.executable_path
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             raise RenderFailed("no browser to run") from e
 
     def render(self, url: str, fetch: Callable[[str, SubLimits], Fetched | None]) -> Rendered:

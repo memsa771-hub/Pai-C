@@ -89,3 +89,10 @@ def test_urdu_quote_in_another_letter_form_matches_the_scanned_page(engine, clea
     assert page.language == "ur"
     assert quote_on_page("آخري تاريخ ١ اگست ٢٠٢٧", normalise(page.text))  # Arabic yeh, Arabic-Indic digits
     assert not quote_on_page("آخری تاریخ ۲ اگست ۲۰۲۷", normalise(page.text))
+
+
+def test_arabic_script_without_urdu_letters_is_tagged_with_the_script_not_a_language(engine, clean, fixture_sites):
+    fixture_sites.set_page(ALPHA, "/a.png", fx.text_png(fx.EN_LINES), "image/png")
+    gw = gateway(engine, fixture_sites, FixedScanText("كتاب جديد في المكتبة"))
+    page = gw.fetch(f"https://{ALPHA}/a.png", OWN, [])
+    assert page.language == "arab"  # Arabic is not Urdu: no language is guessed
