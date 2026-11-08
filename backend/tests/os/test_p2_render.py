@@ -96,7 +96,7 @@ def test_a_missing_browser_is_not_readable_and_keeps_a_flagged_snapshot(engine, 
     assert snap.flagged == "not_readable"
     assert guard.snapshots.latest(url) is None  # never the "last clean" snapshot
     with pytest.raises(RenderFailed):
-        PlaywrightRenderer(browser_path="/no/such/browser").render(url, lambda u: None)
+        PlaywrightRenderer(browser_path="/no/such/browser").render(url, lambda u, lim: None)
 
 
 @needs_browser

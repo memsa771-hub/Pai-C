@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from app.os.knowledge.research.readability import annotate_snapshot
-from app.os.knowledge.research.render import RenderFailed, looks_like_js_shell
+from app.os.knowledge.research.render import RenderFailed, SubLimits, looks_like_js_shell
 from app.os.knowledge.research.scan import ScanFailed, scan_document
 from app.os.knowledge.research.text import detect_language, html_to_text
 
@@ -41,17 +41,40 @@ def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: s
     """The page's DOM after JavaScript ran (R-74). Falls back to `not_readable:render` when rendering fails or the
     rendered page has no text."""
     final = str(r.url)
+    interval, last_by_host = gw.settings.fetch_host_interval_s, {urlsplit(final).hostname or "": page.fetched_at}
 
-    def fetch(url: str):
-        if not allowed(url):
+    def fetch(url: str, limits: SubLimits):
+        """One sub-request of the render: the same rules as a page of its own (allow-list, robots.txt, the host
+        interval), the time left, and a byte limit while streaming. A redirect is not followed here: the browser asks
+        again for the new URL, which is checked in turn."""
+        if limits.time_left_s <= 0 or not allowed(url):
             return None
+        host = urlsplit(url).hostname or ""
         try:
-            resp = gw.client.get(url, follow_redirects=False)
+            if not gw._robots_allows(url):
+                return None
+        except Exception:  # noqa: BLE001  (robots.txt unreachable: stay out)
+            return None
+        last = last_by_host.get(host)
+        if last is not None:
+            wait = interval - (gw.clock() - last).total_seconds()
+            if wait > 0:
+                gw.sleep(min(wait, limits.time_left_s))
+        last_by_host[host] = gw.clock()
+        limit = min(limits.max_bytes, gw.settings.page_max_bytes)
+        try:
+            with gw.client.stream("GET", url, follow_redirects=False) as resp:
+                declared = resp.headers.get("content-length", "")
+                if declared.isdigit() and int(declared) > limit:
+                    return None
+                body = bytearray()
+                for chunk in resp.iter_bytes():
+                    body += chunk
+                    if len(body) > limit:
+                        return None
+                return resp.status_code, dict(resp.headers), bytes(body)
         except Exception:  # noqa: BLE001  (a failed sub-request is a refused sub-request)
             return None
-        if len(resp.content) > gw.settings.page_max_bytes:
-            return None
-        return resp.status_code, dict(resp.headers), resp.content
 
     try:
         out = gw.renderer.render(final, fetch)
@@ -69,7 +92,8 @@ def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: s
 def scanned(gw: PageGateway, page: Page, data: bytes, ctype: str, allowed, official, flags: list | None = None) -> Page:
     """An image or an image-only PDF through the scanner (R-29): `read_method: ocr`, original kept."""
     try:
-        got = scan_document(gw.scanner, data, ctype, max_pages=gw.settings.scan_max_pages)
+        got = scan_document(gw.scanner, data, ctype, max_pages=gw.settings.scan_max_pages,
+                            max_pixels=gw.settings.scan_max_pixels)
     except ScanFailed:
         return _fail(gw, page, "ocr", ctype, data)
     out_page = replace(page, text=got.text, links=(), read_method="ocr", language=detect_language(got.text))

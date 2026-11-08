@@ -83,7 +83,7 @@ def test_an_ocr_snapshot_records_ocr_language_and_original(engine, clean, fixtur
 
 
 def test_urdu_quote_in_another_letter_form_matches_the_scanned_page(engine, clean, fixture_sites):
-    fixture_sites.set_page(ALPHA, "/notice.png", b"\x89PNG-fake", "image/png")
+    fixture_sites.set_page(ALPHA, "/notice.png", fx.text_png(fx.EN_LINES), "image/png")
     gw = gateway(engine, fixture_sites, FixedScanText("\n".join(fx.UR_LINES)))
     page = gw.fetch(f"https://{ALPHA}/notice.png", OWN, [])
     assert page.language == "ur"

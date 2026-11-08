@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import io
+import os
 import shutil
 import subprocess
 import tempfile
@@ -91,7 +92,7 @@ class TesseractScanText:
     """The `tesseract` command line (local, no model cost). Needs the binary and the language data (eng, urd)."""
     name = "tesseract"
 
-    def __init__(self, command: str = "tesseract", timeout_s: float = 60.0,
+    def __init__(self, command: str = "tesseract", timeout_s: float = 180.0,
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> None:
         self.command, self.timeout_s, self._run = command, timeout_s, run
 
@@ -104,8 +105,9 @@ class TesseractScanText:
             path = Path(tmp) / "page"
             path.write_bytes(image)
             try:
+                # One thread: Tesseract's own multithreading made a page take over a minute on a busy machine (bake-off).
                 done = self._run([self.command, str(path), "stdout", "-l", codes], capture_output=True,
-                                 timeout=self.timeout_s, check=False)
+                                 timeout=self.timeout_s, check=False, env={**os.environ, "OMP_THREAD_LIMIT": "1"})
             except (OSError, subprocess.TimeoutExpired) as e:
                 raise ScanFailed(f"tesseract: {type(e).__name__}") from e
         if done.returncode != 0:
@@ -144,14 +146,25 @@ class DoclingScanText:
         return ScanResult(text.strip(), self.name)
 
 
-def rasterise_pdf(data: bytes, max_pages: int, scale: float = 2.0) -> list[bytes]:
-    """The first `max_pages` pages of a PDF as PNG images (pypdfium2)."""
+DEFAULT_MAX_PIXELS = 25_000_000
+
+
+def check_pixels(width: float, height: float, max_pixels: int) -> None:
+    if width * height > max_pixels:
+        raise ScanFailed(f"page image of {int(width)}x{int(height)} pixels is over the limit of {max_pixels}")
+
+
+def rasterise_pdf(data: bytes, max_pages: int, scale: float = 2.0, max_pixels: int = DEFAULT_MAX_PIXELS) -> list[bytes]:
+    """The first `max_pages` pages of a PDF as PNG images (pypdfium2). A page whose image would be larger than
+    `max_pixels` raises ScanFailed before anything is drawn."""
     import pypdfium2 as pdfium
 
     pdf = pdfium.PdfDocument(data)
     try:
         out = []
         for i in range(min(len(pdf), max_pages)):
+            w, h = pdf[i].get_size()
+            check_pixels(w * scale, h * scale, max_pixels)
             buf = io.BytesIO()
             pdf[i].render(scale=scale).to_pil().save(buf, format="PNG")
             out.append(buf.getvalue())
@@ -161,15 +174,26 @@ def rasterise_pdf(data: bytes, max_pages: int, scale: float = 2.0) -> list[bytes
 
 
 def scan_document(scanner: ScanText, data: bytes, content_type: str, *, max_pages: int = 10,
-                  languages: Sequence[str] = ()) -> ScanResult:
+                  languages: Sequence[str] = (), max_pixels: int = DEFAULT_MAX_PIXELS) -> ScanResult:
     """An image file or a PDF through the scanner. Pages are joined by a blank line. Empty text is a failure."""
     kind = content_type.split(";")[0].strip().lower()
     if kind == "application/pdf":
         try:
-            images = rasterise_pdf(data, max_pages)
+            images = rasterise_pdf(data, max_pages, max_pixels=max_pixels)
+        except ScanFailed:
+            raise
         except Exception as e:
             raise ScanFailed(f"rasterise: {type(e).__name__}") from e
     elif kind in IMAGE_TYPES:
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(data)) as img:  # the header only: the size is known before the pixels are read
+                check_pixels(img.width, img.height, max_pixels)
+        except ScanFailed:
+            raise
+        except Exception as e:  # noqa: BLE001  (an image we cannot open is an image we cannot read)
+            raise ScanFailed(f"image: {type(e).__name__}") from e
         images = [data]
     else:
         raise ScanFailed(f"not a scannable type: {kind}")

@@ -97,13 +97,15 @@ def _reading_adapters(settings: OsSettings):
         from app.os.knowledge.research.pages import USER_AGENT
         from app.os.knowledge.research.render import PlaywrightRenderer
 
-        renderer = PlaywrightRenderer(timeout_s=settings.render_timeout_s, browser_path=settings.render_browser_path,
-                                      user_agent=USER_AGENT)
+        from app.os.knowledge.research.render import RenderLimits
+
+        renderer = PlaywrightRenderer(RenderLimits.from_settings(settings, USER_AGENT))
     engine = os.environ.get("OS_SCAN_ENGINE", "").strip().lower()
     if engine:
         from app.os.knowledge.research.scan import DoclingScanText, TesseractScanText
 
-        candidate = {"tesseract": TesseractScanText, "docling": DoclingScanText}.get(engine)
+        makers = {"tesseract": lambda: TesseractScanText(timeout_s=settings.scan_timeout_s), "docling": DoclingScanText}
+        candidate = makers.get(engine)
         if candidate is None or not candidate().available():
             log.warning("OS_SCAN_ENGINE=%s is unknown or not installed: scans are not read", engine)
         else:
