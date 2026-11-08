@@ -20,3 +20,10 @@ The freeze-exception PR moving the Counsellor calendar and admission-rules JSON 
 
 ## Checks
 tests/os: 2777 passed, 1 skipped, 1 xfailed. Legacy: 2560 passed, 13 skipped. tach, freeze, alembic heads (one OS head), traceability OK. One earlier full run showed 68 failures from my compile change (confirm tuple unpacking in `_apply_overrides`); fixed and rerun green (and Postgres was down for a while after a limit reset; reruns done on os_test_c).
+
+## T11 review fixes
+1. The confirm task of a registry fact has no `programme_ref` (set only for programme facts); route and programme checks unchanged (tests).
+2. Calendars through the import: Institutions rows of type `*_calendar` are `calendar` rows (optional `parent_id`, `timezone` columns) recorded with `record_calendar`; Facts rows on a calendar are checked against its type (`field_not_in_calendar`, `not_a_date`, `no_timezone`) and written with `record_calendar_date`, which accepts an `on_change` hook and carries read method, language and evidence. The import calls `on_fact_change` after writing a registry fact (API: `plan_hook(svc.plans, svc.kernel)`; CLI: built from `make_services`), so a re-import that moves `result_date` moves the plan (test). Programme facts written by an import still do not call it (as in T6).
+3. `tz` is required in `record_calendar_date`; the import takes it from the calendar, else its parent (up to four levels); none -> `no_timezone`.
+4. The citation of a calendar date is `fact:<cal>:<field>`; route facts keep `fact:<field>`.
+Checks: tests/os 2788 passed, 1 skipped, 1 xfailed; legacy unchanged (not rerun: no non-OS file changed); tach, freeze, heads (one OS head), traceability OK.
