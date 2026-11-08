@@ -36,9 +36,11 @@ class FactFinding:
     plan_id: int | None = None
 
 
-def allowed_domains(engine: Engine, tenant_id: str) -> tuple[set[str], set[str]]:
+def allowed_domains(engine: Engine, tenant_id: str) -> tuple[set[str] | None, set[str]]:
     """(domains a shown fact may come from, domains marked suspect). Allowed: the reviewed allow-list's active entries,
-    every programme's own official domains, and the official domains of registry entries."""
+    every programme's own official domains, and the official domains of registry entries. The first is None while no
+    reviewed allow-list is loaded (the guard is off or nothing is listed yet): there is then nothing to check against, and
+    rule 9 stays silent rather than flag every source."""
     with engine.connect() as conn:
         entries = conn.execute(select(SD.c.domain, SD.c.state, SD.c.tier).where(SD.c.tenant_id == tenant_id)).all()
         programmes = conn.execute(select(PG.c.official_domains).where(PG.c.tenant_id == tenant_id)).scalars().all()
@@ -47,10 +49,11 @@ def allowed_domains(engine: Engine, tenant_id: str) -> tuple[set[str], set[str]]
     allowed = {domain_of(f"https://{e.domain}/") for e in entries if e.state == "active" and e.tier is not None}
     for domains in (*programmes, *registry):
         allowed |= {domain_of(f"https://{d}/") for d in (domains or [])}
-    return allowed - suspect, suspect
+    return (allowed - suspect if any(e.state == "active" and e.tier is not None for e in entries) else None), suspect
 
 
-def check_entries(entries: Iterable[FactEntry], intake: IntakeRef, allowed: set[str], suspect: set[str]) -> dict[int, list[str]]:
+def check_entries(entries: Iterable[FactEntry], intake: IntakeRef, allowed: set[str] | None,
+                  suspect: set[str]) -> dict[int, list[str]]:
     """The codes found per rule for the facts a student is shown. Only entries that carry a value are 'shown'."""
     found: dict[int, list[str]] = {r: [] for r in RULES}
     for e in entries:
@@ -59,7 +62,7 @@ def check_entries(entries: Iterable[FactEntry], intake: IntakeRef, allowed: set[
         host = domain_of(e.source.url) if e.source is not None else ""
         if host in suspect:
             found[12].append(f"suspect_domain:{e.field}")
-        elif e.source is not None and host not in allowed:
+        elif e.source is not None and allowed is not None and host not in allowed:
             found[9].append(f"domain_not_listed:{e.field}")
         if e.high_stakes and e.level != "verified":
             found[10].append(f"high_stakes_not_verified:{e.field}")

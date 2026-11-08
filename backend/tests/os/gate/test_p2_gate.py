@@ -19,6 +19,7 @@ from app.os.knowledge.review import ReviewerStore, ReviewQueue
 from app.os.knowledge.review.export import export_queue
 from app.os.knowledge.review.hooks import open_suspect_item
 from app.os.knowledge.sheets.importer import run_import
+from app.os.knowledge.sources.allowlist import SourceDomains, load_allowlist
 from app.os.knowledge.sheets.undo import undo_import
 from app.os.ports import consistency as os_consistency
 from app.os.registry.store import RegistryStore
@@ -198,6 +199,7 @@ def test_the_four_rules_in_isolation():
     ], I27, ALLOWED, {"spam.test"})
     assert bad == {9: ["domain_not_listed:a"], 10: ["high_stakes_not_verified:b"],
                    11: ["other_intake_unlabelled:c"], 12: ["suspect_domain:d"]}
+    assert not rules.check_entries([_unchecked("a", url="https://elsewhere.test/x")], I27, None, set())[9]  # no list loaded
     labelled = rules.check_entries([entry("c", intake=IntakeRef(term="winter", year=2026), other=True)], I27, ALLOWED, set())
     assert not labelled[11]  # another year shown with its year is fine
 
@@ -215,6 +217,8 @@ def test_gate_11_consistency_rules_9_to_12_find_nothing_for_a_clean_student_and_
     plan = w.plan("stu-1")
     ports.configure(w.svc)
     try:
+        assert os_consistency.fact_findings("stu-1") == []  # no allow-list loaded yet: rule 9 has nothing to check against
+        SourceDomains(w.engine, "pai").sync(load_allowlist(Path(__file__).parents[1] / "fixtures" / "sources"))
         w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")  # a verified fact on an allowed domain
         assert os_consistency.fact_students() == ["stu-1"]
         assert os_consistency.fact_findings("stu-1") == []  # zero on a fictional student
@@ -224,8 +228,6 @@ def test_gate_11_consistency_rules_9_to_12_find_nothing_for_a_clean_student_and_
         [f9] = os_consistency.fact_findings("stu-1")
         assert (f9.rule, f9.codes, f9.plan_id) == (9, ("domain_not_listed:deadline_close",), plan)
         # the same domain marked suspect without the facts being dropped: rule 12, and a case a person sees
-        from app.os.knowledge.sources.allowlist import SourceDomains
-
         SourceDomains(w.engine, "pai").mark_suspect("unlisted.test", "spam", lambda conn: {})
         [f12] = os_consistency.fact_findings("stu-1")
         assert (f12.rule, f12.codes) == (12, ("suspect_domain:deadline_close",))
