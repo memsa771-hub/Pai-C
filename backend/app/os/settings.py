@@ -34,6 +34,8 @@ class OsSettings:
     render_max_requests: int = 60  # P2-T4: sub-requests (the page itself, scripts, data) one render may make
     render_max_bytes: int = 20_000_000  # P2-T4: total bytes of those sub-requests
     render_max_old_space_mb: int = 512  # P2-T4: the browser's JavaScript heap limit
+    render_max_memory_mb: int = 1024  # P2-T4: the browser's whole memory (cgroup memory limit, where the host allows one)
+    render_max_pids: int = 256  # P2-T4: processes and threads of the browser (cgroup pids limit, else RLIMIT_NPROC)
     render_run_as_uid: int | None = 65534  # P2-T4: when the worker runs as root, the browser runs as this user (OS_RENDER_UID)
     render_no_sandbox: bool = False  # P2-T4: only for hosts where Chromium cannot start its sandbox (OS_RENDER_NO_SANDBOX=1)
     render_browser_path: str | None = None  # P2-T4: a Chromium executable; None = Playwright's own (OS_RENDER_BROWSER)
@@ -132,6 +134,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         render_max_requests=int(env.get("OS_RENDER_MAX_REQUESTS") or 60),
         render_max_bytes=int(env.get("OS_RENDER_MAX_BYTES") or 20_000_000),
         render_max_old_space_mb=int(env.get("OS_RENDER_MAX_OLD_SPACE_MB") or 512),
+        render_max_memory_mb=int(env.get("OS_RENDER_MAX_MEMORY_MB") or 1024),
+        render_max_pids=int(env.get("OS_RENDER_MAX_PIDS") or 256),
         render_run_as_uid=int(env["OS_RENDER_UID"]) if (env.get("OS_RENDER_UID") or "").strip() else 65534,
         render_no_sandbox=flag(env, "OS_RENDER_NO_SANDBOX"),
         render_browser_path=(env.get("OS_RENDER_BROWSER") or "").strip() or None,

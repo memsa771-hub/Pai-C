@@ -12,6 +12,10 @@ resulting DOM (`read_method: render`). The browser is the least trusted thing th
   core-dump limits, an empty environment and a private working directory. If the worker runs as root, the child drops to an
   unprivileged user (`run_as_uid`, 65534 by default) and Chromium keeps its sandbox; only `no_sandbox` removes it, and
   only when an operator sets it.
+- **Memory and processes.** The child is put in a cgroup (memory and pids limits) when the host lets the worker make one;
+  otherwise the unprivileged user gets `RLIMIT_NPROC` and the memory limit is NOT enforced (the JavaScript heap flag
+  still is). Which one a render had is in `last_isolation`. If the worker dies, the browser process gets SIGKILL
+  (`PR_SET_PDEATHSIG`), and Chromium exits when its driver goes.
 - **One deadline.** `render()` has a single wall-clock deadline. When it passes, the child's whole process group is killed
   (SIGKILL), whatever the browser was doing (Playwright's `content()` has no timeout argument of its own).
 - **Limits on sub-requests.** At most `max_requests` of them and `max_bytes` in total; none after the deadline.
@@ -20,6 +24,7 @@ resulting DOM (`read_method: render`). The browser is the least trusted thing th
 from __future__ import annotations
 
 import base64
+import ctypes
 import glob
 import json
 import os
@@ -42,7 +47,7 @@ _DROP = {"content-encoding", "content-length", "transfer-encoding", "connection"
 
 # A page must not get an IP address out of the browser, or a data channel to anywhere (P2-T4 review).
 WEBRTC_BLOCK_SCRIPT = """
-for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel']) {
+for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'WebTransport']) {
   try { delete window[name]; } catch (e) {}
   try { Object.defineProperty(window, name, {value: undefined, configurable: false, writable: false}); } catch (e) {}
 }
@@ -72,6 +77,8 @@ class RenderLimits:
     max_requests: int = 60
     max_bytes: int = 20_000_000
     max_old_space_mb: int = 512
+    max_memory_mb: int = 1024  # whole-browser memory, by cgroup (where the host lets us make one)
+    max_pids: int = 256  # processes and threads: cgroup pids limit, else RLIMIT_NPROC for the unprivileged user
     run_as_uid: int | None = 65534
     no_sandbox: bool = False
     browser_path: str | None = None
@@ -82,6 +89,7 @@ class RenderLimits:
     def from_settings(cls, settings, user_agent: str | None = None) -> RenderLimits:
         return cls(timeout_s=settings.render_timeout_s, max_requests=settings.render_max_requests,
                    max_bytes=settings.render_max_bytes, max_old_space_mb=settings.render_max_old_space_mb,
+                   max_memory_mb=settings.render_max_memory_mb, max_pids=settings.render_max_pids,
                    run_as_uid=settings.render_run_as_uid, no_sandbox=settings.render_no_sandbox,
                    browser_path=settings.render_browser_path, user_agent=user_agent)
 
@@ -95,6 +103,8 @@ def browser_args(limits: RenderLimits) -> list[str]:
     args = [
         "--proxy-server=http://127.0.0.1:9", "--proxy-bypass-list=<-loopback>",  # no way out but the routes
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",  # the browser resolves no name itself
+        "--disable-quic", "--dns-prefetch-disable",  # no UDP transports, no look-ahead lookups
         f"--js-flags=--max-old-space-size={limits.max_old_space_mb}",
         "--disable-gpu", "--disable-dev-shm-usage", "--disable-extensions",
     ]
@@ -107,16 +117,99 @@ def _drops_privileges(limits: RenderLimits) -> bool:
     return hasattr(os, "geteuid") and os.geteuid() == 0 and limits.run_as_uid is not None
 
 
-def _preexec(uid: int | None, cpu_s: int) -> Callable[[], None]:
+class Cgroup:
+    """A control group the browser is put in, with a memory limit and a process limit. Cgroup v2 (one tree) and v1
+    (one tree per controller) are both tried; v2 has NOT been exercised in the build environment (it has v1 only)."""
+
+    def __init__(self, version: str, dirs: list[Path], procs: list[Path]) -> None:
+        self.version, self.dirs, self.procs = version, dirs, procs
+
+    @staticmethod
+    def sweep(root: Path = Path("/sys/fs/cgroup"), older_than_s: float = 60.0) -> int:
+        """Removes the empty groups of workers that died without cleaning up (a group with processes cannot be removed,
+        and a group younger than `older_than_s` may be one that is just being filled)."""
+        n = 0
+        for d in [*root.glob("os-render-*"), *root.glob("*/os-render-*"), *root.glob("*/*/os-render-*")]:
+            try:
+                if d.is_dir() and time.time() - d.stat().st_mtime > older_than_s:
+                    d.rmdir()
+                    n += 1
+            except OSError:
+                pass
+        return n
+
+    @classmethod
+    def create(cls, name: str, memory_mb: int, pids: int, root: Path = Path("/sys/fs/cgroup")) -> Cgroup | None:
+        """None when the host does not let this process make a cgroup (the caller falls back to RLIMIT_NPROC)."""
+        made: list[Path] = []
+        cls.sweep(root)
+        try:
+            if (root / "cgroup.controllers").exists():  # v2
+                own = Path((Path("/proc/self/cgroup").read_text().split("0::")[1].splitlines() or ["/"])[0].strip())
+                base = root / str(own).lstrip("/")
+                try:
+                    (base / "cgroup.subtree_control").write_text("+memory +pids")
+                except OSError:
+                    pass  # already enabled, or not allowed: the limit files below say which
+                d = base / name
+                d.mkdir()
+                made.append(d)
+                (d / "memory.max").write_text(str(memory_mb * 1024 * 1024))
+                (d / "pids.max").write_text(str(pids))
+                return cls("v2", made, [d / "cgroup.procs"])
+            for controller, limit_file, value in (("memory", "memory.limit_in_bytes", memory_mb * 1024 * 1024),
+                                                  ("pids", "pids.max", pids)):
+                d = root / controller / name
+                d.mkdir()
+                made.append(d)
+                (d / limit_file).write_text(str(value))
+            return cls("v1", made, [d / "cgroup.procs" for d in made])
+        except (OSError, IndexError):
+            for d in made:
+                try:
+                    d.rmdir()
+                except OSError:
+                    pass
+            return None
+
+    def join_self(self) -> None:
+        for f in self.procs:
+            with open(f, "w") as fh:
+                fh.write(str(os.getpid()))
+
+    def remove(self) -> None:
+        for d in self.dirs:
+            for _ in range(30):  # the group is empty once its processes are gone
+                try:
+                    d.rmdir()
+                    break
+                except FileNotFoundError:
+                    break
+                except OSError:
+                    time.sleep(0.1)
+
+
+def _preexec(uid: int | None, cpu_s: int, cgroup: Cgroup | None, max_pids: int) -> Callable[[], None]:
+    libc = ctypes.CDLL(None, use_errno=True)
+    parent = os.getpid()
+
     def run() -> None:
         os.setsid()  # its own session and process group: the deadline kills the whole group
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s))
         resource.setrlimit(resource.RLIMIT_FSIZE, (100_000_000, 100_000_000))
+        if cgroup is not None:
+            cgroup.join_self()  # while still root: memory and process limits for the whole browser
+        elif uid is not None:
+            resource.setrlimit(resource.RLIMIT_NPROC, (max_pids, max_pids))  # no cgroup: at least the process count
         if uid is not None:
             os.setgroups([])
             os.setgid(uid)
             os.setuid(uid)
+        # After the user change (it clears the signal): if the worker dies, the browser process dies with it.
+        libc.prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG
+        if os.getppid() != parent:  # the worker was already gone before the signal was set
+            os._exit(1)
     return run
 
 
@@ -169,6 +262,7 @@ class PlaywrightRenderer:
 
     def __init__(self, limits: RenderLimits | None = None, *, timeout_s: float | None = None,
                  browser_path: str | None = None, user_agent: str | None = None) -> None:
+        self.last_isolation: dict = {}
         base = limits or RenderLimits()
         self.limits = RenderLimits(**{**base.__dict__, **{k: v for k, v in (
             ("timeout_s", timeout_s), ("browser_path", browser_path), ("user_agent", user_agent)) if v is not None}})
@@ -211,6 +305,9 @@ class PlaywrightRenderer:
         uid = lim.run_as_uid if _drops_privileges(lim) else None
         root = Path(tempfile.mkdtemp(prefix="os-render-", dir=lim.work_root))
         proc = None
+        cgroup = Cgroup.create(root.name, lim.max_memory_mb, lim.max_pids) if lim.max_memory_mb > 0 else None
+        self.last_isolation = {"cgroup": cgroup.version if cgroup else None, "uid": uid,
+                               "nproc_limit": cgroup is None and uid is not None}  # what this render really had
         try:
             root.chmod(0o755)
             script = root / "render_child.py"
@@ -230,13 +327,15 @@ class PlaywrightRenderer:
                 proc = subprocess.Popen(
                     [sys.executable, str(script), json.dumps(cfg)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL, cwd=work, env=env,
-                    preexec_fn=_preexec(uid, int(lim.timeout_s * 2) + 10))  # noqa: PLW1509  (a new session is the point)
-            except OSError as e:
+                    preexec_fn=_preexec(uid, int(lim.timeout_s * 2) + 10, cgroup, lim.max_pids))  # noqa: PLW1509
+            except (OSError, subprocess.SubprocessError) as e:
                 raise RenderFailed(f"browser process did not start: {type(e).__name__}") from e
             return self._serve(proc, fetch, deadline)
         finally:
             if proc is not None:
                 _kill_group(proc)
+            if cgroup is not None:
+                cgroup.remove()
             shutil.rmtree(root, ignore_errors=True)
 
     def _serve(self, proc: subprocess.Popen, fetch, deadline: float) -> Rendered:

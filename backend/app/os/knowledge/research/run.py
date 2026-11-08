@@ -178,8 +178,8 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
                               intake_year=intake_year)
         for url in read_info or {}:  # a later successful read closes the source's row (R-72)
             not_readable.set_state(url, "readable", programme_ref=programme_ref, field="")
-        for n in names:  # ... and each field once a fact exists, unless an unreadable page was marked for it just now
-            if (programme_ref, n) in stored and not (unreadable and n in open_fields):
+        for n in names:  # ... and each field once a CONFIRMED fact exists; an unconfirmed one still waits for a checker
+            if n not in open_fields:
                 not_readable.close_field(programme_ref, n, intake_year)
     return counts
 

@@ -45,7 +45,6 @@ def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: s
     """The page's DOM after JavaScript ran (R-74). Falls back to `not_readable:render` when rendering fails or the
     rendered page has no text."""
     final = str(r.url)
-    interval, last_by_host = gw.settings.fetch_host_interval_s, {urlsplit(final).hostname or "": page.fetched_at}
 
     def fetch(url: str, limits: SubLimits):
         """One sub-request of the render: the same rules as a page of its own (allow-list, robots.txt, the host
@@ -53,18 +52,12 @@ def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: s
         again for the new URL, which is checked in turn."""
         if limits.time_left_s <= 0 or not allowed(url):
             return None
-        host = urlsplit(url).hostname or ""
         try:
             if not gw._robots_allows(url):
                 return None
         except Exception:  # noqa: BLE001  (robots.txt unreachable: stay out)
             return None
-        last = last_by_host.get(host)
-        if last is not None:
-            wait = interval - (gw.clock() - last).total_seconds()
-            if wait > 0:
-                gw.sleep(min(wait, limits.time_left_s))
-        last_by_host[host] = gw.clock()
+        gw.pace(urlsplit(url).netloc.lower(), limits.time_left_s)  # the gateway's own per-host clock
         limit = min(limits.max_bytes, gw.settings.page_max_bytes)
         try:
             with gw.client.stream("GET", url, follow_redirects=False) as resp:

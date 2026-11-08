@@ -22,7 +22,7 @@ def _old_normalise(text: str) -> str:
     "Applications close on 1 August 2027.", "  Fee:\t1000 units – per “semester”  ", "Ünïcode ÄÖÜ ß straße",
     "Deadline 15.07.2027 at 12:00", "",
 ])
-def test_latin_text_normalises_exactly_as_before(text):
+def test_text_already_in_nfc_form_normalises_exactly_as_before(text):
     assert normalise(text) == _old_normalise(text)
 
 
@@ -80,3 +80,10 @@ def test_joiners_are_removed_only_next_to_arabic_letters():
     assert normalise("ب\u200dا") == normalise("با")
     assert normalise("a\u200db") == "a\u200db" and normalise("a\u200cb") == "a\u200cb"  # elsewhere they stay
     assert normalise("\U0001F468\u200d\U0001F469") == "\U0001F468\u200d\U0001F469"
+
+
+def test_hamza_yeh_written_two_ways_is_one_letter():
+    one = "\u0626"  # the single letter
+    assert normalise(one) == normalise("\u06cc\u0654") == normalise("\u064a\u0654") == normalise("\u0649\u0654")
+    assert normalise("ہیں" + one) == normalise("ہیں\u06cc\u0654")
+    assert normalise(one) != normalise("\u06cc")  # a plain yeh is a different letter

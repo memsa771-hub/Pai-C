@@ -145,3 +145,14 @@ def test_the_strictest_read_method_wins_when_a_url_was_read_two_ways():
     assert info["https://x.test/a"]["read_method"] == "fetch" and info["https://x.test/c"]["read_method"] == "render"
     assert "https://x.test/d" not in info
     assert merge_read_info([b, a])["https://x.test/b"]["read_method"] == "ocr"  # the order does not matter
+
+
+def test_an_unconfirmed_fact_keeps_the_field_open_for_a_checker(engine, clean):
+    nr = NotReadableStore(engine, "pai", clock=lambda: NOW)
+    scan = "https://www.alpha-university.test/scan.pdf"
+    _store(engine, {}, None, [{"url": scan, "reason": "not_readable:render"}], nr)
+    # the next run reads it, but only by OCR: the fact exists, unconfirmed (R-72)
+    _store(engine, _verdict(URL), {URL: {"read_method": "ocr", "language": None}, scan: {"read_method": "fetch", "language": None}}, (), nr)
+    still = {r.field for r in nr.open_rows(programme_ref="p1")}
+    assert "deadline_close" in still  # an unconfirmed fact does not close the request
+    assert "" not in still  # the source itself was read

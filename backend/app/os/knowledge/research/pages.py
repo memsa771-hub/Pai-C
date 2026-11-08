@@ -82,6 +82,7 @@ class PageGateway:
                  sources: "SourceGuard | None" = None, renderer=None, scanner=None) -> None:
         self.engine, self.tenant_id, self.settings = engine, tenant_id, settings
         self.sources = sources
+        self._host_clock: dict[str, datetime] = {}  # P2-T4: when this gateway last asked each host (pages and render sub-requests)
         self.renderer, self.scanner = renderer, scanner  # P2-T4: None = off (JavaScript shells and scans read as before)
         self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True,
                                              timeout=20.0)
@@ -144,10 +145,24 @@ class PageGateway:
             func.split_part(P.c.url, "/", 3) == host,
             (P.c.blocked.is_(None)) | (P.c.blocked.not_in(_NO_REQUEST)),
         )).scalar()
+        mine = self._host_clock.get(host)  # a render's sub-requests count too (they are not rows of os_pages)
+        last = max((t for t in (last, mine) if t is not None), default=None)
         if last is not None:
             wait = self.settings.fetch_host_interval_s - (self.clock() - last).total_seconds()
             if wait > 0:
                 self.sleep(wait)
+        self._host_clock[host] = self.clock()
+
+    def pace(self, host: str, max_wait_s: float) -> None:
+        """For a sub-request of a render: waits out the host interval on the same per-host clock the page fetches use,
+        for at most `max_wait_s`, then stamps the host. (The stamp lives in this process; the page rows in os_pages are
+        what other workers see.)"""
+        last = self._host_clock.get(host)
+        if last is not None:
+            wait = self.settings.fetch_host_interval_s - (self.clock() - last).total_seconds()
+            if wait > 0:
+                self.sleep(min(wait, max_wait_s))
+        self._host_clock[host] = self.clock()
 
     def _download(self, url: str) -> tuple[httpx.Response, bytes | None]:
         """The body, or None when it is over the size limit."""

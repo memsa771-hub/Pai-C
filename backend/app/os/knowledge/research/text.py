@@ -118,6 +118,9 @@ def normalise(text: str) -> str:
     text = text.replace("\x00a0", " ").replace("\x00a0", " ").replace(" ", " ")
     text = text.replace("–", "-").replace("—", "-")
     text = text.replace("’", "'").replace("“", '"').replace("”", '"')
-    table, _, joiners = _folding()
+    table, data, joiners = _folding()
     text = joiners.sub("", unicodedata.normalize("NFC", text)).translate(table)
+    for single, parts in data["compose"].items():
+        for seq in parts:
+            text = text.replace(seq, single)
     return re.sub(r"\s+", " ", text).strip().casefold()
