@@ -91,25 +91,37 @@ class IntakeStore:
                 T.c.year < year).order_by(T.c.year.desc()).limit(1)).first()
         return _intake(row) if row else None
 
-    def set_state(self, intake_id: int, state: str, *, gate_passed_at: datetime | None = None) -> Intake:
-        """Moves an intake one step. `current` needs `gate_passed_at` (R-66): only the coverage gate (T9) passes it."""
+    def set_state(self, intake_id: int, state: str) -> Intake:
+        """Moves an intake one step. It never makes one `current` (R-66): that is the coverage gate's alone
+        (`coverage/gate.py`, through `_gate_set_current`), and an invariant test keeps it so."""
+        if state == "current":
+            raise IntakeError("an intake becomes current only through the coverage gate (R-66)")
         current = self.by_id(intake_id)
         if current is None:
             raise IntakeError(f"no intake {intake_id}")
         if state not in _NEXT[current.state]:
             raise IntakeError(f"an intake cannot go from {current.state} to {state}")
-        values: dict = {"state": state, "updated_at": clock.now()}
-        if state == "current":
-            if gate_passed_at is None:
-                raise IntakeError("an intake becomes current only through the coverage gate (R-66)")
-            values["gate_passed_at"] = gate_passed_at
-        elif gate_passed_at is not None:
-            raise IntakeError("only `current` records a gate pass")
         with self.engine.begin() as conn:
             row = conn.execute(update(T).where(T.c.tenant_id == self.tenant_id, T.c.id == intake_id,
-                                               T.c.state == current.state).values(**values).returning(T)).first()
+                                               T.c.state == current.state)
+                               .values(state=state, updated_at=clock.now()).returning(T)).first()
         if row is None:
             raise IntakeError(f"intake {intake_id} changed while it was being moved")
+        return _intake(row)
+
+    def _gate_lock(self, conn, intake_id: int) -> Intake | None:
+        """The intake with its row locked until the transaction ends. Only the coverage gate calls this."""
+        row = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id, T.c.id == intake_id).with_for_update()).first()
+        return _intake(row) if row else None
+
+    def _gate_set_current(self, conn, intake_id: int, gate_passed_at: datetime) -> Intake:
+        """open -> current with the gate pass recorded, inside the caller's transaction (which holds the row lock).
+        Only `coverage/gate.py` calls this (invariant test: tests/os/test_p2_coverage_invariants.py)."""
+        row = conn.execute(update(T).where(T.c.tenant_id == self.tenant_id, T.c.id == intake_id, T.c.state == "open")
+                           .values(state="current", gate_passed_at=gate_passed_at, updated_at=clock.now())
+                           .returning(T)).first()
+        if row is None:
+            raise IntakeError(f"intake {intake_id} is not open")
         return _intake(row)
 
     def plannable(self, term: str, year: int) -> bool:

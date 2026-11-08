@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.os import models
 from app.os.intakes import IntakeError, IntakeStore, UnknownTerm, check_term, terms
+from tests.os.intake_helpers import make_current
 
 pytestmark = pytest.mark.req("R-62")
 AT = datetime(2027, 3, 1, tzinfo=UTC)
@@ -38,14 +39,12 @@ def test_two_intakes_in_one_year(engine, clean):
 def test_states_and_the_gate(engine, clean):
     s = IntakeStore(engine, "pai")
     i = s.create("r_one", "undergrad", "fall", 2027)
-    with pytest.raises(IntakeError):
-        s.set_state(i.id, "current", gate_passed_at=AT)  # planned -> current is not a step
+    with pytest.raises(IntakeError, match="gate"):
+        s.set_state(i.id, "current")  # R-66: never through set_state, planned or open
     i = s.set_state(i.id, "open")
     with pytest.raises(IntakeError, match="gate"):
-        s.set_state(i.id, "current")  # R-66: no gate pass, no current
-    with pytest.raises(IntakeError):
-        s.set_state(i.id, "closed", gate_passed_at=AT)
-    i = s.set_state(i.id, "current", gate_passed_at=AT)
+        s.set_state(i.id, "current")
+    i = make_current(engine, i.id, AT)
     assert i.state == "current" and i.gate_passed_at == AT
     assert s.set_state(i.id, "closed").state == "closed"
     with pytest.raises(IntakeError):
@@ -69,7 +68,7 @@ def test_plannable_and_fallback(engine, clean):
     s.set_state(a.id, "open")
     assert s.plannable("fall", 2027) and s.fallback_applies("fall", 2027)
     b = s.create("r_two", "undergrad", "fall", 2027, state="open")
-    s.set_state(b.id, "current", gate_passed_at=AT)
+    make_current(engine, b.id, AT)
     assert s.plannable("fall", 2027) and not s.fallback_applies("fall", 2027)
     assert s.previous("r_one", "undergrad", "fall", 2027) is None
     p = s.create("r_one", "undergrad", "fall", 2026)
