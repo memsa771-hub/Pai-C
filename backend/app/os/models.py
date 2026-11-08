@@ -423,6 +423,34 @@ review_attestations = Table(
     UniqueConstraint("tenant_id", "reviewer_id", "batch_ref", name="uq_os_review_attestations"),
 )
 
+# P2-T6 (os_0030): one row per spreadsheet import (P2 spec §4.6). Undo replays the revisions with cause_ref `import-<id>`.
+imports = Table(
+    "os_imports", md,
+    _id(), _tenant(),
+    Column("file_name", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("mode", Text, nullable=False),
+    Column("decision_ref", Text),
+    Column("batch_ref", Text, nullable=False, server_default=""),
+    Column("actor", Text, nullable=False),
+    Column("note_actor", Text),
+    Column("status", Text, nullable=False, server_default="running"),
+    Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("programmes_created", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("report_path", Text),
+    Column("report_csv", Text),
+    Column("error", Text),
+    Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("finished_at", DateTime(timezone=True)),
+    Column("undone_at", DateTime(timezone=True)),
+    Column("undone_by", Text),
+    _in("mode", ("owner_accepted", "reviewers"), "ck_os_imports_mode"),
+    _in("status", ("running", "done", "failed", "undone"), "ck_os_imports_status"),
+    CheckConstraint("mode <> 'owner_accepted' OR decision_ref IS NOT NULL", name="ck_os_imports_decision"),
+    Index("uq_os_imports_live", "tenant_id", "sha256", unique=True,
+          postgresql_where=text("status IN ('running', 'done', 'failed')")),
+)
+
 # --- Slice 2: Knowledge (spec 2026-10-19 §5) -------------------------------------------------------
 
 programmes = Table(

@@ -1,0 +1,7 @@
+# Batch 5 layout: a programme group with its tests, thresholds and merit formula.
+layout: programmes_merit_formula
+sheet: Programmes
+detect: [programme_group, merit_formula]
+note_from: [intermediate_marks_used]
+emit:
+  - set: {programme: programme_group}
