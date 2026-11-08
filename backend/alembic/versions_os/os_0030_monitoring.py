@@ -49,6 +49,8 @@ def upgrade() -> None:
                   nullable=False),
         sa.Column("reason", sa.Text, nullable=False),
         sa.Column("first_run_id", sa.BigInteger, nullable=False),
+        sa.Column("last_run_id", sa.BigInteger, nullable=False),
+        sa.Column("runs", sa.Integer, nullable=False, server_default="1"),  # separate runs that saw it
         sa.Column("first_seen_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.UniqueConstraint("tenant_id", "fact_id", name="uq_os_monitor_seen_fact"),
         schema=S,

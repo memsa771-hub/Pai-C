@@ -9,13 +9,14 @@ A page that cannot be trusted changes nothing and is not kept as the last clean 
 (a timeout, a server error, a block), one that shrank by more than the configured share, or one on which none of the quotes
 of the facts it backs is found. Facts only change through the Knowledge store; plans only through `after_change`."""
 
+import hashlib
 import logging
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import Engine, delete, select, update
+from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
@@ -70,29 +71,35 @@ def _facts_by_url(engine: Engine, tenant_id: str, w: Window, programmes: list[Pr
     return out
 
 
-def _lock_run(conn, tenant_id: str, today: date):
-    """The day's run row, locked for as long as `conn`'s transaction lasts; None if another worker holds it."""
-    return conn.execute(select(RUNS).where(RUNS.c.tenant_id == tenant_id, RUNS.c.run_date == today)
-                        .with_for_update(skip_locked=True)).first()
+def lock_key(tenant_id: str, today: date) -> int:
+    """The session advisory lock that keeps two workers off one day's run. It is held on its own idle connection, so no
+    transaction stays open for the whole run; if that connection dies the lock goes with it."""
+    return int.from_bytes(hashlib.sha256(f"os.monitor:{tenant_id}:{today.isoformat()}".encode()).digest()[:8], "big",
+                          signed=True)
 
 
 def run(engine: Engine, tenant_id: str, today: date, now: datetime, *, gateway: PageGateway, snapshots: SnapshotStore,
         knowledge: SqlKnowledge, queue: ReviewQueue, after_change: AfterChange | None = None,
         config: MonitorConfig | None = None, only_unfinished: bool = False) -> dict:
     """One monitoring run for `today`. A day has one run: one that finished is not repeated, one cut off by a restart is
-    continued (a fact already taken back is no longer monitored; what was seen once is kept). The run row is locked
+    continued (a fact already taken back is no longer monitored; what was seen is kept). The day's advisory lock is held
     while it runs, so two workers never run the same day. `only_unfinished` is the retry tick: it does nothing unless
     today's run was started and not finished."""
     cfg = config or load_config()
+    if only_unfinished and not _exists(engine, tenant_id, today):
+        return {"nothing_to_finish": True}
     with engine.begin() as conn:
         if not only_unfinished:
             conn.execute(insert(RUNS).values(tenant_id=tenant_id, run_date=today, started_at=now)
                          .on_conflict_do_nothing(constraint="uq_os_monitor_runs_day"))
-    with engine.connect() as lock:  # the lock transaction stays open for the whole run
-        row = _lock_run(lock, tenant_id, today)
-        if row is None:
-            return {"nothing_to_finish": True} if only_unfinished and not _exists(engine, tenant_id, today) \
-                else {"locked": True}
+    key = lock_key(tenant_id, today)
+    holder = engine.connect()
+    try:
+        if not holder.execute(select(func.pg_try_advisory_lock(key))).scalar():
+            return {"locked": True}
+        holder.commit()  # the lock is the session's: nothing stays open in a transaction
+        with engine.connect() as conn:
+            row = conn.execute(select(RUNS).where(RUNS.c.tenant_id == tenant_id, RUNS.c.run_date == today)).one()
         if row.finished_at is not None:
             return {**row.counts, "already_ran": True}
         counts = dict.fromkeys(COUNTS, 0)
@@ -103,11 +110,17 @@ def run(engine: Engine, tenant_id: str, today: date, now: datetime, *, gateway: 
             for url, sources in sorted(_facts_by_url(engine, tenant_id, w, programmes, cfg).items()):
                 counts["urls"] += 1
                 counts["facts"] += len(sources)
-                _check_url(url, sources, w, row.id, today, now, gateway, snapshots, knowledge, queue, after_change,
-                           cfg, counts, engine, tenant_id)
-        lock.execute(update(RUNS).where(RUNS.c.id == row.id).values(finished_at=now, counts=counts))
-        lock.commit()
-    return counts
+                _check_url(url, sources, w, row.id, today, gateway, snapshots, knowledge, queue, after_change, cfg,
+                           counts, engine, tenant_id)
+        with engine.begin() as conn:
+            conn.execute(update(RUNS).where(RUNS.c.id == row.id).values(finished_at=now, counts=counts))
+        return counts
+    finally:
+        try:
+            holder.execute(select(func.pg_advisory_unlock(key)))
+            holder.commit()
+        finally:
+            holder.close()
 
 
 def _exists(engine: Engine, tenant_id: str, today: date) -> bool:
@@ -127,8 +140,8 @@ def _sane(text: str, sources: list[_Source], previous, cfg: MonitorConfig) -> st
     return None
 
 
-def _check_url(url, sources, w, run_id, today, now, gateway, snapshots, knowledge, queue, after_change, cfg, counts,
-               engine, tenant_id) -> None:
+def _check_url(url, sources, w, run_id, today, gateway, snapshots, knowledge, queue, after_change, cfg, counts, engine,
+               tenant_id) -> None:
     previous = snapshots.latest(url)  # the last clean page: before the read, so it is what monitoring last trusted
     own = sorted({d for s in sources for d in s.domains})
     page = gateway.fetch_or_record(url, own, [], Scope(region=w.region, family=w.family), refresh=True)
@@ -139,31 +152,43 @@ def _check_url(url, sources, w, run_id, today, now, gateway, snapshots, knowledg
     if not gone and not page.text:
         counts["unreadable"] += 1
         return
+    bad = None
+    snap = None
     if not gone:
         bad = _sane(page.text, sources, previous, cfg)
         # a page that fails is kept for the record but flagged, so it never becomes "the last clean snapshot"
         snap = snapshots.save(url, page.text, content_type="text/html", fetched_at=page.fetched_at, flagged=bad)
-        if bad:
-            counts["unreadable"] += 1
-            return
-        if previous is not None and previous.sha256 != text_hash(page.text):
+        if not bad and previous is not None and previous.sha256 != text_hash(page.text):
             counts["page_changed"] += 1
-    snapshot_id = None if gone else snap.id
-    page_norm = normalise(page.text) if not gone else ""
+    snapshot_id = snap.id if snap else None
+    page_norm = normalise(page.text) if not gone and not bad else ""
+    taken_for_page = False
     for s in sources:
         if gone:
             reason = "page_gone"
+        elif bad:
+            reason = bad  # cannot tell whether the quote is there: counted on its own, longer-lived rule
         elif not quote_on_page(s.fact.quote, page_norm):
             reason = "quote_gone"
         else:
-            _forget(engine, tenant_id, s.fact_id)  # the evidence is back: what was seen once is not a change
+            _forget(engine, tenant_id, s.fact_id)  # the evidence is back: what was seen before is not a change
             continue
-        if _seen_before(engine, tenant_id, s.fact_id, run_id, reason, cfg):
+        needed = cfg.sanity_failures_needed if bad else cfg.seen_runs_needed
+        if _seen_enough(engine, tenant_id, s.fact_id, run_id, reason, needed):
             _take_back(s, reason, url, snapshot_id, run_id, today, knowledge, queue, after_change)
             _forget(engine, tenant_id, s.fact_id)
             counts["taken_back"] += 1
+            taken_for_page = True
         else:
             counts["seen_once"] += 1
+    if bad:
+        counts["unreadable"] += 1
+    if bad and taken_for_page:  # a page that kept failing the checks is a change: one item for the page, with the snapshot
+        queue.open_item("change", dedupe_key=f"change:url:{url}", subject=url, opened_by="monitor",
+                        summary=f"The official page keeps failing the sanity checks ({bad}); its facts are not "
+                                "confirmed until it is checked again",
+                        payload={"url": url, "reason": bad, "run_id": run_id, "snapshot_id": snapshot_id,
+                                 "run_date": today.isoformat(), "facts": [s.fact_id for s in sources]})
 
 
 def _forget(engine: Engine, tenant_id: str, fact_id: int) -> None:
@@ -171,21 +196,22 @@ def _forget(engine: Engine, tenant_id: str, fact_id: int) -> None:
         conn.execute(delete(SEEN).where(SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id))
 
 
-def _seen_before(engine: Engine, tenant_id: str, fact_id: int, run_id: int, reason: str, cfg: MonitorConfig) -> bool:
-    """Notes that this run saw the evidence missing; True when enough separate runs have. A change seen only once (a
+def _seen_enough(engine: Engine, tenant_id: str, fact_id: int, run_id: int, reason: str, needed: int) -> bool:
+    """Notes that this run saw the evidence missing; True when `needed` separate runs have. A change seen only once (a
     page down for a day, a 404 while a site is moved) costs the fact nothing."""
-    if cfg.seen_runs_needed <= 1:
+    if needed <= 1:
         return True
     with engine.begin() as conn:
-        first = conn.execute(select(SEEN.c.first_run_id).where(SEEN.c.tenant_id == tenant_id,
-                                                               SEEN.c.fact_id == fact_id).with_for_update()).scalar()
-        if first is None:
-            conn.execute(insert(SEEN).values(tenant_id=tenant_id, fact_id=fact_id, reason=reason, first_run_id=run_id))
+        row = conn.execute(select(SEEN.c.last_run_id, SEEN.c.runs).where(
+            SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id).with_for_update()).first()
+        if row is None:
+            conn.execute(insert(SEEN).values(tenant_id=tenant_id, fact_id=fact_id, reason=reason, first_run_id=run_id,
+                                             last_run_id=run_id, runs=1))
             return False
-        if first == run_id:
-            return False  # the same run again (a resumed one)
-        conn.execute(update(SEEN).where(SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id).values(reason=reason))
-        return True
+        runs = row.runs + (0 if row.last_run_id == run_id else 1)  # the same run again (a resumed one) is not a new one
+        conn.execute(update(SEEN).where(SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id)
+                     .values(reason=reason, last_run_id=run_id, runs=runs))
+        return runs >= needed
 
 
 def _take_back(s: _Source, reason: str, url: str, snapshot_id: int | None, run_id: int, today: date,

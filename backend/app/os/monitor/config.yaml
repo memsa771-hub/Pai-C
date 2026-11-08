@@ -22,3 +22,6 @@ seen_runs_needed: 2
 sanity_no_match_min_facts: 2
 #  - the text shrank by more than this share of the last clean snapshot's text (percent).
 sanity_max_shrink_percent: 60
+# A sanity failure only delays a change, never hides it: a page that fails the checks on this many runs in a row is
+# taken as changed (its facts go back to unconfirmed and a change item opens for the page, with the flagged snapshot).
+sanity_failures_needed: 2

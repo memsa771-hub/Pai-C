@@ -571,7 +571,7 @@ class ReviewQueue:
     def resolve(self, item_id: int, reviewer: Reviewer, outcome: str, note: str) -> dict:
         """Closes an item that is not a verification. `resolved`: it was looked at; `dismissed`: it needs no work.
         On a `report` or `change` item two more outcomes act on the fact (owner ruling 2026-11-08):
-        `stands` (and `dismissed` on a report) puts the fact back to the status it had before it was taken back, clears
+        `stands` (and `dismissed` on a report whose fact is being re-checked) puts the fact back to the status it had before it was taken back, clears
         the re-check and revises the plans; `agrees` (a report only) confirms the fact is doubtful for everyone: every
         plan's steps wait, and a `collect` item asks for the original to be read again. The note is kept in the item."""
         if outcome not in ("resolved", "dismissed", "stands", "agrees"):
@@ -585,8 +585,9 @@ class ReviewQueue:
             raise ReviewError(422, f"'{outcome}' is for a report or a change")
         if outcome == "agrees" and item.kind != "report":
             raise ReviewError(422, "'agrees' is for a report")
-        if item.kind == "report" and outcome == "dismissed":
-            outcome = "stands"  # a dismissed report puts the fact back
+        if item.kind == "report" and outcome == "dismissed" and item.fact_id is not None \
+                and self.knowledge.get(item.fact_id)[3].recheck is not None:
+            outcome = "stands"  # a dismissed report puts the fact back, if a report took it back; else it just closes
         after: list[Callable[[], None]] = []
         state = None
         with self.engine.begin() as conn:

@@ -1049,6 +1049,8 @@ monitor_seen = Table(  # a change monitoring has seen once: it is acted on only 
     Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT"), nullable=False),
     Column("reason", Text, nullable=False),
     Column("first_run_id", BigInteger, nullable=False),
+    Column("last_run_id", BigInteger, nullable=False),
+    Column("runs", Integer, nullable=False, server_default="1"),  # separate runs that saw it
     Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "fact_id", name="uq_os_monitor_seen_fact"),
 )

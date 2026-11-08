@@ -69,16 +69,15 @@ def report_facts(engine: Engine, tenant_id: str, student_ref: str, fact_ids: lis
                 review_item_id=item_id, created_at=now).returning(REPORTS.c.id)).scalar_one()
             queue.note_report(item_id, {"reason": reason, "text": text, "at": now.isoformat()}, conn)
             fact = knowledge.locked(conn, fid)[3]
+            n = conn.execute(select(func.count(func.distinct(REPORTS.c.student_ref))).where(
+                REPORTS.c.tenant_id == tenant_id, REPORTS.c.review_item_id == item_id)).scalar_one()
+            want = "report_escalated" if n >= cfg.escalate_after_reporters else "report"  # students of THIS open item
             if fact.status != "unconfirmed":  # confirmed, verified or stale: not any more, until someone checks it again
-                knowledge.revise(fid, status="unconfirmed", recheck="report", cause="report", cause_ref=str(report_id),
+                knowledge.revise(fid, status="unconfirmed", recheck=want, cause="report", cause_ref=str(report_id),
                                  actor="student", conflict_note="a student reported this as wrong", conn=conn)
                 queue.void_verify(fid, conn)
-            elif fact.recheck == "report":
-                n = conn.execute(select(func.count(func.distinct(REPORTS.c.student_ref))).where(
-                    REPORTS.c.tenant_id == tenant_id, REPORTS.c.fact_id == fid)).scalar_one()
-                if n >= cfg.escalate_after_reporters:  # enough different students: every plan's steps wait
-                    knowledge.revise(fid, recheck="report_escalated", cause="report", cause_ref=str(report_id),
-                                     actor="student", conn=conn)
+            elif fact.recheck == "report" and want == "report_escalated":  # enough different students: all plans wait
+                knowledge.revise(fid, recheck=want, cause="report", cause_ref=str(report_id), actor="student", conn=conn)
             if fact.recheck != "monitor":  # the reporter's own plan must now see the wait, whatever the fact's state
                 changed.append(fid)
             last_item, reports = item_id, reports + 1
@@ -98,9 +97,12 @@ def for_student(engine: Engine, tenant_id: str, student_ref: str, route_facts: M
     if not held:
         return dict(route_facts), dict(programme_facts)
     with engine.connect() as conn:
+        open_items = select(models.review_items.c.id).where(
+            models.review_items.c.tenant_id == tenant_id, models.review_items.c.kind == "report",
+            models.review_items.c.status == "open")  # a report from an earlier, closed round holds nothing
         mine = set(conn.execute(select(REPORTS.c.fact_id).distinct().where(
             REPORTS.c.tenant_id == tenant_id, REPORTS.c.student_ref == student_ref,
-            REPORTS.c.fact_id.in_([f.id for f in held]))).scalars())
+            REPORTS.c.fact_id.in_([f.id for f in held]), REPORTS.c.review_item_id.in_(open_items))).scalars())
 
     def seen(f: Fact) -> Fact:
         return replace(f, recheck=None) if f.recheck == "report" and f.id not in mine else f

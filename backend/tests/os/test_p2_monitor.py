@@ -359,6 +359,29 @@ def test_a_change_item_can_say_the_fact_stands(w):
     assert w.fact().recheck is None and w.task(plan).blocked_reason is None
 
 
+def test_dismissing_a_report_closes_it_plainly_when_nothing_took_the_fact_back(w):
+    w.kb.revise(w.fact_id, status="unconfirmed", conflict_note="never confirmed", cause="manual")  # no re-check marker
+    item, _ = w.queue.open_item("report", dedupe_key="r", fact_id=w.fact_id)
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    out = w.queue.resolve(item, reviewer, "dismissed", "nothing to put back")
+    assert out["resolution"] == "dismissed" and w.fact().status == "unconfirmed"
+
+
+def test_a_new_round_of_reports_counts_its_own_reporters_only(w, api):
+    report(api, w, S1)
+    report(api, w, S2)
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    [first] = items(w, "report")
+    w.queue.resolve(first.id, reviewer, "dismissed", "the page still says so")  # round one ends: the fact is back
+    assert (w.fact().status, w.fact().recheck) == ("confirmed", None) and blocked(w, api.plan) is None
+    report(api, w, S3)  # round two: one reporter, although three different students have reported over time
+    assert w.fact().recheck == "report" and blocked(w, api.plan3) == "fact_rechecking:deadline_close"
+    assert blocked(w, api.plan) is None and blocked(w, api.plan2) is None  # earlier, closed reports hold nothing
+    report(api, w, S1)
+    report(api, w, S2)  # three in this round
+    assert w.fact().recheck == "report_escalated"
+
+
 def test_a_fact_that_changed_after_it_was_taken_back_is_not_put_back(w):
     from app.os.knowledge.review import ReviewError
 
@@ -499,49 +522,84 @@ def test_drop_domain_facts_marks_the_facts_for_recheck_when_the_flags_are_on(w):
 
 # --- sanity: a bad page changes nothing ---------------------------------------------------------------------------------------
 
-def test_a_page_that_shrank_is_unreadable_and_does_not_become_the_last_clean_snapshot(w):
-    w.plan()
+def test_a_long_page_replaced_by_a_short_notice_is_a_change_after_the_failures_in_a_row(w):
+    """The sanity guard delays a change, never hides it."""
+    plan = w.plan()
     w.run(D1)
     good = w.snapshots.latest(URL)
     w.sites.set_page(HOST, PATH, "<html><body><p>Down for maintenance.</p></body></html>")
-    got = w.run(D2)
-    assert got["unreadable"] == 1 and got["seen_once"] == 0 and got["taken_back"] == 0
+    first = w.run(D2)
+    assert (first["unreadable"], first["seen_once"], first["taken_back"]) == (1, 1, 0)
+    assert w.fact().status == "confirmed" and w.task(plan).blocked_reason is None and items(w, "change") == []
     assert w.snapshots.latest(URL).id == good.id  # the broken page is kept, flagged, and never "the last clean one"
     flagged = w.snapshots.latest(URL, clean_only=False)
     assert flagged.flagged == "sanity_shrunk" and flagged.id != good.id
-    w.run(D3)
-    assert w.fact().status == "confirmed"
+    second = w.run(D3)  # the second failure in a row
+    assert second["taken_back"] == 1
+    f = w.fact()
+    assert (f.status, f.recheck) == ("unconfirmed", "monitor")
+    assert w.task(plan).blocked_reason == "fact_rechecking:deadline_close"  # the steps stop running on the old date
+    [per_url] = [i for i in items(w, "change") if i.subject == URL]  # one item for the page, with the flagged snapshot
+    assert per_url.payload["reason"] == "sanity_shrunk" and per_url.payload["snapshot_id"] == flagged.id
+    assert w.snapshots.latest(URL).id == good.id
+    assert w.run(date(2027, 5, 5))["taken_back"] == 0  # nothing monitored any more, no second item
+    assert len([i for i in items(w, "change") if i.subject == URL]) == 1
 
 
-def test_a_page_with_none_of_the_quotes_is_unreadable_when_it_backs_several_facts(w):
+def test_a_page_where_every_quote_changed_is_a_change_after_the_failures_in_a_row(w):
     w.kb.upsert("programme", "p1", "fee_per_semester", Fact(1000, "Fee per semester: 1000 units", URL, AT, 2027,
                                                             "confirmed", intake_term="winter"))
+    plan = w.plan()
+    w.run(D1)
+    other = page("Applications close on 15 August 2027").replace("Fee per semester: 1000 units", "Fee per semester: 1200 units")
+    w.sites.set_page(HOST, PATH, other)
+    first = w.run(D2)
+    assert (first["unreadable"], first["seen_once"], first["taken_back"]) == (1, 2, 0)
+    assert w.fact().status == "confirmed"
+    second = w.run(D3)
+    assert second["taken_back"] == 2
+    assert w.fact().recheck == "monitor" and w.task(plan).blocked_reason == "fact_rechecking:deadline_close"
+    [per_url] = [i for i in items(w, "change") if i.subject == URL]
+    assert per_url.payload["reason"] == "sanity_no_quote" and sorted(per_url.payload["facts"]) != []
+    assert w.snapshots.latest(URL, clean_only=False).flagged == "sanity_no_quote"
+
+
+def test_a_page_that_passes_again_forgets_the_failures(w):
     w.plan()
     w.run(D1)
-    other = page("A different notice").replace("Fee per semester: 1000 units", "Another paragraph of about the same size")
-    w.sites.set_page(HOST, PATH, other)
-    got = w.run(D2)
-    assert (got["unreadable"], got["seen_once"], got["taken_back"]) == (1, 0, 0)
-    assert w.run(D3)["taken_back"] == 0
+    w.sites.set_page(HOST, PATH, "<html><body><p>Down for maintenance.</p></body></html>")
+    assert w.run(D2)["seen_once"] == 1
+    w.sites.set_page(HOST, PATH, page())
+    assert w.run(D3)["seen_once"] == 0  # a good page: counting starts again
+    w.sites.set_page(HOST, PATH, "<html><body><p>Down for maintenance.</p></body></html>")
+    assert w.run(date(2027, 5, 5))["taken_back"] == 0  # one failure again, not two in a row
 
 
 def test_the_sanity_settings_are_in_config():
     cfg = load_config()
-    assert (cfg.seen_runs_needed, cfg.sanity_no_match_min_facts, cfg.sanity_max_shrink_percent) == (2, 2, 60)
+    assert (cfg.seen_runs_needed, cfg.sanity_no_match_min_facts, cfg.sanity_max_shrink_percent,
+            cfg.sanity_failures_needed) == (2, 2, 60, 2)
 
 
 # --- runs: one at a time, and a cut-off run is finished ---------------------------------------------------------------------
 
 def test_a_run_another_worker_holds_is_not_run_twice_and_the_retry_tick_finishes_a_cut_off_run(w):
+    """The day's lock is a session advisory lock on an idle connection: no transaction stays open during the run."""
     from sqlalchemy import insert as sql_insert
 
     w.plan()
     assert w.run(D1, only_unfinished=True) == {"nothing_to_finish": True}  # no run today: the retry does nothing
     with w.engine.begin() as conn:  # a run that started and was cut off
         conn.execute(sql_insert(models.monitor_runs).values(tenant_id="pai", run_date=D1, started_at=AT))
+    from sqlalchemy import func
+
     with w.engine.connect() as holder:  # another worker is running it
-        holder.execute(select(models.monitor_runs).where(models.monitor_runs.c.run_date == D1).with_for_update())
+        holder.execute(select(func.pg_advisory_lock(monitor.lock_key("pai", D1))))
+        holder.commit()
         assert w.run(D1) == {"locked": True}
+        assert w.run(D1, only_unfinished=True) == {"locked": True}
+        holder.execute(select(func.pg_advisory_unlock(monitor.lock_key("pai", D1))))
+        holder.commit()
     done = w.run(D1, only_unfinished=True)  # the lock is gone: the retry tick finishes it
     assert done["urls"] == 1 and "already_ran" not in done
     assert w.run(D1, only_unfinished=True)["already_ran"] is True  # and then does nothing
