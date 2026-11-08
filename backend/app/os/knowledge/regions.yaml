@@ -6,12 +6,12 @@ version: 1
 countries:
   PK:
     regions:
-      - {code: punjab, name: Punjab, aliases: []}
+      - {code: punjab, name: Punjab, aliases: [Punjab (federal)]}
       - {code: sindh, name: Sindh, aliases: []}
       - {code: khyber_pakhtunkhwa, name: Khyber Pakhtunkhwa, aliases: [KP, KPK, Khyber-Pakhtunkhwa]}
       - {code: balochistan, name: Balochistan, aliases: [Baluchistan]}
-      - {code: islamabad_capital_territory, name: Islamabad Capital Territory, aliases: [ICT, Islamabad]}
+      - {code: islamabad_capital_territory, name: Islamabad Capital Territory, aliases: [ICT, Islamabad, ICT (multi-campus), Islamabad / federal]}
       - {code: azad_jammu_and_kashmir, name: Azad Jammu and Kashmir, aliases: [AJK, Azad Kashmir]}
       - {code: gilgit_baltistan, name: Gilgit-Baltistan, aliases: [GB]}
-      - {code: national, name: National, aliases: []}
+      - {code: national, name: National, aliases: [National (private)]}
       - {code: federal_institution, name: Federal institution, aliases: [federal-institution]}

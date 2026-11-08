@@ -36,6 +36,7 @@ from app.os.knowledge.research.trust import quote_on_page
 from app.os.knowledge.review.policy import ReviewPolicy, load_policy
 from app.os.knowledge.review.reviewers import Reviewer
 from app.os.knowledge.review.sniff import sniff
+from app.os.knowledge.sources.snapshots import SnapshotStore
 from app.os.knowledge.store import SqlKnowledge, StaleFact, fact_digest
 
 I = models.review_items
@@ -212,19 +213,35 @@ class ReviewQueue:
                                 .order_by(RV.c.id)).all()
 
     def _snapshot(self, fact: Fact) -> dict | None:
-        """The page the quote was taken from, as the OS read it (T3 will add stored snapshots behind this)."""
+        """The page the quote was taken from, as the OS stored it (T3's page snapshots). A source read before snapshots
+        existed falls back to the page cache (`os_pages`)."""
         if not fact.url:
             return None
+        snap = SnapshotStore(self.engine, self.tenant_id).latest(fact.url, clean_only=False)
+        if snap is not None:
+            return self._snapshot_view(fact, snap.text, snap.fetched_at, snap.read_method, snap.id, snap.flagged)
         with self.engine.connect() as conn:
             row = conn.execute(select(P).where(P.c.tenant_id == self.tenant_id,
                                                (P.c.url == fact.url) | (P.c.final_url == fact.url))
                                .order_by(P.c.fetched_at.desc())).first()
         if row is None or not row.text:
             return None
-        text = row.text
-        return {"url": fact.url, "fetched_at": row.fetched_at, "read_method": fact.read_method or "fetch",
+        return self._snapshot_view(fact, row.text, row.fetched_at, fact.read_method or "fetch", None, None)
+
+    def _snapshot_view(self, fact: Fact, text: str, fetched_at, read_method: str, snapshot_id: int | None,
+                       flagged: str | None) -> dict:
+        original = SnapshotStore(self.engine, self.tenant_id).original(snapshot_id) if snapshot_id else None
+        return {"url": fact.url, "fetched_at": fetched_at, "read_method": read_method, "snapshot_id": snapshot_id,
                 "text": text[: self.policy.snapshot_max_chars], "truncated": len(text) > self.policy.snapshot_max_chars,
-                "quote_found": quote_on_page(fact.quote, normalise(text)) if fact.quote.strip() else False}
+                "quote_found": quote_on_page(fact.quote, normalise(text)) if fact.quote.strip() else False,
+                "flagged": flagged, "original_type": original[1] if original else None}
+
+    def snapshot_original(self, snapshot_id: int) -> tuple[bytes, str]:
+        """The original PDF or image a snapshot was read from (T3 keeps those two kinds only)."""
+        found = SnapshotStore(self.engine, self.tenant_id).original(snapshot_id)
+        if found is None:
+            raise ReviewError(404, "no original file for that snapshot")
+        return found
 
     def files_for(self, item_id: int, viewer: Reviewer | None = None, show_all: bool = True) -> list[dict]:
         """The item's evidence files. Who uploaded one is shown under the same rule as the reviews (M3)."""
