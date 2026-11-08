@@ -41,10 +41,18 @@ def _request(key: str, template: str, task_type: str, inbox_kind: str, title: st
 
 
 def _result_expected(ref: str, ask: Ask, playbook: Playbook, route_facts: Mapping[str, Fact], today: date, tz: str,
-                     need_confirm: Callable | None) -> _Inst | None:
-    """The step that waits for a result still to come (R-20), when the calendar fact holds a date after today."""
+                     need_confirm: Callable | None, calendar_facts: Mapping[tuple[str, str], Fact] | None = None,
+                     year: int | None = None) -> _Inst | None:
+    """The step that waits for a result still to come (R-20), when the calendar fact holds a date after today.
+    An ask that names an official calendar (P2-T11) reads that calendar's date by its registry id; otherwise the route
+    fact, exactly as before."""
     expected = ask.expected
-    fact = route_facts.get(expected.fact) if expected else None
+    if expected is not None and expected.calendar:
+        fact = (calendar_facts or {}).get((expected.calendar, expected.fact))
+        fref = ("registry", expected.calendar, expected.fact)
+    else:
+        fact = route_facts.get(expected.fact) if expected else None
+        fref = ("route", playbook.key, expected.fact) if expected else None
     if expected is None or fact is None or fact.value is None:
         return None
     try:
@@ -53,21 +61,23 @@ def _result_expected(ref: str, ask: Ask, playbook: Playbook, route_facts: Mappin
         return None  # a calendar that is not a date asks nothing of the student: the provide step stands alone
     if day <= today:
         return None
-    fref = ("route", playbook.key, expected.fact)
+    # a calendar date of another year (the labelled previous-year read, R-26) is never firm: the step stays provisional
+    firm = fact.confirmed and (not expected.calendar or year is None or fact.intake_year == year)
     inst = _Inst(key=keys.make(keys.RESULT_EXPECTED, "fact", ref), tmpl=None, ref=None, task_type="system.milestone",
                  kind="work", inbox_kind=None, tz=fact_tz or tz, title=expected.title, template=keys.RESULT_EXPECTED,
                  days=0, blocked_reason=f"{EXPECTED}:{ref}", deadline=end_of_day(day, fact_tz or tz),
-                 provisional=not fact.confirmed)
+                 provisional=not firm)
     inst.fact_refs.append(fref)
     if fact.url:  # the date comes from this page: cite it
         inst.citations.append({"source": f"fact:{expected.fact}", "url": fact.url})
-    if not fact.confirmed and need_confirm is not None:
+    if not firm and need_confirm is not None:
         need_confirm(fref)
     return inst
 
 
 def expand(insts: dict[str, _Inst], playbook: Playbook, student: StudentState, route_facts: Mapping[str, Fact],
-           today: date, tz: str, *, need_confirm: Callable | None = None) -> tuple[str, ...]:
+           today: date, tz: str, *, need_confirm: Callable | None = None,
+           calendar_facts: Mapping[tuple[str, str], Fact] | None = None, year: int | None = None) -> tuple[str, ...]:
     """Adds the request steps and edges to `insts` in place; returns the answered request keys, sorted."""
     wanted: dict[tuple[str, str], list[tuple[_Inst, Need]]] = {}
     for key in sorted(insts):
@@ -104,7 +114,10 @@ def expand(insts: dict[str, _Inst], playbook: Playbook, student: StudentState, r
         provide = _request(request, keys.PROVIDE, "student.provide", "provide", getattr(ask, level), ask, tz)
         insts[request] = provide
         if kind == "fact" and student.level(ref) is None:
-            waits = _result_expected(ref, ask, playbook, route_facts, today, tz, need_confirm)
+            waits = _result_expected(ref, ask, playbook, route_facts, today, tz, need_confirm, calendar_facts, year)
+            if ask.expected is not None and ask.expected.calendar:
+                # the provide step follows the calendar fact, so a date that arrives or moves revises the plan (P2-T11)
+                provide.fact_refs.append(("registry", ask.expected.calendar, ask.expected.fact))
             if waits is not None:
                 insts[waits.key] = waits
                 provide.deps.append((waits.key, True))  # the provide step waits for it but never pulls it earlier

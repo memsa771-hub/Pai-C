@@ -65,6 +65,14 @@ class KnowledgePort(Protocol):
         opened from), so a gap is never filled from an older year."""
         ...
 
+    def registry_facts(
+        self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
+        intake_term: str | None = None, owner_ref: str | None = None, fallback_previous: bool = False,
+        fallback_year: int | None = None,
+    ) -> dict[tuple[str, str], Fact]:
+        """Facts about registry entities (the dates of a calendar), same rules as `programme_facts` (P2-T11)."""
+        ...
+
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
                     intake_term: str | None = None, owner_ref: str | None = None,
                     fallback_previous: bool = False, fallback_year: int | None = None) -> dict[str, Fact]: ...
