@@ -34,6 +34,7 @@ class OsSettings:
     render_browser_path: str | None = None  # P2-T4: a Chromium executable; None = Playwright's own (OS_RENDER_BROWSER)
     scan_min_pdf_chars: int = 20  # P2-T4: a PDF with less text than this is a scan (read by OCR when a scanner is set)
     scan_max_pages: int = 10  # P2-T4: pages of a scanned PDF that are read
+    source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
     price_cheap_in: float | None = 0.75
@@ -124,6 +125,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         render_browser_path=(env.get("OS_RENDER_BROWSER") or "").strip() or None,
         scan_min_pdf_chars=int(env.get("OS_SCAN_MIN_PDF_CHARS") or 20),
         scan_max_pages=int(env.get("OS_SCAN_MAX_PAGES") or 10),
+        source_guard=flag(env, "OS_SOURCE_GUARD"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

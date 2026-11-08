@@ -36,7 +36,8 @@ def _fail(gw: PageGateway, page: Page, reason: str, ctype: str, original: bytes 
     return replace(blocked, snapshot_id=snap.id)
 
 
-def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: str, allowed, official) -> Page:
+def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: str, allowed, official,
+             flags: list | None = None) -> Page:
     """The page's DOM after JavaScript ran (R-74). Falls back to `not_readable:render` when rendering fails or the
     rendered page has no text."""
     final = str(r.url)
@@ -62,17 +63,17 @@ def rendered(gw: PageGateway, page: Page, r: httpx.Response, html: str, ctype: s
     if not text.strip():
         return _fail(gw, page, "render", ctype, None)
     out_page = replace(page, text=text, links=tuple(links), read_method="render", language=detect_language(text))
-    return _annotated(gw, gw._inspected(out_page, ctype, allowed, official), "render")
+    return _annotated(gw, gw._inspected(out_page, ctype, allowed, official, flags=flags), "render")
 
 
-def scanned(gw: PageGateway, page: Page, data: bytes, ctype: str, allowed, official) -> Page:
+def scanned(gw: PageGateway, page: Page, data: bytes, ctype: str, allowed, official, flags: list | None = None) -> Page:
     """An image or an image-only PDF through the scanner (R-29): `read_method: ocr`, original kept."""
     try:
         got = scan_document(gw.scanner, data, ctype, max_pages=gw.settings.scan_max_pages)
     except ScanFailed:
         return _fail(gw, page, "ocr", ctype, data)
     out_page = replace(page, text=got.text, links=(), read_method="ocr", language=detect_language(got.text))
-    return _annotated(gw, gw._inspected(out_page, ctype, allowed, official, data), "ocr")
+    return _annotated(gw, gw._inspected(out_page, ctype, allowed, official, data, flags=flags), "ocr")
 
 
 def _annotated(gw: PageGateway, page: Page, method: str) -> Page:

@@ -45,19 +45,44 @@ def load_config(path: Path = CONFIG_FILE) -> dict:
 
 
 def _terms(block: dict) -> list[str]:
-    return [str(t).casefold() for words in block.values() for t in words]
+    return [str(t).casefold() for words in block.values() for t in words if not isinstance(t, list)] + [
+        str(v).casefold() for words in block.values() for t in words if isinstance(t, list) for v in t]
+
+
+def _stems(block: dict) -> list[tuple[str, ...]]:
+    """Each entry is one stem: a word, or a list of the forms of one word (they count once)."""
+    out: dict[tuple[str, ...], None] = {}
+    for words in block.values():
+        for t in words:
+            forms = tuple(str(v).casefold() for v in (t if isinstance(t, list) else [t]))
+            out[forms] = None
+    return list(out)
+
+
+_TOKEN = re.compile(r"[^\w]+")
+
+
+def _url_tokens(url: str) -> str:
+    parts = urlsplit(url)
+    return " " + " ".join(t for t in _TOKEN.split(f"{parts.netloc} {parts.path}".casefold()) if t) + " "
+
+
+def _word(term: str, hay: str) -> bool:
+    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", hay) is not None
 
 
 def spam_terms(text: str, links: Sequence[tuple[str, str]], cfg: dict) -> list[str]:
-    """The distinct spam terms found in the text, the link texts and the link addresses."""
-    spam = cfg["spam"]
+    """The distinct spam stems found in the text, the link texts and the link addresses (whole tokens)."""
     hay_text = normalise(" ".join([text, *(a for _, a in links)]))
-    hay_urls = " ".join(f"{urlsplit(u).netloc}{urlsplit(u).path}".casefold() for u, _ in links)
+    hay_urls = [_url_tokens(u) for u, _ in links]
     found = []
-    for term in dict.fromkeys(_terms(spam["terms"])):
-        in_text = re.search(rf"(?<!\w){re.escape(term)}(?!\w)", hay_text)
-        if in_text or term.replace(" ", "-") in hay_urls or term.replace(" ", "") in hay_urls:
-            found.append(term)
+    for forms in _stems(cfg["spam"]["terms"]):
+        for term in forms:
+            joined = " " + term.replace(" ", "") + " "
+            spaced = " " + " ".join(normalise(term).split()) + " "
+            if _word(term, hay_text) or any(spaced in h or joined in h for h in hay_urls):
+                found.append(forms[0])
+                break
     return found
 
 
@@ -91,7 +116,7 @@ def check_page(text: str, links: Sequence[tuple[str, str]], on_list: Callable[[s
     off, total = off_list_links(links, on_list), len(links)
     share = off / total if total else 0.0
     before = (previous.links_off_list / previous.links_total) if previous and previous.links_total else 0.0
-    if off >= fl["min_off_list_links"] and share >= fl["min_share"] and share - before >= fl["min_increase"]:
+    if previous is not None and off >= fl["min_off_list_links"] and share >= fl["min_share"] and share - before >= fl["min_increase"]:
         out.append(Finding("link_flood", f"{off} of {total} links off the lists (before: {before:.2f})"))
 
     wc = cfg["wholesale_change"]
@@ -108,11 +133,12 @@ def check_page(text: str, links: Sequence[tuple[str, str]], on_list: Callable[[s
 
 
 def is_tls_failure(exc: BaseException) -> bool:
-    """A certificate or handshake failure anywhere in the exception chain (httpx verifies by default)."""
+    """A certificate verification failure (verify failed, hostname mismatch, expired) anywhere in the exception chain.
+    Other SSL errors (protocol, EOF, version) are transient, like any network error."""
     seen: set[int] = set()
     while exc is not None and id(exc) not in seen:
         seen.add(id(exc))
-        if isinstance(exc, ssl.SSLError) or "CERTIFICATE_VERIFY_FAILED" in str(exc):
+        if isinstance(exc, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(exc):
             return True
         exc = exc.__cause__ or exc.__context__
     return False
