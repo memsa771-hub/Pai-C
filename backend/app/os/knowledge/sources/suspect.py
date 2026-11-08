@@ -22,7 +22,13 @@ from sqlalchemy import Connection, Engine, select, text
 
 from app.os import models
 from app.os.knowledge.sources import integrity
-from app.os.knowledge.sources.allowlist import AllowList, Scope, SourceDomains, SyncResult, host_matches
+from app.os.knowledge.sources.allowlist import (
+    AllowList,
+    Scope,
+    SourceDomains,
+    SyncResult,
+    host_matches,
+)
 from app.os.knowledge.sources.snapshots import SnapshotStore
 from app.os.knowledge.store import SqlKnowledge
 

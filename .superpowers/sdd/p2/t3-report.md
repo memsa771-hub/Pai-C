@@ -32,3 +32,17 @@ Branch `pc/p2-t3-sources`, merged with T1 commit 18387b3 (interface change). Mig
 - legacy: 2559 passed, 14 skipped.
 - tach: all modules validated. Freeze check: clean. Alembic heads: `os_0026` (os) single head. Traceability: pass.
 - ruff clean on new files (remaining findings in pages.py and worker.py are pre-existing).
+
+## Review fixes (fix(os): T3 review fixes)
+- C1: `flag` uses the listed domain, else the exact host (no two-label fallback). Own-domain test in `inspect` likewise.
+- C2: no link_flood without a previous clean snapshot (first read = baseline); links to hosts listed in any scope are on-list.
+- C3: spam terms are stems (a YAML list = one stem); slot/slots, jackpot, poker removed; URLs match whole tokens.
+- I1: final URL after redirects refused when suspect (`suspect_domain`); `is_listed` false if any matching row is suspect.
+- I2: `mark_suspect` = `UPDATE ... WHERE state='active'` rowcount or `INSERT ... ON CONFLICT DO NOTHING RETURNING` (flag row key is the existing unique `(domain,'','','')`), event in the same transaction; drop serialised by an advisory lock, re-reads status, resumable (`flag` on a suspect domain completes it; `SourceGuard.complete_drops()` at worker start).
+- I3: `SourceGuard.sync` applies the one-body rule to existing rows through the flow; SyncResult counts only real changes.
+- I4: `remove_missing` tombstones suspect rows (tier NULL, kept); a re-added domain with any suspect row is inserted suspect.
+- I5: only `SSLCertVerificationError` / CERTIFICATE_VERIFY_FAILED count as TLS failures.
+- I6: guard on: non-https request or final URL -> `insecure_scheme`.
+- I7: approver ids `person_id` (strip+casefold); `source_reactivated` event with both approvers in the same transaction.
+- M1 label-boundary suffix match; M2 dropped updated/revised; M3 suspect flow after the page transaction; M4 `OsSettings.source_guard`; M5 `os_page_snapshots.original_too_large` (added to os_0026 in place, unmerged).
+- M6 not done: `knowledge_facts` is not T3's table; drop still scans `url ILIKE`. Note for T7/owner.
