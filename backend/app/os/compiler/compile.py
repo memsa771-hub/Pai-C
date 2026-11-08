@@ -181,7 +181,7 @@ def _waits_for(insts: dict[str, _Inst], key: str) -> set[str]:
     return seen
 
 
-def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str]], overrides: Sequence) -> None:
+def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str, str]], overrides: Sequence) -> None:
     def drop(keys: set[str]) -> None:
         for k in keys:
             insts.pop(k, None)
@@ -193,7 +193,7 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
             drop({o.target} & set(insts))
         elif o.op == "cancel_programme":
             drop({k for k, i in insts.items() if i.ref == o.target})
-            for k in [k for k, (ref, _) in confirms.items() if ref == o.target]:
+            for k in [k for k, (ref, _, _) in confirms.items() if ref == o.target]:
                 del confirms[k]
         elif o.op == "add":
             ref = o.payload.get("programme_ref")
@@ -251,7 +251,7 @@ def compile_plan(
     route_key = playbook.key
     insts: dict[str, _Inst] = {}
     by_template: dict[str, list[_Inst]] = {}
-    confirms: dict[str, tuple[str, str]] = {}  # instance key -> (ref, field)
+    confirms: dict[str, tuple[str, str, str]] = {}  # instance key -> (ref, field, scope)
 
     def lookup(ref: str | None, name: str) -> tuple[Fact | None, tuple[str, str, str]]:
         if ref is None:
