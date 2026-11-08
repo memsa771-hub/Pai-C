@@ -58,6 +58,8 @@ def test_os_tables_present():
         "os_fact_revisions",
         # P2-T2 (os_0026)
         "os_registry", "os_registry_revisions", "os_registry_links",
+        # P2-T3 (os_0026)
+        "os_source_domains", "os_page_snapshots", "os_source_files",
     }
 
 

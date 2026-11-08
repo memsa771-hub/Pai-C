@@ -64,6 +64,31 @@ def _models_on(settings: OsSettings, test_model: str) -> bool:
     return bool(test_model or settings.openai_api_key or settings.model_mode == "offline")
 
 
+def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
+    """P2-T3: the source guard (allow-lists, integrity checks, snapshots, suspect flow) when OS_SOURCE_GUARD=1; None
+    otherwise, and the gateway then behaves exactly as before. The reviewed lists are loaded (idempotently) at start."""
+    if not settings.source_guard:
+        return None
+    from app.os.knowledge.changes import after_fact_change
+    from app.os.knowledge.sources.allowlist import SourceDomains, load_allowlist
+    from app.os.knowledge.sources.snapshots import SnapshotStore
+    from app.os.knowledge.sources.suspect import SourceGuard
+    from app.os.workers.jobs import _service
+
+    tenant = settings.tenant_id
+    domains = SourceDomains(engine, tenant)
+    service = _service(settings, engine, kernel)
+
+    def after_change(scope, ref, field, fact_id, status, intake_year) -> None:
+        after_fact_change(service, kernel, scope, ref, field, fact_id, status, intake_year, complete=False)
+
+    guard = SourceGuard(engine, tenant, domains=domains, after_change=after_change,
+                        snapshots=SnapshotStore(engine, tenant, max_bytes=settings.page_max_bytes))
+    guard.sync(load_allowlist())  # the one-body-one-domain rule goes through the suspect flow (review I3)
+    guard.complete_drops()  # a drop cut off by a restart is completed (review I2)
+    return guard
+
+
 def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
     """Registers os.research (readers built once, before launch). False when no model key is set.
 
@@ -91,7 +116,7 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
 
         gateway = OfflinePages()
     else:
-        gateway = PageGateway(engine, settings.tenant_id, settings)
+        gateway = PageGateway(engine, settings.tenant_id, settings, sources=_source_guard(settings, engine, kernel))
     register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles)
     return True
 
