@@ -62,7 +62,7 @@ requirements:
   R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
   R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: true}
   R-34: {title: "Every institution shows its coverage level", phases: [P2], built: true}
-  R-35: {title: "Launch gate: denominator, verified floor and per-region coverage", phases: [P2, P5], built: false}
+  R-35: {title: "Launch gate: denominator, verified floor and per-region coverage", phases: [P2, P5], built: true}
   R-36: {title: "Two route families as data: pk_intermediate and pk_bachelor", phases: [P3, P4], built: false}
   R-37: {title: "Bachelor family covers every admission system", phases: [P4], built: false}
   R-38: {title: "Intermediate family covers every stream and region", phases: [P3], built: false}
@@ -97,7 +97,7 @@ requirements:
   R-63: {title: "Student can plan for any open intake", phases: [P2], built: false}
   R-64: {title: "Student can start a new plan for the next intake", phases: [P2], built: false}
   R-65: {title: "Playbooks versioned per intake; running plans stay pinned", phases: [P2], built: false}
-  R-66: {title: "Coverage dashboard and launch gate are per intake", phases: [P2], built: false}
+  R-66: {title: "Coverage dashboard and launch gate are per intake", phases: [P2], built: true}
   R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: false}
   R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: false}
   R-69: {title: "Review queue export uses the same spreadsheet format", phases: [P2], built: false}

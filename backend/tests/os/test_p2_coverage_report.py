@@ -55,7 +55,7 @@ def readings(engine, intake):
 
 
 def test_rows_count_levels_lists_and_high_stakes(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     verify_floor(k)
     put(k, "programme", "p-two", "deadline_close", fact("confirmed"))  # high-stakes, not verified
     rep, _ = readings(engine, intake)
@@ -69,7 +69,7 @@ def test_rows_count_levels_lists_and_high_stakes(engine, world):
 
 
 def test_gate_a_the_denominator(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     assert readings(engine, intake)[1]["a"].green
     s.record(olist(rows=3), cause="import")  # the list now says 3, 2 are loaded
     a = readings(engine, intake)[1]["a"]
@@ -81,7 +81,7 @@ def test_gate_a_the_denominator(engine, world):
 
 
 def test_gate_b_the_verified_floor_of_first_live_institutions_only(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     _, r = readings(engine, intake)
     assert not r["b"].green and r["b"].checked == 1  # inst:two is not first-live: not asked
     assert {i.code for i in r["b"].items} == {"missing"} and len(r["b"].items) == 3
@@ -95,14 +95,14 @@ def test_gate_b_the_verified_floor_of_first_live_institutions_only(engine, world
 
 
 def test_gate_b_is_also_met_by_a_verified_fact_of_the_institution(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     for f in FLOOR:
         put(k, "registry", "inst:one", f, fact())
     assert readings(engine, intake)[1]["b"].green
 
 
 def test_gate_b_reads_the_rollover_slots(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     put(k, "programme", "p-one", "fee", fact(term="fall", year=2026))  # last year's high-stakes key
     verify_floor(k)
     prev = IntakeStore(engine, "pai").create("punjab", "undergrad", "fall", 2026, state="open")  # noqa: F841
@@ -113,7 +113,7 @@ def test_gate_b_reads_the_rollover_slots(engine, world):
 
 
 def test_gate_c_not_confirmed_must_carry_the_official_link(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     put(k, "programme", "p-two", "deadline_close", fact("confirmed"))
     assert readings(engine, intake)[1]["c"].green
     put(k, "programme", "p-two", "fee", fact("unconfirmed"))  # high-stakes, no URL, no quote
@@ -132,7 +132,7 @@ def test_gate_d_a_place_with_no_online_information_stays_listed(engine, world):
 
 
 def test_other_families_and_regions_are_not_in_this_intake(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     programme(engine, s, "p-other", "inst:two", family="postgrad")
     s.record(inst("far", region="sindh"), cause="import")
     rep, _ = readings(engine, intake)
@@ -140,7 +140,7 @@ def test_other_families_and_regions_are_not_in_this_intake(engine, world):
 
 
 def test_green_when_everything_holds_and_pass_gate_records_it(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     verify_floor(k)
     rep, r = readings(engine, intake)
     assert rep.green and all(x.green for x in r.values())
@@ -150,7 +150,7 @@ def test_green_when_everything_holds_and_pass_gate_records_it(engine, world):
 
 
 def test_pass_gate_refuses_while_red_and_changes_nothing(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     with pytest.raises(gate.GateRed) as e:
         gate.pass_gate(engine, "pai", intake.id, NOW)
     assert {f["gate"] for f in e.value.failing} == {"b"} and e.value.failing[0]["code"] == "missing"
@@ -159,7 +159,7 @@ def test_pass_gate_refuses_while_red_and_changes_nothing(engine, world):
 
 
 def test_workload_uses_the_measured_review_rate(engine, world):
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     verify_floor(k)
     put(k, "programme", "p-two", "deadline_close", fact("confirmed"))
     rep = report.build(engine, "pai", intake.id, NOW)
@@ -192,7 +192,7 @@ def test_suspect_domains_and_open_review_items_are_counted(engine, world):
 
     from app.os import models
 
-    s, k, intake = world
+    s, k, intake = world  # noqa: RUF059
     with engine.begin() as conn:
         conn.execute(insert(models.source_domains).values(tenant_id="pai", domain="odd.alpha.test", region="punjab",
                                                           family="", state="suspect"))
