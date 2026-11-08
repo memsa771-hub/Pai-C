@@ -214,3 +214,36 @@ def test_a_failed_import_stays_live_and_can_be_undone_then_repeated(engine, clea
 class FakeDisputesOK:
     def open_item(self, kind, **kw):
         return 1, True
+
+
+def _system_with_links(engine, tmp_path):
+    from tests.os.registry.helpers import child
+
+    load_list(engine)
+    do_import(engine, tmp_path, [inst(1), inst(2, region="Sindh")], d=deps(engine))
+    s = RegistryStore(engine, "pai")
+    s.record(child("admission_system", "sys", "central-merit", None), cause="import")
+    s.link("sys:central-merit", "admits", E, cause="import", cause_ref="earlier", actor="dev")
+    s.link("sys:central-merit", "admits", "inst:t-inst-002", cause="import", cause_ref="import-77", actor="dev")
+    with engine.begin() as conn:
+        conn.execute(models.imports.insert().values(
+            id=77, tenant_id="pai", file_name="x.xlsx", sha256="7" * 64, mode="reviewers", batch_ref="b", actor="dev",
+            status="done"))
+    return s
+
+
+def test_undo_restores_the_links_a_system_had_before_the_import(engine, clean, tmp_path):
+    s = _system_with_links(engine, tmp_path)
+    r = undo_import(engine, "pai", 77, actor="admin")
+    assert r.links == 1 and [lk.to_id for lk in s.links_from("sys:central-merit")] == [E]  # the earlier link stays
+
+
+def test_undo_refuses_when_a_link_it_would_keep_has_gone(engine, clean, tmp_path):
+    s = _system_with_links(engine, tmp_path)
+    with engine.begin() as conn:  # a link removed outside the revisions: the undo never puts a link back
+        conn.execute(models.registry_links.delete().where(models.registry_links.c.to_id == E))
+    with pytest.raises(UndoRefused) as e:
+        undo_import(engine, "pai", 77, actor="admin")
+    assert e.value.conflicts == [f"link removed sys:central-merit admits:registry:{E}"]
+    assert [lk.to_id for lk in s.links_from("sys:central-merit")] == ["inst:t-inst-002"]
+    assert ImportLog(engine, "pai").get(77).status == "done"

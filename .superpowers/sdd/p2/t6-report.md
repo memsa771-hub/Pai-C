@@ -80,7 +80,7 @@ Minor
 12. The report is kept in the import log (`os_imports.report_csv`, `GET /admin/imports/{id}/report`); the template is built in memory (no temp file).
 13. Undo marks the import undone in the same transaction as the data.
 14. Row, column, file-size and unpacked-size caps (`limits` in `format.yaml`), zip check before parsing, defusedxml required (added to requirements).
-15. `seen_keys` are registered only after a row passed every check. The PROPOSED intake patterns stay marked as such in `format.yaml` and in the plan; for the owner to confirm:
+15. `seen_keys` are registered only after a row passed every check. The intake patterns, approved by the owner (spec §11.3) and no longer marked PROPOSED:
    - `Fall|Spring|Summer|Autumn|Winter YYYY` -> that term and year (`Fall 2027` -> fall 2027)
    - `Session YYYY-YY` and `YYYY-YY` -> term `session`, year = first year (`Session 2026-27` -> 2026)
    - `Batch YYYY`, `Annual YYYY` -> term `batch` / `annual`, year YYYY
@@ -90,3 +90,10 @@ Minor
 Migration `os_0027` edited in place (new columns `note_actor`, `report_csv`; unique index also covers `failed`).
 Dry-run change: 110 Sindh programme rows (seat allocations whose number is only in the quote/note, with no cut-off) are now rejected `no_value`; the rest as before. With every list loaded: Programmes accepted 71, unconfirmed 116, queued 40, rejected 136 (no_value 110, institution_not_loaded 25, placeholder 1). Institutions and Facts unchanged.
 Checks: tests/os 2524 passed, 1 skipped, 1 xfailed; legacy 2560 passed, 13 skipped; tach, freeze, alembic heads (one OS head), traceability OK.
+
+## T6 final touches
+- Undo restores a system's links from `chain[0].before["links"]` (the first `link` revision of the import); if a link that should stay has gone (an import that removed links), undo refuses instead of putting it back. Tests for both.
+- `safe_cell` looks through leading whitespace (`" =1+1"`, `" \t-1"` are neutralised).
+- Known gap, documented here and in the plan: an edit made outside the revisions (a direct change to a programme's columns or a registry row, which writes no revision) is not seen by the undo's conflict check and is overwritten by the restore. All store write paths write revisions, so it only concerns hand edits.
+- Intake patterns: approved by the owner (spec §11.3, 2f741a2); PROPOSED marks removed from `format.yaml`, the plan and this report.
+- Checks after these touches: tests/os 2529 passed, 1 skipped, 1 xfailed; tach, freeze, heads, traceability OK.

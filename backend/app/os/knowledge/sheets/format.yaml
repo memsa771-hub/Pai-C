@@ -67,8 +67,7 @@ not_official_hosts: [wikipedia.org, facebook.com, instagram.com, drive.google.co
 # rejected, and so are the facts and programmes of those rows. Spellings as the batches write them, any case.
 out_of_scope_regions: [Australia, Switzerland, United Kingdom, United States of America]
 
-# Intake text -> (term, year). The year is the first year of a session. PROPOSED mapping, for the owner to confirm (listed
-# in the T6 report): an
+# Intake text -> (term, year). The year is the first year of a session. Approved by the owner (P2 spec §11.3). An
 # intake text no rule matches is queued ("intake_unresolved"), never guessed.
 intake_patterns:
   - {regex: '^(fall|spring|summer|autumn|winter)\s+(\d{4})\b', term: "{1}", year: "{2}"}

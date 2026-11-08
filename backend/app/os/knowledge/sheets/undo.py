@@ -5,7 +5,10 @@
 - a registry row the import inserted is `closed` (never deleted, R-60);
 - a programme the import placed or moved in the registry gets its six registry columns back from the `programme`
   revisions (`before` of the first one of the import); a programme the import created is also `excluded`;
-- a link the import added (`link` revisions) is taken away again.
+- the links of a system go back to its first `link` revision of the import (`before["links"]`): links the import added
+  are taken away; if a link was removed the undo refuses, it never puts one back.
+- Gap (documented): an edit made outside the revisions (a direct change to a programme's columns or a registry row, which
+  writes no revision) is not seen by the conflict check and is overwritten by the restore.
 
 Every step is a new `undo` revision, and the import is marked undone in the same transaction. If anything was changed by
 someone else after the import, the undo refuses and changes nothing: it lists what moved. A revision of another import
@@ -74,6 +77,25 @@ def _links_of(conn, tenant_id: str, from_id: str) -> list[str]:
         LK.c.tenant_id == tenant_id, LK.c.from_id == from_id).order_by(LK.c.id))]
 
 
+def _link_targets(conn, tenant_id: str, reg_chains: dict, conflicts: list[str]) -> dict[int, tuple[list, str, str]]:
+    """Per system: the links it had before the import's first link revision (`chain[0].before["links"]`), the subject
+    of that revision and the entity id. If the import removed a link (the target has one the system no longer has),
+    the undo refuses: it only takes away links, it never puts one back."""
+    first: dict[int, Any] = {}
+    for key, chain in reg_chains.items():
+        if key[0] == "link" and (key[1] not in first or chain[0].id < first[key[1]].id):
+            first[key[1]] = chain[0]
+    out: dict[int, tuple[list, str, str]] = {}
+    for rid, rev in first.items():
+        from_id = conn.execute(select(R.c.entity_id).where(R.c.id == rid)).scalar_one()
+        target = list(rev.before["links"])
+        missing = [x for x in target if x not in _links_of(conn, tenant_id, from_id)]
+        if missing:
+            conflicts.extend(f"link removed {from_id} {x}" for x in missing)
+        out[rid] = (target, rev.subject, from_id)
+    return out
+
+
 def _latest_registry(conn, tenant_id: str, key: tuple, cancelled: list[str]) -> int | None:
     q = select(func.max(RR.c.id)).where(RR.c.tenant_id == tenant_id, RR.c.kind == key[0],
                                         RR.c.cause_ref.notin_(cancelled) | RR.c.cause_ref.is_(None))
@@ -113,6 +135,7 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
                 what = conn.execute(select(R.c.entity_id).where(R.c.id == key[1])).scalar() if key[0] != "programme" \
                     else key[1]
                 result.conflicts.append(f"{key[0]} {what}" + (f" {key[2]}" if key[0] == "link" else ""))
+        link_targets = _link_targets(conn, tenant_id, reg_chains, result.conflicts)
         if result.conflicts:
             raise UndoRefused(result.conflicts)
         for fid, chain in fact_chains.items():
@@ -146,20 +169,17 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
                     before=dict(cur._mapping), after={c: first[c] for c in _PROGRAMME_FIELDS}, cause="import",
                     cause_ref=uref, actor=actor))
             result.programmes += 1
-        for key, chain in reg_chains.items():
-            if key[0] != "link":
-                continue
-            rel, to_kind, to_id = chain[0].subject.split(":", 2)
-            from_id = conn.execute(select(R.c.entity_id).where(R.c.id == key[1])).scalar_one()
-
-            before_set = _links_of(conn, tenant_id, from_id)
-            conn.execute(delete(LK).where(LK.c.tenant_id == tenant_id, LK.c.from_id == from_id, LK.c.rel == rel,
-                                          LK.c.to_kind == to_kind, LK.c.to_id == to_id))
+        for rid, (target, subject, from_id) in link_targets.items():
+            current = _links_of(conn, tenant_id, from_id)
+            for gone in (x for x in current if x not in target):
+                rel, to_kind, to_id = gone.split(":", 2)
+                conn.execute(delete(LK).where(LK.c.tenant_id == tenant_id, LK.c.from_id == from_id,
+                                              LK.c.rel == rel, LK.c.to_kind == to_kind, LK.c.to_id == to_id))
+                result.links += 1
             conn.execute(RR.insert().values(
-                tenant_id=tenant_id, registry_id=key[1], kind="link", subject=chain[0].subject, action="undo",
-                before={"links": before_set}, after={"links": _links_of(conn, tenant_id, from_id)},
+                tenant_id=tenant_id, registry_id=rid, kind="link", subject=subject, action="undo",
+                before={"links": current}, after={"links": _links_of(conn, tenant_id, from_id)},
                 cause="import", cause_ref=uref, actor=actor))
-            result.links += 1
         for key, chain in reg_chains.items():
             if key[0] != "entity":
                 continue

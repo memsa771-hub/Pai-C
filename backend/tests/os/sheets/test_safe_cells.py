@@ -18,7 +18,7 @@ from app.os.knowledge.sheets.template import (
 pytestmark = pytest.mark.req("R-68")
 
 
-@pytest.mark.parametrize("text", ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx"])
+@pytest.mark.parametrize("text", ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx", " =1+1", "  @x", " \t-1"])
 def test_risky_starts_get_an_apostrophe(text):
     assert safe_cell(text) == "'" + text
 
