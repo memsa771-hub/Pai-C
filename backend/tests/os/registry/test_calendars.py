@@ -80,17 +80,18 @@ def test_record_a_date_fact_per_intake(world):
                                                                                    "schedule_date")
     assert k.revisions(fid)[0].cause_ref == "imp-1"
     # another intake is another fact; the same intake again replaces the date (a revision records it)
-    record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2032, 5, 18), url=URL, quote="q",
+    record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2032, 5, 18), tz="Etc/UTC", url=URL, quote="q",
                          checked_at=AT, intake_year=2032, intake_term="main", cause="import")
-    again = record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 22), url=URL, quote="q2",
-                                 checked_at=AT, intake_year=2031, intake_term="main", cause="import")
+    again = record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 22), tz="Etc/UTC", url=URL,
+                                 quote="q2", checked_at=AT, intake_year=2031, intake_term="main", cause="import")
     assert again == fid and [r.action for r in k.revisions(fid)] == ["insert", "change"]
 
 
 def test_a_date_fact_needs_a_calendar_a_field_of_its_type_and_a_source(world):
     s, k = world
     record_calendar(s, calendar_entry(), "result", cause="import")
-    base = {"url": URL, "quote": "q", "checked_at": AT, "intake_year": 2031, "intake_term": "main", "cause": "import"}
+    base = {"url": URL, "quote": "q", "checked_at": AT, "intake_year": 2031, "intake_term": "main", "cause": "import",
+            "tz": "Etc/UTC"}
     with pytest.raises(CalendarError, match="not a calendar"):
         record_calendar_date(s, k, "inst:one", "result_date", date(2031, 5, 20), **base)
     with pytest.raises(CalendarError, match="not in the registry"):
@@ -98,7 +99,12 @@ def test_a_date_fact_needs_a_calendar_a_field_of_its_type_and_a_source(world):
     with pytest.raises(CalendarError, match="field"):  # an exam date does not belong to a result calendar
         record_calendar_date(s, k, "cal:alpha-results", "exam_date", date(2031, 5, 20), **base)
     with pytest.raises(CalendarError, match="timezone"):
-        record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), tz="Mars/Base", **base)
+        record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), **{**base, "tz": "Mars/Base"})
+    with pytest.raises(CalendarError, match="needs its timezone"):  # a date without its zone could be a day off
+        record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), **{**base, "tz": ""})
+    with pytest.raises(TypeError):  # and the argument cannot be left out
+        record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20),
+                             **{k_: v for k_, v in base.items() if k_ != "tz"})
     with pytest.raises(ValueError):  # a confirmed fact needs its quote (invariant 3)
         record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), **{**base, "quote": ""})
     with pytest.raises(ValueError, match="verified"):  # verified only through review
@@ -108,11 +114,22 @@ def test_a_date_fact_needs_a_calendar_a_field_of_its_type_and_a_source(world):
     assert k.get(unconfirmed)[3].status == "unconfirmed"
 
 
+def test_the_change_hook_is_called_after_the_write(world):
+    s, k = world
+    record_calendar(s, calendar_entry(), "result", cause="import")
+    seen = []
+    fid = record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), tz="Etc/UTC", url=URL,
+                               quote="q", checked_at=AT, intake_year=2031, intake_term="main", cause="import",
+                               on_change=lambda *a: seen.append(a))
+    assert seen == [("registry", "cal:alpha-results", "result_date", fid, "confirmed", 2031)]
+    assert k.get(fid)[3].value["date"] == "2031-05-20"  # the fact is stored before the hook runs
+
+
 def test_read_the_dates_of_a_calendar(world):
     s, k = world
     record_calendar(s, calendar_entry(), "result", cause="import")
     record_calendar(s, calendar_entry("alpha-exams", "body:alpha-board"), "exam", cause="import")
-    base = {"url": URL, "quote": "q", "checked_at": AT, "intake_term": "main", "cause": "import"}
+    base = {"url": URL, "quote": "q", "checked_at": AT, "intake_term": "main", "cause": "import", "tz": "Etc/UTC"}
     record_calendar_date(s, k, "cal:alpha-results", "result_date", date(2031, 5, 20), intake_year=2031, **base)
     record_calendar_date(s, k, "cal:alpha-exams", "exam_date", date(2031, 3, 2), intake_year=2031, **base)
     got = calendar_dates(k, ["cal:alpha-results", "cal:alpha-exams"], 2031)

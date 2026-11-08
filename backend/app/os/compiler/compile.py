@@ -387,7 +387,7 @@ def compile_plan(
                                 need_confirm=need_confirm, calendar_facts=calendar_facts or {}, year=year)
 
     for key, (ref, name, scope) in confirms.items():
-        insts[key] = _Inst(key=key, tmpl=None, ref=None if ref == route_key else ref, task_type=CONFIRM_TYPE,
+        insts[key] = _Inst(key=key, tmpl=None, ref=ref if scope == "programme" else None, task_type=CONFIRM_TYPE,
                            kind="work", inbox_kind=None, tz=playbook.default_timezone)
         insts[key].fact_refs.append((scope, ref, name))
 

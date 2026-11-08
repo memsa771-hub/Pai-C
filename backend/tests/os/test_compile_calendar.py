@@ -70,7 +70,7 @@ def test_result_expected_is_dated_from_the_official_calendar():
                                                                   "Matric result expected")
     assert waits.latest_finish == datetime(2027, 4, 30, 23, 59, 59, tzinfo=ZoneInfo("Asia/Karachi"))
     assert waits.fact_refs == (("registry", CAL, FIELD),)  # a change of the calendar fact revises the plan
-    assert {c["url"] for c in waits.citations} == {URL}
+    assert {(c["source"], c["url"]) for c in waits.citations} == {(f"fact:{CAL}:{FIELD}", URL)}  # names the calendar
     assert not waits.provisional and "confirm_fact@" + CAL + ":" + FIELD not in keys_of(d)
     assert (RESULT, True) in task(d, f"provide@fact:{OBTAINED}:stated").depends_on
 
@@ -87,6 +87,11 @@ def test_an_unconfirmed_calendar_date_is_provisional_and_asks_for_confirmation()
     assert task(d, RESULT).provisional
     confirm = task(d, f"confirm_fact@{CAL}:{FIELD}")
     assert confirm.fact_refs == (("registry", CAL, FIELD),)  # scope kept: it is not a programme or route fact
+    assert confirm.programme_ref is None  # a calendar is not a programme: the check belongs to no programme
+    # route and programme checks keep their ref exactly as before
+    plain = build(V2, route={"matric_result_date": fact(DATE, status="unconfirmed")})
+    assert task(plain, "confirm_fact@pakistan_inter:matric_result_date").programme_ref is None
+    assert task(plain, "confirm_fact@pakistan_inter:matric_result_date").fact_refs[0][0] == "route"
 
 
 def test_a_calendar_date_of_another_year_stays_provisional_r26():
@@ -112,6 +117,7 @@ def test_a_route_fact_ask_compiles_as_before_and_ignores_calendars():
     route = {"matric_result_date": fact(DATE)}
     plain = build(V2, route=route)
     assert task(plain, RESULT).fact_refs == (("route", "pakistan_inter", "matric_result_date"),)
+    assert {c["source"] for c in task(plain, RESULT).citations} == {"fact:matric_result_date"}  # route label unchanged
     with_calendar = build(V2, route=route, calendar={(CAL, FIELD): fact({"date": "2027-12-31"})})
     assert plain.tasks == with_calendar.tasks  # byte-identical: the calendar is not an input of this playbook
     assert RESULT not in keys_of(build(V2, calendar={(CAL, FIELD): fact(DATE)}))  # no route fact, no step

@@ -13,6 +13,7 @@ from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
     ImportRefused,
+    plan_hook,
     build_context,
     plan_file,
     run_import,
@@ -56,6 +57,7 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
             from app.os.knowledge.research.pages import PageGateway
 
             deps.fetcher = PageGateway(svc.engine, svc.settings.tenant_id, svc.settings)
+        deps.on_fact_change = plan_hook(svc.plans, svc.kernel)  # the plans that use a registry fact follow it
         return wire_other_tasks(deps)
 
     async def save(upload: UploadFile, tmp: Path) -> Path:

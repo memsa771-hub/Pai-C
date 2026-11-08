@@ -5,7 +5,7 @@ A calendar is a registry row of kind `calendar` with `attrs.calendar_type` (the 
 `{"date": "YYYY-MM-DD", "tz": "Area/City"}`: the shape the plan compiler already reads. Nothing here names a board, a
 country or a date."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from functools import cache
@@ -21,6 +21,7 @@ from app.os.registry.model import RegistryEntry
 from app.os.registry.store import Recorded, RegistryStore
 
 CALENDARS_FILE = Path(__file__).with_name("calendars.yaml")
+FactChanged = Callable[[str, str, str, int, str, int], object]
 
 
 class CalendarError(ValueError):
@@ -67,11 +68,16 @@ def record_calendar(registry: RegistryStore, entry: RegistryEntry, calendar_type
 
 
 def record_calendar_date(registry: RegistryStore, knowledge: SqlKnowledge, calendar_id: str, field: str, day: date, *,
-                         url: str, quote: str, checked_at: datetime, intake_year: int, intake_term: str,
-                         tz: str | None = None, status: str = "confirmed", cause: str, cause_ref: str | None = None,
-                         actor: str | None = None, source: str = "manual") -> int:
+                         tz: str, url: str, quote: str, checked_at: datetime, intake_year: int, intake_term: str,
+                         status: str = "confirmed", cause: str, cause_ref: str | None = None,
+                         actor: str | None = None, source: str = "manual", read_method: str | None = None,
+                         language: str | None = None, evidence: list | None = None,
+                         on_change: FactChanged | None = None) -> int:
     """One date of a calendar for one intake, as a fact. The field must belong to the calendar's type; the fact class
-    comes from the vocabulary. `verified` is reached only through review (T1), never here."""
+    comes from the vocabulary. `tz` is required: a date without its zone could be a day off for a student elsewhere (the
+    caller takes it from the calendar or, failing that, from its parent). `verified` is reached only through review (T1),
+    never here. `on_change(scope, ref, field, fact_id, status, intake_year)` is called after the write, so the plans
+    that use the date follow it (row 6.10): pass the plan service's `after_fact_change`."""
     cal = registry.get(calendar_id)
     if cal is None:
         raise CalendarError(f"{calendar_id} is not in the registry")
@@ -82,16 +88,20 @@ def record_calendar_date(registry: RegistryStore, knowledge: SqlKnowledge, calen
         raise CalendarError(f"{calendar_id} has no calendar type; record it with record_calendar")
     if field not in ctype.fields:
         raise CalendarError(f"field '{field}' is not a date of a {ctype.key} calendar ({sorted(ctype.fields)})")
-    if tz is not None:
-        try:
-            ZoneInfo(tz)
-        except (ZoneInfoNotFoundError, ValueError):
-            raise CalendarError(f"unknown timezone '{tz}'") from None
-    value = {"date": day.isoformat(), **({"tz": tz} if tz else {})}
-    fact = Fact(value=value, quote=quote, url=url, checked_at=checked_at, intake_year=intake_year, status=status,
-                intake_term=intake_term, fact_class=ctype.fields[field])  # validates the trust rules
-    return knowledge.upsert("registry", calendar_id, field, fact, source=source, cause=cause, cause_ref=cause_ref,
-                            actor=actor)
+    if not tz:
+        raise CalendarError("a calendar date needs its timezone")
+    try:
+        ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise CalendarError(f"unknown timezone '{tz}'") from None
+    fact = Fact(value={"date": day.isoformat(), "tz": tz}, quote=quote, url=url, checked_at=checked_at,
+                intake_year=intake_year, status=status, intake_term=intake_term, fact_class=ctype.fields[field],
+                read_method=read_method, language=language)  # validates the trust rules
+    fid = knowledge.upsert("registry", calendar_id, field, fact, source=source, evidence=evidence, cause=cause,
+                           cause_ref=cause_ref, actor=actor)
+    if on_change is not None:
+        on_change("registry", calendar_id, field, fid, status, intake_year)
+    return fid
 
 
 def calendar_dates(knowledge: SqlKnowledge, calendar_ids: Sequence[str], intake_year: int,

@@ -16,12 +16,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.os.knowledge.fact_classes import fact_class as class_of_field
 from app.os.knowledge.fact_classes import is_high_stakes
 from app.os.knowledge.regions import UnknownRegion, normalise_region
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
+from app.os.registry.calendars import calendar_types
 from app.os.registry.model import KIND_PREFIX, REGION_REQUIRED, RegistryEntry, slug
 
 BUCKETS = ("accepted", "unconfirmed", "queued", "rejected", "skipped")
@@ -51,6 +53,8 @@ class PlanContext:
     existing_programmes: Callable[[str], bool] = lambda ref: False
     existing_region: Callable[[str], str | None] = lambda registry_id: None  # registry id -> region code
     region_lookup: Callable[[str], str | None] = lambda registry_id: None  # set by the plan: file first, then database
+    registry_info: Callable[[str], dict | None] = lambda registry_id: None  # a stored entity: kind, calendar_type, timezone, parent_id
+    meta: Callable[[str], dict | None] = lambda registry_id: None  # set by the plan: file first, then database
     require_list: bool = True  # False only for a dry run that asks "what if every list were loaded"
     cap_without_allow_list: bool = False  # real imports: with no allow-list connected nothing is above `unconfirmed`
     decision_ref: str | None = None  # the owner's decision reference (owner-accepted mode)
@@ -214,6 +218,7 @@ def _region(text: str | None, kind: str | None, ctx: PlanContext) -> tuple[str |
 
 def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
     fmt, out, seen = ctx.fmt, [], set()
+    planned: dict[str, str] = {}  # inst_id -> registry id of the rows planned so far (a parent comes before its child)
     for r in batch.sheets["Institutions"]:
         rid = _text(r.get("inst_id")) or ""
         res = RowResult("Institutions", rid, r["_row"], "rejected")
@@ -242,13 +247,14 @@ def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
         if res.bucket in ("skipped", "queued"):
             res.level = None
             continue
-        problem, detail = _institution_entry(r, rid, res, ctx)
+        problem, detail = _institution_entry(r, rid, res, ctx, planned)
         if problem:
             res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
     return out
 
 
-def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext) -> tuple[str | None, str]:
+def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
+                       planned: dict[str, str]) -> tuple[str | None, str]:
     fmt = ctx.fmt
     kind = fmt.kind_of_type(_text(r.get("type")))
     if kind is None:
@@ -277,6 +283,18 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext) -> t
         if lid is None and ctx.require_list:
             return "no_official_list", str(url)
         lists = (lid or "list:not-loaded",)
+    parent = None
+    if _text(r.get("parent_id")):
+        parent = planned.get(_text(r.get("parent_id"))) or ctx.existing_institutions(_text(r.get("parent_id")))
+        if parent is None:
+            return "parent_not_loaded", str(r.get("parent_id"))
+    tz = _text(r.get("timezone"))
+    if tz is not None:
+        try:
+            ZoneInfo(tz)
+        except (ZoneInfoNotFoundError, ValueError):
+            return "bad_timezone", tz
+    ctype = fmt.raw["calendar_types"].get((_text(r.get("type")) or "").lower()) if kind == "calendar" else None
     domains = []
     ou = _text(r.get("official_url"))
     if ou and urlsplit(ou).hostname:
@@ -284,13 +302,16 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext) -> t
     try:
         entry = RegistryEntry(
             entity_id=f"{KIND_PREFIX[kind]}:{slug(rid)}", kind=kind, name=str(r.get("name") or ""), source_url=url,
-            checked_at=checked, quote=quote, region=region, institution_type=_text(r.get("type")),
+            checked_at=checked, quote=quote, region=region, institution_type=_text(r.get("type")), parent_id=parent,
             official_domains=tuple(d for d in domains if re.match(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$", d)), list_ids=lists,
             attrs={})
     except ValueError as e:
         return "invalid_entry", str(e)
-    res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote)
+    res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote, timezone=tz,
+                       calendar_type=ctype)
     _cap(res, url, region, quote, ctx, rm)
+    if res.bucket in ("accepted", "unconfirmed"):
+        planned[rid] = entry.entity_id
     return None, ""
 
 
@@ -304,6 +325,11 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
     file_regions = {res.payload["entry"].entity_id: res.payload["entry"].region for res in institutions
                     if "entry" in res.payload}
     ctx.region_lookup = lambda rid: file_regions.get(rid) or ctx.existing_region(rid)
+    file_meta = {res.payload["entry"].entity_id: {
+        "kind": res.payload["kind"], "calendar_type": res.payload.get("calendar_type"),
+        "timezone": res.payload.get("timezone"), "parent_id": res.payload["entry"].parent_id}
+        for res in institutions if "entry" in res.payload}
+    ctx.meta = lambda rid: file_meta.get(rid) or ctx.registry_info(rid)
 
     def inst_registry_id(inst_id: str) -> str | None:
         return registry_ids.get(inst_id) or ctx.existing_institutions(inst_id)
@@ -433,6 +459,19 @@ def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: tuple[set[st
     return res
 
 
+def _timezone_of(registry_id: str, ctx: PlanContext) -> str | None:
+    """The zone of a calendar's dates: its own, else its parent's (a body or institution), a few levels up."""
+    rid: str | None = registry_id
+    for _ in range(4):
+        meta = ctx.meta(rid) if rid else None
+        if not meta:
+            return None
+        if meta.get("timezone"):
+            return meta["timezone"]
+        rid = meta.get("parent_id")
+    return None
+
+
 def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: PlanContext, inst_registry_id,
                  programme_ids, seen_keys) -> tuple[str | None, str]:
     fmt = ctx.fmt
@@ -479,12 +518,28 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
         res.detail = str(intake_text)
         return None, ""
     term, year = parsed
+    fact_value: dict = {"value": value, "unit": _text(r.get("unit"))}
+    calendar_class = None
+    meta = ctx.meta(ref) if scope == "registry" else None
+    if meta and meta["kind"] == "calendar":  # a date of an official calendar (P2-T11): its field, date and zone are checked
+        ctype = calendar_types().get(meta["calendar_type"] or "")
+        if ctype is None:
+            return "calendar_without_type", ref
+        if field_name not in ctype.fields:
+            return "field_not_in_calendar", f"'{field_name}' is not a date of a {ctype.key} calendar"
+        try:
+            day = date.fromisoformat(value)
+        except ValueError:
+            return "not_a_date", value
+        tz = _timezone_of(ref, ctx)
+        if tz is None:
+            return "no_timezone", ref
+        fact_value, calendar_class = {"date": day.isoformat(), "tz": tz}, ctype.fields[field_name]
     key = (scope, ref, field_name, term, year)
     if key in seen_keys:
         return "duplicate_key", f"{entity} {field_name} {intake_text}"
-    unit = _text(r.get("unit"))
     res.payload = {"row": r, "provenance": chk.provenance, "scope": scope, "ref": ref, "field": field_name,
-                   "value": {"value": value, "unit": unit}, "quote": quote or "", "url": url, "term": term,
+                   "value": fact_value, "quote": quote or "", "url": url, "term": term, "calendar": calendar_class,
                    "year": year, "read_method": rm, "language": lang, "checked_at": checked, "high_stakes": high,
                    "source_type": _text(r.get("source_type"))}
     region = ctx.region_lookup(ref) if scope == "registry" else None

@@ -19,8 +19,10 @@ sheets:
   Institutions:
     key: inst_id
     required: [inst_id, type, name, region, source_url, source_quote, read_method, retrieved, claude_status]
+    # `parent_id` (the inst_id of the body, system or institution a calendar belongs to) and `timezone` (the zone of its
+    # dates) are optional: the v4 batches have neither. A calendar row uses both (P2-T11).
     columns: [inst_id, type, name, region, city, sector, discipline, chartered_by, official_url, in_scope, source_url,
-              source_quote, read_method, retrieved, claude_status, claude_note]
+              source_quote, read_method, retrieved, claude_status, claude_note, parent_id, timezone]
   Programmes:
     key: programme_id
     required: [programme_id, inst_id, programme, source_url, retrieved, claude_status]
@@ -88,6 +90,10 @@ type_kinds:
   admission_body: [admission_body, entry_test_body]
   admission_system: [admission_system]
   entry_test: [admission_test]
+  calendar: [exam_calendar, result_calendar, admission_calendar]
+# Institutions `type` of a calendar row -> its calendar type (registry/calendars.yaml). A calendar's dates are Facts rows
+# on its inst_id; each field must be a date field of the type (P2-T11).
+calendar_types: {exam_calendar: exam, result_calendar: result, admission_calendar: admission}
 
 # Programmes value columns -> the fact they make (field name, class). With a seat category the field is
 # `<field>_<category>`. The class is stored on the fact; high-stakes classes are in fact_classes.yaml.

@@ -34,7 +34,8 @@ def api(engine, clean, os_db):
                         ctype, cause="import")
     record_calendar_date(reg, kb, "cal:alpha-results", "result_date", date(2031, 5, 20), tz="Etc/UTC", url=URL,
                          quote="Result day", checked_at=CHECKED, intake_year=2031, intake_term="main", cause="import")
-    record_calendar_date(reg, kb, "cal:alpha-exams", "exam_date", date(2031, 3, 2), url=URL, quote="", checked_at=CHECKED,
+    record_calendar_date(reg, kb, "cal:alpha-exams", "exam_date", date(2031, 3, 2), tz="Etc/UTC", url=URL, quote="",
+                         checked_at=CHECKED,
                          intake_year=2031, intake_term="main", status="unconfirmed", cause="import")
     app = FastAPI()
     app.include_router(build_router(lambda: services), prefix="/v1/os")

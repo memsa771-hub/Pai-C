@@ -89,3 +89,19 @@ def test_bad_requests(api, tmp_path):
     assert r.status_code == 422 and "Institutions" in r.json()["detail"]
     assert api.get(f"{BASE}/999/report", headers=ADMIN).status_code == 404
     assert api.post(BASE + "/validate", data={"country": "ZZ"}, files=upload(path), headers=ADMIN).status_code == 422
+
+
+def test_the_api_import_tells_the_plans_about_a_calendar_date(api, tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr("app.os.api.imports.plan_hook",
+                        lambda plans, kernel: lambda *a: seen.append(a))
+    body = inst(1, ctype="admission_body", source_url="https://board.alpha.test/about", timezone="Asia/Karachi")
+    body.update(inst_id="ALPHA-BOARD")
+    cal = inst(2, ctype="result_calendar", source_url="https://board.alpha.test/results", parent_id="ALPHA-BOARD")
+    cal.update(inst_id="ALPHA-RESULTS")
+    path = workbook(tmp_path, [body, cal], [fact(1, "ALPHA-RESULTS", field_="result_date", value="2031-05-20",
+                                                 intake="Winter 2027")])
+    r = api.post(BASE, data=FORM, files=upload(path), headers=ADMIN)
+    assert r.status_code == 200, r.text
+    assert [(s[0], s[1], s[2], s[4], s[5]) for s in seen] == [("registry", "cal:alpha-results", "result_date",
+                                                               "verified", 2027)]

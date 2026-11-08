@@ -68,8 +68,9 @@ def _result_expected(ref: str, ask: Ask, playbook: Playbook, route_facts: Mappin
                  days=0, blocked_reason=f"{EXPECTED}:{ref}", deadline=end_of_day(day, fact_tz or tz),
                  provisional=not firm)
     inst.fact_refs.append(fref)
-    if fact.url:  # the date comes from this page: cite it
-        inst.citations.append({"source": f"fact:{expected.fact}", "url": fact.url})
+    if fact.url:  # the date comes from this page: cite it (a calendar's date is labelled with the calendar's id)
+        label = f"fact:{expected.calendar}:{expected.fact}" if expected.calendar else f"fact:{expected.fact}"
+        inst.citations.append({"source": label, "url": fact.url})
     if not firm and need_confirm is not None:
         need_confirm(fref)
     return inst
