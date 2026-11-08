@@ -1,0 +1,6 @@
+# Merit facts (P2-D26, R-31). `history_years`: how many earlier intake years a MeritCheck lists closing merits for.
+version: 1
+history_years: 3
+fields:
+  formula: merit_formula
+  closing: closing_merit

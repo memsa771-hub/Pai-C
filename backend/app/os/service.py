@@ -11,7 +11,7 @@ from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.intakes import IntakeNotOpen, IntakeStore
 from app.os.kernel import Kernel, PlanRef, StaleDraft
-from app.os.knowledge import KnowledgePort
+from app.os.knowledge import KnowledgePort, merit
 from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
 from app.os.playbooks import Playbook, PlaybookError, select_playbook
 from app.os.requests import gate, state
@@ -220,3 +220,4 @@ class PlanService:
         """A fact the compiler uses as a date must parse as one, before it is stored (review I3)."""
         if field in self.anchor_fields():
             date_of(value, field)
+        merit.check_value(field, value)  # P2-T10: a merit formula or closing merit has its shape (R-31)

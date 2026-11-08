@@ -48,3 +48,5 @@ fields:
   application_route: application_route
   portal_url: portal
   intakes: intake
+  merit_formula: merit_formula
+  closing_merit: closing_merit
