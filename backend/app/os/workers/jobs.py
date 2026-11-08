@@ -40,9 +40,9 @@ def _freshness(settings, engine, kernel, client):
 
 
 def _monitor(settings, engine, kernel, client):
-    """P2-T7: season monitoring (OS_MONITOR=1). With the flag off the job does nothing."""
+    """P2-T7: season monitoring (OS_MONITOR=1). With the flag off there is no job: nothing is scheduled or ticked."""
     if not settings.monitor:
-        return lambda: None
+        return None
     from app.os.knowledge.changes import after_fact_change
     from app.os.knowledge.research.pages import PageGateway
     from app.os.knowledge.review import ReviewQueue

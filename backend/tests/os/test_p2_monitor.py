@@ -203,13 +203,13 @@ def test_the_monitor_only_looks_at_facts_of_the_windows_region_and_family(w):
     assert counts["facts"] == 2 and counts["urls"] == 1  # the deadline and the fee share one page; the 2026 fact is out
 
 
-def test_the_job_is_registered_and_does_nothing_without_the_flag(engine, clean, os_db):
+def test_the_job_is_registered_but_scheduled_only_with_the_flag(engine, clean, os_db):
     jobs = {name: cron for name, cron, _ in JOB_FACTORIES}
     assert jobs["monitor"] == "30 3 * * *"
     settings = load_settings({"OS_DATABASE_URL": os_db})
     assert settings.monitor is False
     factory = dict((n, f) for n, _, f in JOB_FACTORIES)["monitor"]
-    assert factory(settings, engine, None, None)() is None
+    assert factory(settings, engine, None, None) is None  # no job at all: nothing scheduled, nothing ticked
     assert load_settings({"OS_DATABASE_URL": os_db, "OS_MONITOR": "1"}).monitor is True
 
 

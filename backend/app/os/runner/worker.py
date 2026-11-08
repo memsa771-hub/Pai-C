@@ -272,7 +272,9 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     from app.os.workers.jobs import JOB_FACTORIES as worker_jobs  # imported late: workers depend on the runner
 
     for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
-        add_job(name, cron, factory(settings, engine, kernel, client))
+        job = factory(settings, engine, kernel, client)
+        if job is not None:  # a factory returns None when its job is off by flag (P2-T7): nothing is scheduled
+            add_job(name, cron, job)
     RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
     if register_documents_if_configured(settings, engine):
         from app.os.documents.run import retry_waiting
