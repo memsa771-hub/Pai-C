@@ -188,6 +188,21 @@ class SqlKnowledge:
             prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
         return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field), prefer)
 
+    def registry_facts(
+        self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
+        intake_term: str | None = None, owner_ref: str | None = None, fallback_previous: bool = False,
+        fallback_year: int | None = None,
+    ) -> dict[tuple[str, str], Fact]:
+        """Facts about registry entities (P2-T11: the dates of a calendar), by (entity id, field). Same rules as
+        `programme_facts`: owner, term and the labelled previous-year fallback."""
+        if not refs or not fields:
+            return {}
+        with self.engine.connect() as conn:
+            rows = conn.execute(self._select("registry", refs, fields, intake_year, intake_term, owner_ref,
+                                             fallback_previous, fallback_year)).all()
+            prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
+        return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field), prefer)
+
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
                     intake_term: str | None = None, owner_ref: str | None = None,
                     fallback_previous: bool = False, fallback_year: int | None = None) -> dict[str, Fact]:

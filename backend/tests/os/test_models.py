@@ -66,6 +66,8 @@ def test_os_tables_present():
         "os_intakes", "os_fact_slots",
         # P2-T4 (os_0030)
         "os_not_readable",
+        # P2-T6 (os_0031)
+        "os_imports",
     }
 
 

@@ -98,8 +98,8 @@ requirements:
   R-64: {title: "Student can start a new plan for the next intake", phases: [P2], built: false}
   R-65: {title: "Playbooks versioned per intake; running plans stay pinned", phases: [P2], built: false}
   R-66: {title: "Coverage dashboard and launch gate are per intake", phases: [P2], built: true}
-  R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: false}
-  R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: false}
+  R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: true}
+  R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: true}
   R-69: {title: "Review queue export uses the same spreadsheet format", phases: [P2], built: false}
   R-70: {title: "Merit shown only in student login handled by share-position step", phases: [P4], built: false}
   R-71: {title: "Content integrity checks, not only domain, before using a page", phases: [P2], built: false}

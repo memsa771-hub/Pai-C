@@ -103,7 +103,9 @@ from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_pa
 from app.os.api.consistency import add_consistency_routes
 from app.os.api.coverage import add_coverage_routes
 from app.os.api.registry import add_registry_routes
+from app.os.api.calendars import add_calendar_routes
 from app.os.api.review import add_review_routes
+from app.os.api.imports import add_import_routes
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
 from app.os.ports import choice_requests, document_files, fact_proposals, student_facts
@@ -692,7 +694,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_consistency_routes(router, services, require_admin)  # P1-T10 (R-05)
     add_registry_routes(router, services, require_admin)  # P2-T2 (R-32, R-33, R-34)
     add_coverage_routes(router, services, require_admin)  # P2-T9 (R-34, R-35, R-66)
+    add_calendar_routes(router, services, require_admin)  # P2-T11 (R-20, R-33)
     add_review_routes(router, services, require_admin)  # P2-T5 (R-25, R-42)
+    add_import_routes(router, services, require_admin)  # P2-T6 (R-67, R-68)
     if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
         from app.os.rehearsal.api import add_rehearsal_routes
 
