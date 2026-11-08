@@ -54,6 +54,8 @@ def test_os_tables_present():
         "os_student_requests",
         # P1-T10 (os_0024)
         "os_consistency_cases", "os_consistency_runs",
+        # P2-T1 (os_0025)
+        "os_fact_revisions",
     }
 
 

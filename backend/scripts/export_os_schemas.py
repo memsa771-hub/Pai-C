@@ -19,7 +19,10 @@ from app.os.contracts.fact_proposal import FactProposalV1  # noqa: E402
 from app.os.contracts.os_event import OsEventV1  # noqa: E402
 from app.os.contracts.plan_summary import PlanSummaryV1  # noqa: E402
 from app.os.contracts.plan_view import PlanViewV1  # noqa: E402
+from app.os.contracts.merit_check import MeritCheckV1  # noqa: E402
+from app.os.contracts.programme_facts import ProgrammeFactsV1  # noqa: E402
 from app.os.contracts.programme_list import ProgrammeListV1  # noqa: E402
+from app.os.contracts.programme_list_v2 import ProgrammeListV2  # noqa: E402
 from app.os.contracts.route_contract_v2 import RouteContractV2  # noqa: E402
 from app.os.contracts.student_facts import StudentFactsV1  # noqa: E402
 from app.os.contracts.vault_event import VaultEventV1  # noqa: E402
@@ -31,7 +34,8 @@ MODELS = {"decision_record.v1": DecisionRecordV1, "plan_summary.v1": PlanSummary
           "route_contract.v2": RouteContractV2, "escalation.v2": EscalationV2,
           "plan_view.v1": PlanViewV1, "os_event.v1": OsEventV1, "choice_request.v1": ChoiceRequestV1,
           "student_facts.v1": StudentFactsV1, "vault_event.v1": VaultEventV1, "fact_proposal.v1": FactProposalV1,
-          "fact_conflicts.v1": FactConflictsV1}
+          "fact_conflicts.v1": FactConflictsV1, "programme_facts.v1": ProgrammeFactsV1,
+          "merit_check.v1": MeritCheckV1, "programme_list.v2": ProgrammeListV2}
 
 
 def main() -> None:
