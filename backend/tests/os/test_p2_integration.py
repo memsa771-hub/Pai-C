@@ -44,13 +44,13 @@ def test_one_migration_chain_and_each_step_goes_back(os_db, engine, clean):
     cfg.set_main_option("script_location", str(BACKEND / "alembic"))
     script = ScriptDirectory.from_config(cfg)
     chain = []
-    rev = script.get_revision("os_0032")
+    rev = script.get_revision("os_0033")
     while rev is not None and rev.revision >= "os_0026":
         chain.append(rev.revision)
         rev = script.get_revision(rev.down_revision) if rev.down_revision else None
-    assert chain == ["os_0032", "os_0031", "os_0030", "os_0029", "os_0028", "os_0027", "os_0026"]
+    assert chain == ["os_0033", "os_0032", "os_0031", "os_0030", "os_0029", "os_0028", "os_0027", "os_0026"]
     engine.dispose()
-    for step in ("os_0031", "os_0030", "os_0029", "os_0028", "os_0027", "os_0026", "os_0025"):  # every migration has a working downgrade
+    for step in ("os_0032", "os_0031", "os_0030", "os_0029", "os_0028", "os_0027", "os_0026", "os_0025"):  # every migration has a working downgrade
         run_alembic(["downgrade", step], os_db)
     eng = create_engine(os_db)
     try:

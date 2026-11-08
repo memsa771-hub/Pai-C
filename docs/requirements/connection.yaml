@@ -50,13 +50,13 @@ requirements:
   R-20: {title: "Not-yet-existing data becomes a dated result-expected step", phases: [P1], built: true}
   R-21: {title: "Conflicting data becomes a which-is-right step with both sources", phases: [P1], built: true}
   R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: true}
-  R-23: {title: "Outside facts are Knowledge records with URL and quote", phases: [P2], built: false}
-  R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
+  R-23: {title: "Outside facts are Knowledge records with URL and quote", phases: [P2], built: true}
+  R-24: {title: "Only listed official domains count as sources", phases: [P2], built: true}
   R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: true}
-  R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: false}
+  R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: true}
   R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: true}
   R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: true}
-  R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
+  R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: true}
   R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: true}
   R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: true}
   R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
@@ -79,7 +79,7 @@ requirements:
   # the stage A-I replay are done and tagged.
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
-  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
+  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: true}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
   R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
   R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}
@@ -91,23 +91,23 @@ requirements:
   R-57: {title: "Requirement traceability check in CI", phases: [P0], built: true}
   R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: true}
   R-59: {title: "Every phase passes the full suite in CI", phases: [P0, P1], built: true}
-  R-60: {title: "Cycle-bound facts stored per intake; nothing overwritten", phases: [P2], built: false}
-  R-61: {title: "Yearly rollover opens a new intake from the previous one", phases: [P2], built: false}
-  R-62: {title: "More than one intake per year works the same way", phases: [P2], built: false}
-  R-63: {title: "Student can plan for any open intake", phases: [P2], built: false}
-  R-64: {title: "Student can start a new plan for the next intake", phases: [P2], built: false}
-  R-65: {title: "Playbooks versioned per intake; running plans stay pinned", phases: [P2], built: false}
+  R-60: {title: "Cycle-bound facts stored per intake; nothing overwritten", phases: [P2], built: true}
+  R-61: {title: "Yearly rollover opens a new intake from the previous one", phases: [P2], built: true}
+  R-62: {title: "More than one intake per year works the same way", phases: [P2], built: true}
+  R-63: {title: "Student can plan for any open intake", phases: [P2], built: true}
+  R-64: {title: "Student can start a new plan for the next intake", phases: [P2], built: true}
+  R-65: {title: "Playbooks versioned per intake; running plans stay pinned", phases: [P2], built: true}
   R-66: {title: "Coverage dashboard and launch gate are per intake", phases: [P2], built: true}
   R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: true}
   R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: true}
-  R-69: {title: "Review queue export uses the same spreadsheet format", phases: [P2], built: false}
+  R-69: {title: "Review queue export uses the same spreadsheet format", phases: [P2], built: true}
   R-70: {title: "Merit shown only in student login handled by share-position step", phases: [P4], built: false}
-  R-71: {title: "Content integrity checks, not only domain, before using a page", phases: [P2], built: false}
-  R-72: {title: "Unreadable official sources marked not_readable and sent to checkers", phases: [P2], built: false}
+  R-71: {title: "Content integrity checks, not only domain, before using a page", phases: [P2], built: true}
+  R-72: {title: "Unreadable official sources marked not_readable and sent to checkers", phases: [P2], built: true}
   R-73: {title: "Intermediate Part-I marks are high-stakes when universities count them", phases: [P4], built: false}
-  R-74: {title: "Research reads JavaScript pages with a headless browser", phases: [P2], built: false}
-  R-75: {title: "A threshold has an owner; never merged across bodies", phases: [P2], built: false}
-  R-76: {title: "One vocabulary for regions and statuses", phases: [P2], built: false}
+  R-74: {title: "Research reads JavaScript pages with a headless browser", phases: [P2], built: true}
+  R-75: {title: "A threshold has an owner; never merged across bodies", phases: [P2], built: true}
+  R-76: {title: "One vocabulary for regions and statuses", phases: [P2], built: true}
   R-77: {title: "Abroad routes: Germany, UK, US with full data and gate", phases: [P6], built: false}
   R-78: {title: "Constraints reach the Vault from one source", phases: [P1], built: true}
   R-79: {title: "Hand-off is built: export, choice columns, decision_changed", phases: [P1], built: true}

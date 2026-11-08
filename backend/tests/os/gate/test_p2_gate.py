@@ -38,12 +38,14 @@ PROOFS = Path(__file__).parent
 MANIFEST = {
     4: [("tests.os.gate.test_p2_gate", "test_gate_4_spam_page_is_refused_the_domain_suspect_facts_unconfirmed_item_open")],
     5: [("tests.os.gate.test_p2_gate", "test_gate_5_a_not_readable_source_is_collected_with_evidence_and_approved_by_a_second_reviewer")],
-    6: [("tests.os.test_p2_coverage_report", "test_report_reads_the_launch_gate")],
+    6: [("tests.os.test_p2_coverage_report", "test_gate_a_the_denominator"),
+        ("tests.os.test_p2_coverage_report", "test_green_when_everything_holds_and_pass_gate_records_it")],
     8: [("tests.os.test_p2_monitor", "test_a_page_change_in_season_resets_the_fact_pauses_the_step_and_queues_the_item"),
         ("tests.os.test_p2_monitor", "test_a_report_shows_not_confirmed_to_everyone_but_only_the_reporters_steps_wait")],
     9: [("tests.os.test_p2_intakes_proof", "test_rollover_proof_2026_to_2027")],
     10: [("tests.os.gate.test_p2_gate", "test_gate_10_a_spreadsheet_round_trip_with_deliberate_errors_catches_each_and_undo_restores")],
     11: [("tests.os.gate.test_p2_gate", "test_gate_11_consistency_rules_9_to_12_find_nothing_for_a_clean_student_and_each_violation"),
+         ("tests.os.test_calendar_plan", "test_6_20_the_result_step_follows_the_official_calendar"),
          ("tests.os.test_p2_merit_ports", "test_programme_list_v2_coverage_levels")],
 }
 
@@ -92,7 +94,8 @@ def test_gate_5_a_not_readable_source_is_collected_with_evidence_and_approved_by
     fid = out["fact_id"]
     fact_ = k.get(fid)[3]
     assert (fact_.status, fact_.read_method) == ("unconfirmed", "human")  # a person's reading is not yet a fact
-    assert NotReadableStore(engine, "pai").open_rows(programme_ref="p1") == []  # the source no longer waits
+    left = NotReadableStore(engine, "pai").open_rows(programme_ref="p1")
+    assert [r.field for r in left] == [""]  # the field no longer waits; the source itself stays unreadable by machine
     verify = out["verify_item_id"]
     queue.submit_review(verify, check1, "check", "correct")  # compared with the original: confirmed
     assert k.get(fid)[3].status == "confirmed"
@@ -270,3 +273,54 @@ def test_spike1_harness_scores_the_bars_per_region_and_calls_nothing(w, tmp_path
     plan_ = json.loads(out[-1])
     assert plan_["facts"] == 5 and plan_["within_cap"] is False and plan_["estimated_cost_usd"] == 0.2
     assert cli.main(["score", "--region", "sindh"], engine=w.engine, tenant_id="pai", key_dir=tmp_path, out=out.append) == 2
+
+
+# --- the admin API for the queue export and the sync, and the migration ----------------------------------------------------------
+
+@pytest.mark.req("R-69")
+def test_the_admin_api_exports_the_queue_and_syncs_collect_items(w):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from tests.os.test_api import ADMIN
+    from tests.os.test_p2_monitor import make_api
+
+    c = make_api(w)
+    w.queue.open_item("change", dedupe_key="c1", fact_id=w.fact_id)
+    NotReadableStore(w.engine, "pai").mark("https://admissions.alpha.test/scan", "not_readable:ocr", programme_ref="p1",
+                                            fields=["fee"], intake_year=2027)
+    assert c.get("/v1/os/admin/review/export").status_code == 401
+    r = c.get("/v1/os/admin/review/export?kind=change", headers=ADMIN)
+    assert r.status_code == 200 and r.headers["x-rows"] == "1" and r.headers["x-items-without-row"] == ""
+    sheet = load_workbook(BytesIO(r.content))["Facts"]
+    header = [cell.value for cell in sheet[1]]
+    row = dict(zip(header, [cell.value for cell in sheet[2]], strict=False))
+    assert row["field"] == "deadline_close" and row["fact_id"].startswith("Q-") and row["source_url"].startswith("https://")
+    assert c.get("/v1/os/admin/review/export?kind=nonsense", headers=ADMIN).status_code == 422
+    got = c.post("/v1/os/admin/review/sync", headers=ADMIN, json={})
+    assert got.status_code == 200 and got.json()["collect_opened"] == 1
+
+
+@pytest.mark.req("R-05")
+def test_os_0033_widens_the_case_rule_and_goes_back_only_when_no_new_case_exists(engine, clean, os_db):
+    from sqlalchemy import create_engine
+
+    from tests.os.conftest import run_alembic, truncate_os_tables
+
+    cases = models.consistency_cases
+    with engine.begin() as conn:
+        conn.execute(cases.insert().values(tenant_id="pai", student_ref="s1", rule=11, codes=["other_intake_unlabelled:x"]))
+        with pytest.raises(Exception):  # still a closed range: 13 is P4's
+            with conn.begin_nested():
+                conn.execute(cases.insert().values(tenant_id="pai", student_ref="s1", rule=13, codes=[]))
+    engine.dispose()
+    with pytest.raises(Exception):
+        run_alembic(["downgrade", "os_0032"], os_db)  # a case for rule 11 exists: nothing is thrown away
+    eng = create_engine(os_db)
+    try:
+        truncate_os_tables(eng)
+    finally:
+        eng.dispose()
+    run_alembic(["downgrade", "os_0032"], os_db)
+    run_alembic(["upgrade", "os@head"], os_db)
