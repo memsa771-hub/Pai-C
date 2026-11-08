@@ -32,7 +32,7 @@ def test_a_programme_row_creates_the_programme_its_place_in_the_registry_and_its
     d = deps(engine)
     path = workbook(tmp_path, [inst(1)], programmes=[
         prog(1, "T-INST-001", closing_merit="88.5", closing_scale="100", min_hssc="60%"),
-        prog(2, "T-INST-001", seat_category="quota b", seats="7", chk=checks("correct", None))])
+        prog(2, "T-INST-001", seat_category="quota b", seats="7", **checks("correct", None))])
     res = do_import(engine, path, d)
     assert res.programmes_created == ["T-PRG-001", "T-PRG-002"]
     p = d.programmes.get("T-PRG-001")

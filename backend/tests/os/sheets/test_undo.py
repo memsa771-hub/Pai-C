@@ -83,3 +83,16 @@ def test_undo_refuses_when_someone_changed_a_fact_after_the_import(engine, clean
 def test_unknown_import(engine, clean):
     with pytest.raises(KeyError):
         undo_import(engine, "pai", 999, actor="admin")
+
+
+def test_a_withdrawn_fact_does_not_make_an_institution_researched(engine, clean, tmp_path):
+    from app.os.registry.coverage import coverage_map
+
+    load_list(engine)
+    iid = do_import(engine, tmp_path, [inst(1)], [fact(1, "T-INST-001")])
+    assert coverage_map(engine, "pai", 2027)[E].level == "verified"
+    undo_import(engine, "pai", iid, actor="admin")
+    assert E not in coverage_map(engine, "pai", 2027)  # the institution is closed by the undo too
+    iid2 = do_import(engine, tmp_path, [inst(1)], [], name="b.xlsx")
+    assert coverage_map(engine, "pai", 2027)[E].level == "listed"  # the withdrawn fact (stale, empty) is not counted
+    assert iid2

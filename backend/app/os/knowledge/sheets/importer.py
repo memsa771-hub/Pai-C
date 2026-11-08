@@ -266,8 +266,9 @@ def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, d
                                          name=str(row["programme"]), aliases=(), start_urls=https,
                                          official_domains=(), notes=row.get("campus")))
         created.append(ref)
-    deps.registry.link_programme(ref, institution_id=p["inst_registry_id"], level=row.get("level"),
-                                 field=row.get("field"), family=None, region=inst.region if inst else None,
-                                 cause="import", cause_ref=cref, actor=actor)
+    place = {k: v for k, v in (("level", row.get("level")), ("field", row.get("field")),
+                               ("region", inst.region if inst else None)) if v is not None}
+    deps.registry.link_programme(ref, institution_id=p["inst_registry_id"], cause="import", cause_ref=cref,
+                                 actor=actor, **place)
     for f in p["facts"]:
         _write_fact(deps, r, {**f, "scope": "programme", "ref": ref}, import_id, mode, decision_ref, actor)
