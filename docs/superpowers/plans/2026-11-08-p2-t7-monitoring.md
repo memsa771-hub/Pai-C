@@ -35,3 +35,6 @@ tests/os 2660 passed; legacy 2560 passed; vitest 593 passed; next build ok; tach
 
 ## Review fixes
 Owner ruling 2026-11-08 (only reporters wait; 3 reporters or a reviewer escalate; a dismissed report restores the status), recovery outcomes `stands`/`agrees`, two-run rule, sanity guard, OS_REPORTS flag, atomic limits. tests/os 2675 passed; legacy 2560 passed; vitest 595 passed.
+
+## Round 2
+A sanity failure delays a change, never hides it (sanity_failures_needed runs in a row: facts back to unconfirmed with marker monitor and one change item per page). Dismissed report restores only when a re-check marker is set. Escalation counts reporters of the open item. The day lock is a session advisory lock. tests/os 2678 passed; legacy 2560 passed.
