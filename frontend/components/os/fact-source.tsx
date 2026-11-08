@@ -5,6 +5,7 @@ import copy from '@/components/counselor/workspace/copy.json';
 import { sourceHost } from '@/lib/os-inbox';
 import { checkedOn, formatChecked, sourceLevel, type FactLevel } from '@/lib/os-my-plan';
 import { useMyPlan } from './my-plan-context';
+import { ReportLink } from './report-link';
 
 const t = copy.connect.myPlan;
 
@@ -28,6 +29,8 @@ export function FactSource({ level, url, date = null }: { level: FactLevel | nul
              className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline">
             {t.source}<ExternalLink className="size-3" aria-hidden />
           </a>
+          <span aria-hidden>·</span>
+          <ReportLink url={url} />
         </>
       )}
     </span>

@@ -104,6 +104,7 @@ from app.os.api.consistency import add_consistency_routes
 from app.os.api.coverage import add_coverage_routes
 from app.os.api.registry import add_registry_routes
 from app.os.api.calendars import add_calendar_routes
+from app.os.api.report import add_report_routes
 from app.os.api.review import add_review_routes
 from app.os.api.imports import add_import_routes
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
@@ -697,6 +698,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_calendar_routes(router, services, require_admin)  # P2-T11 (R-20, R-33)
     add_review_routes(router, services, require_admin)  # P2-T5 (R-25, R-42)
     add_import_routes(router, services, require_admin)  # P2-T6 (R-67, R-68)
+    if get_services().settings.reports:  # P2-T7 (R-28): absent without OS_REPORTS, so 404
+        add_report_routes(router, services)
     if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
         from app.os.rehearsal.api import add_rehearsal_routes
 

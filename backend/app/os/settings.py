@@ -43,6 +43,8 @@ class OsSettings:
     scan_max_pages: int = 10  # P2-T4: pages of a scanned PDF that are read
     scan_max_pixels: int = 25_000_000  # P2-T4: a page image larger than this is refused (decompression bombs)
     scan_timeout_s: float = 180.0  # P2-T4: how long a scan engine may take for one page
+    monitor: bool = False  # P2-T7: the daily season monitoring job (OS_MONITOR)
+    reports: bool = False  # P2-T7: students report a fact as wrong, and the steps wait for it (OS_REPORTS)
     source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
@@ -144,6 +146,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         scan_max_pixels=int(env.get("OS_SCAN_MAX_PIXELS") or 25_000_000),
         scan_timeout_s=float(env.get("OS_SCAN_TIMEOUT_S") or 180.0),
         source_guard=flag(env, "OS_SOURCE_GUARD"),
+        monitor=flag(env, "OS_MONITOR"),
+        reports=flag(env, "OS_REPORTS"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

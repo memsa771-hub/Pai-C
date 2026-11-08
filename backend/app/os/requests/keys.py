@@ -15,7 +15,8 @@ LEVELS = ("stated", "shown", "confirmed")
 AWAITING = "awaiting_fact"  # blocked_reason codes the compiler gives a step with an unmet or doubtful need
 DOUBT = "which_is_right"
 EXPECTED = "result_expected"
-BLOCK_CODES = (AWAITING, DOUBT, EXPECTED)
+RECHECKING = "fact_rechecking"  # P2-D20: the fact that dates the step is being checked again (monitoring or a report)
+BLOCK_CODES = (AWAITING, DOUBT, EXPECTED, RECHECKING)
 
 
 @dataclass(frozen=True)

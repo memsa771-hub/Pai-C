@@ -87,10 +87,14 @@ class PlanService:
         calendar_facts = ({k: f for k, f in self.knowledge.registry_facts(
             sorted({c for c, _ in calendars}), sorted({n for _, n in calendars}), year, **read).items()
             if k in calendars} if calendars else {})
-        return compile_plan(
-            contract, playbook,
+        from app.os.monitor.reports import for_student  # imported here: the report module imports the review queue
+
+        route_facts, programme_facts = for_student(  # owner ruling 2026-11-08: a reported fact holds only the reporters' steps
+            self.engine, self.kernel.tenant_id, contract.student_ref,
             self.knowledge.route_facts(playbook.key, sorted(route_fields), year, **read),
-            self.knowledge.programme_facts(refs, sorted(programme_fields), year, **read),
+            self.knowledge.programme_facts(refs, sorted(programme_fields), year, **read))
+        return compile_plan(
+            contract, playbook, route_facts, programme_facts,
             self.today(), self.disabled_types(),
             overrides=overrides, chosen={"visa": self.visa_programme(contract, plan_id, overrides)},
             excluded={"visa": self.not_visa_programmes(contract, plan_id)}, student=student,

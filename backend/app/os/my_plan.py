@@ -73,9 +73,10 @@ def _note(found: dict, url: str, day: date, confirmed: bool) -> None:
                   "confirmed": old["confirmed"] and confirmed}
 
 
-def _knowledge_sources(svc: Any, route_key: str, refs: list[str], year: int | None, found: dict) -> None:
+def _facts_of(svc: Any, route_key: str, refs: list[str], year: int | None) -> list:
+    """The Knowledge facts behind a plan's route and programmes for its intake year."""
     if year is None:
-        return
+        return []
     # every field the Knowledge has for these, not a list of ours. Any owner's rows count (P2-T2): the port read below
     # takes owner_ref=None (the general row first, else a body's), so a source an owner set is dated like any other.
     with svc.engine.connect() as conn:
@@ -87,7 +88,11 @@ def _knowledge_sources(svc: Any, route_key: str, refs: list[str], year: int | No
     programme_fields = sorted({r.field for r in rows if r.scope == "programme"})
     facts = list(svc.knowledge.route_facts(route_key, route_fields, year).values())
     facts += list(svc.knowledge.programme_facts(refs, programme_fields, year).values())
-    for f in facts:
+    return facts
+
+
+def _knowledge_sources(svc: Any, route_key: str, refs: list[str], year: int | None, found: dict) -> None:
+    for f in _facts_of(svc, route_key, refs, year):
         if not f.url.strip():  # an unconfirmed fact may have no source yet: nothing to date
             continue
         _note(found, f.url, f.checked_at.date(), f.confirmed)
@@ -101,7 +106,7 @@ def _playbook_sources(book: Any, found: dict) -> None:
             _note(found, str(c.url), check.checked, check.confirmed)
 
 
-def build_my_plan(svc: Any, student_ref: str) -> dict:
+def _choose(svc: Any, student_ref: str) -> tuple[dict | None, str]:
     chosen = _counsellor(svc, student_ref)
     source = "counsellor"
     if chosen is None or chosen["state"] in ("stopped", "finished"):
@@ -109,13 +114,31 @@ def build_my_plan(svc: Any, student_ref: str) -> dict:
         own = _self_serve(svc, student_ref)
         if own is not None and (chosen is None or own["plan_id"] != chosen["plan_id"]):  # not the adopted plan itself
             chosen, source = own, "self_serve"
-    if chosen is None:
-        return _empty()
+    return chosen, source
+
+
+def _plan_refs(svc: Any, chosen: dict) -> tuple[Any, dict, str | None, list[str]]:
     book = _book(svc, chosen)
     c = chosen["contract"]
     route_key = chosen["pin"].playbook_key if chosen["pin"] is not None else (book.key if book else None)
     cancelled = OverrideStore(svc.engine, svc.settings.tenant_id).cancelled(chosen["plan_id"])
-    refs = [p["programme_ref"] for p in c.get("programmes") or [] if p["programme_ref"] not in cancelled]
+    return book, c, route_key, [p["programme_ref"] for p in c.get("programmes") or [] if p["programme_ref"] not in cancelled]
+
+
+def plan_facts(svc: Any, student_ref: str) -> list:
+    """The Knowledge facts the student's plan shows (what a student may report as wrong, P2-T7, R-28)."""
+    chosen, _ = _choose(svc, student_ref)
+    if chosen is None:
+        return []
+    _, c, route_key, refs = _plan_refs(svc, chosen)
+    return [] if route_key is None else _facts_of(svc, route_key, refs, (c.get("target_intake") or {}).get("year"))
+
+
+def build_my_plan(svc: Any, student_ref: str) -> dict:
+    chosen, source = _choose(svc, student_ref)
+    if chosen is None:
+        return _empty()
+    book, c, route_key, refs = _plan_refs(svc, chosen)
     found: dict[str, dict] = {}
     if route_key is not None:
         year = (c.get("target_intake") or {}).get("year")
