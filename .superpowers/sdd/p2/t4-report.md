@@ -129,3 +129,5 @@ tests/os: 2493 passed, 2 skipped (Docling is not installed), 1 xfailed. Legacy: 
 | 5 | `close_field` runs only for fields whose stored fact is confirmed; an unconfirmed (for example OCR) fact keeps the field open for a checker (test). |
 | 6 | "Latin byte-identical" is reworded to "identical for text already in NFC form" (report, plan, normalise.yaml, test name). |
 | 7 | Hamza-yeh: U+06CC+U+0654, U+064A+U+0654 and U+0649+U+0654 all fold to U+0626 (`compose:` in `normalise.yaml`); a plain yeh stays different (test). |
+
+Checks after round 2: tests/os 2501 passed, 2 skipped (Docling), 1 xfailed; legacy 2560 passed, 13 skipped; tach ok, freeze clean, single OS head `os_0027`, traceability ok.
