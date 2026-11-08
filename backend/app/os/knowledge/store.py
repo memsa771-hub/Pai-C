@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Engine, and_, func, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
@@ -19,9 +19,10 @@ RV = models.fact_revisions
 RI = models.review_items
 Scope = Literal["route", "programme", "registry"]
 Source = Literal["seed", "manual", "research"]
-# P2-D9: what a revision records of a fact (its key columns never change, so they are not repeated)
+# P2-D9: what a revision records of a fact. The key columns do not change, except `intake_term` once: the backfill of
+# facts written before P2 (D-t1-1) sets it, and that revision must show it.
 _TRACKED = ("value", "quote", "url", "checked_at", "status", "conflict_note", "source", "fact_class", "read_method",
-            "language")
+            "language", "intake_term")
 
 
 def _fact(row) -> Fact:
@@ -124,26 +125,51 @@ class SqlKnowledge:
         self.tenant_id = tenant_id
 
     def _select(self, scope: Scope, refs: Sequence[str], fields: Sequence[str], intake_year: int,
-                intake_term: str | None, owner_ref: str | None):
+                intake_term: str | None, owner_ref: str | None, fallback_previous: bool = False,
+                fallback_year: int | None = None):
+        # P2-D24: with the fallback an earlier year's row is also read (`_resolve` lets the asked year win). An earlier
+        # year's row must be of the asked term; a row of the asked year whose term was never recorded ('') counts for
+        # any term, because the write paths of before P2 do not record one.
+        if fallback_previous:
+            this_year = and_(T.c.intake_year == intake_year, T.c.intake_term.in_([intake_term, ""])
+                             if intake_term is not None else true())
+            # the newest earlier year; with `fallback_year`, only that year (a registered intake names its source year)
+            earlier = and_(T.c.intake_year == fallback_year if fallback_year is not None
+                           else T.c.intake_year < intake_year,
+                           T.c.intake_term == intake_term if intake_term is not None else true())
+            year = or_(this_year, earlier)
+        else:
+            year = T.c.intake_year == intake_year
         q = select(T).where(
             T.c.tenant_id == self.tenant_id, T.c.scope == scope, T.c.ref.in_(list(refs)),
-            T.c.field.in_(list(fields)), T.c.intake_year == intake_year,
+            T.c.field.in_(list(fields)), year,
         )
-        if intake_term is not None:
+        if intake_term is not None and not fallback_previous:
             q = q.where(T.c.intake_term == intake_term)
         if owner_ref is not None:
             q = q.where(T.c.owner_ref.in_(sorted({owner_ref, ""})))
-        return q.order_by(T.c.id)
+        return q.order_by(T.c.intake_year, T.c.id)
+
+    def _current_term(self, conn, intake_year: int) -> str | None:
+        """The term of the intake that is current (else open) in `intake_year`: the term that wins a clash when a read
+        names none (T8). None when no intake is registered for the year."""
+        I = models.intakes
+        return conn.execute(select(I.c.term).where(
+            I.c.tenant_id == self.tenant_id, I.c.year == intake_year, I.c.state.in_(["current", "open"]),
+        ).order_by((I.c.state == "current").desc(), I.c.updated_at.desc(), I.c.id.desc()).limit(1)).scalar()
 
     @staticmethod
-    def _resolve(rows, owner_ref: str | None, key) -> dict:
-        """One row per key (P2-D8, plan "Resolution order"):
+    def _resolve(rows, owner_ref: str | None, key, prefer_term: str | None = None) -> dict:
+        """One row per key (P2-D8, plan "Resolution order"), best first by:
+        - year: the asked year beats an earlier one (the labelled fallback, P2-D24);
         - owner: with an owner_ref, that owner's row wins over the general ('') row; with None (any owner), the
-          general row wins, then the newest id;
-        - term: with intake_term=None, the newest id wins among terms (T8 will prefer the intake's current term)."""
+          general row wins;
+        - term: the asked term, else the intake's current term (T8), wins over another term;
+        - the newest id."""
         best: dict = {}
-        for r in rows:  # ordered by id, so a later row of equal rank replaces an earlier one
-            rank = (r.owner_ref == owner_ref) if owner_ref else (r.owner_ref == "")
+        for r in rows:  # ordered by year then id, so a later row of equal rank replaces an earlier one
+            rank = (r.intake_year, (r.owner_ref == owner_ref) if owner_ref else (r.owner_ref == ""),
+                    prefer_term is not None and r.intake_term == prefer_term)
             k = key(r)
             if k not in best or rank >= best[k][0]:
                 best[k] = (rank, r)
@@ -151,21 +177,27 @@ class SqlKnowledge:
 
     def programme_facts(
         self, refs: Sequence[str], fields: Sequence[str], intake_year: int, *,
-        intake_term: str | None = None, owner_ref: str | None = None,
+        intake_term: str | None = None, owner_ref: str | None = None, fallback_previous: bool = False,
+        fallback_year: int | None = None,
     ) -> dict[tuple[str, str], Fact]:
         if not refs or not fields:
             return {}
         with self.engine.connect() as conn:
-            rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref)).all()
-        return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field))
+            rows = conn.execute(self._select("programme", refs, fields, intake_year, intake_term, owner_ref,
+                                             fallback_previous, fallback_year)).all()
+            prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
+        return self._resolve(rows, owner_ref, lambda r: (r.ref, r.field), prefer)
 
     def route_facts(self, route_key: str, fields: Sequence[str], intake_year: int, *,
-                    intake_term: str | None = None, owner_ref: str | None = None) -> dict[str, Fact]:
+                    intake_term: str | None = None, owner_ref: str | None = None,
+                    fallback_previous: bool = False, fallback_year: int | None = None) -> dict[str, Fact]:
         if not fields:
             return {}
         with self.engine.connect() as conn:
-            rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref)).all()
-        return self._resolve(rows, owner_ref, lambda r: r.field)
+            rows = conn.execute(self._select("route", [route_key], fields, intake_year, intake_term, owner_ref,
+                                             fallback_previous, fallback_year)).all()
+            prefer = intake_term if intake_term is not None else self._current_term(conn, intake_year)
+        return self._resolve(rows, owner_ref, lambda r: r.field, prefer)
 
     def _row(self, conn, fact_id: int, lock: bool = False):
         q = select(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)

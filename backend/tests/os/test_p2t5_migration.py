@@ -18,7 +18,7 @@ pytestmark = pytest.mark.req("R-42")
 NEW = {"os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations"}
 
 
-def test_os_0026_upgrade_downgrade(os_db, engine, clean):
+def test_os_0028_upgrade_downgrade(os_db, engine, clean):
     assert NEW <= set(inspect(engine).get_table_names(schema=OS_SCHEMA))
     engine.dispose()
     run_alembic(["downgrade", "os_0027"], os_db)

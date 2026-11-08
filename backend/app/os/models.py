@@ -43,7 +43,8 @@ REVIEWER_KINDS = ("person", "ai")  # owner ruling 2026-11-07: an AI check may co
 REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", "conflict", "import_dispute")
 REVIEW_STEPS = ("check", "approve", "collect")
 REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
-REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover",
+                    "backfill")
 FACT_SCOPES = ("route", "programme", "registry")  # P2-T2: `registry` = a fact about a registry entity
 REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test", "institution", "campus",
                   "seat_category", "calendar", "official_list")  # P2 spec §4.1: generic concepts; instances are data
@@ -959,7 +960,7 @@ consistency_runs = Table(
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
 
-# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0026) ---------------------------------
+# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0027) ---------------------------------
 
 SOURCE_TIERS = ("regulator", "board", "admission_body", "institution")
 SOURCE_STATES = ("active", "suspect")
@@ -1022,4 +1023,39 @@ source_files = Table(
     Column("content", LargeBinary, nullable=False),
     _created(),
     UniqueConstraint("tenant_id", "snapshot_id", name="uq_os_source_files_snapshot"),
+)
+
+# P2-T8 (os_0029): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
+INTAKE_STATES = ("planned", "open", "current", "closed")
+
+intakes = Table(
+    "os_intakes", md,
+    _id(), _tenant(),
+    Column("region", Text, nullable=False),
+    Column("family", Text, nullable=False),
+    Column("term", Text, nullable=False),
+    Column("year", Integer, nullable=False),
+    Column("state", Text, nullable=False, server_default="planned"),
+    Column("gate_passed_at", DateTime(timezone=True)),
+    Column("opened_from_id", BigInteger, ForeignKey("os.os_intakes.id", ondelete="SET NULL")),
+    _created(),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "region", "family", "term", "year", name="uq_os_intakes_key"),
+    _in("state", INTAKE_STATES, "ck_os_intakes_state"),
+    CheckConstraint("term ~ '^[a-z_]+$'", name="ck_os_intakes_term"),
+    CheckConstraint("state <> 'current' OR gate_passed_at IS NOT NULL", name="ck_os_intakes_current_gate"),
+    Index("ix_os_intakes_term_year", "tenant_id", "term", "year"),
+)
+
+fact_slots = Table(
+    "os_fact_slots", md,
+    _id(), _tenant(),
+    Column("intake_id", BigInteger, ForeignKey("os.os_intakes.id", ondelete="CASCADE"), nullable=False),
+    Column("scope", Text, nullable=False),
+    Column("ref", Text, nullable=False),
+    Column("field", Text, nullable=False),
+    Column("owner_ref", Text, nullable=False, server_default=""),
+    Column("fact_class", Text),
+    _created(),
+    UniqueConstraint("tenant_id", "intake_id", "scope", "ref", "field", "owner_ref", name="uq_os_fact_slots_key"),
 )
