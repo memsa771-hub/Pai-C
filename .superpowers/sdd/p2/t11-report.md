@@ -27,3 +27,10 @@ tests/os: 2777 passed, 1 skipped, 1 xfailed. Legacy: 2560 passed, 13 skipped. ta
 3. `tz` is required in `record_calendar_date`; the import takes it from the calendar, else its parent (up to four levels); none -> `no_timezone`.
 4. The citation of a calendar date is `fact:<cal>:<field>`; route facts keep `fact:<field>`.
 Checks: tests/os 2788 passed, 1 skipped, 1 xfailed; legacy unchanged (not rerun: no non-OS file changed); tach, freeze, heads (one OS head), traceability OK.
+
+## Imports and undo revise plans for every fact (R-68)
+- Every fact an import writes (programme, registry; route facts have no import path) calls `on_fact_change` after its transaction commits, so the plans that use it follow it; undo calls it for each fact it changes back (status after the undo, e.g. `stale` for a withdrawn fact), after the undo commits. API and CLI pass `plan_hook(svc.plans, svc.kernel)` for both.
+- A plan that cannot follow (for example a recompile that raises) never fails the import or the undo: the error is kept (`ImportResult.hook_errors` and `os_imports.error` as "n plan revisions failed ...", `UndoResult.hook_errors`) and the fact stays stored.
+- Found by the first test: an imported date was stored as `{"value","unit"}`, which the compiler cannot read as a date, so a plan anchored on it raised on recompile. An ISO date in a row whose unit is `date` is now also kept as `"date"` (`{"value","unit","date"}`); any other spelling stays text, never guessed.
+- Tests: programme fact imported then re-imported with a changed value -> the plan's step moves; hook called once per fact with the stored status, for programme and registry scope; undo calls it per fact and the plan follows; broken hook reported and import completes; API undo passes the hook.
+- Checks: tests/os 2794 passed, 1 skipped, 1 xfailed; tach, freeze, heads (one OS head), traceability OK. Legacy not rerun (no non-OS file changed).
