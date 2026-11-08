@@ -114,3 +114,6 @@ paths pass `flags` on to `_inspected`).
 | Total | 6/10 (60%, was 50%) | mean 0.91 | mean 0.2 (was 2.5), 0 failures |
 
 Docling still was not compared. Removing the direction marks fixed the first Urdu line. The thread limit cut the time per case by about 10x and the earlier 60 s timeouts did not recur (load average was 4 to 5). Still failing: the blurred "1" read as "|", the Urdu number "1000" read as "0001" (a real misread: correctly refused), and the Urdu scan PDF letters. The recommendation does not change: Tesseract does not pass the bar (6/10), and its Urdu output stays a draft for a person (OCR facts stay `unconfirmed`).
+
+### Checks after the review fixes (merged with T3 at 3a8f13e)
+tests/os: 2493 passed, 2 skipped (Docling is not installed), 1 xfailed. Legacy: 2560 passed, 13 skipped. tach ok, freeze clean, single OS head `os_0027`, traceability ok. The Tesseract tests ran and were not skipped.
