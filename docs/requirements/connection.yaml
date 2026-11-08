@@ -18,8 +18,8 @@
 
 phases:
   P0: {name: "Setup and Counsellor fixes", status: done}
-  P1: {name: "Connection core", status: current}
-  P2: {name: "National data system", status: planned}
+  P1: {name: "Connection core", status: done}
+  P2: {name: "National data system", status: current}
   P3: {name: "Intermediate family", status: planned}
   P4: {name: "Bachelor's family", status: planned}
   P5: {name: "Launch", status: planned}
