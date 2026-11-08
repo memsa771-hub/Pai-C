@@ -9,7 +9,7 @@ import yaml
 from scripts.os_import_batch import main
 from tests.os.registry.helpers import LIST_URL
 
-from .helpers import COUNTRY, deps, fact, inst, load_list, workbook
+from .helpers import COUNTRY, checks, deps, fact, inst, load_list, workbook
 
 pytestmark = pytest.mark.req("R-68")
 
@@ -62,3 +62,10 @@ def test_import_undo_and_list(engine, clean, tmp_path):
     assert code == 2 and "already undone" in text
     code, text = run(["undo", "99", "--actor", "admin"], d)
     assert code == 2
+
+
+def test_import_with_queued_rows_and_no_queue_is_refused_with_exit_code_2(engine, clean, tmp_path):
+    load_list(engine)
+    path = workbook(tmp_path, [inst(1, chk=checks("correct", "no"))])
+    code, text = run(["import", str(path), "--country", COUNTRY, "--owner-accepted", "ref", "--actor", "dev"], deps(engine))
+    assert code == 2 and "review queue is not connected" in text

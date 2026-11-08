@@ -131,6 +131,7 @@ def test_report_log_and_second_import_refused(engine, clean, tmp_path):
     assert (rec.status, rec.mode, rec.decision_ref, rec.actor, rec.file_name) == (
         "done", "owner_accepted", DECISION, "dev", "batch.xlsx")
     assert len(rec.sha256) == 64 and rec.counts["Institutions"]["rejected"] == 1 and rec.report_path
+    assert rec.report_csv == res.report_path.read_text(encoding="utf-8")  # kept with the log, not only beside the file
     with pytest.raises(AlreadyImported):
         run_import(path, d, mode="owner_accepted", actor="dev", country=COUNTRY, decision_ref=DECISION)
 

@@ -1,6 +1,7 @@
 """P2-T6: the format file, the template and the reader with its legacy layouts (P2 spec §4.6; master R-67, R-68)."""
 
 import csv
+from pathlib import Path
 
 import openpyxl
 import pytest
@@ -132,3 +133,46 @@ def test_queue_export_writes_the_same_format_for_the_reviewers(tmp_path):
     b = read_batch(path)
     [row] = b.sheets["Facts"]
     assert (row["fact_id"], row["claude_status"], row["checker1_result"]) == ("Q-0001", "unconfirmed", None)
+
+
+def test_a_legacy_batch2_row_with_no_value_column_becomes_one_placeholder_row(tmp_path):
+    header = ["programme_id", "programme", "open_merit_seats", "total_seats", "closing_open_merit_aggregate",
+              "closing_source_url", "seats_source_url", "seats_quote", *COMMON]
+    b = _legacy(tmp_path, header, [["P1", "Test Medicine", None, None, None, None, None, None, "I1", "Session 2025-26",
+                                     "2026-11-03", "found", None, "correct", "yes"],
+                                    [None] * len(header)])
+    [row] = b.sheets["Programmes"]  # kept as one placeholder, so the plan can reject it as no_value
+    assert row["programme_id"] == "P1" and row["seats"] is None and row["closing_merit"] is None
+
+
+def test_files_and_sheets_over_the_caps_are_refused(tmp_path):
+    import copy
+    from dataclasses import replace
+
+    fmt = load_format()
+
+    def with_limits(**kw):
+        raw = copy.deepcopy(fmt.raw)
+        raw["limits"].update(kw)
+        return replace(fmt, raw=raw)
+
+    path = workbook(tmp_path, [inst(n) for n in range(1, 6)], [fact(1, "T-INST-001")])
+    with pytest.raises(SheetError, match="more than 3 rows"):
+        read_batch(path, with_limits(max_rows_per_sheet=3))
+    with pytest.raises(SheetError, match="larger than"):
+        read_batch(path, with_limits(max_file_bytes=100))
+    with pytest.raises(SheetError, match="unpacks to more"):
+        read_batch(path, with_limits(max_uncompressed_bytes=100))
+    with pytest.raises(SheetError, match="columns"):
+        read_batch(path, with_limits(max_columns=5))
+    (tmp_path / "junk.xlsx").write_bytes(b"not a zip")
+    with pytest.raises(SheetError, match="not a workbook"):
+        read_batch(tmp_path / "junk.xlsx")
+    assert len(read_batch(path).sheets["Institutions"]) == 5  # the real caps are generous
+
+
+def test_workbooks_are_parsed_with_defusedxml():
+    from openpyxl.xml import DEFUSEDXML
+
+    assert DEFUSEDXML
+    assert "defusedxml" in (Path(__file__).parents[3] / "requirements.txt").read_text()

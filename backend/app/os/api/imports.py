@@ -5,8 +5,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi import Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from app.os.api.services import Services
 from app.os.knowledge.programmes import ProgrammeStore

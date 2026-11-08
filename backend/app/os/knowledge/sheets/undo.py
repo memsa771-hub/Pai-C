@@ -69,6 +69,11 @@ def _registry_chains(conn, tenant_id: str, cref: str) -> dict[tuple, list]:
     return out
 
 
+def _links_of(conn, tenant_id: str, from_id: str) -> list[str]:
+    return [f"{x.rel}:{x.to_kind}:{x.to_id}" for x in conn.execute(select(LK).where(
+        LK.c.tenant_id == tenant_id, LK.c.from_id == from_id).order_by(LK.c.id))]
+
+
 def _latest_registry(conn, tenant_id: str, key: tuple, cancelled: list[str]) -> int | None:
     q = select(func.max(RR.c.id)).where(RR.c.tenant_id == tenant_id, RR.c.kind == key[0],
                                         RR.c.cause_ref.notin_(cancelled) | RR.c.cause_ref.is_(None))
@@ -147,16 +152,13 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
             rel, to_kind, to_id = chain[0].subject.split(":", 2)
             from_id = conn.execute(select(R.c.entity_id).where(R.c.id == key[1])).scalar_one()
 
-            def links() -> list[str]:
-                return [f"{x.rel}:{x.to_kind}:{x.to_id}" for x in conn.execute(select(LK).where(
-                    LK.c.tenant_id == tenant_id, LK.c.from_id == from_id).order_by(LK.c.id))]
-
-            before_set = links()
+            before_set = _links_of(conn, tenant_id, from_id)
             conn.execute(delete(LK).where(LK.c.tenant_id == tenant_id, LK.c.from_id == from_id, LK.c.rel == rel,
                                           LK.c.to_kind == to_kind, LK.c.to_id == to_id))
             conn.execute(RR.insert().values(
                 tenant_id=tenant_id, registry_id=key[1], kind="link", subject=chain[0].subject, action="undo",
-                before={"links": before_set}, after={"links": links()}, cause="import", cause_ref=uref, actor=actor))
+                before={"links": before_set}, after={"links": _links_of(conn, tenant_id, from_id)},
+                cause="import", cause_ref=uref, actor=actor))
             result.links += 1
         for key, chain in reg_chains.items():
             if key[0] != "entity":
