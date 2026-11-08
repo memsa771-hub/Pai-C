@@ -1,0 +1,18 @@
+# What the launch gate expects (P2 spec §4.9; master R-35). Data, so a family can change it without code.
+#
+# floor_fields: the facts that must be `verified` for an institution whose first-live intake is open (R-35b): deadlines,
+#   merit formulas and eligibility thresholds. They are Knowledge field names (fact_classes.yaml), read per programme
+#   (or per institution when it has no programme of the family). The rollover slots of an intake (os_fact_slots) add
+#   the other high-stakes keys the previous year had.
+# institution_types: types that must have an official list in the region even when no institution of that type is
+#   loaded yet (R-35a). Empty: every type with an institution in the region is read.
+# checks_per_fact / work_hours_per_day / measure_days: the workload estimate (master §12): two checks per fact; the
+#   checkers' measured rate is rows verified in the last `measure_days` days over worked days x hours per day.
+version: 1
+checks_per_fact: 2
+work_hours_per_day: 6
+measure_days: 14
+default:
+  floor_fields: [deadline_close, merit_formula, grade_requirement]
+  institution_types: []
+families: {}   # a family code with its own floor_fields / institution_types replaces the default for that family
