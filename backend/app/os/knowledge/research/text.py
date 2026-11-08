@@ -68,8 +68,8 @@ NORMALISE_FILE = Path(__file__).with_name("normalise.yaml")
 
 
 @cache
-def _folding(path: Path = NORMALISE_FILE) -> tuple[dict[int, int | None], dict]:
-    """The str.translate table and the language data, from `normalise.yaml` (P2-D14)."""
+def _folding(path: Path = NORMALISE_FILE) -> tuple[dict[int, int | None], dict, re.Pattern]:
+    """The str.translate table, the language data and the joiner pattern, from `normalise.yaml` (P2-D14)."""
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     table: dict[int, int | None] = {}
     for target, letters in data["fold"].items():
@@ -83,13 +83,18 @@ def _folding(path: Path = NORMALISE_FILE) -> tuple[dict[int, int | None], dict]:
     for start in data["digits"]:
         for i in range(10):
             table[int(start, 16) + i] = ord(str(i))
-    return table, data
+    joiners = "".join(chr(int(c, 16)) for c in data["joiners"]["chars"])
+    arabic = "".join(f"{chr(int(lo, 16))}-{chr(int(hi, 16))}" for lo, hi in data["joiners"]["next_to"])
+    pattern = re.compile(f"(?<=[{arabic}])[{joiners}]|[{joiners}](?=[{arabic}])")
+    return table, data, pattern
 
 
 def detect_language(text: str) -> str | None:
-    """The language code of a text when most of its letters are in a script the data maps to one, else None."""
-    _, data = _folding()
-    letters = [c for c in text if c.isalpha()]
+    """The language of a text, only with evidence (see `normalise.yaml`): a language code (`ur`) when the text uses
+    enough letters of that language alone; the script tag (`arab`) when most letters are in a listed script but
+    there is no such evidence; None otherwise (Latin text, digits, nothing)."""
+    _, data, _ = _folding()
+    letters = [c for c in unicodedata.normalize("NFC", text) if c.isalpha()]
     if not letters:
         return None
     counts: dict[str, int] = {}
@@ -97,9 +102,12 @@ def detect_language(text: str) -> str | None:
         script = unicodedata.name(c, "").split(" ")[0]
         counts[script] = counts.get(script, 0) + 1
     script, n = max(counts.items(), key=lambda kv: kv[1])
-    if n / len(letters) >= data["min_script_share"]:
-        return data["language_by_script"].get(script)
-    return None
+    if n / len(letters) < data["min_script_share"] or script not in data["script_tags"]:
+        return None
+    for code, rule in data["languages"].get(script, {}).items():
+        if sum(1 for c in letters if c in rule["letters"]) >= rule["min_letters"]:
+            return code
+    return data["script_tags"][script]
 
 
 def normalise(text: str) -> str:
@@ -110,5 +118,6 @@ def normalise(text: str) -> str:
     text = text.replace("\x00a0", " ").replace("\x00a0", " ").replace(" ", " ")
     text = text.replace("–", "-").replace("—", "-")
     text = text.replace("’", "'").replace("“", '"').replace("”", '"')
-    text = text.translate(_folding()[0])
+    table, _, joiners = _folding()
+    text = joiners.sub("", unicodedata.normalize("NFC", text)).translate(table)
     return re.sub(r"\s+", " ", text).strip().casefold()

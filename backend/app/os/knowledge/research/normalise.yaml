@@ -1,6 +1,6 @@
 # Text folding for quote matching (P2-D14, R-76 spelling). Applied by `text.normalise` to the quote and the page alike, so a
 # quote typed with one form of a letter still matches a page that uses another. Quotes stay in their own language (D-15);
-# only the comparison form is folded. Latin text is not touched by this file.
+# only the comparison form is folded. Latin text is not touched by this file (it is only put in NFC form first).
 #
 # Folded letters are the ones keyboards and OCR use interchangeably. Letters that make different words are NOT folded
 # (for example the two Urdu forms of yeh at the end of a word, and the aspirate heh).
@@ -8,14 +8,28 @@ fold:   # target: [letters that become the target]
   "ی": ["ي", "ى"]        # Urdu yeh <- Arabic yeh, Arabic alef maksura
   "ک": ["ك"]             # Urdu kaf <- Arabic kaf
   "ہ": ["ه"]             # Urdu heh goal <- Arabic heh
-remove:   # code points removed: diacritics (harakat), tatweel, joiners
-  ranges: [["064B", "065F"], ["0670", "0670"], ["06D6", "06DC"], ["06DF", "06E4"], ["06E7", "06E8"], ["06EA", "06ED"]]
-  singles: ["0640", "200C", "200D"]
+remove:   # code points removed: short-vowel marks (harakat), tatweel, direction marks
+  # The marks 0653-0655 (maddah above, hamza above, hamza below) are NOT removed: they are part of letters (آ أ إ).
+  ranges: [["064B", "0652"], ["0656", "065F"], ["0670", "0670"], ["06D6", "06DC"], ["06DF", "06E4"], ["06E7", "06E8"],
+           ["06EA", "06ED"]]
+  singles: ["0640", "200E", "200F"]   # tatweel; left-to-right and right-to-left marks (OCR engines add them around digits)
+# Joiners are removed only next to an Arabic-script letter (where they only change how letters join, not the word).
+# Anywhere else (an emoji sequence, a Latin text) they stay.
+joiners:
+  chars: ["200C", "200D"]
+  next_to: [["0600", "06FF"], ["0750", "077F"], ["08A0", "08FF"], ["FB50", "FDFF"], ["FE70", "FEFF"]]
 digits:   # each range of ten digits becomes 0-9
   - "0660"   # Arabic-Indic
   - "06F0"   # Extended Arabic-Indic (used with Urdu)
-# Which language a text is in, by the script most of its letters are in. Only scripts listed here are labelled: a text
-# in any other script gets no language (nothing is guessed, and Latin pages keep today's behaviour).
-language_by_script:
-  ARABIC: ur
+# Which language a text is in. A text is labelled only when most of its letters are in a script listed here.
+# `languages`: the language code is given only with evidence: at least `min_letters` of its own letters (letters that
+# the other languages written in that script do not use). Without evidence the text gets the script tag from
+# `script_tags` (ISO 15924, lower case, four letters), never a guessed language. Latin and other scripts: no label.
 min_script_share: 0.5   # share of the letters that must be in the script
+script_tags:
+  ARABIC: arab
+languages:
+  ARABIC:
+    ur:
+      letters: ["ٹ", "ڈ", "ڑ", "ں", "ے", "ہ", "ھ"]   # Urdu-only forms (Arabic and Persian do not use them)
+      min_letters: 3
