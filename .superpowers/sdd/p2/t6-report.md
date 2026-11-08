@@ -62,3 +62,31 @@ Dry run after the rulings (same method as above):
 - `_load_programme` passes only the columns it has (level, field, region) to `link_programme(..., cause="import", cause_ref, actor)`.
 - `coverage_map` ignores withdrawn facts (stale with an empty value), with a test.
 - The 4 programme tests pass. tests/os: 2493 passed, 1 skipped, 1 xfailed. Legacy: 2560 passed, 13 skipped. tach, freeze, alembic heads (one OS head), traceability OK.
+
+## T6 review fixes (fix(os): T6 review fixes (R-67, R-68))
+Critical
+1. Real imports with missing ports: rows that need a review item with no review queue connected are refused (`ImportRefused`; nothing logged or loaded; CLI exit 2, API 409). With no allow-list connected no row goes above `unconfirmed` (`allow_list_not_connected`). `except ImportError: pass` in `wire_other_tasks` now only leaves the port None, and None has these consequences. Tests for both.
+2. Undo handles every revision kind: `entity` chains restore or close registry rows, `programme` revisions restore the six programme columns from `before` (and the created programmes are excluded), `link` revisions take the added links away; conflict detection is per kind and subject. Scenario A (institution exists, import only places programmes) and scenario B (import re-links an existing programme) are tested, plus a link-revision test.
+Important
+3. A failed import stays live (unique index covers `failed`); undo handles failed imports; `programmes_created` is saved on failure. Test: failed import, same file refused, undo, re-import.
+4. CSV formula guard (`safe_cell`: `= + - @`, tab, CR get a leading apostrophe) in the report, the template/workbook cells and the queue export.
+5. Facts attach only to programmes that were loaded or already exist; otherwise `programme_not_loaded` (a queued or rejected programme row is not "loaded").
+6. A missing `read_method` (legacy Programmes layouts) is never assumed to be fetch: the row needs a re-fetch.
+7. The §11.3 waiver is scoped: owner-accepted mode, a decision reference, and the sha256 of one of the five v4 files (listed in `format.yaml`); any other file keeps the re-fetch. Batch 2/3/5 programme rows (no `read_method` column) are covered by the waiver in those files.
+8. A legacy batch 2 row with no value column becomes one placeholder row and is rejected `no_value`; a programme row with no value column is rejected `no_value` in general.
+9. API actor is the identity behind the admin token (`admin`); the typed name is stored as `note_actor` (also on the import log). The undo ignores the typed name.
+Minor
+10/11. Spec clarifications written in the plan (one check -> `confirmed`, never `verified`; `conflict` stays `unconfirmed`; check 1 `not_readable` -> `unconfirmed`; and the rest), see "Spec clarifications" in docs/superpowers/plans/2026-11-07-p2-t6-sheets.md.
+12. The report is kept in the import log (`os_imports.report_csv`, `GET /admin/imports/{id}/report`); the template is built in memory (no temp file).
+13. Undo marks the import undone in the same transaction as the data.
+14. Row, column, file-size and unpacked-size caps (`limits` in `format.yaml`), zip check before parsing, defusedxml required (added to requirements).
+15. `seen_keys` are registered only after a row passed every check. The PROPOSED intake patterns stay marked as such in `format.yaml` and in the plan; for the owner to confirm:
+   - `Fall|Spring|Summer|Autumn|Winter YYYY` -> that term and year (`Fall 2027` -> fall 2027)
+   - `Session YYYY-YY` and `YYYY-YY` -> term `session`, year = first year (`Session 2026-27` -> 2026)
+   - `Batch YYYY`, `Annual YYYY` -> term `batch` / `annual`, year YYYY
+   - `YYYY` -> no term, year YYYY
+   - anything else (`standing`, `current`, `previous cycle ...`) -> queued `intake_unresolved`.
+
+Migration `os_0027` edited in place (new columns `note_actor`, `report_csv`; unique index also covers `failed`).
+Dry-run change: 110 Sindh programme rows (seat allocations whose number is only in the quote/note, with no cut-off) are now rejected `no_value`; the rest as before. With every list loaded: Programmes accepted 71, unconfirmed 116, queued 40, rejected 136 (no_value 110, institution_not_loaded 25, placeholder 1). Institutions and Facts unchanged.
+Checks: tests/os 2524 passed, 1 skipped, 1 xfailed; legacy 2560 passed, 13 skipped; tach, freeze, alembic heads (one OS head), traceability OK.

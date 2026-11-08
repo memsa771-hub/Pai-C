@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
         p.add_argument("--batch-ref", default=None)
         p.add_argument("--report", default=None)
     sub.choices["validate"].add_argument("--lists", default=None)
+    sub.choices["validate"].add_argument("--decision-ref", default=None,
+                                         help="the owner's decision reference: shows the plan with the spec §11.3 waiver")
     sub.choices["validate"].add_argument("--no-list-needed", action="store_true",
                                          help="what if every official list were loaded (dry run only)")
     imp = sub.choices["import"]
@@ -81,7 +83,7 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             return 0
         if args.cmd == "validate":
             ctx = build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
-                                family=args.family, list_urls=_list_urls(Path(args.lists) if args.lists else None,
+                                family=args.family, decision_ref=args.decision_ref, list_urls=_list_urls(Path(args.lists) if args.lists else None,
                                                                          args.country),
                                 require_list=not args.no_list_needed)
             _, results = plan_file(Path(args.file), ctx)
