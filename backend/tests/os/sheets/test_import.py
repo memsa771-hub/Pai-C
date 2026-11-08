@@ -158,15 +158,31 @@ def test_reviewer_mode_verifies_only_with_two_attested_different_reviewers(engin
     assert "accepted_by" not in ev
 
 
-def test_model_read_rows_stay_unconfirmed_until_the_quote_matches_on_a_refetched_page(engine, clean, tmp_path):
+def rev_import(tmp_path, d, institutions, facts=()):
+    ok = checks(n1="amina", n2="bilal")
+    d.attested = lambda ref, batch: ref in ("amina", "bilal")
+    path = workbook(tmp_path, [{**i, **ok} for i in institutions], [{**f, **ok} for f in facts])
+    return run_import(path, d, mode="reviewers", actor="dev", country=COUNTRY, batch_ref="b7")
+
+
+def test_owner_accepted_model_read_rows_are_verified_without_refetch_and_the_waiver_is_recorded(engine, clean, tmp_path):
+    load_list(engine)
+    res = imp(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="webfetch (model-extracted)")])
+    row = fact_row(engine, "deadline_close")
+    assert row.status == "verified" and row.read_method == "model"
+    assert row.evidence[0]["refetch_waived"] == "P2 spec §11.3" and row.evidence[0]["decision_ref"] == DECISION
+    assert [r.reason for r in res.rows if r.sheet == "Facts"] == ["both_checks"]
+
+
+def test_reviewer_mode_model_read_rows_stay_unconfirmed_until_the_quote_matches_on_a_refetched_page(engine, clean,
+                                                                                                    tmp_path):
     load_list(engine)
     model = {"read_method": "webfetch (model-extracted)"}
-    rows = [fact(1, "T-INST-001", field_="m_ok", **model), fact(2, "T-INST-001", field_="m_bad", quote_verbatim="Not on it",
-                                                                    **model),
+    rows = [fact(1, "T-INST-001", field_="m_ok", **model),
+            fact(2, "T-INST-001", field_="m_bad", quote_verbatim="Not on it", **model),
             fact(3, "T-INST-001", field_="m_blocked", source_url="https://blocked.alpha.test/x", **model)]
-    page = Page("Admissions. Last date 2027-07-15 for all.")
-    fetcher = FakeFetcher({NOTICE: page})
-    res = imp(tmp_path, deps(engine, fetcher=fetcher), [inst(1)], rows)
+    fetcher = FakeFetcher({NOTICE: Page("Admissions. Last date 2027-07-15 for all.")})
+    res = rev_import(tmp_path, deps(engine, fetcher=fetcher), [inst(1)], rows)
     assert fact_row(engine, "m_ok").status == "verified"
     assert fact_row(engine, "m_bad").status == "unconfirmed"
     assert fact_row(engine, "m_blocked").status == "unconfirmed"
@@ -174,11 +190,12 @@ def test_model_read_rows_stay_unconfirmed_until_the_quote_matches_on_a_refetched
     assert reasons["T-F-002"] == "quote_not_found" and reasons["T-F-003"] == "refetch_blocked:not_official"
     assert sum(1 for url, _ in fetcher.calls if url == NOTICE) == 1  # one fetch per URL
     assert fetcher.calls[0][1].region == "punjab"
+    assert "refetch_waived" not in fact_row(engine, "m_ok").evidence[0]
 
 
-def test_without_a_fetcher_a_model_read_row_cannot_be_confirmed(engine, clean, tmp_path):
+def test_reviewer_mode_without_a_fetcher_a_model_read_row_cannot_be_confirmed(engine, clean, tmp_path):
     load_list(engine)
-    res = imp(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="image (machine-read)")])
+    res = rev_import(tmp_path, deps(engine), [inst(1)], [fact(1, "T-INST-001", read_method="image (machine-read)")])
     assert fact_row(engine, "deadline_close").status == "unconfirmed"
     assert [r.reason for r in res.rows if r.sheet == "Facts"] == ["refetch_not_run"]
 

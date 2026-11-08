@@ -114,6 +114,35 @@ def test_a_non_institution_kind_needs_no_official_list_but_a_region(tmp_path):
     assert rows[("Institutions", "T-INST-002")].reason == "missing_region"
 
 
+def test_reviewers_mode_keeps_the_refetch_for_model_read_rows(tmp_path):
+    c = PlanContext(country=COUNTRY, mode=REVIEWERS, batch_ref="b", attested=lambda r, b: True, list_urls=dict(LISTS))
+    ok = checks(n1="amina", n2="bilal")
+    _, results = plan_file(workbook(tmp_path, [inst(1, chk=ok)], [
+        fact(1, "T-INST-001", chk=ok, read_method="webfetch (model-extracted)"), fact(2, "T-INST-001", field_="b", chk=ok)]),
+        c)
+    f1, f2 = [r for r in results if r.sheet == "Facts"]
+    assert f1.needs_refetch and "refetch_waived" not in f1.payload["provenance"] and not f2.needs_refetch
+
+
+def test_a_single_check_model_read_row_keeps_the_refetch_even_in_owner_mode(tmp_path):
+    rows = plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", read_method="image (machine-read)", chk=checks("correct", None))])
+    r = rows[("Facts", "T-F-001")]
+    assert r.level == "confirmed" and r.needs_refetch
+
+
+def test_foreign_rows_and_what_hangs_on_them_are_skipped_not_rejected(tmp_path):
+    rows = plan(tmp_path, [inst(1), inst(2, ctype="foreign_qualification_awarding_body", region="United Kingdom"),
+                           inst(3, ctype="foreign_qualification_awarding_body", region="australia")],
+                [fact(1, "T-INST-002"), fact(2, "T-INST-001", field_="x")],
+                [prog(1, "T-INST-003")])
+    assert rows[("Institutions", "T-INST-002")].reason == "out_of_scope_region"
+    assert rows[("Institutions", "T-INST-003")].bucket == "skipped"
+    assert (rows[("Facts", "T-F-001")].bucket, rows[("Facts", "T-F-001")].reason) == ("skipped", "entity_out_of_scope")
+    assert rows[("Facts", "T-F-002")].bucket == "accepted"
+    assert (rows[("Programmes", "T-PRG-001")].bucket, rows[("Programmes", "T-PRG-001")].reason) == (
+        "skipped", "entity_out_of_scope")
+
+
 def test_the_allow_list_check_caps_a_row_at_unconfirmed(tmp_path):
     rows = plan(tmp_path, [inst(1)], official=lambda url, scope: False)
     r = rows[("Institutions", "T-INST-001")]
@@ -145,7 +174,11 @@ def test_fact_rows_become_buckets_with_reasons(tmp_path):
     assert got["T-F-009"] == ("unconfirmed", "no_quote")  # no quote: never above unconfirmed
     assert got["T-F-010"] == ("rejected", "duplicate_key")
     assert got["T-F-011"] == ("rejected", "non_official_source")
-    assert got["T-F-012"] == ("accepted", "both_checks") and rows[("Facts", "T-F-012")].needs_refetch
+    assert got["T-F-012"] == ("accepted", "both_checks")
+    # owner ruling §11.3: both AI checks accepted a model-read row, so no re-fetch, and the waiver is on the record
+    assert not rows[("Facts", "T-F-012")].needs_refetch
+    assert rows[("Facts", "T-F-012")].payload["provenance"]["refetch_waived"] == "P2 spec §11.3"
+    assert "refetch_waived" not in rows[("Facts", "T-F-001")].payload["provenance"]
     assert got["T-F-013"] == ("rejected", "bad_language")
     assert got["T-F-014"] == ("queued", "checker2_rejected")
     assert rows[("Facts", "T-F-001")].payload["term"] == "fall" and rows[("Facts", "T-F-001")].payload["year"] == 2027

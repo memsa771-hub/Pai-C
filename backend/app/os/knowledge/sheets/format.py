@@ -71,6 +71,10 @@ class Format:
         host = host.lower()
         return any(host == h or host.endswith("." + h) for h in self.raw["not_official_hosts"])
 
+    def out_of_scope_region(self, text: str | None) -> bool:
+        t = (text or "").strip().lower()
+        return t in {r.lower() for r in self.raw["out_of_scope_regions"]}
+
     def kind_of_type(self, type_text: str | None) -> str | None:
         t = (type_text or "").strip().lower()
         for kind, types in self.raw["type_kinds"].items():

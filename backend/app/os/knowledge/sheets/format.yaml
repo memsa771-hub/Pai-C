@@ -56,6 +56,10 @@ source_types:
 # hosts that are never a source (R-72); the allow-list (T3) is the positive check
 not_official_hosts: [wikipedia.org, facebook.com, instagram.com, drive.google.com, educationinkarachi.net, ajkbise.net]
 
+# Institutions whose region is another country are out of scope for this phase (abroad is R-77): skipped, not
+# rejected, and so are the facts and programmes of those rows. Spellings as the batches write them, any case.
+out_of_scope_regions: [Australia, Switzerland, United Kingdom, United States of America]
+
 # Intake text -> (term, year). The year is the first year of a session. PROPOSED mapping, for the owner to confirm: an
 # intake text no rule matches is queued ("intake_unresolved"), never guessed.
 intake_patterns:
@@ -91,5 +95,8 @@ programme_facts:
 
 # Who the owner-accepted import (P2-D16a) accepts as the two checks, and the provenance it records.
 owner_accepted:
+  # owner ruling, P2 spec §11.3: a model- or image-read row that both AI checks accepted is `verified` without a
+  # re-fetch. Only in this mode; the reviewers mode keeps the re-fetch. Recorded in each fact's provenance.
+  refetch_waiver: "P2 spec §11.3"
   checker1: {claude_check_1: ["Claude – check 1", "Claude - check 1"]}
   checker2: {claude_check_2: ["Claude – check 2 (independent)", "Claude - check 2 (independent)"]}

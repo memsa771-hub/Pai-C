@@ -179,7 +179,12 @@ def _cap(result: RowResult, url: str, region: str | None, quote: str | None, ctx
     elif ctx.official is not None and not ctx.official(url, _scope(region, ctx)):
         _lower(result, "source_not_on_allow_list")
     elif read_method in ctx.fmt.needs_refetch:
-        result.needs_refetch = True
+        if ctx.mode == OWNER_ACCEPTED and result.level == "verified":
+            # owner ruling P2 spec §11.3: both AI checks accepted it, so no re-fetch; the waiver is on the record
+            prov = result.payload.setdefault("provenance", {})
+            prov["refetch_waived"] = ctx.fmt.raw["owner_accepted"]["refetch_waiver"]
+        else:
+            result.needs_refetch = True
 
 
 def _lower(result: RowResult, reason: str) -> None:
@@ -215,6 +220,9 @@ def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
             continue
         if (_text(r.get("in_scope")) or "yes").lower() in ("no", "n", "false"):
             res.bucket, res.reason = "skipped", "out_of_scope"
+            continue
+        if fmt.out_of_scope_region(_text(r.get("region"))):
+            res.bucket, res.reason, res.detail = "skipped", "out_of_scope_region", str(r.get("region"))
             continue
         chk = read_checks(r, ctx)
         res.bucket, res.level, res.reason, res.queue_kind = decide(status, chk, False)
@@ -284,6 +292,8 @@ def _fact_key_seen(seen: set, key: tuple) -> bool:
 
 def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list[RowResult]) -> list[RowResult]:
     fmt = ctx.fmt
+    abroad = {res.row_id for res in institutions if res.reason in ("out_of_scope", "out_of_scope_region")}
+    skipped_programmes: set[str] = set()
     registry_ids = {res.row_id: res.payload["entry"].entity_id for res in institutions
                     if res.bucket in ("accepted", "unconfirmed") and "entry" in res.payload}
 
@@ -309,6 +319,10 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         if status not in fmt.claude_statuses:
             res.reason, res.detail = "bad_status", str(status)
             continue
+        if (_text(r.get("inst_id")) or "") in abroad:
+            res.bucket, res.reason = "skipped", "entity_out_of_scope"
+            skipped_programmes.add(rid)
+            continue
         chk = read_checks(r, ctx)
         res.bucket, res.level, res.reason, res.queue_kind = decide(status, chk, True)
         res.detail = "; ".join(chk.notes)
@@ -321,7 +335,8 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         else:
             programme_refs.add(rid)
     for r in batch.sheets.get("Facts", []):
-        out.append(_fact_row(r, ctx, inst_registry_id, programme_refs | _all_programme_ids(batch), seen_keys))
+        out.append(_fact_row(r, ctx, inst_registry_id, programme_refs | _all_programme_ids(batch), seen_keys,
+                             abroad | skipped_programmes))
     return out
 
 
@@ -379,7 +394,8 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
     return None, ""
 
 
-def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: set[str], seen_keys) -> RowResult:
+def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: set[str], seen_keys,
+              out_of_scope: set[str]) -> RowResult:
     fmt = ctx.fmt
     rid = _text(r.get("fact_id")) or ""
     res = RowResult("Facts", rid, r["_row"], "rejected")
@@ -389,6 +405,9 @@ def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: set[str], se
     status = _text(r.get("claude_status"))
     if status not in fmt.claude_statuses:
         res.reason, res.detail = "bad_status", str(status)
+        return res
+    if (_text(r.get("entity_id")) or "") in out_of_scope:
+        res.bucket, res.reason = "skipped", "entity_out_of_scope"
         return res
     chk = read_checks(r, ctx)
     hs_col = (_text(r.get("high_stakes")) or "").upper()
