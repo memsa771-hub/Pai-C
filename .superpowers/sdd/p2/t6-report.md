@@ -57,3 +57,8 @@ What the reasons mean:
 Dry run after the rulings (same method as above):
 - Lists as present: Institutions accepted 428 (verified), unconfirmed 1, queued 4, rejected 117 (no_official_list 94, no_quote 13, unknown_region 9, non_official 1), skipped 20 (lead 3, in_scope=no 6, foreign 11). Programmes accepted 3, queued 40, rejected 320 (319 institution_not_loaded + placeholder). Facts accepted 150 (verified, 0 waiting for re-fetch), unconfirmed 12, queued 36, rejected 112 (entity_unknown 107, entity_not_single 5), skipped 26 (foreign 22, lead 3, searched 1).
 - Every list loaded: Institutions accepted 522, unconfirmed 1, queued 4, rejected 23 (no_quote 13, unknown_region 9, non_official 1), skipped 20. Programmes accepted 181, unconfirmed 116 (no_quote), queued 40, rejected 26. Facts accepted 172, unconfirmed 13, queued 41, rejected 84 (entity_unknown 77, entity_not_single 5, non_official 2), skipped 26.
+
+## Final (after merging the T2 fix 051a0f4)
+- `_load_programme` passes only the columns it has (level, field, region) to `link_programme(..., cause="import", cause_ref, actor)`.
+- `coverage_map` ignores withdrawn facts (stale with an empty value), with a test.
+- The 4 programme tests pass. tests/os: 2493 passed, 1 skipped, 1 xfailed. Legacy: 2560 passed, 13 skipped. tach, freeze, alembic heads (one OS head), traceability OK.
