@@ -21,6 +21,10 @@ class MonitorConfig:
     report_reasons: tuple[str, ...]
     max_reported_facts_per_day: int
     report_text_max_chars: int
+    escalate_after_reporters: int
+    seen_runs_needed: int
+    sanity_no_match_min_facts: int
+    sanity_max_shrink_percent: int
 
 
 @cache
@@ -28,8 +32,12 @@ def load_config(path: Path = CONFIG_FILE) -> MonitorConfig:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     cfg = MonitorConfig(tuple(raw["monitored_statuses"]), tuple(int(c) for c in raw["gone_http"]),
                         tuple(raw["report_reasons"]), int(raw["max_reported_facts_per_day"]),
-                        int(raw["report_text_max_chars"]))
-    if not cfg.report_reasons or cfg.max_reported_facts_per_day < 1 or set(cfg.monitored_statuses) - {"confirmed", "verified"}:
+                        int(raw["report_text_max_chars"]), int(raw["escalate_after_reporters"]),
+                        int(raw["seen_runs_needed"]), int(raw["sanity_no_match_min_facts"]),
+                        int(raw["sanity_max_shrink_percent"]))
+    if (not cfg.report_reasons or cfg.max_reported_facts_per_day < 1 or cfg.escalate_after_reporters < 2
+            or cfg.seen_runs_needed < 1 or not 1 <= cfg.sanity_max_shrink_percent <= 100
+            or set(cfg.monitored_statuses) - {"confirmed", "verified"}):
         raise ValueError("monitor/config.yaml is not valid")
     return cfg
 

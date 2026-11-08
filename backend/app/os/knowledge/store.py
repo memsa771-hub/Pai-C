@@ -108,7 +108,8 @@ def _void_reviews(conn, tenant_id: str, fact_id: int, except_item: int | None, a
                           .values(status="closed", resolution="void", closed_at=func.now())
                           .returning(RI.c.batch_ref, RI.c.payload)).all()
     checkable = after.status == "confirmed" or (
-        after.status == "unconfirmed" and after.read_method in load_policy().compare_with_original)
+        after.status == "unconfirmed" and (after.read_method in load_policy().compare_with_original
+                                           or after.recheck_reason is not None))
     if voided and checkable:
         old = voided[0]
         author = (old.payload or {}).get("author_ref")

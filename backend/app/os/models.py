@@ -248,7 +248,7 @@ knowledge_facts = Table(
     _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
     _in("read_method", READ_METHODS, "ck_os_knowledge_facts_read_method"),
     CheckConstraint("language ~ '^[a-z]{2,3}$'", name="ck_os_knowledge_facts_language"),
-    CheckConstraint("recheck_reason IS NULL OR recheck_reason IN ('monitor', 'report')",
+    CheckConstraint("recheck_reason IS NULL OR recheck_reason IN ('monitor', 'report', 'report_escalated')",
                     name="ck_os_knowledge_facts_recheck"),
 )
 
@@ -1041,6 +1041,16 @@ fact_reports = Table(
     _created(),
     Index("ix_os_fact_reports_student", "tenant_id", "student_ref", "created_at"),
     Index("ix_os_fact_reports_fact", "tenant_id", "fact_id"),
+)
+
+monitor_seen = Table(  # a change monitoring has seen once: it is acted on only when a later run sees it too
+    "os_monitor_seen", md,
+    _id(), _tenant(),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT"), nullable=False),
+    Column("reason", Text, nullable=False),
+    Column("first_run_id", BigInteger, nullable=False),
+    Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "fact_id", name="uq_os_monitor_seen_fact"),
 )
 
 monitor_runs = Table(

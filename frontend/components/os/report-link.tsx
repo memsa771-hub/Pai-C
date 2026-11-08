@@ -2,20 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
-import { asReportTexts, reportOutcome, type OsReportTexts } from '@/lib/os-report';
+import { asReportTexts, asReportableUrls, reportOutcome, type OsReportTexts } from '@/lib/os-report';
 
-let cached: Promise<OsReportTexts | null> | null = null;
+interface Loaded { texts: OsReportTexts; urls: Set<string> }
+let cached: Promise<Loaded | null> | null = null;
 
-/** The approved sentences, asked for once. An answer that is not the texts (the part is off) leaves the link out. */
-function loadTexts(): Promise<OsReportTexts | null> {
-  cached ??= Promise.resolve().then(() => workspaceApi.getOsReportTexts()).then(asReportTexts).catch(() => null);
+/** The approved sentences and the pages that have facts to report, asked for once. An answer that is not the texts (the
+ * part is off, OS_REPORTS unset) leaves the link out. */
+function load(): Promise<Loaded | null> {
+  cached ??= Promise.resolve().then(async () => {
+    const texts = asReportTexts(await workspaceApi.getOsReportTexts());
+    return texts ? { texts, urls: asReportableUrls(await workspaceApi.getOsReportSources()) } : null;
+  }).catch(() => null);
   return cached;
 }
 
 /** "Report as wrong" under a source line (R-28): a reason, optional words, one send. The facts behind the page go back to
  * "not confirmed" at once on the server. Renders nothing until the sentences are there. */
 export function ReportLink({ url }: { url: string }) {
-  const [texts, setTexts] = useState<OsReportTexts | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [detail, setDetail] = useState('');
@@ -24,11 +29,12 @@ export function ReportLink({ url }: { url: string }) {
 
   useEffect(() => {
     let live = true;
-    void loadTexts().then((t) => { if (live) setTexts(t); });
+    void load().then((l) => { if (live) setLoaded(l); });
     return () => { live = false; };
   }, []);
 
-  if (!texts) return null;
+  if (!loaded || !loaded.urls.has(url)) return null;  // only under a page that has facts to report
+  const texts = loaded.texts;
   const t = texts.texts;
   if (said && !open) return <span data-report-said role="status">{said}</span>;
   if (!open) {

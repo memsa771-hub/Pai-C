@@ -16,7 +16,7 @@ from app.os.knowledge import Fact, SqlKnowledge
 from app.os.knowledge.changes import after_fact_change
 from app.os.knowledge.programmes import Programme, ProgrammeStore
 from app.os.knowledge.research.pages import PageGateway
-from app.os.knowledge.review import ReviewQueue
+from app.os.knowledge.review import ReviewerStore, ReviewQueue
 from app.os.knowledge.sources.snapshots import SnapshotStore
 from app.os.monitor import run as monitor
 from app.os.monitor.config import load_config, load_texts
@@ -26,7 +26,7 @@ from app.os.settings import load_settings
 from app.os.workers import confirm_fact
 from app.os.workers.jobs import JOB_FACTORIES
 from tests.os.registry.helpers import inst, olist, store
-from tests.os.test_api import ADMIN, TOKEN, contract
+from tests.os.test_api import TOKEN, contract
 
 FAKE = Path(__file__).parent / "playbooks"
 HOST = "www.alpha-university.test"
@@ -34,17 +34,26 @@ PATH = "/admissions/notice"
 URL = f"https://{HOST}{PATH}"
 QUOTE = "Applications close on 1 August 2027"
 AT = datetime(2027, 4, 1, tzinfo=UTC)
-D1, D2 = date(2027, 5, 2), date(2027, 5, 3)
+D1, D2, D3 = date(2027, 5, 2), date(2027, 5, 3), date(2027, 5, 4)
 pytestmark = pytest.mark.req("R-27", "R-28")
 
 
+def page(close="Applications close on 1 August 2027") -> str:
+    """The fixture university's notice with one sentence changed (so the page does not shrink)."""
+    return ("<html><body><h1>Admissions notice: fall 2027</h1><p>Applications for BS Computing open on 1 June 2027. "
+            f"{close}.</p><p>Fee per semester: 1000 units.</p><p><a href='/admissions/apply'>How to apply</a></p>"
+            "</body></html>")
+
+
 class World:
-    def __init__(self, engine, os_db, sites):
+    def __init__(self, engine, os_db, sites, reports=True):
         self.engine, self.sites = engine, sites
-        settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true"})
+        settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true",
+                                  **({"OS_REPORTS": "1"} if reports else {})})
         self.svc = make_services(settings, engine=engine, playbooks=load_playbook_dir(FAKE), today=lambda: D1)
         self.kb = SqlKnowledge(engine, "pai")
-        self.queue = ReviewQueue(engine, "pai", self.kb)
+        self.queue = ReviewQueue(engine, "pai", self.kb, on_fact_change=lambda sc, ref, fld, fid, st, yr, done:
+                                 self.changed(sc, ref, fld, fid, st, yr))
         self.snapshots = SnapshotStore(engine, "pai")
         self.gateway = PageGateway(engine, "pai", settings, client=sites.client(), sleep=lambda s: None)
         ProgrammeStore(engine, "pai").upsert(Programme(
@@ -67,7 +76,7 @@ class World:
     def plan(self, student="stu-1") -> int:
         return self.svc.plans.start_plan(
             __import__("app.os.contracts.route_contract", fromlist=["RouteContract"]).RouteContract.model_validate(
-                contract(student))).plan_id
+                contract(student, external_ref=f"ext-{student}"))).plan_id
 
     def changed(self, scope, ref, field, fact_id, status, year) -> None:
         after_fact_change(self.svc.plans, self.svc.kernel, scope, ref, field, fact_id, status, year, complete=False)
@@ -89,6 +98,11 @@ class World:
 @pytest.fixture
 def w(engine, clean, os_db, fixture_sites):
     return World(engine, os_db, fixture_sites)
+
+
+@pytest.fixture
+def w_off(engine, clean, os_db, fixture_sites):
+    return World(engine, os_db, fixture_sites, reports=False)
 
 
 def items(w, kind):
@@ -129,9 +143,12 @@ def test_a_page_change_in_season_resets_the_fact_pauses_the_step_and_queues_the_
     assert (first["windows"], first["urls"], first["facts"], first["taken_back"]) == (1, 1, 1, 0)
     assert w.fact().status == "confirmed" and items(w, "change") == []
     # the official page changes: the deadline moved
-    w.sites.set_page(HOST, PATH, "<html><body><p>Applications close on 15 August 2027.</p></body></html>")
-    second = w.run(D2)
-    assert (second["taken_back"], second["page_changed"]) == (1, 1)
+    w.sites.set_page(HOST, PATH, page("Applications close on 15 August 2027"))
+    second = w.run(D2)  # seen once: a temporary page problem must not cost a fact
+    assert (second["taken_back"], second["seen_once"], second["page_changed"]) == (0, 1, 1)
+    assert w.fact().status == "confirmed" and w.task(plan).blocked_reason is None and items(w, "change") == []
+    third = w.run(D3)  # seen on a second, separate run
+    assert third["taken_back"] == 1
     f = w.fact()
     assert (f.status, f.recheck) == ("unconfirmed", "monitor") and "changed" in f.conflict_note
     last = w.kb.revisions(w.fact_id)[-1]
@@ -142,6 +159,10 @@ def test_a_page_change_in_season_resets_the_fact_pauses_the_step_and_queues_the_
     with w.engine.connect() as conn:  # the student's plan was revised through the kernel
         kinds = [r.type for r in conn.execute(select(models.events.c.type).where(models.events.c.plan_id == plan))]
     assert kinds.count("plan_revised") >= 1
+    with w.engine.connect() as conn:  # and the student is told: the plan's "updated" notice and the bell event
+        notices = conn.execute(select(models.tasks.c.title).where(models.tasks.c.plan_id == plan,
+                                                                  models.tasks.c.template_key == "plan_updated")).all()
+    assert [n.title for n in notices] == ["Your plan was updated"]
     [item] = items(w, "change")  # and the item is queued, with where to look
     assert (item.fact_id, item.payload["reason"], item.payload["url"]) == (w.fact_id, "quote_gone", URL)
     assert item.payload["snapshot_id"] and w.snapshots.get(item.payload["snapshot_id"]).text.count("15 August") == 1
@@ -172,15 +193,21 @@ def test_off_season_nothing_is_read(w):
     assert not [r for r in w.sites.requests if r[0] == HOST]
 
 
-def test_a_gone_page_takes_its_facts_back_but_a_failing_page_does_not(w):
+def test_a_gone_page_counts_only_when_seen_twice_and_a_failing_page_never_does(w):
     w.plan()
     w.run(D1)
     w.sites.set_page(HOST, PATH, "server trouble", status=500)
     broken = w.run(D2)
     assert broken["unreadable"] == 1 and broken["taken_back"] == 0 and w.fact().status == "confirmed"
     w.sites.set_page(HOST, PATH, "not found", status=404)
-    gone = w.run(date(2027, 5, 4))
-    assert gone["taken_back"] == 1
+    once = w.run(D3)
+    assert (once["taken_back"], once["seen_once"]) == (0, 1) and w.fact().status == "confirmed"
+    w.sites.set_page(HOST, PATH, page())
+    back = w.run(date(2027, 5, 5))  # the page is back: what was seen once is forgotten
+    assert back["taken_back"] == 0 and back["seen_once"] == 0
+    w.sites.set_page(HOST, PATH, "not found", status=404)
+    assert w.run(date(2027, 5, 6))["seen_once"] == 1  # counting starts again
+    assert w.run(date(2027, 5, 7))["taken_back"] == 1
     assert items(w, "change")[0].payload["reason"] == "page_gone"
 
 
@@ -188,9 +215,10 @@ def test_a_verified_fact_is_taken_back_too_and_its_open_verify_item_is_voided(w)
     k = w.kb
     k.set_status(w.fact_id, "verified", cause="review", actor="tester")
     item, _ = w.queue.open_item("verify", dedupe_key="v", fact_id=w.fact_id)
-    w.sites.set_page(HOST, PATH, "<p>Applications close on 9 September 2027</p>")
+    w.sites.set_page(HOST, PATH, page("Applications close on 9 September 2027"))
     w.plan()
-    assert w.run(D1)["taken_back"] == 1
+    w.run(D1)
+    assert w.run(D2)["taken_back"] == 1
     assert w.fact().status == "unconfirmed"
     assert w.queue.get_item(item).resolution == "void"
 
@@ -213,10 +241,9 @@ def test_the_job_is_registered_but_scheduled_only_with_the_flag(engine, clean, o
     assert load_settings({"OS_DATABASE_URL": os_db, "OS_MONITOR": "1"}).monitor is True
 
 
-# --- reports (row 6.23) -----------------------------------------------------------------------------------------------------
+# --- reports (row 6.23) and the owner ruling of 2026-11-08 ---------------------------------------------------------------
 
-@pytest.fixture
-def api(w):
+def make_api(w):
     app = FastAPI()
     app.include_router(build_router(lambda: w.svc), prefix="/v1/os")
 
@@ -227,40 +254,140 @@ def api(w):
 
     app.dependency_overrides[current_student_ref] = student
     app.dependency_overrides[current_student_ref_for_write] = student
-    c = TestClient(app)
-    c.plan = w.plan()
+    return TestClient(app)
+
+
+@pytest.fixture
+def api(w):
+    c = make_api(w)
+    c.plan = w.plan("stu-1")
+    c.plan2 = w.plan("stu-2")
+    c.plan3 = w.plan("stu-3")
     return c
 
 
-S1, S2 = {"X-Test-Student": "stu-1"}, {"X-Test-Student": "stu-2"}
+S1, S2, S3 = {"X-Test-Student": "stu-1"}, {"X-Test-Student": "stu-2"}, {"X-Test-Student": "stu-3"}
+
+
+def report(api, w, headers=S1, reason="wrong_date", text=None, fid=None):
+    return api.post(f"/v1/os/facts/{fid or w.fact_id}/report", headers=headers, json={"reason": reason, "text": text})
+
+
+def blocked(w, plan) -> str | None:
+    return w.task(plan).blocked_reason
 
 
 @pytest.mark.req("R-28")
-def test_a_student_report_resets_the_fact_pauses_the_step_and_queues_the_item(w, api):
-    r = api.post(f"/v1/os/facts/{w.fact_id}/report", headers=S1,
-                 json={"reason": "wrong_date", "text": "My teacher says it moved to September."})
+def test_a_report_shows_not_confirmed_to_everyone_but_only_the_reporters_steps_wait(w, api):
+    r = report(api, w, text="My teacher says it moved to September.")
     assert r.status_code == 200 and r.json()["status"] == "received"
     f = w.fact()
-    assert (f.status, f.recheck) == ("unconfirmed", "report")
+    assert (f.status, f.recheck) == ("unconfirmed", "report")  # "not confirmed" on every screen at once
     assert "September" not in (f.conflict_note or "")  # the student's words never reach the fact
     assert w.kb.revisions(w.fact_id)[-1].cause == "report"
-    step = w.task(api.plan)
-    assert step.state == "blocked" and step.blocked_reason == "fact_rechecking:deadline_close"
+    assert blocked(w, api.plan) == "fact_rechecking:deadline_close" and w.task(api.plan).state == "blocked"
+    for other in (api.plan2, api.plan3):  # the others keep running, on a date marked provisional
+        assert blocked(w, other) is None and w.task(other).state != "blocked" and w.task(other).provisional
     [item] = items(w, "report")
     assert item.fact_id == w.fact_id and item.payload["reports"][0]["reason"] == "wrong_date"
-    assert "September" in item.payload["reports"][0]["text"]  # only the review item holds them
-    # the same fact reported again joins the open item
-    again = api.post(f"/v1/os/facts/{w.fact_id}/report", headers=S1, json={"reason": "other"})
-    assert again.status_code == 200 and len(items(w, "report")) == 1
-    assert items(w, "report")[0].join_count == 1 and len(items(w, "report")[0].payload["reports"]) == 2
+    assert "September" in item.payload["reports"][0]["text"]  # only the review item holds the words
+    with w.engine.connect() as conn:  # the reporter is told: the plan's "updated" notice and the revision
+        notice = conn.execute(select(models.tasks.c.title).where(models.tasks.c.plan_id == api.plan,
+                                                                 models.tasks.c.template_key == "plan_updated")).all()
+    assert [n.title for n in notice] == ["Your plan was updated"]
+
+
+@pytest.mark.req("R-28")
+def test_three_different_students_make_it_everyones_wait_and_one_student_twice_does_not(w, api):
+    report(api, w, S1)
+    assert report(api, w, S1, reason="other").status_code == 200  # the same student again: still one reporter
+    assert w.fact().recheck == "report" and blocked(w, api.plan2) is None
+    report(api, w, S2)
+    assert w.fact().recheck == "report" and blocked(w, api.plan2) == "fact_rechecking:deadline_close"  # the reporter
+    assert blocked(w, api.plan3) is None
+    report(api, w, S3)  # the third different student
+    assert w.fact().recheck == "report_escalated"
+    assert all(blocked(w, p) == "fact_rechecking:deadline_close" for p in (api.plan, api.plan2, api.plan3))
+    assert len(items(w, "report")) == 1 and items(w, "report")[0].join_count == 3  # one item, joined each time
+
+
+@pytest.mark.req("R-28")
+def test_a_reviewer_who_agrees_makes_it_everyones_wait_and_asks_for_the_original(w, api):
+    report(api, w, S1)
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    [item] = items(w, "report")
+    out = w.queue.resolve(item.id, reviewer, "agrees", "the page does say September")
+    assert out["resolution"] == "agrees"
+    assert w.fact().recheck == "report_escalated" and blocked(w, api.plan3) == "fact_rechecking:deadline_close"
+    [c] = items(w, "collect")
+    assert c.fact_id == w.fact_id and c.payload["reason"] == "reported"
+
+
+@pytest.mark.req("R-28")
+def test_a_dismissed_report_puts_the_fact_back_and_the_step_runs_again(w, api):
+    """The end-to-end recovery: report, dismiss, the step is ready again."""
+    w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")
+    report(api, w)
+    assert w.fact().status == "unconfirmed" and blocked(w, api.plan) == "fact_rechecking:deadline_close"
+    verify, _ = w.queue.open_item("verify", dedupe_key="v", fact_id=w.fact_id)
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    [item] = items(w, "report")
+    with pytest.raises(Exception):  # a note is needed
+        w.queue.resolve(item.id, reviewer, "dismissed", " ")
+    out = w.queue.resolve(item.id, reviewer, "dismissed", "the page still says 1 August")
+    assert (out["resolution"], out["fact_status"]) == ("stands", "verified")  # the status it had before
+    f = w.fact()
+    assert (f.status, f.recheck) == ("verified", None)
+    last = w.kb.revisions(w.fact_id)[-1]
+    assert (last.cause, last.actor) == ("review", "amina") and last.before["status"] == "unconfirmed"
+    step = w.task(api.plan)
+    assert step.blocked_reason is None and step.state != "blocked" and not step.provisional
+    assert w.queue.get_item(verify).resolution == "void"
+
+
+@pytest.mark.req("R-27")
+def test_a_change_item_can_say_the_fact_stands(w):
+    plan = w.plan()
+    w.run(D1)
+    w.sites.set_page(HOST, PATH, page("Applications close on 15 August 2027"))
+    w.run(D2)
+    w.run(D3)
+    assert w.task(plan).blocked_reason == "fact_rechecking:deadline_close"
+    [item] = items(w, "change")
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    assert w.queue.resolve(item.id, reviewer, "stands", "a typo on the page, fixed by the office")["fact_status"] == "confirmed"
+    assert w.fact().recheck is None and w.task(plan).blocked_reason is None
+
+
+def test_a_fact_that_changed_after_it_was_taken_back_is_not_put_back(w):
+    from app.os.knowledge.review import ReviewError
+
+    w.plan()
+    w.kb.revise(w.fact_id, status="unconfirmed", recheck="monitor", cause="monitor")
+    item, _ = w.queue.open_item("change", dedupe_key="c", fact_id=w.fact_id)
+    w.kb.revise(w.fact_id, value={"date": "2027-09-01"}, quote="Applications close on 1 September 2027", cause="research")
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    with pytest.raises(ReviewError) as e:
+        w.queue.resolve(item, reviewer, "stands", "ok")
+    assert e.value.status == 409 and w.fact().status == "unconfirmed"
+
+
+def test_sync_opens_a_verify_item_for_every_fact_being_rechecked(w):
+    w.kb.revise(w.fact_id, status="unconfirmed", recheck="monitor", cause="monitor")
+    w.queue.sync()
+    [v] = [i for i in items(w, "verify") if i.fact_id == w.fact_id]
+    reviewer, _ = ReviewerStore(w.engine, "pai").add("amina", "Amina", "checker")
+    w.queue.submit_review(v.id, reviewer, "check", "correct")  # the first positive check confirms it again
+    assert (w.fact().status, w.fact().recheck) == ("confirmed", None)
 
 
 def test_only_a_fact_the_students_plan_shows_can_be_reported(w, api):
     other = w.kb.upsert("programme", "p9", "deadline_close", Fact({"date": "2027-08-01"}, "q", "https://x.test/y", AT, 2027,
                                                                   "confirmed"))
-    assert api.post(f"/v1/os/facts/{other}/report", headers=S1, json={"reason": "other"}).status_code == 404
-    assert api.post(f"/v1/os/facts/{w.fact_id}/report", headers=S2, json={"reason": "other"}).status_code == 404  # no plan
-    assert api.post("/v1/os/facts/9999/report", headers=S1, json={"reason": "other"}).status_code == 404
+    assert report(api, w, fid=other).status_code == 404
+    assert api.post(f"/v1/os/facts/{w.fact_id}/report", headers={"X-Test-Student": "nobody"},
+                    json={"reason": "other"}).status_code == 404  # no plan
+    assert report(api, w, fid=9999).status_code == 404
     assert api.post(f"/v1/os/facts/{w.fact_id}/report", json={"reason": "other"}).status_code == 401
     assert w.fact().status == "confirmed"
 
@@ -278,18 +405,56 @@ def test_a_student_may_report_only_a_few_different_facts_a_day(w, api):
     ids = [w.kb.upsert("programme", "p1", f"field_{i}", Fact(i, "q", URL, AT, 2027, "confirmed", intake_term="winter"))
            for i in range(cap + 1)]
     for fid in ids[:cap]:
-        assert api.post(f"/v1/os/facts/{fid}/report", headers=S1, json={"reason": "other"}).status_code == 200
-    assert api.post(f"/v1/os/facts/{ids[cap]}/report", headers=S1, json={"reason": "other"}).status_code == 429
-    assert api.post(f"/v1/os/facts/{ids[0]}/report", headers=S1, json={"reason": "other"}).status_code == 200  # same fact
+        assert report(api, w, fid=fid, reason="other").status_code == 200
+    assert report(api, w, fid=ids[cap], reason="other").status_code == 429
+    assert report(api, w, fid=ids[0], reason="other").status_code == 200  # the same fact again
 
 
-def test_the_report_link_reports_every_fact_behind_a_source(w, api):
+def test_the_limit_holds_when_two_requests_arrive_at_once(w, api):
+    from concurrent.futures import ThreadPoolExecutor
+    from dataclasses import replace
+
+    from app.os.monitor.reports import ReportError, report_facts
+
+    cfg = replace(load_config(), max_reported_facts_per_day=1)
+    b = w.kb.upsert("programme", "p1", "fee_per_semester", Fact(1000, "Fee per semester: 1000 units", URL, AT, 2027,
+                                                                "confirmed", intake_term="winter"))
+    def go(fid):
+        try:
+            return report_facts(w.engine, "pai", "stu-1", [fid], "other", None, datetime.now(UTC), knowledge=w.kb,
+                                queue=w.queue, config=cfg)["status"]
+        except ReportError as e:
+            return e.status
+    with ThreadPoolExecutor(2) as pool:
+        got = sorted(map(str, pool.map(go, [w.fact_id, b])))
+    assert got == ["429", "received"]
+    with w.engine.connect() as conn:
+        assert len(conn.execute(select(models.fact_reports.c.fact_id).distinct()).all()) == 1
+
+
+def test_the_report_link_reports_every_fact_behind_a_source_or_none_of_them(w, api):
+    cap = load_config().max_reported_facts_per_day
+    for i in range(cap):  # cap + 1 facts share the page: the batch is too big, so none of it is applied
+        w.kb.upsert("programme", "p1", f"extra_{i}", Fact(i, "q", URL, AT, 2027, "confirmed", intake_term="winter"))
+    r = api.post("/v1/os/sources/report", headers=S1, json={"url": URL, "reason": "page_changed"})
+    assert r.status_code == 429
+    with w.engine.connect() as conn:
+        assert conn.execute(select(models.fact_reports.c.id)).all() == []
+    assert w.fact().status == "confirmed" and items(w, "report") == []
+    ok = api.post("/v1/os/sources/report", headers=S2, json={"url": "https://nowhere.test/", "reason": "other"})
+    assert ok.status_code == 404
+
+
+def test_a_source_report_of_a_few_facts_reports_them_all(w, api):
     w.kb.upsert("programme", "p1", "fee_per_semester", Fact(1000, "Fee per semester: 1000 units", URL, AT, 2027,
                                                             "confirmed", intake_term="winter"))
-    r = api.post("/v1/os/sources/report", headers=S1, json={"url": URL, "reason": "page_changed"})
-    assert r.status_code == 200
+    assert api.post("/v1/os/sources/report", headers=S1, json={"url": URL, "reason": "page_changed"}).status_code == 200
     assert {i.field for i in items(w, "report")} == {"deadline_close", "fee_per_semester"}
-    assert api.post("/v1/os/sources/report", headers=S1, json={"url": "https://nowhere.test/", "reason": "other"}).status_code == 404
+
+
+def test_the_link_is_offered_only_under_pages_that_have_facts(w, api):
+    assert api.get("/v1/os/report/sources", headers=S1).json() == {"urls": [URL]}
+    assert api.get("/v1/os/report/sources", headers={"X-Test-Student": "nobody"}).json() == {"urls": []}
 
 
 def test_the_report_texts_are_the_approved_ones(w, api):
@@ -297,6 +462,89 @@ def test_the_report_texts_are_the_approved_ones(w, api):
     assert [r["code"] for r in got["reasons"]] == list(load_config().report_reasons)
     assert got["texts"]["report_link"] == "Report as wrong" and got["reasons"][0]["label"] == "The date is wrong"
     assert api.get("/v1/os/report/texts").status_code == 401
+    assert "standing approval" in (Path(__file__).parents[2] / "app/os/monitor/texts.yaml").read_text()
+
+
+# --- the flags off ---------------------------------------------------------------------------------------------------------
+
+def test_with_reports_off_the_routes_do_not_exist_and_nothing_is_marked(w_off):
+    c = make_api(w_off)
+    plan = w_off.plan("stu-1")
+    h = {"X-Test-Student": "stu-1"}
+    assert c.get("/v1/os/report/texts", headers=h).status_code == 404  # so the link hides
+    assert c.get("/v1/os/report/sources", headers=h).status_code == 404
+    assert c.post(f"/v1/os/facts/{w_off.fact_id}/report", headers=h, json={"reason": "other"}).status_code == 404
+    assert c.post("/v1/os/sources/report", headers=h, json={"url": URL, "reason": "other"}).status_code == 404
+    assert w_off.fact().status == "confirmed" and w_off.task(plan).blocked_reason is None
+    assert load_settings({"OS_DATABASE_URL": "x"}).reports is False
+
+
+def test_the_suspect_path_keeps_fact_missing_when_monitor_and_reports_are_off(w_off):
+    from app.os.knowledge.sources.suspect import drop_domain_facts
+
+    plan = w_off.plan()
+    drop_domain_facts(w_off.engine, "pai", w_off.kb, HOST, w_off.changed)  # no marker given: today's behaviour
+    assert w_off.fact().status == "unconfirmed" and w_off.fact().recheck is None
+    assert w_off.task(plan).blocked_reason is None or w_off.task(plan).blocked_reason.startswith("fact_missing")
+    assert not (w_off.task(plan).blocked_reason or "").startswith("fact_rechecking")
+
+
+def test_drop_domain_facts_marks_the_facts_for_recheck_when_the_flags_are_on(w):
+    from app.os.knowledge.sources.suspect import drop_domain_facts
+
+    plan = w.plan()
+    drop_domain_facts(w.engine, "pai", w.kb, HOST, w.changed, "monitor")
+    assert w.fact().recheck == "monitor" and w.task(plan).blocked_reason == "fact_rechecking:deadline_close"
+
+
+# --- sanity: a bad page changes nothing ---------------------------------------------------------------------------------------
+
+def test_a_page_that_shrank_is_unreadable_and_does_not_become_the_last_clean_snapshot(w):
+    w.plan()
+    w.run(D1)
+    good = w.snapshots.latest(URL)
+    w.sites.set_page(HOST, PATH, "<html><body><p>Down for maintenance.</p></body></html>")
+    got = w.run(D2)
+    assert got["unreadable"] == 1 and got["seen_once"] == 0 and got["taken_back"] == 0
+    assert w.snapshots.latest(URL).id == good.id  # the broken page is kept, flagged, and never "the last clean one"
+    flagged = w.snapshots.latest(URL, clean_only=False)
+    assert flagged.flagged == "sanity_shrunk" and flagged.id != good.id
+    w.run(D3)
+    assert w.fact().status == "confirmed"
+
+
+def test_a_page_with_none_of_the_quotes_is_unreadable_when_it_backs_several_facts(w):
+    w.kb.upsert("programme", "p1", "fee_per_semester", Fact(1000, "Fee per semester: 1000 units", URL, AT, 2027,
+                                                            "confirmed", intake_term="winter"))
+    w.plan()
+    w.run(D1)
+    other = page("A different notice").replace("Fee per semester: 1000 units", "Another paragraph of about the same size")
+    w.sites.set_page(HOST, PATH, other)
+    got = w.run(D2)
+    assert (got["unreadable"], got["seen_once"], got["taken_back"]) == (1, 0, 0)
+    assert w.run(D3)["taken_back"] == 0
+
+
+def test_the_sanity_settings_are_in_config():
+    cfg = load_config()
+    assert (cfg.seen_runs_needed, cfg.sanity_no_match_min_facts, cfg.sanity_max_shrink_percent) == (2, 2, 60)
+
+
+# --- runs: one at a time, and a cut-off run is finished ---------------------------------------------------------------------
+
+def test_a_run_another_worker_holds_is_not_run_twice_and_the_retry_tick_finishes_a_cut_off_run(w):
+    from sqlalchemy import insert as sql_insert
+
+    w.plan()
+    assert w.run(D1, only_unfinished=True) == {"nothing_to_finish": True}  # no run today: the retry does nothing
+    with w.engine.begin() as conn:  # a run that started and was cut off
+        conn.execute(sql_insert(models.monitor_runs).values(tenant_id="pai", run_date=D1, started_at=AT))
+    with w.engine.connect() as holder:  # another worker is running it
+        holder.execute(select(models.monitor_runs).where(models.monitor_runs.c.run_date == D1).with_for_update())
+        assert w.run(D1) == {"locked": True}
+    done = w.run(D1, only_unfinished=True)  # the lock is gone: the retry tick finishes it
+    assert done["urls"] == 1 and "already_ran" not in done
+    assert w.run(D1, only_unfinished=True)["already_ran"] is True  # and then does nothing
 
 
 def test_a_rechecked_fact_that_is_confirmed_again_loses_the_marker_whatever_path_confirms_it(w):
@@ -325,14 +573,6 @@ def test_only_a_high_stakes_fact_under_recheck_blocks_a_step(w):
                                                           recheck="monitor"))
     w.changed("programme", "p1", "deadline_close", w.fact_id, "unconfirmed", 2027)
     assert w.task(plan).blocked_reason is None  # not high-stakes: the step runs on a provisional date, as before
-
-
-def test_drop_domain_facts_marks_the_facts_for_recheck_too(w):
-    from app.os.knowledge.sources.suspect import drop_domain_facts
-
-    plan = w.plan()
-    drop_domain_facts(w.engine, "pai", w.kb, HOST, w.changed)
-    assert w.fact().recheck == "monitor" and w.task(plan).blocked_reason == "fact_rechecking:deadline_close"
 
 
 # --- the migration --------------------------------------------------------------------------------------------------------

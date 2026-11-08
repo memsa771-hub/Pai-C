@@ -1,7 +1,6 @@
-"""Student reports of a wrong fact (P2-T7, R-28): the approved sentences, and the report itself."""
+"""Student reports of a wrong fact (P2-T7, R-28). The routes exist only with OS_REPORTS=1; without it they answer 404."""
 
 from collections.abc import Callable
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,7 +11,7 @@ from app.os.api.services import Services
 from app.os.knowledge.changes import after_fact_change
 from app.os.knowledge.review import ReviewQueue
 from app.os.monitor.config import load_config, load_texts
-from app.os.monitor.reports import ReportError, report_fact
+from app.os.monitor.reports import ReportError, report_facts
 from app.os.my_plan import plan_facts
 
 
@@ -29,19 +28,16 @@ class SourceReportIn(ReportIn):
 def add_report_routes(router: APIRouter, services: Callable[[], Services]) -> None:
     def submit(svc: Services, student: str, fact_ids: list[int], body: ReportIn) -> dict:
         tenant = svc.settings.tenant_id
-        queue = ReviewQueue(svc.engine, tenant, svc.knowledge)
 
         def changed(scope, ref, field, fact_id, status, year) -> None:
             after_fact_change(svc.plans, svc.kernel, scope, ref, field, fact_id, status, year, complete=False)
 
-        out = None
-        for fid in fact_ids:
-            try:
-                out = report_fact(svc.engine, tenant, student, fid, body.reason, body.text, clock.now(),
-                                  knowledge=svc.knowledge, queue=queue, after_change=changed)
-            except ReportError as e:
-                raise HTTPException(status_code=e.status, detail=e.detail) from None
-        return out or {"status": "nothing_to_report"}
+        try:
+            return report_facts(svc.engine, tenant, student, fact_ids, body.reason, body.text, clock.now(),
+                                knowledge=svc.knowledge, queue=ReviewQueue(svc.engine, tenant, svc.knowledge),
+                                after_change=changed)
+        except ReportError as e:
+            raise HTTPException(status_code=e.status, detail=e.detail) from None
 
     @router.get("/report/texts")
     def texts(student: str = Depends(current_student_ref)) -> dict:
@@ -49,6 +45,11 @@ def add_report_routes(router: APIRouter, services: Callable[[], Services]) -> No
         return {"reasons": [{"code": r, "label": t[f"reason_{r}"]} for r in load_config().report_reasons],
                 "texts": {k: t[k] for k in ("report_link", "report_title", "report_detail_label", "report_submit",
                                             "report_thanks", "report_limit", "report_failed")}}
+
+    @router.get("/report/sources")
+    def sources(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """The source pages of the student's plan that have facts to report: the link shows only under these."""
+        return {"urls": sorted({f.url for f in plan_facts(svc, student) if f.url and f.id is not None})}
 
     @router.post("/facts/{fact_id}/report")
     def report(fact_id: int, body: ReportIn, student: str = Depends(current_student_ref_for_write),
@@ -60,9 +61,10 @@ def add_report_routes(router: APIRouter, services: Callable[[], Services]) -> No
     @router.post("/sources/report")
     def report_source(body: SourceReportIn, student: str = Depends(current_student_ref_for_write),
                       svc: Services = Depends(services)) -> dict:
-        """The "Report as wrong" link under a source line: every fact of the student's plan with that page."""
-        want = urlsplit(body.url.strip())
-        ids = sorted({f.id for f in plan_facts(svc, student) if f.url == body.url.strip() and f.id is not None})
-        if not ids or not want.scheme:
+        """The "Report as wrong" link under a source line: every fact of the student's plan with that page, counted
+        against the day's allowance as a whole."""
+        url = body.url.strip()
+        ids = sorted({f.id for f in plan_facts(svc, student) if f.url == url and f.id is not None})
+        if not ids:
             raise HTTPException(status_code=404, detail="source_not_found")
         return submit(svc, student, ids, ReportIn(reason=body.reason, text=body.text))

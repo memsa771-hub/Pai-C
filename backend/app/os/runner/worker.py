@@ -89,6 +89,7 @@ def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
     # P2 integration: a suspect domain opens a `suspect_domain` item in the review queue (T5)
     queue = ReviewQueue(engine, tenant, SqlKnowledge(engine, tenant))
     guard = SourceGuard(engine, tenant, domains=domains, after_change=after_change, on_suspect=open_suspect_item(queue),
+                        recheck="monitor" if (settings.monitor or settings.reports) else None,
                         snapshots=SnapshotStore(engine, tenant, max_bytes=settings.page_max_bytes))
     guard.sync(load_allowlist())  # the one-body-one-domain rule goes through the suspect flow (review I3)
     guard.complete_drops()  # a drop cut off by a restart is completed (review I2)

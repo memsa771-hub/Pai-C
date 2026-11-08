@@ -1,6 +1,7 @@
 # P2-T7: the sentences a student sees about a fact that is being checked again (P2-D20, P2-D22; R-27, R-28). Copy lives
-# here, never in code. No country, institution, date or figure appears in them. Approved by the owner for P2 (owner
-# ruling of 2026-11-07: build P2 from the spec; student sentences are listed in the T7 report for sign-off).
+# here, never in code. No country, institution, date or figure appears in them.
+# Approved by the owner's standing approval of student sentences (chat: "you dont need to open PRs for such silly student
+# sentences just update it directly"). The PR lists all twelve for the owner to read.
 version: 1
 approved: true
 texts:

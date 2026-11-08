@@ -172,10 +172,10 @@ class ReviewQueue:
                                              I.c.kind == "verify", I.c.status == "open")
                              .values(status="closed", resolution="void", closed_at=func.now())).rowcount
 
-    def note_report(self, item_id: int, entry: dict) -> None:
+    def note_report(self, item_id: int, entry: dict, conn=None) -> None:
         """Adds one student report (reason code, their words, when) to a `report` item. The words stay here: only
         reviewers read them, never another student."""
-        with self.engine.begin() as conn:
+        with self.knowledge._tx(conn) as conn:
             payload = conn.execute(select(I.c.payload).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
                                    .with_for_update()).scalar_one()
             conn.execute(update(I).where(I.c.id == item_id).values(
@@ -192,7 +192,8 @@ class ReviewQueue:
         with self.engine.connect() as conn:
             rows = conn.execute(select(F.c.id, F.c.field, F.c.fact_class).where(
                 F.c.tenant_id == self.tenant_id,
-                (F.c.status == "confirmed") | ((F.c.status == "unconfirmed") & F.c.read_method.in_(compare)),
+                (F.c.status == "confirmed")
+                | ((F.c.status == "unconfirmed") & (F.c.read_method.in_(compare) | F.c.recheck_reason.is_not(None))),
             ).order_by(F.c.id)).all()
         opened = 0
         for r in rows:
@@ -370,7 +371,10 @@ class ReviewQueue:
         return self.evaluate(item_id, reviewer)
 
     def _promotable(self, fact: Fact) -> bool:
-        return fact.status == "unconfirmed" and fact.read_method in self.policy.compare_with_original
+        """An unconfirmed fact a first positive check can confirm: a machine or hand reading (R-72), or a fact monitoring
+        or a student report took back (P2-T7), which a reviewer compares with the page again."""
+        return fact.status == "unconfirmed" and (fact.read_method in self.policy.compare_with_original
+                                                  or fact.recheck is not None)
 
     def _file_of(self, conn, file_id: int, item_id: int) -> bool:
         return conn.execute(select(FL.c.id).where(FL.c.id == file_id, FL.c.item_id == item_id,
@@ -565,24 +569,77 @@ class ReviewQueue:
                 "verify_item_id": verify_id}
 
     def resolve(self, item_id: int, reviewer: Reviewer, outcome: str, note: str) -> dict:
-        """Closes an item that is not a verification: it was looked at (`resolved`) or does not need work
-        (`dismissed`). The note is kept in the item."""
-        if outcome not in ("resolved", "dismissed"):
-            raise ReviewError(422, "outcome must be resolved or dismissed")
+        """Closes an item that is not a verification. `resolved`: it was looked at; `dismissed`: it needs no work.
+        On a `report` or `change` item two more outcomes act on the fact (owner ruling 2026-11-08):
+        `stands` (and `dismissed` on a report) puts the fact back to the status it had before it was taken back, clears
+        the re-check and revises the plans; `agrees` (a report only) confirms the fact is doubtful for everyone: every
+        plan's steps wait, and a `collect` item asks for the original to be read again. The note is kept in the item."""
+        if outcome not in ("resolved", "dismissed", "stands", "agrees"):
+            raise ReviewError(422, "outcome must be resolved, dismissed, stands or agrees")
         if not note.strip():
             raise ReviewError(422, "say what you checked in a note")
         item = self.get_item(item_id)
         if item.kind == "verify":
             raise ReviewError(422, "a verify item is closed by its checks")
+        if outcome in ("stands", "agrees") and item.kind not in ("report", "change"):
+            raise ReviewError(422, f"'{outcome}' is for a report or a change")
+        if outcome == "agrees" and item.kind != "report":
+            raise ReviewError(422, "'agrees' is for a report")
+        if item.kind == "report" and outcome == "dismissed":
+            outcome = "stands"  # a dismissed report puts the fact back
+        after: list[Callable[[], None]] = []
+        state = None
         with self.engine.begin() as conn:
             row = conn.execute(select(I).where(I.c.id == item_id, I.c.tenant_id == self.tenant_id)
                                .with_for_update()).one()
             if row.status != "open":
                 raise _no("this item is already closed")
+            if outcome == "stands":
+                state = self._restore(conn, row, reviewer, after)
+            elif outcome == "agrees":
+                state = self._escalate(conn, row, reviewer, after)
             conn.execute(update(I).where(I.c.id == item_id).values(
                 status="closed", resolution=outcome, closed_at=func.now(), closed_by=reviewer.id,
                 payload={**(row.payload or {}), "resolution_note": note.strip(), "resolved_by": reviewer.ref}))
-        return {"item_id": item_id, "item_status": "closed", "resolution": outcome, "fact_status": None}
+        for call in after:
+            call()
+        return {"item_id": item_id, "item_status": "closed", "resolution": outcome, "fact_status": state}
+
+    def _restore(self, conn, item, reviewer: Reviewer, after: list) -> str:
+        """The fact stands: back to the status the revision log says it had before monitoring or a report took it back."""
+        if item.fact_id is None:
+            raise ReviewError(422, "this item has no fact")
+        scope, ref, field, fact = self.knowledge.locked(conn, item.fact_id)
+        if fact.status != "unconfirmed" or fact.recheck is None:
+            raise _no("the fact is not being re-checked any more")
+        took = next((r for r in reversed(self.knowledge.revisions(item.fact_id))
+                     if r.cause in ("monitor", "report") and r.before and r.after["status"] == "unconfirmed"
+                     and r.before["status"] in ("confirmed", "verified", "stale")), None)
+        if took is None:
+            raise _no("the log shows no earlier status to put back")
+        if any(took.after[k] != getattr(fact, k) for k in ("value", "quote", "url")):
+            raise _no("the fact changed after it was taken back; check it again instead")
+        prev = took.before["status"]
+        cause = dict(cause="review", cause_ref=str(item.id), actor=reviewer.ref, conn=conn)
+        if prev in ("confirmed", "verified"):
+            self.knowledge.set_status(item.fact_id, prev, **cause)  # confirmed or verified clears the re-check
+        else:
+            self.knowledge.revise(item.fact_id, status=prev, recheck=None, **cause)
+        self.void_verify(item.fact_id, conn)
+        after.append(lambda: self._changed(scope, ref, field, item.fact_id, prev, fact.intake_year, True))
+        return prev
+
+    def _escalate(self, conn, item, reviewer: Reviewer, after: list) -> str:
+        """A reviewer agrees with the reports: every plan that uses the fact waits, and the original is read again."""
+        scope, ref, field, fact = self.knowledge.locked(conn, item.fact_id)
+        if fact.recheck is not None and fact.recheck != "report_escalated":
+            self.knowledge.revise(item.fact_id, recheck="report_escalated", cause="review", cause_ref=str(item.id),
+                                  actor=reviewer.ref, conn=conn)
+            after.append(lambda: self._changed(scope, ref, field, item.fact_id, "unconfirmed", fact.intake_year, False))
+        self.open_item("collect", dedupe_key=f"collect:{item.fact_id}", fact_id=item.fact_id, opened_by="review",
+                       summary="Reviewers agree this fact looks wrong; read the original again",
+                       payload={"reason": "reported", "source_item": item.id}, conn=conn)
+        return fact.status
 
     # --- evidence files -----------------------------------------------------------------------------------------------
 

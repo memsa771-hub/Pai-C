@@ -692,7 +692,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_consistency_routes(router, services, require_admin)  # P1-T10 (R-05)
     add_registry_routes(router, services, require_admin)  # P2-T2 (R-32, R-33, R-34)
     add_review_routes(router, services, require_admin)  # P2-T5 (R-25, R-42)
-    add_report_routes(router, services)  # P2-T7 (R-28)
+    if get_services().settings.reports:  # P2-T7 (R-28): absent without OS_REPORTS, so 404
+        add_report_routes(router, services)
     if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
         from app.os.rehearsal.api import add_rehearsal_routes
 

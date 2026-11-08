@@ -1,10 +1,13 @@
 """The daily monitoring job `os.monitor` (P2 spec §4.7, P2-D20, P2-D21; R-27; row 6.24).
 
 For each region and family inside its notice window: group the confirmed and verified facts of the window's intake by
-source URL, read each page again, keep the new snapshot, and check each fact's quote on the new page. A quote that is gone,
-or a page that is gone, takes the fact back to `unconfirmed` (marker `monitor`): the plans that use it are revised (the steps
-it dates wait, `fact_rechecking`) and a `change` item opens in the review queue. A page that cannot be read now (a timeout, a
-server error, a block) changes nothing. Facts only change through the Knowledge store; plans only through `after_change`."""
+source URL, read each page again, and check each fact's quote on the new page. A fact goes back to `unconfirmed` (marker
+`monitor`) only when its evidence is missing on two separate runs: the quote is gone from the page, or the page is gone
+(404 or 410). The plans that use it are revised (the steps it dates wait, `fact_rechecking`) and a `change` item opens.
+
+A page that cannot be trusted changes nothing and is not kept as the last clean snapshot: one that cannot be read now
+(a timeout, a server error, a block), one that shrank by more than the configured share, or one on which none of the quotes
+of the facts it backs is found. Facts only change through the Knowledge store; plans only through `after_change`."""
 
 import logging
 from collections import defaultdict
@@ -12,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
@@ -29,10 +32,11 @@ from app.os.monitor.config import MonitorConfig, load_config
 from app.os.monitor.windows import Window, active_windows
 
 log = logging.getLogger(__name__)
-K, RUNS = models.knowledge_facts, models.monitor_runs
+K, RUNS, SEEN = models.knowledge_facts, models.monitor_runs, models.monitor_seen
 # after_change(scope, ref, field, fact_id, status, intake_year): revises the plans that use the fact
 AfterChange = Callable[[str, str, str, int, str, int], None]
 _GUARDED = ("integrity:", "suspect_domain", "tls_", "insecure_scheme", "redirect_not_official")
+COUNTS = ("windows", "urls", "facts", "taken_back", "seen_once", "unreadable", "guarded", "page_changed")
 
 
 @dataclass(frozen=True)
@@ -66,37 +70,66 @@ def _facts_by_url(engine: Engine, tenant_id: str, w: Window, programmes: list[Pr
     return out
 
 
+def _lock_run(conn, tenant_id: str, today: date):
+    """The day's run row, locked for as long as `conn`'s transaction lasts; None if another worker holds it."""
+    return conn.execute(select(RUNS).where(RUNS.c.tenant_id == tenant_id, RUNS.c.run_date == today)
+                        .with_for_update(skip_locked=True)).first()
+
+
 def run(engine: Engine, tenant_id: str, today: date, now: datetime, *, gateway: PageGateway, snapshots: SnapshotStore,
         knowledge: SqlKnowledge, queue: ReviewQueue, after_change: AfterChange | None = None,
-        config: MonitorConfig | None = None) -> dict:
-    """One monitoring run for `today`. A day has one run: a run that finished is not repeated, one cut off by a restart is
-    continued (a fact already taken back is no longer monitored). Returns the counts."""
+        config: MonitorConfig | None = None, only_unfinished: bool = False) -> dict:
+    """One monitoring run for `today`. A day has one run: one that finished is not repeated, one cut off by a restart is
+    continued (a fact already taken back is no longer monitored; what was seen once is kept). The run row is locked
+    while it runs, so two workers never run the same day. `only_unfinished` is the retry tick: it does nothing unless
+    today's run was started and not finished."""
     cfg = config or load_config()
     with engine.begin() as conn:
-        run_id = conn.execute(insert(RUNS).values(tenant_id=tenant_id, run_date=today, started_at=now)
-                              .on_conflict_do_nothing(constraint="uq_os_monitor_runs_day").returning(RUNS.c.id)).scalar()
-        if run_id is None:
-            done = conn.execute(select(RUNS.c.id, RUNS.c.finished_at, RUNS.c.counts).where(
-                RUNS.c.tenant_id == tenant_id, RUNS.c.run_date == today)).one()
-            if done.finished_at is not None:
-                return {**done.counts, "already_ran": True}
-            run_id = done.id
-    counts = dict.fromkeys(("windows", "urls", "facts", "taken_back", "unreadable", "guarded", "page_changed"), 0)
-    windows = active_windows(engine, tenant_id, today)
-    counts["windows"] = len(windows)
-    programmes = ProgrammeStore(engine, tenant_id).all() if windows else []
-    for w in windows:
-        for url, sources in sorted(_facts_by_url(engine, tenant_id, w, programmes, cfg).items()):
-            counts["urls"] += 1
-            counts["facts"] += len(sources)
-            _check_url(url, sources, w, run_id, today, gateway, snapshots, knowledge, queue, after_change, cfg, counts)
-    with engine.begin() as conn:
-        conn.execute(update(RUNS).where(RUNS.c.id == run_id).values(finished_at=now, counts=counts))
+        if not only_unfinished:
+            conn.execute(insert(RUNS).values(tenant_id=tenant_id, run_date=today, started_at=now)
+                         .on_conflict_do_nothing(constraint="uq_os_monitor_runs_day"))
+    with engine.connect() as lock:  # the lock transaction stays open for the whole run
+        row = _lock_run(lock, tenant_id, today)
+        if row is None:
+            return {"nothing_to_finish": True} if only_unfinished and not _exists(engine, tenant_id, today) \
+                else {"locked": True}
+        if row.finished_at is not None:
+            return {**row.counts, "already_ran": True}
+        counts = dict.fromkeys(COUNTS, 0)
+        windows = active_windows(engine, tenant_id, today)
+        counts["windows"] = len(windows)
+        programmes = ProgrammeStore(engine, tenant_id).all() if windows else []
+        for w in windows:
+            for url, sources in sorted(_facts_by_url(engine, tenant_id, w, programmes, cfg).items()):
+                counts["urls"] += 1
+                counts["facts"] += len(sources)
+                _check_url(url, sources, w, row.id, today, now, gateway, snapshots, knowledge, queue, after_change,
+                           cfg, counts, engine, tenant_id)
+        lock.execute(update(RUNS).where(RUNS.c.id == row.id).values(finished_at=now, counts=counts))
+        lock.commit()
     return counts
 
 
-def _check_url(url, sources, w, run_id, today, gateway, snapshots, knowledge, queue, after_change, cfg, counts) -> None:
-    previous = snapshots.latest(url)  # before the read: the page as monitoring last saw it
+def _exists(engine: Engine, tenant_id: str, today: date) -> bool:
+    with engine.connect() as conn:
+        return conn.execute(select(RUNS.c.id).where(RUNS.c.tenant_id == tenant_id, RUNS.c.run_date == today)).first() is not None
+
+
+def _sane(text: str, sources: list[_Source], previous, cfg: MonitorConfig) -> str | None:
+    """Why this page cannot be trusted to say a quote is gone, or None. Both checks are in config.yaml."""
+    if previous is not None and len(previous.text) > 0:
+        shrunk = 100 * (len(previous.text) - len(text)) / len(previous.text)
+        if shrunk > cfg.sanity_max_shrink_percent:
+            return "sanity_shrunk"
+    page_norm = normalise(text)
+    if len(sources) >= cfg.sanity_no_match_min_facts and not any(quote_on_page(s.fact.quote, page_norm) for s in sources):
+        return "sanity_no_quote"
+    return None
+
+
+def _check_url(url, sources, w, run_id, today, now, gateway, snapshots, knowledge, queue, after_change, cfg, counts,
+               engine, tenant_id) -> None:
+    previous = snapshots.latest(url)  # the last clean page: before the read, so it is what monitoring last trusted
     own = sorted({d for s in sources for d in s.domains})
     page = gateway.fetch_or_record(url, own, [], Scope(region=w.region, family=w.family), refresh=True)
     gone = page.blocked is not None and any(page.blocked == f"http_{c}" for c in cfg.gone_http)
@@ -106,12 +139,16 @@ def _check_url(url, sources, w, run_id, today, gateway, snapshots, knowledge, qu
     if not gone and not page.text:
         counts["unreadable"] += 1
         return
-    snapshot_id = None
     if not gone:
-        snap = snapshots.save(url, page.text, content_type="text/html", fetched_at=page.fetched_at)
-        snapshot_id = snap.id
+        bad = _sane(page.text, sources, previous, cfg)
+        # a page that fails is kept for the record but flagged, so it never becomes "the last clean snapshot"
+        snap = snapshots.save(url, page.text, content_type="text/html", fetched_at=page.fetched_at, flagged=bad)
+        if bad:
+            counts["unreadable"] += 1
+            return
         if previous is not None and previous.sha256 != text_hash(page.text):
             counts["page_changed"] += 1
+    snapshot_id = None if gone else snap.id
     page_norm = normalise(page.text) if not gone else ""
     for s in sources:
         if gone:
@@ -119,9 +156,36 @@ def _check_url(url, sources, w, run_id, today, gateway, snapshots, knowledge, qu
         elif not quote_on_page(s.fact.quote, page_norm):
             reason = "quote_gone"
         else:
+            _forget(engine, tenant_id, s.fact_id)  # the evidence is back: what was seen once is not a change
             continue
-        _take_back(s, reason, url, snapshot_id, run_id, today, knowledge, queue, after_change)
-        counts["taken_back"] += 1
+        if _seen_before(engine, tenant_id, s.fact_id, run_id, reason, cfg):
+            _take_back(s, reason, url, snapshot_id, run_id, today, knowledge, queue, after_change)
+            _forget(engine, tenant_id, s.fact_id)
+            counts["taken_back"] += 1
+        else:
+            counts["seen_once"] += 1
+
+
+def _forget(engine: Engine, tenant_id: str, fact_id: int) -> None:
+    with engine.begin() as conn:
+        conn.execute(delete(SEEN).where(SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id))
+
+
+def _seen_before(engine: Engine, tenant_id: str, fact_id: int, run_id: int, reason: str, cfg: MonitorConfig) -> bool:
+    """Notes that this run saw the evidence missing; True when enough separate runs have. A change seen only once (a
+    page down for a day, a 404 while a site is moved) costs the fact nothing."""
+    if cfg.seen_runs_needed <= 1:
+        return True
+    with engine.begin() as conn:
+        first = conn.execute(select(SEEN.c.first_run_id).where(SEEN.c.tenant_id == tenant_id,
+                                                               SEEN.c.fact_id == fact_id).with_for_update()).scalar()
+        if first is None:
+            conn.execute(insert(SEEN).values(tenant_id=tenant_id, fact_id=fact_id, reason=reason, first_run_id=run_id))
+            return False
+        if first == run_id:
+            return False  # the same run again (a resumed one)
+        conn.execute(update(SEEN).where(SEEN.c.tenant_id == tenant_id, SEEN.c.fact_id == fact_id).values(reason=reason))
+        return True
 
 
 def _take_back(s: _Source, reason: str, url: str, snapshot_id: int | None, run_id: int, today: date,

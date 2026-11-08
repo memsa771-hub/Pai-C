@@ -622,6 +622,12 @@ class WorkspaceApi {
     return this.requestJson(`/v1/os/report/texts?${params}`);
   }
 
+  /** PAI OS: the source pages of the student's plan that have facts to report (P2-T7). */
+  async getOsReportSources(): Promise<unknown> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/report/sources?${params}`);
+  }
+
   /** PAI OS: report the facts behind a source line as wrong (P2-T7, R-28). */
   async reportOsSource(url: string, reason: string, text: string | null): Promise<{ status: string }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
@@ -676,7 +682,7 @@ class WorkspaceApi {
     return this.reviewerJson(this.reviewPath(`/items/${id}/collect`), token, { method: 'POST', body: JSON.stringify(body) });
   }
 
-  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed', note: string): Promise<import('./os-review').OsReviewResult> {
+  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed' | 'stands' | 'agrees', note: string): Promise<import('./os-review').OsReviewResult> {
     return this.reviewerJson(this.reviewPath(`/items/${id}/resolve`), token, {
       method: 'POST', body: JSON.stringify({ outcome, note }),
     });

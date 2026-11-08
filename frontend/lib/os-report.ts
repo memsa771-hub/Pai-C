@@ -20,3 +20,10 @@ export function asReportTexts(body: unknown): OsReportTexts | null {
   if (!b || !Array.isArray(b.reasons) || !b.reasons.length || !b.texts || typeof b.texts.report_link !== 'string') return null;
   return b as OsReportTexts;
 }
+
+/** The source pages of the student's plan that have facts to report (the answer of `GET /report/sources`); the link shows
+ * only under one of them. Anything else reads as none. */
+export function asReportableUrls(body: unknown): Set<string> {
+  const urls = (body as { urls?: unknown } | null)?.urls;
+  return new Set(Array.isArray(urls) ? urls.filter((u): u is string => typeof u === 'string') : []);
+}

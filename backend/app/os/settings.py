@@ -30,6 +30,7 @@ class OsSettings:
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
     monitor: bool = False  # P2-T7: the daily season monitoring job (OS_MONITOR)
+    reports: bool = False  # P2-T7: students report a fact as wrong, and the steps wait for it (OS_REPORTS)
     source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
@@ -118,6 +119,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
         source_guard=flag(env, "OS_SOURCE_GUARD"),
         monitor=flag(env, "OS_MONITOR"),
+        reports=flag(env, "OS_REPORTS"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

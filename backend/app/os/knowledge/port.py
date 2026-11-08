@@ -11,7 +11,9 @@ from typing import Any, Literal, Protocol
 FactStatus = Literal["confirmed", "unconfirmed", "stale", "verified"]
 STATUSES: tuple[str, ...] = ("confirmed", "unconfirmed", "stale", "verified")
 READ_METHODS: tuple[str, ...] = ("fetch", "render", "ocr", "human", "model")
-RECHECK_REASONS: tuple[str, ...] = ("monitor", "report")  # why an unconfirmed fact is being checked again (P2-D20)
+RECHECK_REASONS: tuple[str, ...] = ("monitor", "report", "report_escalated")
+# why an unconfirmed fact is being checked again (P2-D20). `report`: a student reported it, so only the reporters' steps wait
+# (owner ruling 2026-11-08); `report_escalated`: a reviewer agreed or 3 students reported it, so every step waits.
 _SOURCED = ("confirmed", "verified")
 CONFIRMED_LEVELS: tuple[str, ...] = _SOURCED  # statuses that count as confirmed (a verified fact is confirmed too)
 

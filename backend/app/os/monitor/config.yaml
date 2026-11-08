@@ -10,3 +10,15 @@ report_reasons: [wrong_date, wrong_amount, page_changed, other]
 # A student may report this many different facts in 24 hours; the same fact again joins its open item.
 max_reported_facts_per_day: 5
 report_text_max_chars: 1000
+# Owner ruling 2026-11-08: a reported fact shows as "not confirmed" to everyone at once, but only the reporters' steps wait.
+# Every plan's steps wait once a reviewer agrees, or this many different students have reported the same fact.
+escalate_after_reporters: 3
+# A change counts only when it is seen on this many separate runs (a temporary page problem must not cost a fact).
+seen_runs_needed: 2
+# Sanity checks on a page before it can take a fact back. A page that fails is "unreadable": nothing changes and it does
+# not replace the last clean snapshot.
+#  - none of the quotes of the page's facts is on it, when the page backs at least this many facts (an error page or a
+#    different page; with one fact, "its quote is gone" is the very change we look for, and the two-run rule decides);
+sanity_no_match_min_facts: 2
+#  - the text shrank by more than this share of the last clean snapshot's text (percent).
+sanity_max_shrink_percent: 60

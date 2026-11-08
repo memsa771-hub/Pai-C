@@ -2,17 +2,22 @@
 // req: R-28
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { asReportTexts, reportOutcome } from '@/lib/os-report';
+import { asReportTexts, asReportableUrls, reportOutcome } from '@/lib/os-report';
 
 const TEXTS = {
   reasons: [{ code: 'wrong_date', label: 'The date is wrong' }, { code: 'other', label: 'Something else' }],
   texts: { report_link: 'Report as wrong', report_title: 'What looks wrong?', report_detail_label: 'Tell us more',
            report_submit: 'Send report', report_thanks: 'Thank you.', report_limit: 'Too many today.', report_failed: 'Could not send.' },
 };
-const api = vi.hoisted(() => ({ getOsReportTexts: vi.fn(), reportOsSource: vi.fn() }));
+const api = vi.hoisted(() => ({ getOsReportTexts: vi.fn(), getOsReportSources: vi.fn(), reportOsSource: vi.fn() }));
 vi.mock('@/lib/api', () => ({ workspaceApi: api }));
 
-beforeEach(() => { vi.resetModules(); api.getOsReportTexts.mockReset(); api.reportOsSource.mockReset(); });
+beforeEach(() => {
+  vi.resetModules();
+  api.getOsReportTexts.mockReset();
+  api.getOsReportSources.mockReset().mockResolvedValue({ urls: ['https://a.example/x'] });
+  api.reportOsSource.mockReset();
+});
 afterEach(cleanup);
 
 async function mount() {
@@ -27,6 +32,16 @@ describe('report as wrong', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(document.body.querySelector('[data-report-link]')).toBeNull();
     expect(asReportTexts({ reasons: [] })).toBeNull();
+  });
+
+  it('shows the link only under a page that has facts to report', async () => {
+    api.getOsReportTexts.mockResolvedValue(TEXTS);
+    api.getOsReportSources.mockResolvedValue({ urls: ['https://b.example/y'] });
+    await mount();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(document.body.querySelector('[data-report-link]')).toBeNull();
+    expect(asReportableUrls({ urls: ['u', 3] })).toEqual(new Set(['u']));
+    expect(asReportableUrls(null).size).toBe(0);
   });
 
   it('sends the chosen reason and the words, and says thanks', async () => {

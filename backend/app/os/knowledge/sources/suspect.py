@@ -60,12 +60,13 @@ class SourceGuard:
     def __init__(self, engine: Engine, tenant_id: str, *, domains: SourceDomains | None = None,
                  snapshots: SnapshotStore | None = None, knowledge: SqlKnowledge | None = None,
                  after_change: AfterChange | None = None, on_suspect: Callable[[SuspectCase], None] | None = None,
-                 config: dict | None = None) -> None:
+                 config: dict | None = None, recheck: str | None = None) -> None:
         self.engine, self.tenant_id = engine, tenant_id
         self.domains = domains or SourceDomains(engine, tenant_id)
         self.snapshots = snapshots or SnapshotStore(engine, tenant_id)
         self.knowledge = knowledge or SqlKnowledge(engine, tenant_id)
         self.after_change, self.on_suspect, self.config = after_change, on_suspect, config
+        self.recheck = recheck  # P2-T7: "monitor" when monitoring or reports are on, else None (steps keep `fact_missing`)
 
     # --- lookup (before the cache and the network) ------------------------------------------------------
 
@@ -134,12 +135,12 @@ class SourceGuard:
 
     def complete_drops(self) -> int:
         """Completes the drop for every suspect domain (after a crash between the state change and the drop)."""
-        return sum(len(drop_domain_facts(self.engine, self.tenant_id, self.knowledge, d, self.after_change))
+        return sum(len(drop_domain_facts(self.engine, self.tenant_id, self.knowledge, d, self.after_change, self.recheck))
                    for d in self.domains.domains(state="suspect"))
 
     def _finish(self, domain: str, reason: str, detail: str, url: str, snapshot_id: int | None,
                 won: bool) -> SuspectCase | None:
-        dropped = drop_domain_facts(self.engine, self.tenant_id, self.knowledge, domain, self.after_change)
+        dropped = drop_domain_facts(self.engine, self.tenant_id, self.knowledge, domain, self.after_change, self.recheck)
         if not won:
             return None
         case = SuspectCase(domain, reason, detail, url, snapshot_id, tuple(dropped))
@@ -165,9 +166,10 @@ def _lock_key(tenant_id: str, domain: str) -> int:
 
 
 def drop_domain_facts(engine: Engine, tenant_id: str, knowledge: SqlKnowledge, domain: str,
-                      after_change: AfterChange | None = None) -> list[int]:
+                      after_change: AfterChange | None = None, recheck: str | None = None) -> list[int]:
     """Every confirmed, verified or stale fact whose source URL is on the domain goes back to `unconfirmed` (spec
-    §4.2). Each step is a revision (cause `monitor`, ref `source:<domain>`). Idempotent and resumable: callers for one
+    §4.2; with `recheck` ("monitor", when monitoring or reports are on) the steps they date wait, P2-D20). Each step is a
+    revision (cause `monitor`, ref `source:<domain>`). Idempotent and resumable: callers for one
     domain are serialised by an advisory lock and each fact's status is read again before it changes, so a fact
     drops once however many callers run. Returns the fact ids this call dropped."""
     dropped: list[int] = []
@@ -183,7 +185,7 @@ def drop_domain_facts(engine: Engine, tenant_id: str, knowledge: SqlKnowledge, d
                 if r is None or r.status == "unconfirmed":
                     continue
                 knowledge.set_status(fid, "unconfirmed", cause="monitor", cause_ref=f"source:{domain}",
-                                     actor="source_guard", recheck="monitor")  # the steps it dates wait (P2-D20)
+                                     actor="source_guard", recheck=recheck)  # None: today's behaviour
                 dropped.append(fid)
                 if after_change is not None:
                     after_change(r.scope, r.ref, r.field, fid, "unconfirmed", r.intake_year)
