@@ -4,7 +4,9 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import insert
 
+from app.os import models
 from app.os.coverage import gate, report
 from app.os.intakes import IntakeStore
 from app.os.intakes.rollover import rollover
@@ -39,6 +41,9 @@ def world(engine, clean):
     s.record(inst("two"), cause="import")
     programme(engine, s, "p-one", "inst:one")
     programme(engine, s, "p-two", "inst:two")
+    with engine.begin() as conn:  # the official domain of the fictional notices (R-24): on the allow-list, active
+        conn.execute(insert(models.source_domains).values(tenant_id="pai", domain="alpha.test", region="punjab",
+                                                          family="undergrad", tier="institution", state="active"))
     ins = IntakeStore(engine, "pai")
     intake = ins.create("punjab", "undergrad", "fall", 2027, state="open")
     return s, SqlKnowledge(engine, "pai"), intake

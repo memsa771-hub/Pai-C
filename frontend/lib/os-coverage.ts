@@ -69,6 +69,7 @@ export const ITEM_LABELS: Record<string, string> = {
   not_verified: 'Not verified',
   no_link: 'Not confirmed and no official link',
   suspect_domain: 'Link is on a suspect domain',
+  not_official_domain: 'Link is on no official allow-list',
   no_date: 'List has no date',
   gate_turned_red: 'Current intake no longer passes its gate',
 };

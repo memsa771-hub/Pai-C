@@ -255,7 +255,7 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
                 b.items.append(Item("not_verified", f"{i} {key[1]} {key[2]}", st))
 
     sources = SourceDomains(engine, tenant_id)
-    c_read = Reading("c", "Everything else high-stakes is verified or not confirmed with a listed official link")
+    c_read = Reading("c", "Everything else high-stakes is verified or not confirmed with a link on a listed official domain")
     for i in insts:
         for key, f in sorted(held[i].items()):
             c_read.checked += 1
@@ -263,8 +263,13 @@ def build(engine: Engine, tenant_id: str, intake_id: int, now: datetime) -> Repo
                 continue
             if not (f.url.strip() and f.quote.strip()):
                 c_read.items.append(Item("no_link", f"{i} {key[1]} {key[2]}", "not confirmed and no official link"))
-            elif (st := sources.state_of(_host(f.url))) is not None and st.state == "suspect":
-                c_read.items.append(Item("suspect_domain", f"{i} {key[1]} {key[2]}", f"{st.domain} is suspect"))
+            else:  # R-24: only a listed official domain counts as a source; a suspect one fails too
+                st = sources.state_of(_host(f.url))
+                if st is None:
+                    c_read.items.append(Item("not_official_domain", f"{i} {key[1]} {key[2]}",
+                                             f"{_host(f.url)} is on no allow-list"))
+                elif st.state == "suspect":
+                    c_read.items.append(Item("suspect_domain", f"{i} {key[1]} {key[2]}", f"{st.domain} is suspect"))
 
     d = Reading("d", "No online information: stays listed, offered only as 'PAI can't run this place yet'")
     for i, r in insts.items():

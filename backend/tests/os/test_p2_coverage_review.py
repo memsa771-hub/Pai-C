@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from sqlalchemy import insert
+from sqlalchemy import update
 
 from app.os import models
 from app.os.coverage import gate, report
@@ -139,12 +139,23 @@ def test_a_list_without_a_date_is_red_and_several_complete_lists_are_fine(engine
 def test_a_suspect_domain_fails_reading_c(engine, world):  # noqa: F811
     s, k, intake = world  # noqa: RUF059
     put(k, "programme", "p-two", "deadline_close", fact("confirmed"))
-    assert readings(engine, intake)[1]["c"].green
+    assert readings(engine, intake)[1]["c"].green  # alpha.test is a listed, active domain in the fixture
     with engine.begin() as conn:
-        conn.execute(insert(models.source_domains).values(tenant_id="pai", domain="alpha.test", region="punjab",
-                                                          family="undergrad", state="suspect"))
+        conn.execute(update(models.source_domains).where(models.source_domains.c.domain == "alpha.test")
+                     .values(state="suspect"))
     c = readings(engine, intake)[1]["c"]
     assert [(i.code, i.subject) for i in c.items] == [("suspect_domain", "inst:two p-two deadline_close")]
+
+
+def test_a_link_on_no_allow_list_fails_reading_c(engine, world):  # noqa: F811
+    """R-24: only listed official domains count, so a gate with no allow-list loaded stays red."""
+    s, k, intake = world  # noqa: RUF059
+    put(k, "programme", "p-two", "deadline_close", replace(fact("confirmed"), url="https://elsewhere.invalid/notice"))
+    c = readings(engine, intake)[1]["c"]
+    assert [(i.code, i.subject) for i in c.items] == [("not_official_domain", "inst:two p-two deadline_close")]
+    assert "elsewhere.invalid" in c.items[0].detail
+    put(k, "programme", "p-two", "deadline_close", fact())  # verified: the link is not asked about
+    assert readings(engine, intake)[1]["c"].green
 
 
 def test_the_rate_is_per_reviewer_day(engine, world):  # noqa: F811
