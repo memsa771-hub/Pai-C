@@ -54,7 +54,7 @@ T12 in detail:
 | 12 | Freeze-exception replays (merit answers, calendar move): only the intended answers changed; Counsellor lead approved | **Not done: open.** No frozen file changed in P2 so far (`check_freeze.py --base origin/pai-connect`: unchanged). The two freeze-exception PRs (flags `CONNECT_MERIT_ANSWERS`, `CONNECT_CALENDAR_FROM_KNOWLEDGE`) each need the label, the R-ID, a replay and `@memsa771-hub`'s approval; the OS side they call is built (T10, T11) |
 | 13 | This handoff written; the owner signs off | Written (draft). **Awaiting the owner's sign-off** |
 
-Test counts on the T12 branch: `tests/os` COUNT_OS passed; the legacy suite 2560 passed, 13 skipped; vitest COUNT_FE passed; `next build --webpack` ok; `tach check`, `check_freeze.py`, `check_traceability.py --gate P2` ok; one OS Alembic head (`os_0033`).
+Test counts on the T12 branch: `tests/os` 2946 (2 skipped, 1 xfailed) passed; the legacy suite 2560 passed, 13 skipped; vitest 602 passed; `next build --webpack` ok; `tach check`, `check_freeze.py`, `check_traceability.py --gate P2` ok; one OS Alembic head (`os_0033`).
 
 ## 3. Owner decisions and rulings
 
