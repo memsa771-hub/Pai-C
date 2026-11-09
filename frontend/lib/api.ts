@@ -616,6 +616,75 @@ class WorkspaceApi {
     return body.cases;
   }
 
+  /**
+   * PAI OS review queue (P2-T5): a reviewer's own token goes in its own header, never in a URL. A 401 means a wrong
+   * reviewer token, so it never signs the user out.
+   */
+  private async reviewerFetch(path: string, reviewerToken: string, options: RequestInit = {}, json = true): Promise<Response> {
+    const headers: Record<string, string> = { 'X-OS-Reviewer-Token': reviewerToken };
+    if (json) headers['Content-Type'] = 'application/json';
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}${path}`, { ...options, credentials: 'include', cache: 'no-store', headers });
+    if (!res.ok) {
+      const text = await res.text();
+      let detail = text;
+      try { detail = (JSON.parse(text) as { detail?: string }).detail ?? text; } catch { /* keep the text */ }
+      throw Object.assign(new Error(`API ${res.status}: ${detail}`), { status: res.status, detail });
+    }
+    return res;
+  }
+
+  private async reviewerJson<T>(path: string, reviewerToken: string, options: RequestInit = {}): Promise<T> {
+    return (await (await this.reviewerFetch(path, reviewerToken, options)).json()) as T;
+  }
+
+  private reviewPath(path: string, extra: Record<string, string> = {}): string {
+    return `/v1/os/review${path}?${new URLSearchParams({ network: this.requireWorkspace(), ...extra })}`;
+  }
+
+  async getOsReviewer(token: string): Promise<import('./os-review').OsReviewer> {
+    return this.reviewerJson(this.reviewPath('/me'), token);
+  }
+
+  async getOsReviewItems(token: string, status: 'open' | 'closed' = 'open', kind?: string): Promise<import('./os-review').OsReviewItem[]> {
+    const body = await this.reviewerJson<{ items: import('./os-review').OsReviewItem[] }>(
+      this.reviewPath('/items', { status, ...(kind ? { kind } : {}) }), token);
+    return body.items;
+  }
+
+  async getOsReviewItem(token: string, id: number): Promise<import('./os-review').OsReviewDetail> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}`), token);
+  }
+
+  async postOsReview(token: string, id: number, body: Record<string, unknown>): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/review`), token, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async collectOsReview(token: string, id: number, body: Record<string, unknown>): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/collect`), token, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed', note: string): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/resolve`), token, {
+      method: 'POST', body: JSON.stringify({ outcome, note }),
+    });
+  }
+
+  async uploadOsReviewEvidence(token: string, id: number, file: File): Promise<import('./os-review').OsReviewFile> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await this.reviewerFetch(this.reviewPath(`/items/${id}/evidence`), token, { method: 'POST', body: form }, false);
+    return (await res.json()) as import('./os-review').OsReviewFile;
+  }
+
+  async getOsReviewFile(token: string, fileId: number): Promise<Blob> {
+    return (await this.reviewerFetch(this.reviewPath(`/files/${fileId}`), token, {}, false)).blob();
+  }
+
+  async attestOsReviewBatch(token: string, batchRef: string): Promise<{ batch_ref: string; new: boolean }> {
+    return this.reviewerJson(this.reviewPath(`/batches/${encodeURIComponent(batchRef)}/attest`), token, { method: 'POST' });
+  }
+
   async resolveOsConsistencyCase(adminToken: string, id: number, note: string): Promise<import('./os-consistency').OsConsistencyCase> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.adminJson(`/v1/os/admin/consistency/${id}/resolve?${params}`, adminToken, {

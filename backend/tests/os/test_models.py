@@ -56,6 +56,8 @@ def test_os_tables_present():
         "os_consistency_cases", "os_consistency_runs",
         # P2-T1 (os_0025)
         "os_fact_revisions",
+        # P2-T5 (os_0026)
+        "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
     }
 
 

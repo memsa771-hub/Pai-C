@@ -38,6 +38,11 @@ FACT_SOURCES = ("seed", "manual", "research")
 FACT_STATUSES = ("confirmed", "unconfirmed", "stale", "verified")  # P2-D6: `verified` is confirmed + two reviews
 READ_METHODS = ("fetch", "render", "ocr", "human", "model")  # P2-D11/D18: how the fact's source text was read
 REVISION_ACTIONS = ("insert", "change", "status", "undo")
+REVIEWER_ROLES = ("checker", "approver", "admin")  # P2-D15
+REVIEWER_KINDS = ("person", "ai")  # owner ruling 2026-11-07: an AI check may count as a check; a person can replace it
+REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", "conflict", "import_dispute")
+REVIEW_STEPS = ("check", "approve", "collect")
+REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
 REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
 
 md = OsBase.metadata
@@ -251,6 +256,100 @@ fact_revisions = Table(
     _in("cause", REVISION_CAUSES, "ck_os_fact_revisions_cause"),
     Index("ix_os_fact_revisions_fact", "tenant_id", "fact_id", "id"),
     Index("ix_os_fact_revisions_cause", "tenant_id", "cause", "cause_ref"),
+)
+
+# P2-T5 (os_0026, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
+reviewers = Table(
+    "os_reviewers", md,
+    _id(), _tenant(),
+    Column("ref", Text, nullable=False),  # the reviewer's id in checks and spreadsheets, e.g. a name or ai_check_1
+    Column("display_name", Text, nullable=False),
+    Column("identity", Text, nullable=False),  # the person or the model and prompt behind the ref; checks need two
+    Column("role", Text, nullable=False),
+    Column("kind", Text, nullable=False, server_default="person"),
+    Column("token_hash", Text, nullable=False),  # sha256 of the personal token (the token is shown once)
+    Column("active", Boolean, nullable=False, server_default=text("true")),
+    _created(),
+    Column("disabled_at", DateTime(timezone=True)),
+    UniqueConstraint("tenant_id", "ref", name="uq_os_reviewers_ref"),
+    UniqueConstraint("token_hash", name="uq_os_reviewers_token"),
+    _in("role", REVIEWER_ROLES, "ck_os_reviewers_role"),
+    _in("kind", REVIEWER_KINDS, "ck_os_reviewers_kind"),
+)
+
+review_items = Table(
+    "os_review_items", md,
+    _id(), _tenant(),
+    Column("kind", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("resolution", Text),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT")),
+    Column("subject", Text, nullable=False, server_default=""),  # what a fact-less item is about (a domain, a source)
+    Column("field", Text),
+    Column("intake_term", Text, nullable=False, server_default=""),
+    Column("intake_year", Integer),
+    Column("owner_ref", Text, nullable=False, server_default=""),
+    Column("summary", Text, nullable=False, server_default=""),
+    Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("batch_ref", Text),
+    Column("dedupe_key", Text, nullable=False),
+    Column("join_count", Integer, nullable=False, server_default="0"),  # the same thing reported again joins the item
+    Column("opened_by", Text, nullable=False, server_default="manual"),
+    _created(),
+    Column("closed_at", DateTime(timezone=True)),
+    Column("closed_by", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT")),
+    _in("kind", REVIEW_ITEM_KINDS, "ck_os_review_items_kind"),
+    _in("status", ("open", "closed"), "ck_os_review_items_status"),
+    Index("uq_os_review_items_open", "tenant_id", "dedupe_key", unique=True, postgresql_where=text("status = 'open'")),
+    Index("ix_os_review_items_list", "tenant_id", "status", "kind", "id"),
+    Index("ix_os_review_items_batch", "tenant_id", "batch_ref"),
+)
+
+review_files = Table(
+    "os_review_files", md,
+    _id(), _tenant(),
+    Column("item_id", BigInteger, ForeignKey("os.os_review_items.id", ondelete="RESTRICT"), nullable=False),
+    Column("uploaded_by", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("filename", Text, nullable=False),
+    Column("content_type", Text, nullable=False),
+    Column("size", Integer, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("data", LargeBinary, nullable=False),
+    _created(),
+    Index("ix_os_review_files_item", "tenant_id", "item_id"),
+)
+
+fact_reviews = Table(
+    "os_fact_reviews", md,
+    _id(), _tenant(),
+    Column("item_id", BigInteger, ForeignKey("os.os_review_items.id", ondelete="RESTRICT"), nullable=False),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT")),
+    Column("reviewer_id", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("step", Text, nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("corrected_value", JSONB),
+    Column("corrected_quote", Text),
+    Column("note", Text),
+    Column("evidence_file_id", BigInteger, ForeignKey("os.os_review_files.id", ondelete="RESTRICT")),
+    Column("high_stakes", Boolean, nullable=False, server_default=text("true")),  # the need as of this review
+    Column("fact_digest", Text),  # sha256 of the value, quote and URL the reviewer saw: a changed fact voids the item
+    _created(),
+    UniqueConstraint("item_id", "reviewer_id", name="uq_os_fact_reviews_reviewer"),
+    _in("step", REVIEW_STEPS, "ck_os_fact_reviews_step"),
+    _in("outcome", REVIEW_OUTCOMES, "ck_os_fact_reviews_outcome"),
+    CheckConstraint("(step = 'check' AND outcome IN ('correct', 'wrong', 'unclear')) OR "
+                    "(step = 'approve' AND outcome IN ('approve', 'reject')) OR "
+                    "(step = 'collect' AND outcome = 'collected')", name="ck_os_fact_reviews_step_outcome"),
+    Index("ix_os_fact_reviews_item", "tenant_id", "item_id"),
+)
+
+review_attestations = Table(
+    "os_review_attestations", md,
+    _id(), _tenant(),
+    Column("reviewer_id", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("batch_ref", Text, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "reviewer_id", "batch_ref", name="uq_os_review_attestations"),
 )
 
 # --- Slice 2: Knowledge (spec 2026-10-19 §5) -------------------------------------------------------
