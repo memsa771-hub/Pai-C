@@ -30,7 +30,7 @@ requirements:
   R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: true}
   R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: true}
   R-04: {title: "Every change shows the same result in both products", phases: [P1], built: true}
-  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1, P2], built: true}
+  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: true}
   R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: true}
   R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: true}
   R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: true}

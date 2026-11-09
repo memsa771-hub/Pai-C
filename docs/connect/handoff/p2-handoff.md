@@ -21,7 +21,7 @@ Phase spec: `docs/superpowers/specs/2026-11-07-p2-national-data-design.md` (with
 | T9 | Coverage API and screen, the launch-gate reading (a) to (d), the intake `current` gate (`set_state` refuses `current`), workload estimate | R-34, R-35, R-66 | branch `pc/p2-t9-coverage` (`0bb5bc3`); no migration |
 | T10 | `ProgrammeFacts` and `MeritCheck` ports, merit formula and closing-merit shapes, `programme_list.v2` | R-23, R-30, R-31, R-48; rows 6.10, 6.25 | branch `pc/p2-t10-merit` (`a748803`); no migration |
 | T11 | Calendars as registry rows and facts, `result_expected` from an official calendar by registry id, imports and undo revise plans for every fact | R-20, R-26, R-33; row 6.20 | branch `pc/p2-t11-calendars` (`6b94c6c`); no migration |
-| T12 | This gate: consistency rules 9 to 12 in the nightly job, the scripted gate proofs, the R-69 queue export, not-readable sources into the queue, the Spike 1 harness, this handoff | R-05 (rules 9 to 12), R-35 (the reading), R-69; it does not build R-59 (CI) | branch `pc/p2-t12-gate`; `os_0033` |
+| T12 | This gate: consistency rules 9 to 12 in the nightly job, the scripted gate proofs, the R-69 queue export, not-readable sources into the queue, the Spike 1 harness, this handoff | R-35 (the reading), R-69, and rules 9 to 12 of the consistency job (R-05 stays a P1 requirement in the yaml: the master spec §12 lists it under P1 only); it does not build R-59 (CI) | branch `pc/p2-t12-gate`; `os_0033` |
 
 Integration: `pc/p2-integration` merges T1 to T11 on one migration chain `os_0025` to `os_0032` (`os_0033` is T12's). Each task branch keeps its own migration number; the chain was renumbered on the integration branch and again when the tasks reach `pai-connect`.
 
@@ -54,7 +54,7 @@ T12 in detail:
 | 12 | Freeze-exception replays (merit answers, calendar move): only the intended answers changed; Counsellor lead approved | **Not done: open.** No frozen file changed in P2 so far (`check_freeze.py --base origin/pai-connect`: unchanged). The two freeze-exception PRs (flags `CONNECT_MERIT_ANSWERS`, `CONNECT_CALENDAR_FROM_KNOWLEDGE`) each need the label, the R-ID, a replay and `@memsa771-hub`'s approval; the OS side they call is built (T10, T11) |
 | 13 | This handoff written; the owner signs off | Written (draft). **Awaiting the owner's sign-off** |
 
-Test counts on the T12 branch: `tests/os` 2946 (2 skipped, 1 xfailed) passed; the legacy suite 2560 passed, 13 skipped; vitest 602 passed; `next build --webpack` ok; `tach check`, `check_freeze.py`, `check_traceability.py --gate P2` ok; one OS Alembic head (`os_0033`).
+Test counts on the T12 branch: `tests/os` 2955 (2 skipped, 1 xfailed) passed; the legacy suite 2560 passed, 13 skipped; vitest 602 passed; `next build --webpack` ok; `tach check`, `check_freeze.py`, `check_traceability.py --gate P2` ok; one OS Alembic head (`os_0033`).
 
 ## 3. Owner decisions and rulings
 
