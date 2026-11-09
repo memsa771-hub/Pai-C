@@ -754,21 +754,29 @@ def cmd_backup() -> Path:
 
 
 def restore_dump(dump: Path) -> None:
+    """Restore a dump as one transaction: it all lands, or nothing changes."""
     compose("up", "-d", "postgres", capture=False)
     wait_pg()
     compose("stop", "backend", "worker", capture=False, check=False)
     with dump.open("rb") as fh:
         proc = subprocess.run([*docker_cmd(), "compose", "-f", COMPOSE_FILE, "exec", "-T", "postgres",
                                "pg_restore", "--clean", "--if-exists", "--no-owner", "--no-acl",
+                               "--single-transaction", "--exit-on-error",
                                f"--username={DB_USER}", f"--dbname={DB_NAME}"], stdin=fh)
     if proc.returncode != 0:
-        say("pg_restore reported errors (often harmless 'does not exist' notices); check the output.")
-    say(f"restored {dump.name}")
+        die(f"Restoring {dump.name} failed, so the database was left unchanged. See the error above.")
+    users = compose("exec", "-T", "postgres", "psql", "-U", DB_USER, "-d", DB_NAME, "-At",
+                    "-c", "select count(*) from users", quiet=True).stdout.strip()
+    say(f"restored {dump.name}: {users} users")
 
 
 def wait_pg() -> None:
-    for _ in range(30):
-        if compose("exec", "-T", "postgres", "pg_isready", "-U", DB_USER, check=False, quiet=True).returncode == 0:
+    # TCP on purpose. During first-time setup the image runs a temporary server
+    # on the unix socket only and then shuts it down, so a socket check passes
+    # too early and a restore started then is cut off.
+    for _ in range(90):
+        if compose("exec", "-T", "postgres", "pg_isready", "-h", "127.0.0.1", "-U", DB_USER,
+                   check=False, quiet=True).returncode == 0:
             return
         time.sleep(2)
     die("postgres did not become ready")
@@ -792,6 +800,13 @@ def volume_tar(volume: str, into: Path, name: str, extract: bool = False) -> Non
         ["sh", "-c", f"cd /data && tar -cf /out/{name} ."]
     run([*docker_cmd(), "run", "--rm", "-v", f"{volume}:/data", "-v", f"{into}:/out", "alpine", *mode],
         capture=False)
+
+
+def reset_volumes() -> None:
+    """Empty the stack's volumes before an import. Postgres keeps the password it
+    was first set up with, so a database made with another .env must not survive."""
+    for volume in ("pgdata", "files", "qdrant_data"):
+        run([*docker_cmd(), "volume", "rm", "-f", f"{PROJECT}_{volume}"], quiet=True)
 
 
 def cmd_export() -> None:
@@ -826,9 +841,14 @@ def cmd_import() -> None:
         ensure_docker()
         ensure_checkout()
     os.chdir(ARGS.dir)
-    if (ARGS.dir / ".env").exists() and not confirm("A stack already exists here. Overwrite its data with the import?", default=False):
-        return
+    if (ARGS.dir / ".env").exists():
+        if not confirm("A stack already exists here. Overwrite its data with the import?", default=False):
+            return
+        if compose("ps", "-q", "--status", "running", "postgres", check=False, quiet=True).stdout.strip():
+            cmd_backup()                        # backups/ survives the volume reset below
     compose("down", capture=False, check=False)
+    reset_volumes()
+    run([*docker_cmd(), "network", "create", PROXY_NETWORK_HOST], check=False, quiet=True)
     with tempfile.TemporaryDirectory(prefix="pai-import-") as tmp_s:
         tmp = Path(tmp_s)
         os.chmod(tmp, 0o755)

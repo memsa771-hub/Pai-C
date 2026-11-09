@@ -114,3 +114,34 @@ def test_backup_cron_ignores_the_no_crontab_message(monkeypatch):
     op.ensure_backup_cron()
     assert len(written) == 1
     assert written[0].startswith("15 3 * * * ") and "no crontab" not in written[0]
+
+
+def test_wait_pg_checks_tcp_not_the_setup_socket(monkeypatch):
+    from types import SimpleNamespace as NS
+    seen = []
+    monkeypatch.setattr(op, "compose", lambda *a, **kw: seen.append(a) or NS(returncode=0, stdout=""))
+    op.wait_pg()
+    assert "pg_isready" in seen[0] and "-h" in seen[0] and "127.0.0.1" in seen[0]
+
+
+def test_restore_stops_on_failure_and_is_all_or_nothing(monkeypatch, tmp_path):
+    from types import SimpleNamespace as NS
+    dump = tmp_path / "db.dump"
+    dump.write_bytes(b"x")
+    seen = []
+    monkeypatch.setattr(op, "LOG_PATH", None)
+    monkeypatch.setattr(op, "compose", lambda *a, **kw: NS(returncode=0, stdout=""))
+    monkeypatch.setattr(op, "wait_pg", lambda: None)
+    monkeypatch.setattr(op, "docker_cmd", lambda: ["docker"])
+    monkeypatch.setattr(op.subprocess, "run", lambda cmd, **kw: seen.append(cmd) or NS(returncode=1))
+    with pytest.raises(SystemExit):
+        op.restore_dump(dump)
+    assert "--single-transaction" in seen[0] and "--exit-on-error" in seen[0]
+
+
+def test_reset_volumes_removes_all_three(monkeypatch):
+    seen = []
+    monkeypatch.setattr(op, "docker_cmd", lambda: ["docker"])
+    monkeypatch.setattr(op, "run", lambda cmd, **kw: seen.append(cmd))
+    op.reset_volumes()
+    assert [c[-1] for c in seen] == ["pai-beta_pgdata", "pai-beta_files", "pai-beta_qdrant_data"]
