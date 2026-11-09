@@ -252,7 +252,7 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
                 prog = conn.execute(select(G).where(G.c.tenant_id == tenant_id, G.c.ref == ref)).first()
                 facts = conn.execute(select(F).where(
                     F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
-                    F.c.intake_year == intake_year).order_by(F.c.field)).all()
+                    F.c.intake_year == intake_year, F.c.owner_ref == "").order_by(F.c.field)).all()
                 out.append({"ref": ref, "plan_id": plan_id, "rank": choice["rank"], "name": prog.name if prog else ref,
                             "university": prog.university if prog else None, "intake_year": intake_year,
                             "facts": [_fact_out(f, admin=False) for f in facts]})
