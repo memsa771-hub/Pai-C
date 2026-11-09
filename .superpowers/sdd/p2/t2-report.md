@@ -1,6 +1,6 @@
 # P2-T2 registry report
 
-Branch `pc/p2-t2-registry` (T1 interface commit 18387b3 merged). Migration `os_0026_registry` (down_revision `os_0025`; renumber at merge).
+Branch `pc/p2-t2-registry` (T1 interface commit 18387b3 merged). Migration `os_0027_registry` (down_revision `os_0026`; renumbered at merge).
 
 ## Built (R-32, R-33, R-34)
 - Migration/models: `os_registry` (entity_id `<prefix>:<slug>`, kind, parent, region, institution_type, aliases, official_domains, status+successor, `list_ids`, source_url/quote/checked_at, `attrs` JSONB), append-only `os_registry_revisions` (FK RESTRICT), `os_registry_links` (`uses_test`, `has_category`, `admits`), `os_programmes` + `institution_id, campus_id, level, field, family, region`, `ck_os_knowledge_facts_scope` widened with `registry`. Downgrade refuses with data.

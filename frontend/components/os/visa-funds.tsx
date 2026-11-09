@@ -51,7 +51,7 @@ export function VisaFunds({ funds, busy, onReduction }: { funds: OsFunds | null;
       <h2 className="mb-1 font-semibold">Funds you need: {fundsLine(funds)}</h2>
       {funds && funds.required !== null && (
         <p className="break-words text-muted-foreground">
-          {!on && funds.status !== 'confirmed' && <span className="text-amber-900">⚠ {funds.status} </span>}
+          {!on && funds.status !== 'confirmed' && funds.status !== 'verified' && <span className="text-amber-900">⚠ {funds.status} </span>}
           {funds.reduction > 0 && <>after {funds.reduction.toLocaleString('en-US')} {funds.currency_label} of other proof </>}
           {on && <FactSource level={factLevel(funds.status)} url={funds.url} />}
           {!on && funds.url && (
