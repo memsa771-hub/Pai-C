@@ -226,7 +226,8 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
             data = path.read_bytes()
         return Response(content=data, headers={
             "Content-Disposition": 'attachment; filename="review-queue.xlsx"', "X-Rows": str(n),
-            "X-Items-Without-Row": ",".join(map(str, skipped))},
+            "X-Items-Without-Row": ",".join(map(str, skipped[:50])) + (f",+{len(skipped) - 50} more" if len(skipped) > 50 else ""),
+            "X-Items-Without-Row-Count": str(len(skipped))},
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     @router.get("/admin/review/reviewers", dependencies=[Depends(require_admin)])

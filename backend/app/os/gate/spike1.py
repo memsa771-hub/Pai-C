@@ -6,8 +6,10 @@ right value. The harness **scores what the system holds against the key**; it ne
 scoring costs nothing. The research run that fills the facts is separate and billed (cost cap in the owner's ruling Q5);
 `plan` says what it would need and whether it fits the cap, without running it.
 
-Bars (master §12): 100% correct among `verified` facts, at least 95% among `confirmed` facts. A key entry with no fact is
-`missing`; a fact below `confirmed` is `not_confirmed`. Neither counts as correct, and both are listed.
+Bars (master §12): 100% correct among `verified` facts, at least 95% among `confirmed` facts. **Every entry of the key is
+scored, not only the high-stakes ones** (the stricter reading), and every entry must be held at `confirmed` or above: a key
+entry with no fact is `missing`, a fact below `confirmed` is `not_confirmed`, and either one fails the region, as does fewer
+than 5 distinct institutions (a programme counts for its institution, so five programmes of one institution are one).
 
 Answer-key file shape (nothing country-specific in the code; the region code is a key of regions.yaml):
 
@@ -19,6 +21,7 @@ Answer-key file shape (nothing country-specific in the code; the region code is 
       - {scope: programme|registry|route, ref: <ref>, field: <field>, value: <the right value>, owner_ref: ""}
 """
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -92,25 +95,38 @@ def keys_in(directory: Path = KEY_DIR) -> dict[str, Path]:
             if p.name != "spike1_answer_key.yaml"}
 
 
+class _Invalid:
+    """A value that is never equal to anything (NaN, infinity): a fact that holds one is wrong, not 'equal to the key'."""
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+    __hash__ = None  # type: ignore[assignment]
+
+
 def normal(value: Any) -> Any:
-    """A value in the form it is compared in: text trimmed and case-folded, a number as a float, a `{value: x}` wrapper
-    unwrapped (the import writes `{"value": ..., "unit": ..., "date": ...}`), containers recursively."""
+    """A value in the form it is compared in: text trimmed and case-folded, a finite number as a float, a `{value: x}`
+    or `{date: x}` wrapper unwrapped (the import writes `{"value": ..., "unit": ..., "date": ...}`, research
+    `{"date": ..., "tz": ...}`), containers recursively. NaN and infinity match nothing."""
     if isinstance(value, dict):
         if "value" in value and set(value) <= {"value", "unit", "date", "tz"}:
             return normal(value["value"])
+        if "date" in value and set(value) <= {"date", "tz"}:
+            return normal(value["date"])
         return {k: normal(v) for k, v in sorted(value.items())}
     if isinstance(value, (list, tuple)):
         return [normal(v) for v in value]
     if isinstance(value, bool) or value is None:
         return value
     if isinstance(value, (int, float)):
-        return float(value)
+        return float(value) if math.isfinite(value) else _Invalid()
     if isinstance(value, str):
         text = " ".join(value.split()).casefold()
         try:
-            return float(text.replace(",", ""))
+            number = float(text.replace(",", ""))
         except ValueError:
             return text
+        return number if math.isfinite(number) else text  # "nan" and "inf" stay words
     return value
 
 
@@ -131,10 +147,11 @@ class Score:
 
     @property
     def passed(self) -> bool:
-        """The bars hold, and there is something to hold them to: a sample of institutions, and at least one verified fact."""
+        """Every entry is held at confirmed or above, the bars hold, and there is a sample to hold them to: at least 5
+        distinct institutions and at least one verified fact."""
         v, c = self.rate("verified"), self.rate("confirmed")
-        return (self.institutions >= SAMPLE_PER_REGION and v is not None and v >= BAR_VERIFIED
-                and (c is None or c >= BAR_CONFIRMED))
+        return (not self.missing and not self.not_confirmed and self.institutions >= SAMPLE_PER_REGION
+                and v is not None and v >= BAR_VERIFIED and (c is None or c >= BAR_CONFIRMED))
 
     def as_dict(self) -> dict:
         return {"region": self.region, "checked": self.checked, "institutions": self.institutions,
@@ -143,11 +160,34 @@ class Score:
                 "wrong": self.wrong, "missing": self.missing, "not_confirmed": self.not_confirmed, "passed": self.passed}
 
 
+def institutions_of(engine: Engine, tenant_id: str, key: AnswerKey) -> set[str]:
+    """The distinct institutions the key's entries belong to: a programme counts for the institution it is placed under
+    (T2), a registry entity for itself when it is an institution or for its parent when it is a campus. An entry that
+    resolves to no institution counts for none, so a key of unplaced programmes never reaches the sample."""
+    found: set[str] = set()
+    with engine.connect() as conn:
+        for scope in ("programme", "registry"):
+            refs = sorted({e.ref for e in key.entries if e.scope == scope})
+            if not refs:
+                continue
+            if scope == "programme":
+                found |= {r for r in conn.execute(select(models.programmes.c.institution_id).where(
+                    models.programmes.c.tenant_id == tenant_id, models.programmes.c.ref.in_(refs))).scalars() if r}
+            else:
+                for r in conn.execute(select(models.registry.c.entity_id, models.registry.c.kind, models.registry.c.parent_id)
+                                      .where(models.registry.c.tenant_id == tenant_id,
+                                             models.registry.c.entity_id.in_(refs))):
+                    inst = r.entity_id if r.kind == "institution" else r.parent_id if r.kind == "campus" else None
+                    if inst:
+                        found.add(inst)
+    return found
+
+
 def score_key(engine: Engine, tenant_id: str, key: AnswerKey) -> Score:
-    """Compares the facts held with the key. Only high-stakes entries are scored against the 100% bar through `verified`;
-    every entry's fact is looked up for its intake (the key's term and year) and owner."""
+    """Compares the facts held with the key. Every entry is scored (not only the high-stakes ones); each fact is looked
+    up for the key's intake (term and year) and owner."""
     score = Score(key.region)
-    score.institutions = len({e.ref for e in key.entries})
+    score.institutions = len(institutions_of(engine, tenant_id, key))
     held: dict[tuple[str, str, str, str], Any] = {}
     with engine.connect() as conn:
         rows = conn.execute(select(K).where(

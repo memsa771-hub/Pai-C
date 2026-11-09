@@ -132,7 +132,12 @@ def test_gate_10_a_spreadsheet_round_trip_with_deliberate_errors_catches_each_an
     path = workbook(tmp_path, institutions, facts)
     res = run_import(path, d, mode="reviewers", actor="dev", country=COUNTRY, batch_ref="b7")
     reasons = {r.row_id: (r.bucket, r.reason) for r in res.rows}
-    assert reasons["T-INST-002"] == ("rejected", "unknown_region")  # each deliberate error is caught, by name
+    assert reasons["T-INST-002"] == ("rejected", "unknown_region")  # a typed region spelling no list allows
+    assert reasons["T-F-001"] == ("accepted", "both_checks")  # the good row is not caught
+    assert reasons["T-F-002"] == ("unconfirmed", "source_not_on_allow_list")  # a bad URL
+    assert reasons["T-F-003"] == ("unconfirmed", "no_quote")  # a missing quote
+    assert reasons["T-F-004"] == ("accepted", "second_check_missing")  # one checker on a high-stakes row
+    assert reasons["T-F-005"] == ("unconfirmed", "quote_not_found")  # a model-extracted quote not on the re-fetched page
     with engine.connect() as conn:
         held = {r.field: r.status for r in conn.execute(select(models.knowledge_facts))}
     assert held["good"] == "verified"
@@ -140,7 +145,7 @@ def test_gate_10_a_spreadsheet_round_trip_with_deliberate_errors_catches_each_an
     assert held["one_checker"] == "confirmed"  # one checker never makes a high-stakes row verified
     assert held["model_quote"] == "unconfirmed"  # the quote is not on the re-fetched page
     assert RegistryStore(engine, "pai").get("inst:t-inst-002") is None
-    # undo restores the state before the import: nothing is deleted, every fact is withdrawn
+    # undo withdraws what the import loaded: nothing is deleted, every fact goes stale and the entity is closed
     undo_import(engine, "pai", res.import_id, actor="admin")
     with engine.connect() as conn:
         assert {r.status for r in conn.execute(select(models.knowledge_facts))} == {"stale"}
@@ -169,6 +174,34 @@ def test_the_review_queue_exports_the_one_spreadsheet_format_and_the_file_import
     assert _facts(engine)[0].quote and _facts(engine)[0].status in ("unconfirmed", "confirmed")  # same fact, not lowered
 
 
+@pytest.mark.req("R-69")
+def test_the_queue_export_round_trips_risky_text_and_session_intakes(engine, clean, tmp_path):
+    from app.os.knowledge.sheets.reader import read_batch
+
+    load_list(engine)
+    k = SqlKnowledge(engine, "pai")
+    queue = ReviewQueue(engine, "pai", k)
+    run_import(workbook(tmp_path, [inst(1)], [], name="first.xlsx"), deps(engine), mode="owner_accepted", actor="dev",
+               country=COUNTRY, decision_ref="owner chat")
+    e = "inst:t-inst-001"
+    values = {"f_eq": "=1+1", "f_minus": "-5 units", "f_plus": "+92 300", "f_at": "@home", "f_apostrophe": "'Tis the season"}
+    for field, text in values.items():
+        fid = k.upsert("registry", e, field, Fact(text, "the notice says so", NOTICE, AT, 2026, "unconfirmed",
+                                                  intake_term="session"))
+        queue.open_item("change", dedupe_key=field, fact_id=fid)
+    path, n, _ = export_queue(queue, tmp_path / "queue.xlsx")
+    assert n == len(values)
+    back = {r["field"]: r for r in read_batch(path).sheets["Facts"]}
+    assert {f: r["value"] for f, r in back.items()} == values  # what we wrote comes back as it was, formula-like or not
+    assert {r["intake"] for r in back.values()} == {"2026-27"}  # a session is written the way the sheet reads it
+    res = run_import(path, deps(engine, disputes=FakeDisputes()), mode="reviewers", actor="dev", country=COUNTRY,
+                     batch_ref="queue")
+    assert res.counts["Facts"]["rejected"] == 0
+    with engine.connect() as conn:
+        held = {r.field: (r.intake_term, r.intake_year) for r in conn.execute(select(models.knowledge_facts))}
+    assert set(held.values()) == {("session", 2026)}
+
+
 def _facts(engine):
     with engine.connect() as conn:
         return list(conn.execute(select(models.knowledge_facts).order_by(models.knowledge_facts.c.id)))
@@ -176,19 +209,31 @@ def _facts(engine):
 
 # --- 11: consistency rules 9-12 -----------------------------------------------------------------------------------------------------
 
-def entry(field="deadline_close", *, value="2027-08-01", level="verified", high=True, url=URL, intake=None, other=False):
-    return FactEntry(field=field, fact_class="deadline", high_stakes=high, level=level, value=value,
+def entry(field="deadline_close", *, value="2027-08-01", level="verified", url=URL, intake=None, other=False, high=True):
+    return FactEntry(field=field, fact_class="deadline" if high else "application_route", high_stakes=high, level=level, value=value,
                      source=SourceRef(url=url, quote="q", checked_at=AT) if url else None,
                      fact_intake=intake or IntakeRef(term="winter", year=2027), other_intake=other)
 
 
 I27 = IntakeRef(term="winter", year=2027)
-ALLOWED = {"alpha.test"}
+
+
+def listed_on(*domains):
+    return lambda url: any(d in url for d in domains)
+
+
+def _unchecked(field, *, level="verified", url=URL, intake=None, fact_class="deadline", high_stakes=True):
+    """An entry as a surface that bypassed the contract's own checks would hand over."""
+    return FactEntry.model_construct(
+        field=field, fact_class=fact_class, high_stakes=high_stakes, level=level, value="v",
+        source=SourceRef(url=url, quote="q", checked_at=AT) if url else None, fact_intake=intake or I27,
+        other_intake=False, owner_ref=None, read_method=None, language=None)
 
 
 @pytest.mark.req("R-05")
 def test_the_four_rules_in_isolation():
-    clean = rules.check_entries([entry(), entry("fee", level="confirmed", high=False)], I27, ALLOWED, set())
+    ok = listed_on("alpha.test")
+    clean = rules.check_entries([entry(), entry("application_route", level="confirmed", high=False)], I27, ok, set())
     assert all(not codes for codes in clean.values())  # a verified high-stakes fact, an allowed source, its own year
     bad = rules.check_entries([
         _unchecked("a", url="https://elsewhere.test/x"),  # 9: not on the allow-list
@@ -196,85 +241,202 @@ def test_the_four_rules_in_isolation():
         _unchecked("c", intake=IntakeRef(term="winter", year=2026)),  # 11: another year, not labelled
         _unchecked("d", url="https://www.spam.test/p"),  # 12: suspect domain
         entry("e", level="not_confirmed", value=None, url="https://elsewhere.test/y"),  # no value shown: nothing to break
-    ], I27, ALLOWED, {"spam.test"})
+    ], I27, ok, {"spam.test"})
     assert bad == {9: ["domain_not_listed:a"], 10: ["high_stakes_not_verified:b"],
                    11: ["other_intake_unlabelled:c"], 12: ["suspect_domain:d"]}
-    assert not rules.check_entries([_unchecked("a", url="https://elsewhere.test/x")], I27, None, set())[9]  # no list loaded
-    labelled = rules.check_entries([entry("c", intake=IntakeRef(term="winter", year=2026), other=True)], I27, ALLOWED, set())
+    labelled = rules.check_entries([entry("c", intake=IntakeRef(term="winter", year=2026), other=True)], I27, ok, set())
     assert not labelled[11]  # another year shown with its year is fine
 
 
-def _unchecked(field, *, level="verified", url=URL, intake=None):
-    """An entry as a surface that bypassed the contract's own checks would hand over."""
-    return FactEntry.model_construct(
-        field=field, fact_class="deadline", high_stakes=True, level=level, value="v",
-        source=SourceRef(url=url, quote="q", checked_at=AT), fact_intake=intake or I27, other_intake=False,
-        owner_ref=None, read_method=None, language=None)
+@pytest.mark.req("R-05")
+def test_a_shown_value_with_no_source_is_caught_and_the_raw_url_is_checked_too():
+    ok = listed_on("alpha.test")
+    got = rules.check_entries([_unchecked("a", url=None)], I27, ok, set())
+    assert got[9] == ["no_source:a"]  # a value with no source at all escapes nothing
+    got = rules.check_entries([_unchecked("a", url=None)], I27, None, None)  # even when the list and the guard cannot run
+    assert got[9] == ["no_source:a"]
+    # the entry shows no SourceRef, but the fact holds a URL on a suspect domain: rule 12 reads the raw URL
+    got = rules.check_entries([_unchecked("b", url=None)], I27, ok, {"spam.test"}, urls={"b": "https://www.spam.test/p"})
+    assert got[12] == ["suspect_domain:b"] and not got[9]
+    got = rules.check_entries([_unchecked("c", url=None)], I27, ok, set(), urls={"c": "https://elsewhere.test/p"})
+    assert got[9] == ["domain_not_listed:c"]
 
 
 @pytest.mark.req("R-05")
-def test_gate_11_consistency_rules_9_to_12_find_nothing_for_a_clean_student_and_each_violation(w):
+def test_high_stakes_is_recomputed_from_the_fact_classes_not_taken_from_the_entry():
+    liar = _unchecked("deadline_close", level="confirmed", fact_class=None, high_stakes=False)  # says it is not high-stakes
+    assert rules.check_entries([liar], I27, listed_on("alpha.test"), set())[10] == ["high_stakes_not_verified:deadline_close"]
+    other = _unchecked("application_route", level="confirmed", fact_class="application_route", high_stakes=True)
+    assert rules.check_entries([other], I27, listed_on("alpha.test"), set())[10] == []  # a class that is not high-stakes
+
+
+def _lists(tmp_path, region, family, *domains):
+    import yaml
+
+    (tmp_path / f"{region}.yaml").write_text(yaml.safe_dump({
+        "region": region, "family": family,
+        "bodies": [{"body_ref": f"body-{region}", "tier": "regulator", "domains": list(domains),
+                    "list_ref": "https://lists.alpha.test/x", "reviewed_by": "tester-1"}]}), encoding="utf-8")
+    return load_allowlist(tmp_path)
+
+
+@pytest.mark.req("R-05")
+def test_gate_11_consistency_rules_9_to_12_find_nothing_for_a_clean_student_and_each_violation(w, tmp_path):
+    from dataclasses import replace
+
     plan = w.plan("stu-1")
-    ports.configure(w.svc)
+    w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")  # a verified fact on the programme's own domain
+    off = replace(w.svc, settings=replace(w.svc.settings, source_guard=False))
+    on = replace(w.svc, settings=replace(w.svc.settings, source_guard=True))
+    ports.configure(off)
     try:
-        assert os_consistency.fact_findings("stu-1") == []  # no allow-list loaded yet: rule 9 has nothing to check against
-        SourceDomains(w.engine, "pai").sync(load_allowlist(Path(__file__).parents[1] / "fixtures" / "sources"))
-        w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")  # a verified fact on an allowed domain
-        assert os_consistency.fact_students() == ["stu-1"]
-        assert os_consistency.fact_findings("stu-1") == []  # zero on a fictional student
-        # a fact whose source is no longer on the lists is shown: rule 9
+        # no allow-list loaded and the guard off: rules 9 and 12 are NOT RUN, which is not the same as zero findings
+        assert os_consistency.fact_rules_status() == {9: rules.NO_ALLOW_LIST, 10: None, 11: None, 12: rules.GUARD_OFF}
+        assert os_consistency.fact_students() == ["stu-1"] and os_consistency.fact_findings("stu-1") == []
+        ports.configure(on)
+        assert os_consistency.fact_rules_status() == {9: rules.NO_ALLOW_LIST, 10: None, 11: None, 12: None}
+        # the list for the programme's own region and family is loaded: rule 9 runs
+        SourceDomains(w.engine, "pai").sync(_lists(tmp_path, "punjab", "university", "higher-ed-regulator.test"))
+        assert os_consistency.fact_rules_status() == {9: None, 10: None, 11: None, 12: None}
+        assert os_consistency.fact_findings("stu-1") == []  # zero, and now it means zero
+        # a source on a domain the list does not name for this programme's region and family: rule 9
         w.kb.revise(w.fact_id, url="https://unlisted.test/notice", cause="manual")
         w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")
         [f9] = os_consistency.fact_findings("stu-1")
         assert (f9.rule, f9.codes, f9.plan_id) == (9, ("domain_not_listed:deadline_close",), plan)
+        # a domain listed only for another region is not enough (the scope is the programme's own)
+        w.kb.revise(w.fact_id, url="https://www.beta-college.test/notice", cause="manual")
+        w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")
+        SourceDomains(w.engine, "pai").sync(_lists(tmp_path, "sindh", "university", "beta-college.test"))
+        assert [f.rule for f in os_consistency.fact_findings("stu-1")] == [9]
+        # the domain of the list for this region and family: listed, nothing found
+        w.kb.revise(w.fact_id, url="https://www.higher-ed-regulator.test/notice", cause="manual")
+        w.kb.set_status(w.fact_id, "verified", cause="review", actor="tester")
+        assert os_consistency.fact_findings("stu-1") == []
         # the same domain marked suspect without the facts being dropped: rule 12, and a case a person sees
-        SourceDomains(w.engine, "pai").mark_suspect("unlisted.test", "spam", lambda conn: {})
+        SourceDomains(w.engine, "pai").mark_suspect("higher-ed-regulator.test", "spam", lambda conn: {})
         [f12] = os_consistency.fact_findings("stu-1")
         assert (f12.rule, f12.codes) == (12, ("suspect_domain:deadline_close",))
         case_id, created = os_consistency.open_case("stu-1", f12.rule, f12.plan_id, list(f12.codes))
         assert created and [c.rule for c in os_consistency.cases("open")] == [12]  # rule 12 fits the case table
         assert os_consistency.open_case("stu-1", 12, plan, list(f12.codes)) == (case_id, False)  # touched, not repeated
+        ports.configure(off)  # the guard off again: rule 12 is not run, so it finds nothing and says so
+        assert os_consistency.fact_rules_status()[12] == rules.GUARD_OFF and not [
+            f for f in os_consistency.fact_findings("stu-1") if f.rule == 12]
     finally:
         ports.configure(None)
 
 
 # --- the Spike 1 harness (item 7): scoring, no live call -----------------------------------------------------------------------------------
 
-@pytest.mark.req("R-35")
-def test_spike1_harness_scores_the_bars_per_region_and_calls_nothing(w, tmp_path):
+def spike_world(w, n_institutions=5, programmes_per=1, right="2027-08-01"):
+    """`n_institutions` institutions with `programmes_per` programmes each, a verified deadline on every programme."""
+    from app.os.knowledge.programmes import Programme, ProgrammeStore
+    from tests.os.registry.helpers import inst as reg_inst
+
+    reg, progs, refs = RegistryStore(w.engine, "pai"), ProgrammeStore(w.engine, "pai"), []
+    for i in range(1, n_institutions + 1):
+        reg.record(reg_inst(f"s{i}", region="punjab"), cause="import")
+        for j in range(programmes_per):
+            ref = f"q{i}-{j}"
+            progs.upsert(Programme(ref=ref, route_key="ireland_master", university=f"U{i}", name=ref, aliases=(),
+                                   start_urls=(URL,), official_domains=("alpha.test",)))
+            reg.link_programme(ref, institution_id=f"inst:s{i}", cause="import")
+            fid = w.kb.upsert("programme", ref, "deadline_close", Fact({"date": right}, QUOTE, URL, AT, 2027, "confirmed",
+                                                                       intake_term="winter"))
+            w.kb.set_status(fid, "verified", cause="review", actor="tester")
+            refs.append(ref)
+    return refs
+
+
+def write_key(tmp_path, refs, region="punjab", value=None, extra=()):
+    key = tmp_path / f"{region}_answer_key.yaml"
+    entries = [{"scope": "programme", "ref": r, "field": "deadline_close", "value": value or {"date": "2027-08-01"}}
+               for r in refs] + list(extra)
+    key.write_text(json.dumps({"version": 1, "region": region, "intake": {"term": "winter", "year": 2027},
+                               "checker": "bilal", "entries": entries}), encoding="utf-8")
+    return key
+
+
+def run_score(w, tmp_path, *args):
     from scripts import os_spike1_rerun as cli
 
-    key = tmp_path / "punjab_answer_key.yaml"
-    entries = [{"scope": "programme", "ref": f"p{i}", "field": "deadline_close", "value": {"date": "2027-08-01"}}
-               for i in range(1, 6)]
-    key.write_text(json.dumps({"version": 1, "region": "punjab", "intake": {"term": "winter", "year": 2027},
-                               "checker": "bilal", "entries": entries}), encoding="utf-8")
     out: list[str] = []
-    # the programmes p1..p5 hold verified facts: four right, one wrong (the wrong one must fail the 100% bar)
-    for i in range(1, 6):
-        date_ = "2027-08-01" if i != 5 else "2027-09-09"
-        fid = w.kb.upsert("programme", f"p{i}", "deadline_close", Fact({"date": date_}, QUOTE, URL, AT, 2027, "confirmed",
-                                                                       intake_term="winter"))
-        w.kb.set_status(fid, "verified", cause="review", actor="tester")
-    code = cli.main(["score", "--region", "punjab"], engine=w.engine, tenant_id="pai", key_dir=tmp_path, out=out.append)
-    report = json.loads(out[-1])
-    assert code == 1 and report["passed"] is False
-    assert report["regions"][0]["verified"] == {"held": 5, "correct": 4, "rate": 0.8}
-    assert report["regions"][0]["wrong"] == [{"scope": "programme", "ref": "p5", "field": "deadline_close", "status": "verified"}]
-    w.kb.revise(w.kb.programme_facts(["p5"], ["deadline_close"], 2027)[("p5", "deadline_close")].id,
-                value={"date": "2027-08-01"}, quote=QUOTE, cause="manual")
-    w.kb.set_status(w.kb.programme_facts(["p5"], ["deadline_close"], 2027)[("p5", "deadline_close")].id, "confirmed",
-                    cause="manual")
-    out.clear()
-    code = cli.main(["score", "--all"], engine=w.engine, tenant_id="pai", key_dir=tmp_path, out=out.append)
-    report = json.loads(out[-1])
-    assert code == 0 and report["passed"] and report["regions"][0]["confirmed"]["rate"] == 1.0
-    out.clear()
+    code = cli.main(["score", *args], engine=w.engine, tenant_id="pai", key_dir=tmp_path, out=out.append)
+    return code, (json.loads(out[-1]) if out and out[-1].startswith("{") else None)
+
+
+@pytest.mark.req("R-35")
+def test_spike1_harness_passes_only_when_every_entry_is_held_and_right(w, tmp_path):
+    refs = spike_world(w)
+    write_key(tmp_path, refs)
+    code, report = run_score(w, tmp_path, "--region", "punjab")
+    r = report["regions"][0]
+    assert code == 0 and report["passed"] and r["institutions"] == 5 and r["verified"] == {"held": 5, "correct": 5, "rate": 1.0}
+    # one wrong verified fact fails the 100% bar
+    fid = w.kb.programme_facts([refs[4]], ["deadline_close"], 2027)[(refs[4], "deadline_close")].id
+    w.kb.revise(fid, value={"date": "2027-09-09"}, quote=QUOTE, cause="manual")
+    w.kb.set_status(fid, "verified", cause="review", actor="tester")
+    code, report = run_score(w, tmp_path, "--region", "punjab")
+    assert code == 1 and report["regions"][0]["verified"]["rate"] == 0.8
+    assert report["regions"][0]["wrong"] == [{"scope": "programme", "ref": refs[4], "field": "deadline_close",
+                                              "status": "verified"}]
+
+
+@pytest.mark.req("R-35")
+def test_spike1_one_correct_entry_and_ninety_nine_missing_fails(w, tmp_path):
+    refs = spike_world(w, n_institutions=5)
+    ghosts = [{"scope": "programme", "ref": f"ghost-{i}", "field": "deadline_close", "value": {"date": "2027-08-01"}}
+              for i in range(99)]
+    write_key(tmp_path, refs[:1], extra=ghosts)
+    code, report = run_score(w, tmp_path, "--region", "punjab")
+    r = report["regions"][0]
+    assert code == 1 and not report["passed"] and len(r["missing"]) == 99
+    assert r["verified"] == {"held": 1, "correct": 1, "rate": 1.0}  # the rate alone would say 100%: the missing ones fail it
+
+
+@pytest.mark.req("R-35")
+def test_spike1_five_programmes_of_one_institution_are_not_a_sample(w, tmp_path):
+    refs = spike_world(w, n_institutions=1, programmes_per=5)
+    write_key(tmp_path, refs)
+    code, report = run_score(w, tmp_path, "--region", "punjab")
+    r = report["regions"][0]
+    assert code == 1 and r["institutions"] == 1 and r["verified"]["rate"] == 1.0 and not report["passed"]
+
+
+@pytest.mark.req("R-35")
+def test_spike1_an_entry_below_confirmed_fails_the_region(w, tmp_path):
+    refs = spike_world(w)
+    write_key(tmp_path, refs)
+    fid = w.kb.programme_facts([refs[0]], ["deadline_close"], 2027)[(refs[0], "deadline_close")].id
+    w.kb.revise(fid, status="unconfirmed", cause="manual")
+    code, report = run_score(w, tmp_path, "--region", "punjab")
+    assert code == 1 and report["regions"][0]["not_confirmed"] == [
+        {"scope": "programme", "ref": refs[0], "field": "deadline_close", "status": "unconfirmed"}]
+
+
+def test_spike1_values_compare_in_one_form_and_nan_matches_nothing():
+    from app.os.gate.spike1 import normal
+
+    assert normal({"date": "2027-08-01", "tz": "Europe/Dublin"}) == normal("2027-08-01") == normal({"value": "2027-08-01", "unit": "date"})
+    assert normal(" 1,000 ") == normal(1000) == 1000.0
+    assert normal(float("nan")) != normal(float("nan")) and normal(float("inf")) != normal(float("inf"))
+    assert normal("NaN") == "nan" and normal("inf") == "inf"  # words, not numbers
+    assert normal({"date": "2027-08-01"}) != normal({"date": "2027-08-02"})
+
+
+@pytest.mark.req("R-35")
+def test_spike1_plan_and_the_refusals(w, tmp_path):
+    from scripts import os_spike1_rerun as cli
+
+    refs = spike_world(w)
+    write_key(tmp_path, refs)
+    out: list[str] = []
     assert cli.main(["plan", "--region", "punjab", "--cost-per-fact", "0.04", "--spent", "19.9"], key_dir=tmp_path,
                     out=out.append) == 0
     plan_ = json.loads(out[-1])
     assert plan_["facts"] == 5 and plan_["within_cap"] is False and plan_["estimated_cost_usd"] == 0.2
-    assert cli.main(["score", "--region", "sindh"], engine=w.engine, tenant_id="pai", key_dir=tmp_path, out=out.append) == 2
+    assert run_score(w, tmp_path, "--region", "sindh")[0] == 2
 
 
 # --- the admin API for the queue export and the sync, and the migration ----------------------------------------------------------
@@ -326,3 +488,19 @@ def test_os_0033_widens_the_case_rule_and_goes_back_only_when_no_new_case_exists
         eng.dispose()
     run_alembic(["downgrade", "os_0032"], os_db)
     run_alembic(["upgrade", "os@head"], os_db)
+
+
+@pytest.mark.req("R-24")
+def test_the_allow_lists_are_loaded_whether_or_not_the_source_guard_is_on(engine, clean, tmp_path, monkeypatch):
+    from app.os.knowledge.sources import allowlist
+    from app.os.runner.worker import load_allow_lists
+    from app.os.settings import load_settings
+
+    settings = load_settings({"DATABASE_URL": "x"})
+    assert settings.source_guard is False
+    assert load_allow_lists(settings, engine) == 0  # no list files: nothing to load, and no error
+    assert SourceDomains(engine, "pai").domains() == []
+    monkeypatch.setattr(allowlist, "load_allowlist", lambda *a, **k: _lists(tmp_path, "punjab", "university", "a.test"))
+    assert load_allow_lists(settings, engine) == 1
+    assert SourceDomains(engine, "pai").domains() == ["a.test"]
+    assert load_allow_lists(settings, engine) == 1  # again: idempotent

@@ -11,3 +11,13 @@ def safe_cell(value: Any) -> Any:
     if isinstance(value, str) and (value.startswith(_RISKY) or value.lstrip().startswith(_RISKY)):
         return "'" + value
     return value
+
+
+def unsafe_cell(value: Any) -> Any:
+    """The inverse of `safe_cell` on read: one leading apostrophe is taken off when the rest of the cell starts like a
+    formula, so what we wrote comes back as it was (R-69 round trip). Any other leading apostrophe is the text's own."""
+    if isinstance(value, str) and value.startswith("'") and len(value) > 1:
+        rest = value[1:]
+        if rest.startswith(_RISKY) or rest.lstrip().startswith(_RISKY):
+            return rest
+    return value

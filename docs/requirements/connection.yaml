@@ -30,7 +30,7 @@ requirements:
   R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: true}
   R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: true}
   R-04: {title: "Every change shows the same result in both products", phases: [P1], built: true}
-  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: true}
+  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1, P2], built: true}
   R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: true}
   R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: true}
   R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: true}
@@ -79,7 +79,9 @@ requirements:
   # the stage A-I replay are done and tagged.
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
-  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: true}
+  # R-48 stays false: the OS side (ProgrammeFacts, MeritCheck) is built and tested (P2-T10), but the Counsellor answers from it only
+  # after freeze exception 1 (CONNECT_MERIT_ANSWERS), which needs the Counsellor lead. See docs/connect/handoff/p2-handoff.md.
+  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
   R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
   R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}

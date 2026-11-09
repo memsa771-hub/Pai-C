@@ -33,6 +33,9 @@ def _value_cell(value) -> str:
 
 
 def _intake_cell(term: str, year: int) -> str:
+    """The intake as the sheet's text rules read it back (P2 spec §11.3): `Fall 2027`, a session as `2026-27`, a bare year."""
+    if term == "session":
+        return f"{year}-{(year + 1) % 100:02d}"
     return f"{term.capitalize()} {year}".strip() if term else str(year)
 
 

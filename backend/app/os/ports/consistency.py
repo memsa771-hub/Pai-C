@@ -56,9 +56,19 @@ def fact_students() -> list[str]:
     return facts.open_plan_students(svc.engine, svc.settings.tenant_id)
 
 
+def fact_rules_status() -> dict[int, str | None]:
+    """For rules 9-12: None when the rule runs, else why not ("no allow-list loaded", "source guard off"). The job
+    reports these as "not run", never as a count of zero."""
+    from app.os.consistency import facts
+
+    svc = ports.services()
+    return facts.rule_status(svc.engine, svc.settings.tenant_id, svc.settings.source_guard)
+
+
 def fact_findings(student_ref: str) -> list:
     """Rules 9-12 for one student: `FactFinding(rule, codes, plan_id)`, codes only (R-01). Reads, repairs nothing."""
     from app.os.consistency import facts
 
     svc = ports.services()
-    return facts.student_findings(svc.engine, svc.settings.tenant_id, svc.knowledge, svc.plans.playbooks, student_ref)
+    return facts.student_findings(svc.engine, svc.settings.tenant_id, svc.knowledge, svc.plans.playbooks, student_ref,
+                                  guard_on=svc.settings.source_guard)

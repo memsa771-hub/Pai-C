@@ -64,6 +64,18 @@ def _models_on(settings: OsSettings, test_model: str) -> bool:
     return bool(test_model or settings.openai_api_key or settings.model_mode == "offline")
 
 
+def load_allow_lists(settings: OsSettings, engine: Engine) -> int:
+    """Loads the reviewed allow-lists (`knowledge/sources/lists/*.yaml`) into `os_source_domains`, idempotently, whether or
+    not the source guard is on. The guard decides what is refused at read time; the lists themselves are data, and the
+    consistency rule about allowed sources reads them (P2-T12). Returns how many entries the files hold."""
+    from app.os.knowledge.sources.allowlist import SourceDomains, load_allowlist
+
+    allow = load_allowlist()
+    if getattr(allow, "entries", None):
+        SourceDomains(engine, settings.tenant_id).sync(allow)
+    return len(getattr(allow, "entries", None) or [])
+
+
 def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
     """P2-T3: the source guard (allow-lists, integrity checks, snapshots, suspect flow) when OS_SOURCE_GUARD=1; None
     otherwise, and the gateway then behaves exactly as before. The reviewed lists are loaded (idempotently) at start."""
@@ -308,6 +320,7 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
         job = factory(settings, engine, kernel, client)
         if job is not None:  # a factory returns None when its job is off by flag (P2-T7): nothing is scheduled
             add_job(name, cron, job)
+    load_allow_lists(settings, engine)  # with or without the guard: the nightly check's rule 9 reads these lists (P2-T12)
     RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
     if register_documents_if_configured(settings, engine):
         from app.os.documents.run import retry_waiting

@@ -539,7 +539,15 @@ def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: 
             db.rollback()
             errors += 1
             log.error("PAI OS consistency check failed for one student: %s", type(exc).__name__)
-    for student in os_consistency.fact_students():  # rules 9-12 (P2-T12): what a student is shown, read from PAI OS alone
+    not_run: dict[int, str] = {}
+    try:  # rules 9-12 (P2-T12): what a student is shown, read from PAI OS alone
+        not_run = {r: why for r, why in os_consistency.fact_rules_status().items() if why}
+        fact_students = os_consistency.fact_students()
+    except Exception as exc:  # noqa: BLE001  (class name only)
+        errors += 1
+        fact_students = []
+        log.error("PAI OS consistency (rules 9-12) could not start: %s", type(exc).__name__)
+    for student in fact_students:
         try:
             for f in os_consistency.fact_findings(student):
                 findings[f.rule] = findings.get(f.rule, 0) + 1
@@ -550,9 +558,12 @@ def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: 
             db.rollback()
             errors += 1
             log.error("PAI OS consistency check (rules 9-12) failed for one student: %s", type(exc).__name__)
+    if not_run:  # never a silent zero: say which rule did not run and why
+        log.warning("PAI OS consistency (%s): not run %s", mode, dict(sorted(not_run.items())))
     if findings:
         log.warning("PAI OS consistency (%s): findings per rule %s", mode, dict(sorted(findings.items())))
-    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors}
+    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors,
+            "not_run": not_run}
 
 
 def next_consistency_run(now: datetime, hour: int) -> datetime:
