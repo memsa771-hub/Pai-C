@@ -132,10 +132,10 @@ def sudo(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 def sudo_write(path: str, text: str, mode: str = "644") -> None:
-    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".pai") as tmp:
-        tmp.write(text)
-    sudo(["install", "-m", mode, tmp.name, path], quiet=True)
-    os.unlink(tmp.name)
+    # tee writes in place. A Caddyfile bind-mounted as a single file is tied to
+    # its inode, so replacing the file would leave the container on the old copy.
+    sudo(["tee", path], inp=text, quiet=True)
+    sudo(["chmod", mode, path], quiet=True)
 
 
 def sudo_read(path: str) -> str:
@@ -507,11 +507,15 @@ def detect_proxy() -> Proxy:
                 info = json.loads(out([*docker_cmd(), "inspect", name]))[0]
                 nets = [n for n in info["NetworkSettings"]["Networks"] if n != "bridge"]
                 proxy.network = nets[0] if nets else "bridge"
+                proxy.caddyfile = ""
                 for mount in info.get("Mounts", []):
                     if mount.get("Destination") == "/etc/caddy/Caddyfile":
                         proxy.caddyfile = mount["Source"]
                     elif mount.get("Destination") == "/etc/caddy":
                         proxy.caddyfile = str(Path(mount["Source"]) / "Caddyfile")
+                if not proxy.caddyfile:
+                    die(f"Caddy container {name} has no Caddyfile mounted from this server, so its "
+                        "config cannot be extended here (docs/DEPLOY.md, section 5).")
                 return proxy
         die(f"Port 443 is held by a Docker container that is not Caddy ({owner}). "
             "Stop it, or run the stack behind it by hand (docs/DEPLOY.md, section 5).")
@@ -610,9 +614,13 @@ def configure_proxy(proxy: Proxy, front: int, back: int) -> None:
     elif proxy.kind == "caddy-docker":
         current = sudo_read(proxy.caddyfile)
         new = splice_block(current, render_caddy_blocks(f"{FRONTEND_ALIAS}:3000", f"{BACKEND_ALIAS}:8000"))
+        sudo_write(proxy.caddyfile + ".pai-backup", current)
+        say(f"website Caddyfile backed up to {proxy.caddyfile}.pai-backup")
         sudo_write(proxy.caddyfile, new)
-        run([*docker_cmd(), "exec", proxy.container, "caddy", "validate", "--config", "/etc/caddy/Caddyfile"],
-            capture=False)
+        if run([*docker_cmd(), "exec", proxy.container, "caddy", "validate", "--config", "/etc/caddy/Caddyfile"],
+               capture=False, check=False).returncode != 0:
+            sudo_write(proxy.caddyfile, current)
+            die("Caddy rejected the new config. The website's Caddyfile was put back unchanged.")
         run([*docker_cmd(), "exec", proxy.container, "caddy", "reload", "--config", "/etc/caddy/Caddyfile"],
             capture=False)
     elif proxy.kind == "nginx-host":

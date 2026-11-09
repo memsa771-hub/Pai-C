@@ -89,3 +89,15 @@ def test_cli_dispatches_and_requires_a_command(monkeypatch):
     assert seen["ran"] and op.ARGS.dir == ROOT
     with pytest.raises(SystemExit):
         op.main([])
+
+
+def test_sudo_write_keeps_the_inode_of_a_bind_mounted_file(monkeypatch):
+    calls = []
+    monkeypatch.setattr(op, "sudo", lambda cmd, **kw: calls.append((cmd, kw)))
+    op.sudo_write("/srv/Caddyfile", "site {
+}
+")
+    assert calls[0] == (["tee", "/srv/Caddyfile"], {"inp": "site {
+}
+", "quiet": True})
+    assert not any(cmd[0] in ("install", "mv", "cp") for cmd, _ in calls)
