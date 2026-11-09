@@ -44,6 +44,13 @@ REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", 
 REVIEW_STEPS = ("check", "approve", "collect")
 REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
 REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+FACT_SCOPES = ("route", "programme", "registry")  # P2-T2: `registry` = a fact about a registry entity
+REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test", "institution", "campus",
+                  "seat_category", "calendar", "official_list")  # P2 spec §4.1: generic concepts; instances are data
+REGISTRY_STATUSES = ("active", "closed", "merged", "renamed")
+REGISTRY_LINK_RELS = ("uses_test", "has_category", "admits")
+REGISTRY_LINK_TO = ("registry", "programme")
+REGISTRY_REVISION_KINDS = ("entity", "link", "programme")  # what a registry revision is about (subject says which)
 
 md = OsBase.metadata
 
@@ -233,7 +240,7 @@ knowledge_facts = Table(
     Column("language", Text),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
                      name="uq_os_knowledge_facts"),
-    _in("scope", ("route", "programme"), "ck_os_knowledge_facts_scope"),
+    _in("scope", FACT_SCOPES, "ck_os_knowledge_facts_scope"),
     _in("status", FACT_STATUSES, "ck_os_knowledge_facts_status"),
     _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
     _in("read_method", READ_METHODS, "ck_os_knowledge_facts_read_method"),
@@ -256,6 +263,69 @@ fact_revisions = Table(
     _in("cause", REVISION_CAUSES, "ck_os_fact_revisions_cause"),
     Index("ix_os_fact_revisions_fact", "tenant_id", "fact_id", "id"),
     Index("ix_os_fact_revisions_cause", "tenant_id", "cause", "cause_ref"),
+)
+
+# P2-T2 (P2 spec §4.1, P2-D2): the registry of institutions, bodies, systems, tests, categories, calendars and the
+# official lists they came from. Standing facts are columns (P2-D4); cycle-bound facts are Knowledge facts of scope
+# `registry`. Rows are never deleted: a closed or merged entity keeps its row (R-60).
+registry = Table(
+    "os_registry", md,
+    _id(), _tenant(),
+    Column("entity_id", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("parent_id", Text),
+    Column("region", Text),
+    Column("institution_type", Text),
+    Column("name", Text, nullable=False),
+    Column("aliases", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("official_domains", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("status", Text, nullable=False, server_default="active"),
+    Column("successor_id", Text),
+    Column("list_ids", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("source_url", Text, nullable=False),
+    Column("quote", Text, nullable=False, server_default=""),
+    Column("checked_at", DateTime(timezone=True), nullable=False),
+    Column("attrs", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    _created(),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "entity_id", name="uq_os_registry_entity"),
+    _in("kind", REGISTRY_KINDS, "ck_os_registry_kind"),
+    _in("status", REGISTRY_STATUSES, "ck_os_registry_status"),
+    Index("ix_os_registry_kind_region", "tenant_id", "kind", "region"),
+    Index("ix_os_registry_parent", "tenant_id", "parent_id"),
+)
+
+registry_revisions = Table(  # append only, like os_fact_revisions (P2-D9)
+    "os_registry_revisions", md,
+    _id(), _tenant(),
+    Column("registry_id", BigInteger, ForeignKey("os.os_registry.id", ondelete="RESTRICT"), nullable=False),
+    Column("kind", Text, nullable=False, server_default="entity"),  # entity | link | programme (what was changed)
+    Column("subject", Text),  # link: 'rel:to_kind:to_id'; programme: its ref; entity: NULL
+    Column("action", Text, nullable=False),
+    Column("before", JSONB),
+    Column("after", JSONB, nullable=False),
+    Column("cause", Text, nullable=False),
+    Column("cause_ref", Text),
+    Column("actor", Text),
+    Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    _in("kind", REGISTRY_REVISION_KINDS, "ck_os_registry_revisions_kind"),
+    _in("action", REVISION_ACTIONS, "ck_os_registry_revisions_action"),
+    _in("cause", REVISION_CAUSES, "ck_os_registry_revisions_cause"),
+    Index("ix_os_registry_revisions_entity", "tenant_id", "registry_id", "id"),
+)
+
+registry_links = Table(  # an admission system's tests, seat categories and what it admits (P2 spec §4.1)
+    "os_registry_links", md,
+    _id(), _tenant(),
+    Column("from_id", Text, nullable=False),
+    Column("rel", Text, nullable=False),
+    Column("to_kind", Text, nullable=False),
+    Column("to_id", Text, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "from_id", "rel", "to_kind", "to_id", name="uq_os_registry_links"),
+    _in("rel", REGISTRY_LINK_RELS, "ck_os_registry_links_rel"),
+    _in("to_kind", REGISTRY_LINK_TO, "ck_os_registry_links_to_kind"),
+    Index("ix_os_registry_links_to", "tenant_id", "to_kind", "to_id"),
 )
 
 # P2-T5 (os_0026, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
@@ -367,7 +437,15 @@ programmes = Table(
     Column("status", Text, nullable=False, server_default="active"),
     Column("notes", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # P2-T2 (os_0027): the programme level of the registry (P2 spec §4.1). All NULL for programmes outside it.
+    Column("institution_id", Text),
+    Column("campus_id", Text),
+    Column("level", Text),
+    Column("field", Text),
+    Column("family", Text),
+    Column("region", Text),
     UniqueConstraint("tenant_id", "ref", name="uq_os_programmes_ref"),
+    Index("ix_os_programmes_institution", "tenant_id", "institution_id"),
     _in("status", ("active", "excluded", "requested"), "ck_os_programmes_status"),  # requested: Slice 4
 )
 

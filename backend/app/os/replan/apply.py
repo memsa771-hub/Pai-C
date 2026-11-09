@@ -189,7 +189,7 @@ class Replanner:
         with self.engine.connect() as conn:
             return bool(conn.execute(select(func.count()).select_from(F).where(
                 F.c.tenant_id == self.tenant, F.c.scope == "programme", F.c.ref == ref, F.c.intake_year == year,
-                F.c.status.in_(("confirmed", "verified")))).scalar())
+                F.c.owner_ref == "", F.c.status.in_(("confirmed", "verified")))).scalar())
 
     def check(self, plan_id: int, ops: list[Op]) -> tuple[list[Op], list[dict]]:
         """(kept, refused). Raises CompileError when the plan does not compile even without the operations."""

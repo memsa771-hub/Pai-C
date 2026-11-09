@@ -59,9 +59,9 @@ requirements:
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
   R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: false}
   R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: false}
-  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: false}
-  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: false}
-  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: false}
+  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
+  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: true}
+  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: true}
   R-35: {title: "Launch gate: denominator, verified floor and per-region coverage", phases: [P2, P5], built: false}
   R-36: {title: "Two route families as data: pk_intermediate and pk_bachelor", phases: [P3, P4], built: false}
   R-37: {title: "Bachelor family covers every admission system", phases: [P4], built: false}

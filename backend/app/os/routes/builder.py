@@ -242,7 +242,7 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
     with plans.engine.connect() as conn:
         facts = conn.execute(select(func.count()).select_from(F).where(
             F.c.tenant_id == plans.kernel.tenant_id, F.c.scope == "programme", F.c.ref == in_ref,
-            F.c.intake_year == year)).scalar()
+            F.c.intake_year == year, F.c.owner_ref == "")).scalar()  # research's rows, not a body's
     if not facts:
         raise NotAllowed(f"{in_ref} is still being researched")
     _not_started(plans, plan_id, out_ref)
