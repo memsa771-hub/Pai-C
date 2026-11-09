@@ -97,3 +97,20 @@ def test_sudo_write_keeps_the_inode_of_a_bind_mounted_file(monkeypatch):
     op.sudo_write("/srv/Caddyfile", "site {\n}\n")
     assert calls[0] == (["tee", "/srv/Caddyfile"], {"inp": "site {\n}\n", "quiet": True})
     assert not any(cmd[0] in ("install", "mv", "cp") for cmd, _ in calls)
+
+
+def test_backup_cron_ignores_the_no_crontab_message(monkeypatch):
+    from types import SimpleNamespace as NS
+    written = []
+
+    def fake_run(cmd, **kw):
+        if cmd == ["crontab", "-l"]:
+            return NS(returncode=1, stdout="no crontab for root")
+        written.append(kw["inp"])
+        return NS(returncode=0, stdout="")
+
+    monkeypatch.setattr(op, "run", fake_run)
+    monkeypatch.setattr(op, "ARGS", NS(dir=Path("/root/pai-c")), raising=False)
+    op.ensure_backup_cron()
+    assert len(written) == 1
+    assert written[0].startswith("15 3 * * * ") and "no crontab" not in written[0]

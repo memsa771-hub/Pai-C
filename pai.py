@@ -648,7 +648,8 @@ def verify_live() -> bool:
 
 def ensure_backup_cron() -> None:
     line = f"15 3 * * * cd {ARGS.dir} && python3 pai.py backup >> backups/backup.log 2>&1"
-    current = out(["crontab", "-l"], check=False)
+    listing = run(["crontab", "-l"], check=False, quiet=True)
+    current = listing.stdout.strip() if listing.returncode == 0 else ""   # else "no crontab for root"
     if "pai.py backup" in current:
         return
     run(["crontab", "-"], inp=(current + "\n" if current else "") + line + "\n", quiet=True)
