@@ -282,7 +282,7 @@ def test_the_browser_is_in_a_cgroup_with_memory_and_process_limits(engine, clean
 
 
 @needs_browser
-@pytest.mark.skipif(os.geteuid() != 0, reason="the fallback limits the unprivileged user the browser drops to")
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() != 0, reason="the fallback limits the unprivileged user the browser drops to")
 def test_without_a_cgroup_the_unprivileged_user_gets_a_process_limit(engine, clean, fixture_sites):
     url = served(fixture_sites, "document.getElementById('root').textContent = 'ok';")
     renderer = PlaywrightRenderer(limits(max_memory_mb=0, max_pids=300))  # 0: no cgroup is made
