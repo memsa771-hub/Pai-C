@@ -29,6 +29,8 @@ class OsSettings:
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
+    monitor: bool = False  # P2-T7: the daily season monitoring job (OS_MONITOR)
+    reports: bool = False  # P2-T7: students report a fact as wrong, and the steps wait for it (OS_REPORTS)
     render_shell_max_chars: int = 200  # P2-T4: a fetched page with fewer visible characters and scripts is a JavaScript shell
     render_timeout_s: float = 30.0  # P2-T4: ONE wall-clock deadline for a whole render (start, load, read); then the browser is killed
     render_max_requests: int = 60  # P2-T4: sub-requests (the page itself, scripts, data) one render may make
@@ -144,6 +146,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         scan_max_pixels=int(env.get("OS_SCAN_MAX_PIXELS") or 25_000_000),
         scan_timeout_s=float(env.get("OS_SCAN_TIMEOUT_S") or 180.0),
         source_guard=flag(env, "OS_SOURCE_GUARD"),
+        monitor=flag(env, "OS_MONITOR"),
+        reports=flag(env, "OS_REPORTS"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),
