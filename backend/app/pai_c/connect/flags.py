@@ -9,6 +9,7 @@ PARTS: tuple[str, ...] = (
     "CONNECT_STUDENT_FACTS",
     "CONNECT_ONE_UPLOAD",
     "CONNECT_MY_PLAN",
+    "CONNECT_CALENDAR_FROM_KNOWLEDGE",
 )
 
 

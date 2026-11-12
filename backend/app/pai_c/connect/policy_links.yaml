@@ -1,0 +1,15 @@
+# Freeze exception 3 (P2-D28): which values of policy/academic_calendar.json and policy/admission_rules.json are read
+# from Knowledge while CONNECT_CALENDAR_FROM_KNOWLEDGE is on. A link is added when the row is imported (T6) and names
+# the Knowledge fact by scope, ref and field; it is never guessed. Only a confirmed or verified fact replaces the file's
+# value. Empty: every value is the file's own, so the Counsellor reads exactly what it reads today.
+#
+# calendar:
+#   - {target: event | test | intake, key: <row key in academic_calendar.json>,
+#      attr: months | register_months | test_months | result_months | apply_months | merit_list_months
+#            | classes_start_month,
+#      fact: {scope: registry, ref: <registry calendar id>, field: <date field>}}
+# admission_rules:
+#   - {applies_to: <the rule's applies_to, exactly>, attr: min_percent | years,
+#      fact: {scope: programme | registry, ref: <id>, field: <field>}}
+calendar: []
+admission_rules: []

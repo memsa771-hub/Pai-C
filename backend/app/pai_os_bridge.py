@@ -883,3 +883,20 @@ def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
     except Exception:
         log.exception("programmes could not be read; treated as none")
         return []
+
+
+def confirmed_knowledge(keys, intake_year: int) -> dict:
+    """Confirmed Knowledge facts by `(scope, ref, field)` for the Counsellor's calendar and admission-rules adapter
+    (P2-D28, freeze exception 3). `{}` when PAI OS is not mounted, and on any failure (logged): the policy files' own
+    values are then used."""
+    if not keys:
+        return {}
+    try:
+        from app.os.ports import plan_query
+
+        return plan_query.confirmed_facts(keys, intake_year)
+    except ports.OsUnavailable:
+        return {}
+    except Exception:
+        log.exception("knowledge facts could not be read; the policy files' values are used")
+        return {}

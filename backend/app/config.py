@@ -354,6 +354,8 @@ class Config:
     CONNECT_STUDENT_FACTS: bool = os.environ.get("CONNECT_STUDENT_FACTS", "false").lower() in ("true", "1", "yes")
     CONNECT_ONE_UPLOAD: bool = os.environ.get("CONNECT_ONE_UPLOAD", "false").lower() in ("true", "1", "yes")
     CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
+    # Freeze exception 3 (P2-D28): the academic calendar and admission rules read through Knowledge (linked values only).
+    CONNECT_CALENDAR_FROM_KNOWLEDGE: bool = os.environ.get("CONNECT_CALENDAR_FROM_KNOWLEDGE", "false").lower() in ("true", "1", "yes")
     # The hour (UTC, 0-23) at which the nightly Counsellor/PAI OS consistency job runs (P1-T10, R-05). Not a flag: the job
     # runs only while the OS is mounted, the `counsellor` module is on and CONNECT_HANDOFF is on.
     CONNECT_CONSISTENCY_HOUR_UTC: int = int(os.environ.get("CONNECT_CONSISTENCY_HOUR_UTC", "21")) % 24

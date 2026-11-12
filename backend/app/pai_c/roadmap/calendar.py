@@ -71,8 +71,19 @@ def validate(data: dict) -> dict:
 
 
 @lru_cache(maxsize=1)
-def calendar() -> dict:
+def _file() -> dict:
     return validate(load_data("academic_calendar.json"))
+
+
+def calendar() -> dict:
+    """The calendar file; with CONNECT_CALENDAR_FROM_KNOWLEDGE on, its linked values come from confirmed Knowledge
+    facts in the same shape (freeze exception 3, P2-D28). Off: the file itself."""
+    from app.pai_c.connect import policy_knowledge  # lazy: keeps this module import-light
+
+    return policy_knowledge.calendar(_file(), validate)
+
+
+calendar.cache_clear = _file.cache_clear  # callers that reload the file keep working
 
 
 def event(key: str) -> dict | None:
