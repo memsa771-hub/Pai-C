@@ -356,6 +356,8 @@ class Config:
     CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
     # P2 freeze exception 2 (R-48): merit items in the chosen path come from PAI OS MeritCheck.
     CONNECT_MERIT_ANSWERS: bool = os.environ.get("CONNECT_MERIT_ANSWERS", "false").lower() in ("true", "1", "yes")
+    # Freeze exception 3 (P2-D28): the academic calendar and admission rules read through Knowledge (linked values only).
+    CONNECT_CALENDAR_FROM_KNOWLEDGE: bool = os.environ.get("CONNECT_CALENDAR_FROM_KNOWLEDGE", "false").lower() in ("true", "1", "yes")
     # The hour (UTC, 0-23) at which the nightly Counsellor/PAI OS consistency job runs (P1-T10, R-05). Not a flag: the job
     # runs only while the OS is mounted, the `counsellor` module is on and CONNECT_HANDOFF is on.
     CONNECT_CONSISTENCY_HOUR_UTC: int = int(os.environ.get("CONNECT_CONSISTENCY_HOUR_UTC", "21")) % 24
