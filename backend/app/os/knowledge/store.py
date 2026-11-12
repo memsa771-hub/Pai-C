@@ -75,7 +75,7 @@ def _snapshot(row) -> dict[str, Any]:
 def _revise(conn, tenant_id: str, fact_id: int, before, after, cause: str, cause_ref: str | None,
             actor: str | None, except_item: int | None = None) -> None:
     """Writes one append-only revision; no revision when nothing tracked changed."""
-    if cause not in models.REVISION_CAUSES:
+    if cause not in models.FACT_REVISION_CAUSES:
         raise ValueError(f"unknown revision cause '{cause}'")
     old = _snapshot(before) if before is not None else None
     new = _snapshot(after)
