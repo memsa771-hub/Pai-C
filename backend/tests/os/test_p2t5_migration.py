@@ -1,4 +1,4 @@
-"""P2-T5: migration os_0028 (reviewers, review items, checks, evidence, attestations) and the review policy file.
+"""P2-T5: migration os_0026 (reviewers, review items, checks, evidence, attestations) and the review policy file.
 Fictional data."""
 
 from dataclasses import replace
@@ -18,10 +18,10 @@ pytestmark = pytest.mark.req("R-42")
 NEW = {"os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations"}
 
 
-def test_os_0028_upgrade_downgrade(os_db, engine, clean):
+def test_os_0026_upgrade_downgrade(os_db, engine, clean):
     assert NEW <= set(inspect(engine).get_table_names(schema=OS_SCHEMA))
     engine.dispose()
-    run_alembic(["downgrade", "os_0027"], os_db)
+    run_alembic(["downgrade", "os_0025"], os_db)
     try:
         eng = create_engine(os_db)
         try:
@@ -38,7 +38,7 @@ def test_downgrade_refuses_to_drop_records(os_db, engine, clean):
                                                      role="checker", token_hash="h1"))
     engine.dispose()
     with pytest.raises(Exception):
-        run_alembic(["downgrade", "os_0027"], os_db)
+        run_alembic(["downgrade", "os_0025"], os_db)
 
 
 def _reviewer(conn, ref="amina", token="h1", **kw) -> int:

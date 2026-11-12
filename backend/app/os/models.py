@@ -43,8 +43,7 @@ REVIEWER_KINDS = ("person", "ai")  # owner ruling 2026-11-07: an AI check may co
 REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", "conflict", "import_dispute")
 REVIEW_STEPS = ("check", "approve", "collect")
 REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
-REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover",
-                    "backfill")
+REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
 FACT_SCOPES = ("route", "programme", "registry")  # P2-T2: `registry` = a fact about a registry entity
 REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test", "institution", "campus",
                   "seat_category", "calendar", "official_list")  # P2 spec §4.1: generic concepts; instances are data
@@ -333,7 +332,7 @@ registry_links = Table(  # an admission system's tests, seat categories and what
     Index("ix_os_registry_links_to", "tenant_id", "to_kind", "to_id"),
 )
 
-# P2-T5 (os_0028, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
+# P2-T5 (os_0026, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
 reviewers = Table(
     "os_reviewers", md,
     _id(), _tenant(),
@@ -470,7 +469,7 @@ programmes = Table(
     Column("status", Text, nullable=False, server_default="active"),
     Column("notes", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    # P2-T2 (os_0026): the programme level of the registry (P2 spec §4.1). All NULL for programmes outside it.
+    # P2-T2 (os_0027): the programme level of the registry (P2 spec §4.1). All NULL for programmes outside it.
     Column("institution_id", Text),
     Column("campus_id", Text),
     Column("level", Text),

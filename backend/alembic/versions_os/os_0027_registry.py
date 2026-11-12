@@ -1,8 +1,8 @@
 """P2-T2: the registry (P2 spec §4.1, P2-D2, P2-D3, P2-D4; R-32, R-33, R-34): `os_registry` with its append-only
 revisions and links, the programme level on `os_programmes`, and the `registry` fact scope.
 
-Revision ID: os_0026
-Revises: os_0025
+Revision ID: os_0027
+Revises: os_0026
 Create Date: 2026-11-07
 
 Self-contained on purpose: it does not import app.os, so later model changes cannot rewrite history.
@@ -13,8 +13,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from alembic import op
 
-revision = "os_0026"
-down_revision = "os_0025"
+revision = "os_0027"
+down_revision = "os_0026"
 branch_labels = None
 depends_on = None
 
@@ -110,12 +110,12 @@ def downgrade() -> None:
     conn = op.get_bind()
     for table in ("os_registry", "os_registry_links"):
         if conn.execute(sa.text(f"SELECT 1 FROM {S}.{table} LIMIT 1")).first():
-            raise RuntimeError(f"os_0026 downgrade refused: {table} holds rows (no silent loss)")
+            raise RuntimeError(f"os_0027 downgrade refused: {table} holds rows (no silent loss)")
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_knowledge_facts WHERE scope = 'registry' LIMIT 1")).first():
-        raise RuntimeError("os_0026 downgrade refused: facts of scope 'registry' exist (no silent loss)")
+        raise RuntimeError("os_0027 downgrade refused: facts of scope 'registry' exist (no silent loss)")
     linked = " OR ".join(f"{c} IS NOT NULL" for c in PROGRAMME_COLUMNS)
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_programmes WHERE {linked} LIMIT 1")).first():
-        raise RuntimeError("os_0026 downgrade refused: programmes carry registry columns (no silent loss)")
+        raise RuntimeError("os_0027 downgrade refused: programmes carry registry columns (no silent loss)")
     op.drop_table("os_registry_links", schema=S)
     op.drop_table("os_registry_revisions", schema=S)
     op.drop_table("os_registry", schema=S)
