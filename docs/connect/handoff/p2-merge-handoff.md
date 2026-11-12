@@ -25,7 +25,7 @@ task groups. This note covers only where the merges into `pai-connect` stand and
 | P2-T5 review queue | #206 | `os_0026_review_queue` |
 | P2-T2 registry | #204 | `os_0027_registry` |
 | P2-T3 sources | #205 | `os_0028_sources` |
-| P2-T8 intakes | #207 (open; conflicts fixed 2026-11-12, see §3) | `os_0029_intakes` |
+| P2-T8 intakes | #207 (merged 2026-11-12; conflicts fixed that day, see §3) | `os_0029_intakes` |
 
 **Watch the migration order.** The branches that were built later (T7, T9, T11, T12 and `pc/p2-integration`)
 assumed the order registry 0026, sources 0027, review 0028. What merged is review 0026, registry 0027, sources 0028.
