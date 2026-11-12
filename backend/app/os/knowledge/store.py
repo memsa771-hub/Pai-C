@@ -1,6 +1,9 @@
 """SQL-backed Knowledge store (os_knowledge_facts). Slice 2's research agent writes through the same API."""
 
-from collections.abc import Sequence
+import hashlib
+import json
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -9,11 +12,12 @@ from sqlalchemy import Engine, and_, func, or_, select, true, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.os import clock, models
-from app.os.knowledge.port import Fact
+from app.os.knowledge.port import CONFIRMED_LEVELS, Fact
 
 T = models.knowledge_facts
 RV = models.fact_revisions
-Scope = Literal["route", "programme"]
+RI = models.review_items
+Scope = Literal["route", "programme", "registry"]
 Source = Literal["seed", "manual", "research"]
 # P2-D9: what a revision records of a fact. The key columns do not change, except `intake_term` once: the backfill of
 # facts written before P2 (D-t1-1) sets it, and that revision must show it.
@@ -28,6 +32,25 @@ def _fact(row) -> Fact:
         intake_term=row.intake_term, owner_ref=row.owner_ref, fact_class=row.fact_class,
         read_method=row.read_method, language=row.language,
     )
+
+
+class StaleFact(ValueError):
+    """The fact changed between the moment a decision was made on it and the moment it was written (P2-T5, I2)."""
+
+
+# What a reviewer judges: the reading itself and how it was read (P2-T5, I4). A change to any of them voids reviews.
+_CONTENT = ("value", "quote", "url", "fact_class", "read_method")
+
+
+def fact_digest(fact: "Fact") -> str:
+    """sha256 of the content a reviewer sees. `set_status` and `revise` can require it on the locked row."""
+    return hashlib.sha256(json.dumps([getattr(fact, k) for k in _CONTENT], sort_keys=True, default=str)
+                          .encode()).hexdigest()
+
+
+def _check_digest(row, expected: str | None) -> None:
+    if expected is not None and fact_digest(_fact(row)) != expected:
+        raise StaleFact("the fact changed since it was read; nothing was written")
 
 
 @dataclass(frozen=True)
@@ -50,9 +73,9 @@ def _snapshot(row) -> dict[str, Any]:
 
 
 def _revise(conn, tenant_id: str, fact_id: int, before, after, cause: str, cause_ref: str | None,
-            actor: str | None) -> None:
+            actor: str | None, except_item: int | None = None) -> None:
     """Writes one append-only revision; no revision when nothing tracked changed."""
-    if cause not in models.REVISION_CAUSES:
+    if cause not in models.FACT_REVISION_CAUSES:
         raise ValueError(f"unknown revision cause '{cause}'")
     old = _snapshot(before) if before is not None else None
     new = _snapshot(after)
@@ -66,6 +89,34 @@ def _revise(conn, tenant_id: str, fact_id: int, before, after, cause: str, cause
         action = "change"
     conn.execute(RV.insert().values(tenant_id=tenant_id, fact_id=fact_id, action=action, before=old, after=new,
                                     cause=cause, cause_ref=cause_ref, actor=actor))
+    if old is not None and any(old[k] != new[k] for k in _CONTENT):
+        _void_reviews(conn, tenant_id, fact_id, except_item, after)
+
+
+def _void_reviews(conn, tenant_id: str, fact_id: int, except_item: int | None, after) -> None:
+    """A fact whose reading changed leaves no open verify item: its checks were of another reading (I3). Items a
+    reviewer holds locked right now are skipped (no waiting, so no deadlock); their checks carry a digest and are
+    voided when they are applied, or by the queue's sweep. A fact that can still be checked gets a fresh verify item in
+    the same transaction (the author of the old item stays barred from checking the new reading)."""
+    from app.os.knowledge.review.policy import load_policy
+
+    q = select(RI.c.id).where(RI.c.tenant_id == tenant_id, RI.c.fact_id == fact_id, RI.c.kind == "verify",
+                              RI.c.status == "open")
+    if except_item is not None:
+        q = q.where(RI.c.id != except_item)
+    voided = conn.execute(update(RI).where(RI.c.id.in_(q.with_for_update(skip_locked=True)))
+                          .values(status="closed", resolution="void", closed_at=func.now())
+                          .returning(RI.c.batch_ref, RI.c.payload)).all()
+    checkable = after.status == "confirmed" or (
+        after.status == "unconfirmed" and after.read_method in load_policy().compare_with_original)
+    if voided and checkable:
+        old = voided[0]
+        author = (old.payload or {}).get("author_ref")
+        conn.execute(RI.insert().values(
+            tenant_id=tenant_id, kind="verify", fact_id=fact_id, subject="", field=after.field,
+            intake_term=after.intake_term, intake_year=after.intake_year, owner_ref=after.owner_ref,
+            payload={"author_ref": author} if author else {}, batch_ref=old.batch_ref,
+            dedupe_key=f"verify:{fact_id}", opened_by="review"))
 
 
 class SqlKnowledge:
@@ -242,21 +293,71 @@ class SqlKnowledge:
             _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), "monitor", None, "freshness")
             return True
 
+    @contextmanager
+    def _tx(self, conn) -> Iterator[Any]:
+        """The caller's transaction when it passes one (so several writes are one commit), else a new one."""
+        if conn is not None:
+            yield conn
+        else:
+            with self.engine.begin() as own:
+                yield own
+
+    def locked(self, conn, fact_id: int) -> tuple[str, str, str, Fact]:
+        """(scope, ref, field, fact) as it is now, locked for this transaction."""
+        row = self._row(conn, fact_id, lock=True)
+        if row is None:
+            raise KeyError(fact_id)
+        return row.scope, row.ref, row.field, _fact(row)
+
     def set_status(self, fact_id: int, status: str, *, cause: str, cause_ref: str | None = None,
-                   actor: str | None = None) -> Fact:
+                   actor: str | None = None, expected_digest: str | None = None, conn=None) -> Fact:
         """Moves a fact to another trust level with its cause (P2-D6, D9). The trust rule is checked on the locked
-        row: `confirmed` and `verified` need a quote and URL, and `verified` needs cause `review` (T5 decides who)."""
+        row: `confirmed` and `verified` need a quote and URL, and `verified` needs cause `review`. With
+        `expected_digest` the write is refused (StaleFact) if the locked row's reading is not the one decided on."""
         if status == "verified" and cause != "review":
             raise ValueError("verified is reached only with cause 'review'")
-        with self.engine.begin() as conn:
-            before = self._row(conn, fact_id, lock=True)
+        with self._tx(conn) as c:
+            before = self._row(c, fact_id, lock=True)
             if before is None:
                 raise KeyError(fact_id)
+            _check_digest(before, expected_digest)
             Fact(**{**_fact(before).__dict__, "status": status})  # validates
-            conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
-                         .values(status=status, updated_at=func.now()))
-            after = self._row(conn, fact_id)
-            _revise(conn, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
+            c.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
+                      .values(status=status, updated_at=func.now()))
+            after = self._row(c, fact_id)
+            _revise(c, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
+        return _fact(after)
+
+    _REVISABLE = ("value", "quote", "url", "status", "conflict_note", "read_method", "language")
+
+    def revise(self, fact_id: int, *, cause: str, cause_ref: str | None = None, actor: str | None = None,
+               expected_digest: str | None = None, except_item: int | None = None, conn=None,
+               **changes: Any) -> Fact:
+        """Changes some columns of a fact in one step, with its cause (P2-D9). Used by the review queue (T5) to
+        correct a value or move a fact down. Everything is read and checked on the locked row; a new value, quote or
+        URL sets `checked_at` to the shared clock. `expected_digest` refuses the write on a changed reading;
+        `except_item` is the review item the caller is itself closing. Nothing is deleted: the old state stays in
+        the revision."""
+        bad = sorted(set(changes) - set(self._REVISABLE))
+        if bad:
+            raise ValueError(f"cannot revise {bad}")
+        self._no_verified(changes.get("status"))
+        with self._tx(conn) as c:
+            before = self._row(c, fact_id, lock=True)
+            if before is None:
+                raise KeyError(fact_id)
+            _check_digest(before, expected_digest)
+            old = _fact(before)
+            if old.status == "verified" and {"value", "quote", "url"} & set(changes) and "status" not in changes:
+                changes = {**changes, "status": "unconfirmed"}  # a changed reading is no longer verified (T1 rule)
+            Fact(**{**old.__dict__, **changes})  # validates
+            values = dict(changes)
+            if {"value", "quote", "url"} & set(changes):
+                values["checked_at"] = clock.now()
+            c.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
+                      .values(**values, updated_at=func.now()))
+            after = self._row(c, fact_id)
+            _revise(c, self.tenant_id, fact_id, before, after, cause, cause_ref, actor, except_item)
         return _fact(after)
 
     def annotate(self, fact_id: int, *, conflict_note: str | None, checked_at=None, cause: str = "research",

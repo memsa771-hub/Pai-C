@@ -3,20 +3,20 @@
 `os_intakes`: one row per region, family, term and year, with a state. `current` needs a recorded gate pass.
 `os_fact_slots`: the (scope, ref, field, owner) keys a new intake expects, copied from the previous one with no values.
 
-Revision ID: os_0026
-Revises: os_0025
+Revision ID: os_0029
+Revises: os_0028
 Create Date: 2026-11-07
 
-Self-contained on purpose: it does not import app.os. Other P2 tasks also add a migration on os_0025; the integration
-owner renumbers the chain at merge time.
+Self-contained on purpose: it does not import app.os. Written on os_0025 as os_0026; renumbered to os_0029 (after
+T5, T2 and T3) when merged into pai-connect.
 """
 
 import sqlalchemy as sa
 
 from alembic import op
 
-revision = "os_0026"
-down_revision = "os_0025"
+revision = "os_0029"
+down_revision = "os_0028"
 branch_labels = None
 depends_on = None
 
