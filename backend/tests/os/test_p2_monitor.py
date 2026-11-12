@@ -1,4 +1,4 @@
-"""P2-T7: season monitoring, notice windows, the re-check marker, student notices and reports (R-27, R-28; rows 6.23,
+﻿"""P2-T7: season monitoring, notice windows, the re-check marker, student notices and reports (R-27, R-28; rows 6.23,
 6.24). Fictional `.test` sites served by the fixture server; fictional programmes. Verified facts only through review."""
 
 from datetime import UTC, date, datetime
