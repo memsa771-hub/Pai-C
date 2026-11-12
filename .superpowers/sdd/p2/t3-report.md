@@ -1,6 +1,6 @@
 # P2-T3 report: sources (R-24, R-71, R-29 snapshot part)
 
-Branch `pc/p2-t3-sources`, merged with T1 commit 18387b3 (interface change). Migration `os_0026_sources` (down_revision `os_0025`; expect a renumber).
+Branch `pc/p2-t3-sources`, merged with T1 commit 18387b3 (interface change). Migration `os_0028_sources` (down_revision `os_0027`, renumbered after T5 and T2 merged).
 
 ## Built
 - Tables `os_source_domains`, `os_page_snapshots`, `os_source_files` (models + migration; downgrade refuses if rows exist).
@@ -30,7 +30,7 @@ Branch `pc/p2-t3-sources`, merged with T1 commit 18387b3 (interface change). Mig
 ## Counts and checks
 - tests/os: 2400 passed, 1 skipped, 1 xfailed. New: 30 tests in `test_p2_sources_*.py` (+ models table list).
 - legacy: 2559 passed, 14 skipped.
-- tach: all modules validated. Freeze check: clean. Alembic heads: `os_0026` (os) single head. Traceability: pass.
+- tach: all modules validated. Freeze check: clean. Alembic heads: `os_0028` (os) single head. Traceability: pass.
 - ruff clean on new files (remaining findings in pages.py and worker.py are pre-existing).
 
 ## Review fixes (fix(os): T3 review fixes)
@@ -44,5 +44,5 @@ Branch `pc/p2-t3-sources`, merged with T1 commit 18387b3 (interface change). Mig
 - I5: only `SSLCertVerificationError` / CERTIFICATE_VERIFY_FAILED count as TLS failures.
 - I6: guard on: non-https request or final URL -> `insecure_scheme`.
 - I7: approver ids `person_id` (strip+casefold); `source_reactivated` event with both approvers in the same transaction.
-- M1 label-boundary suffix match; M2 dropped updated/revised; M3 suspect flow after the page transaction; M4 `OsSettings.source_guard`; M5 `os_page_snapshots.original_too_large` (added to os_0026 in place, unmerged).
+- M1 label-boundary suffix match; M2 dropped updated/revised; M3 suspect flow after the page transaction; M4 `OsSettings.source_guard`; M5 `os_page_snapshots.original_too_large` (in os_0028).
 - M6 not done: `knowledge_facts` is not T3's table; drop still scans `url ILIKE`. Note for T7/owner.

@@ -963,7 +963,7 @@ consistency_runs = Table(
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
 
-# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0027) ---------------------------------
+# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0028) ---------------------------------
 
 SOURCE_TIERS = ("regulator", "board", "admission_body", "institution")
 SOURCE_STATES = ("active", "suspect")
