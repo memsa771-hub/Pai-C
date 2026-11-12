@@ -1,13 +1,8 @@
 """P2-T3: official-source allow-lists with runtime state, page snapshots and original files (P2 spec P2-D10, P2-D11;
 R-24, R-71, R-29). New tables only: nothing existing changes, so with the guard off behaviour is as before.
 
-<<<<<<<< HEAD:backend/alembic/versions_os/os_0027_sources.py
-Revision ID: os_0027
-Revises: os_0026
-========
 Revision ID: os_0028
 Revises: os_0027
->>>>>>>> origin/pc/p2-t3-sources:backend/alembic/versions_os/os_0028_sources.py
 Create Date: 2026-11-07
 
 Self-contained on purpose: it does not import app.os, so later model changes cannot rewrite history.
@@ -17,13 +12,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-<<<<<<<< HEAD:backend/alembic/versions_os/os_0027_sources.py
-revision = "os_0027"
-down_revision = "os_0026"
-========
 revision = "os_0028"
 down_revision = "os_0027"
->>>>>>>> origin/pc/p2-t3-sources:backend/alembic/versions_os/os_0028_sources.py
 branch_labels = None
 depends_on = None
 
@@ -96,11 +86,7 @@ def downgrade() -> None:
     conn = op.get_bind()
     for table in (F, SN, D):
         if conn.execute(sa.text(f"SELECT 1 FROM {S}.{table} LIMIT 1")).first():
-<<<<<<<< HEAD:backend/alembic/versions_os/os_0027_sources.py
-            raise RuntimeError(f"os_0027 downgrade refused: {table} holds rows (no silent loss)")
-========
             raise RuntimeError(f"os_0028 downgrade refused: {table} holds rows (no silent loss)")
->>>>>>>> origin/pc/p2-t3-sources:backend/alembic/versions_os/os_0028_sources.py
     op.drop_table(F, schema=S)
     op.drop_table(SN, schema=S)
     op.drop_table(D, schema=S)
