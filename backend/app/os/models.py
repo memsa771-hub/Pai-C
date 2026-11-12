@@ -44,6 +44,7 @@ REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", 
 REVIEW_STEPS = ("check", "approve", "collect")
 REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
 REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+FACT_REVISION_CAUSES = (*REVISION_CAUSES, "backfill")  # P2-T8: the intake_term backfill (fact revisions only)
 FACT_SCOPES = ("route", "programme", "registry")  # P2-T2: `registry` = a fact about a registry entity
 REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test", "institution", "campus",
                   "seat_category", "calendar", "official_list")  # P2 spec §4.1: generic concepts; instances are data
@@ -260,7 +261,7 @@ fact_revisions = Table(
     Column("actor", Text),
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     _in("action", REVISION_ACTIONS, "ck_os_fact_revisions_action"),
-    _in("cause", REVISION_CAUSES, "ck_os_fact_revisions_cause"),
+    _in("cause", FACT_REVISION_CAUSES, "ck_os_fact_revisions_cause"),
     Index("ix_os_fact_revisions_fact", "tenant_id", "fact_id", "id"),
     Index("ix_os_fact_revisions_cause", "tenant_id", "cause", "cause_ref"),
 )
