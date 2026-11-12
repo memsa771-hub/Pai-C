@@ -6,7 +6,14 @@ from string import Formatter
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.os.contracts.student_facts import FACT_KEY
 from app.os.eligibility.rules import EligibilityRules, SelfServe
@@ -124,9 +131,11 @@ class Need(_Model):
 
 class Expected(_Model):
     """`fact`: a route Knowledge fact holding the date the result comes out (the calendar); `title`: the step shown
-    until then (R-20)."""
+    until then (R-20). With `calendar` (a registry calendar id, `cal:<slug>`), `fact` is instead the date field of that
+    official calendar, read by its registry id (P2-T11); without it the ask reads the route fact exactly as before."""
     fact: str
     title: str = Field(min_length=1)
+    calendar: str | None = Field(default=None, pattern=r"^cal:[a-z0-9][a-z0-9_-]*$")
 
 
 class Ask(_Model):
@@ -302,10 +311,25 @@ class Playbook(_Model):
                                          f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
+        self._durations_are_sourced_or_estimated()
         self._check_needs()
         self._check_pages()
         self._check_sources()
         return self
+
+    def _durations_are_sourced_or_estimated(self) -> None:
+        """R-30: a duration without an official figure is marked `estimate: true`. A constant a step uses as its
+        duration or lead time, or that a note names, must carry a citation or the estimate flag; one with neither is
+        refused, so an unsourced figure can never reach the student as if it were official."""
+        used: set[str] = set()
+        for t in self.tasks:
+            used |= {n for n in (t.lead_time.constant if t.lead_time else None, t.duration_constant) if n}
+            for note in t.anchor.notes() if t.anchor else ():
+                used |= placeholders(note or "") & set(self.constants)
+        bare = sorted(n for n in used if not self.constants[n].estimate and not self.constants[n].citations)
+        if bare:
+            raise ValueError(f"constant(s) {bare} are durations or named in a note: cite the source or mark "
+                             f"them `estimate: true` (R-30)")
 
     def _check_needs(self) -> None:
         reserved = sorted(t.template_key for t in self.tasks if t.template_key in REQUEST_TEMPLATES)

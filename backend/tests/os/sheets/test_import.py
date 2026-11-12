@@ -56,7 +56,8 @@ def test_both_ai_checks_make_a_verified_fact_with_the_owner_provenance(engine, c
     assert e.official_domains == ("college1.alpha.test",) and e.institution_type == "private_medical_college"
     row = fact_row(engine, "deadline_close")
     assert (row.scope, row.ref, row.status, row.intake_term, row.intake_year) == ("registry", E, "verified", "fall", 2027)
-    assert row.value == {"value": "2027-07-15", "unit": "date"} and row.read_method == "fetch" and row.language == "en"
+    assert row.value == {"value": "2027-07-15", "unit": "date", "date": "2027-07-15"}  # an ISO date, as the compiler reads it
+    assert row.read_method == "fetch" and row.language == "en"
     ev = row.evidence[0]
     assert (ev["checker1"], ev["checker2"], ev["accepted_by"], ev["decision_ref"]) == (
         "claude_check_1", "claude_check_2", "owner", DECISION)

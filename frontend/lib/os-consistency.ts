@@ -24,6 +24,10 @@ export const RULE_LABELS: Record<number, string> = {
   6: 'Files',
   7: 'Duplicate requests',
   8: 'Excluded fields',
+  9: 'Source not on the allow-list',
+  10: 'High-stakes fact not verified',
+  11: 'Other intake shown without its year',
+  12: 'Source marked suspect',
 };
 
 export function ruleLabel(rule: number): string {

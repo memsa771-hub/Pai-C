@@ -14,6 +14,7 @@ Every step is a new `undo` revision, and the import is marked undone in the same
 someone else after the import, the undo refuses and changes nothing: it lists what moved. A revision of another import
 that has itself been undone does not count as a change."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -48,6 +49,7 @@ class UndoResult:
     programmes: int = 0
     links: int = 0
     conflicts: list[str] = field(default_factory=list)
+    hook_errors: list[str] = field(default_factory=list)  # plan revisions that failed after the undo committed
 
 
 def _when(v: Any) -> Any:
@@ -108,7 +110,8 @@ def _latest_registry(conn, tenant_id: str, key: tuple, cancelled: list[str]) -> 
     return conn.execute(q).scalar()
 
 
-def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -> UndoResult:
+def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str,
+                on_fact_change: Callable[[str, str, str, int, str, int], object] | None = None) -> UndoResult:
     log = ImportLog(engine, tenant_id)
     rec = log.get(import_id)
     if rec is None:
@@ -122,6 +125,7 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
     cancelled = [ref for r in log.list(10_000) if r.status == "undone" and r.id != import_id
                  for ref in (cause_ref(r.id), f"undo-{r.id}")]
     result = UndoResult()
+    changed: list[tuple[str, str, str, int, str, int]] = []  # facts changed back, told to the plans after the commit
     with engine.begin() as conn:
         fact_chains = _fact_chains(conn, tenant_id, cref)
         reg_chains = _registry_chains(conn, tenant_id, cref)
@@ -150,6 +154,7 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
             conn.execute(FR.insert().values(tenant_id=tenant_id, fact_id=fid, action="undo",
                                             before=fact_snapshot(before), after=fact_snapshot(after), cause="import",
                                             cause_ref=uref, actor=actor))
+            changed.append((after.scope, after.ref, after.field, fid, after.status, after.intake_year))
             result.facts += 1
         # programmes first (they name registry rows), then links, then the entities themselves
         done_programmes: set[str] = set()
@@ -201,4 +206,10 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str) -
                 status="excluded", institution_id=None, campus_id=None, level=None, field=None, family=None,
                 region=None, updated_at=func.now()))
         log.mark_undone(import_id, actor, conn)  # the same transaction: the log never disagrees with the data
+    if on_fact_change is not None:  # after the commit: the plans that used a withdrawn or restored fact follow it
+        for args in changed:
+            try:
+                on_fact_change(*args)
+            except Exception as e:  # noqa: BLE001  (the undo is committed; a plan that cannot follow is reported)
+                result.hook_errors.append(f"{args[0]}:{args[1]}:{args[2]}: {type(e).__name__}: {e}")
     return result

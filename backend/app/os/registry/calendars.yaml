@@ -1,0 +1,15 @@
+# Calendars (P2 spec §4.11; master R-20, R-33): the types a registry `calendar` row may have, the date fields each type may
+# hold as cycle-bound facts, and the fact class of each field (high-stakes ones show as fact only when verified, R-25). A
+# calendar's instances (which board, which dates) are data that arrive through the import; none is written here.
+version: 1
+types:
+  exam:
+    label: Exam calendar
+    fields: {registration_open: schedule_date, registration_close: deadline, exam_date: test_date}
+  result:
+    label: Result calendar
+    fields: {result_date: schedule_date}
+  admission:
+    label: Admission calendar
+    fields: {application_open: schedule_date, application_close: deadline, merit_list_date: schedule_date,
+             classes_start: schedule_date}

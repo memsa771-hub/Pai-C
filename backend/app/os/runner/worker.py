@@ -64,6 +64,18 @@ def _models_on(settings: OsSettings, test_model: str) -> bool:
     return bool(test_model or settings.openai_api_key or settings.model_mode == "offline")
 
 
+def load_allow_lists(settings: OsSettings, engine: Engine) -> int:
+    """Loads the reviewed allow-lists (`knowledge/sources/lists/*.yaml`) into `os_source_domains`, idempotently, whether or
+    not the source guard is on. The guard decides what is refused at read time; the lists themselves are data, and the
+    consistency rule about allowed sources reads them (P2-T12). Returns how many entries the files hold."""
+    from app.os.knowledge.sources.allowlist import SourceDomains, load_allowlist
+
+    allow = load_allowlist()
+    if getattr(allow, "entries", None):
+        SourceDomains(engine, settings.tenant_id).sync(allow)
+    return len(getattr(allow, "entries", None) or [])
+
+
 def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
     """P2-T3: the source guard (allow-lists, integrity checks, snapshots, suspect flow) when OS_SOURCE_GUARD=1; None
     otherwise, and the gateway then behaves exactly as before. The reviewed lists are loaded (idempotently) at start."""
@@ -82,7 +94,14 @@ def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
     def after_change(scope, ref, field, fact_id, status, intake_year) -> None:
         after_fact_change(service, kernel, scope, ref, field, fact_id, status, intake_year, complete=False)
 
-    guard = SourceGuard(engine, tenant, domains=domains, after_change=after_change,
+    from app.os.knowledge import SqlKnowledge
+    from app.os.knowledge.review import ReviewQueue
+    from app.os.knowledge.review.hooks import open_suspect_item
+
+    # P2 integration: a suspect domain opens a `suspect_domain` item in the review queue (T5)
+    queue = ReviewQueue(engine, tenant, SqlKnowledge(engine, tenant))
+    guard = SourceGuard(engine, tenant, domains=domains, after_change=after_change, on_suspect=open_suspect_item(queue),
+                        recheck="monitor" if (settings.monitor or settings.reports) else None,
                         snapshots=SnapshotStore(engine, tenant, max_bytes=settings.page_max_bytes))
     guard.sync(load_allowlist())  # the one-body-one-domain rule goes through the suspect flow (review I3)
     guard.complete_drops()  # a drop cut off by a restart is completed (review I2)
@@ -298,7 +317,10 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     from app.os.workers.jobs import JOB_FACTORIES as worker_jobs  # imported late: workers depend on the runner
 
     for name, cron, factory in [*worker_jobs, *JOB_FACTORIES]:
-        add_job(name, cron, factory(settings, engine, kernel, client))
+        job = factory(settings, engine, kernel, client)
+        if job is not None:  # a factory returns None when its job is off by flag (P2-T7): nothing is scheduled
+            add_job(name, cron, job)
+    load_allow_lists(settings, engine)  # with or without the guard: the nightly check's rule 9 reads these lists (P2-T12)
     RESEARCH["on"] = register_research_if_configured(settings, engine, kernel)
     if register_documents_if_configured(settings, engine):
         from app.os.documents.run import retry_waiting

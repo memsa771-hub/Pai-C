@@ -46,3 +46,29 @@ def claim_run(run_date: date, mode: str) -> int | None:
 
 def finish_run(run_id: int, counts: dict) -> None:
     _store().finish_run(run_id, counts)
+
+
+def fact_students() -> list[str]:
+    """Students with an open plan of any source: rules 9-12 are about the facts any student is shown (P2-T12)."""
+    from app.os.consistency import facts
+
+    svc = ports.services()
+    return facts.open_plan_students(svc.engine, svc.settings.tenant_id)
+
+
+def fact_rules_status() -> dict[int, str | None]:
+    """For rules 9-12: None when the rule runs, else why not ("no allow-list loaded", "source guard off"). The job
+    reports these as "not run", never as a count of zero."""
+    from app.os.consistency import facts
+
+    svc = ports.services()
+    return facts.rule_status(svc.engine, svc.settings.tenant_id, svc.settings.source_guard)
+
+
+def fact_findings(student_ref: str) -> list:
+    """Rules 9-12 for one student: `FactFinding(rule, codes, plan_id)`, codes only (R-01). Reads, repairs nothing."""
+    from app.os.consistency import facts
+
+    svc = ports.services()
+    return facts.student_findings(svc.engine, svc.settings.tenant_id, svc.knowledge, svc.plans.playbooks, student_ref,
+                                  guard_on=svc.settings.source_guard)

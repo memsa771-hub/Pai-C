@@ -512,7 +512,7 @@ def consistency_students(db) -> list[str]:
 
 
 def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: datetime | None = None) -> dict:
-    """The consistency check of master 9.3 rules 1-8 (P1-T10, R-05). Reads both sides, repairs nothing and writes only
+    """The consistency check of master 9.3 rules 1-12 (P1-T10, P2-T12, R-05). Reads both sides, repairs nothing and writes only
     its own case rows (R-01). `mode` is `nightly` or `settled` (the end-of-test check). A mismatch opens one case for a
     person when `open_cases`; the same mismatch next time only touches it. Logs carry rule numbers and counts only."""
     try:
@@ -539,9 +539,31 @@ def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: 
             db.rollback()
             errors += 1
             log.error("PAI OS consistency check failed for one student: %s", type(exc).__name__)
+    not_run: dict[int, str] = {}
+    try:  # rules 9-12 (P2-T12): what a student is shown, read from PAI OS alone
+        not_run = {r: why for r, why in os_consistency.fact_rules_status().items() if why}
+        fact_students = os_consistency.fact_students()
+    except Exception as exc:  # noqa: BLE001  (class name only)
+        errors += 1
+        fact_students = []
+        log.error("PAI OS consistency (rules 9-12) could not start: %s", type(exc).__name__)
+    for student in fact_students:
+        try:
+            for f in os_consistency.fact_findings(student):
+                findings[f.rule] = findings.get(f.rule, 0) + 1
+                if open_cases:
+                    _, created = os_consistency.open_case(student, f.rule, f.plan_id, list(f.codes))
+                    opened, touched = opened + created, touched + (not created)
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only)
+            db.rollback()
+            errors += 1
+            log.error("PAI OS consistency check (rules 9-12) failed for one student: %s", type(exc).__name__)
+    if not_run:  # never a silent zero: say which rule did not run and why
+        log.warning("PAI OS consistency (%s): not run %s", mode, dict(sorted(not_run.items())))
     if findings:
         log.warning("PAI OS consistency (%s): findings per rule %s", mode, dict(sorted(findings.items())))
-    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors}
+    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors,
+            "not_run": not_run}
 
 
 def next_consistency_run(now: datetime, hour: int) -> datetime:
@@ -869,6 +891,21 @@ def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -
         raise StepError("unavailable") from None
 
 
+def merit_check(student_ref: str, programme_ref: str, term: str, year: int) -> dict | None:
+    """PAI OS MeritCheck for one chosen place (a dict valid as `merit_check.v1`; P2 freeze exception 2, R-48). None
+    when PAI OS is not mounted, and on any failure (logged): the Counsellor then shows no merit item."""
+    try:
+        from app.os.contracts.route_contract import IntakeRef
+        from app.os.ports import plan_query
+
+        return plan_query.merit_check(student_ref, programme_ref, IntakeRef(term=term, year=year)).model_dump(mode="json")
+    except ports.OsUnavailable:
+        return None
+    except Exception:
+        log.exception("merit check could not be read; treated as none")
+        return None
+
+
 def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
     """The places for a route and intake, `{ref, name, university}`. `[]` when PAI OS is not mounted, and on any
     failure (logged)."""
@@ -883,3 +920,20 @@ def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
     except Exception:
         log.exception("programmes could not be read; treated as none")
         return []
+
+
+def confirmed_knowledge(keys, intake_year: int) -> dict:
+    """Confirmed Knowledge facts by `(scope, ref, field)` for the Counsellor's calendar and admission-rules adapter
+    (P2-D28, freeze exception 3). `{}` when PAI OS is not mounted, and on any failure (logged): the policy files' own
+    values are then used."""
+    if not keys:
+        return {}
+    try:
+        from app.os.ports import plan_query
+
+        return plan_query.confirmed_facts(keys, intake_year)
+    except ports.OsUnavailable:
+        return {}
+    except Exception:
+        log.exception("knowledge facts could not be read; the policy files' values are used")
+        return {}

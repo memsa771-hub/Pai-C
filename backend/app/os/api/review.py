@@ -168,6 +168,18 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
             "Content-Disposition": safe_disposition("inline" if inline else "attachment", meta["filename"]),
             "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "no-store"})
 
+    @router.get("/review/snapshots/{snapshot_id}/original")
+    def snapshot_original(snapshot_id: int, who: Reviewer = Depends(reviewer),
+                          svc: Services = Depends(services)) -> Response:
+        """The PDF or image a snapshot was read from (T3 stores those two kinds only), for the review screen."""
+        try:
+            data, ctype = queue_for(svc).snapshot_original(snapshot_id)
+        except ReviewError as e:
+            raise _fail(e) from None
+        return Response(content=data, media_type=ctype, headers={
+            "Content-Disposition": safe_disposition("inline", f"original-{snapshot_id}"),
+            "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "no-store"})
+
     @router.post("/review/batches/{batch_ref}/attest")
     def attest(batch_ref: str, who: Reviewer = Depends(reviewer), svc: Services = Depends(services)) -> dict:
         try:
@@ -185,7 +197,8 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
 
     @router.post("/admin/review/sync", dependencies=[Depends(require_admin)])
     def sync(body: SyncIn, svc: Services = Depends(services)) -> dict:
-        return {"opened": queue_for(svc).sync(**body.model_dump())}
+        q = queue_for(svc)
+        return {"opened": q.sync(**body.model_dump()), "collect_opened": q.sync_not_readable()}
 
     @router.get("/admin/review/items/{item_id}/audit", dependencies=[Depends(require_admin)])
     def audit(item_id: int, svc: Services = Depends(services)) -> dict:
@@ -195,6 +208,27 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
         except ReviewError as e:
             raise _fail(e) from None
         return {**d, "item": item_out(d["item"])}
+
+    @router.get("/admin/review/export", dependencies=[Depends(require_admin)])
+    def export(status: str | None = "open", kind: str | None = None, batch_ref: str | None = None,
+               svc: Services = Depends(services)) -> Response:
+        """The queue, filtered, as an R-67 spreadsheet; the same file imports back (R-69)."""
+        import tempfile
+        from pathlib import Path
+
+        from app.os.knowledge.review.export import export_queue
+
+        if kind and kind not in models.REVIEW_ITEM_KINDS:
+            raise HTTPException(status_code=422, detail="unknown kind")
+        with tempfile.TemporaryDirectory() as tmp:
+            path, n, skipped = export_queue(queue_for(svc), Path(tmp) / "review-queue.xlsx", status=status or None,
+                                            kind=kind, batch_ref=batch_ref)
+            data = path.read_bytes()
+        return Response(content=data, headers={
+            "Content-Disposition": 'attachment; filename="review-queue.xlsx"', "X-Rows": str(n),
+            "X-Items-Without-Row": ",".join(map(str, skipped[:50])) + (f",+{len(skipped) - 50} more" if len(skipped) > 50 else ""),
+            "X-Items-Without-Row-Count": str(len(skipped))},
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     @router.get("/admin/review/reviewers", dependencies=[Depends(require_admin)])
     def reviewers(svc: Services = Depends(services)) -> dict:

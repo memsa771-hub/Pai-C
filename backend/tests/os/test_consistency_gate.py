@@ -87,7 +87,9 @@ def test_the_nightly_job_finds_nothing_with_two_open_requests(world):  # noqa: F
         choose_t8(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
         assert s.rows("open")  # the version-2 plan asks for the certificates
         finds_nothing(s.who)
-        assert_consistent(s.who.factory)
+        got = assert_consistent(s.who.factory)
+        # rules 9 and 12 could not run here (no allow-list, no guard): the job says so instead of reporting zero
+        assert got["not_run"] == {9: "no allow-list loaded", 12: "source guard off"}
 
 
 def test_the_nightly_job_finds_nothing_with_a_confirmed_document(world):  # noqa: F811

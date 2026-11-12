@@ -15,6 +15,7 @@ from app.os.knowledge.sheets.importer import (
     ImportRefused,
     build_context,
     plan_file,
+    plan_hook,
     run_import,
     wire_other_tasks,
 )
@@ -56,6 +57,7 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
             from app.os.knowledge.research.pages import PageGateway
 
             deps.fetcher = PageGateway(svc.engine, svc.settings.tenant_id, svc.settings)
+        deps.on_fact_change = plan_hook(svc.plans, svc.kernel)  # the plans that use a registry fact follow it
         return wire_other_tasks(deps)
 
     async def save(upload: UploadFile, tmp: Path) -> Path:
@@ -131,7 +133,8 @@ def add_import_routes(router: APIRouter, services: Callable[[], Services], requi
     @router.post("/admin/imports/{import_id}/undo", dependencies=[Depends(require_admin)])
     def undo(import_id: int, actor: str | None = Form(None), svc: Services = Depends(services)) -> dict:
         try:
-            r = undo_import(svc.engine, svc.settings.tenant_id, import_id, actor=ADMIN_ACTOR)
+            r = undo_import(svc.engine, svc.settings.tenant_id, import_id, actor=ADMIN_ACTOR,
+                            on_fact_change=plan_hook(svc.plans, svc.kernel))
         except KeyError:
             raise HTTPException(status_code=404, detail="import not found") from None
         except UndoRefused as e:

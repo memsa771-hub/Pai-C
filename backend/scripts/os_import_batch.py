@@ -23,6 +23,7 @@ from app.os.knowledge.sheets.importer import (
     ImportDeps,
     build_context,
     plan_file,
+    plan_hook,
     run_import,
     wire_other_tasks,
     write_report,
@@ -105,6 +106,11 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                               ProgrammeStore(engine, tenant),
                               fetcher=PageGateway(engine, tenant, settings) if getattr(args, "refetch", False) else None)
             deps = wire_other_tasks(deps)
+            if args.cmd in ("import", "undo"):  # the plans that use an imported or withdrawn fact follow it (row 6.10)
+                from app.os.api.services import make_services
+
+                svc = make_services(settings)
+                deps.on_fact_change = plan_hook(svc.plans, svc.kernel)
         if args.cmd == "import":
             res = run_import(Path(args.file), deps, mode=OWNER_ACCEPTED if args.owner_accepted else REVIEWERS,
                              actor=args.actor, country=args.country, decision_ref=args.owner_accepted,
@@ -115,7 +121,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
         elif args.cmd == "undo":
             from app.os.knowledge.sheets.undo import undo_import
 
-            r = undo_import(deps.engine, deps.tenant_id, args.import_id, actor=args.actor)
+            r = undo_import(deps.engine, deps.tenant_id, args.import_id, actor=args.actor,
+                            on_fact_change=deps.on_fact_change)
             out(f"undone: {r.facts} facts, {r.registry} registry rows, {r.programmes} programmes")
         else:
             from app.os.knowledge.sheets.importlog import ImportLog

@@ -593,6 +593,24 @@ class WorkspaceApi {
     return (await res.json()) as T;
   }
 
+  /** PAI OS admin: the intakes and the coverage report of one (P2-T9, R-35, R-66). */
+  async getOsIntakes(adminToken: string): Promise<import('./os-coverage').OsIntake[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.adminJson<{ intakes: import('./os-coverage').OsIntake[] }>(`/v1/os/admin/intakes?${params}`, adminToken);
+    return body.intakes;
+  }
+
+  async getOsCoverage(adminToken: string, intake: number): Promise<import('./os-coverage').OsCoverage> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), intake: String(intake) });
+    return this.adminJson(`/v1/os/admin/coverage?${params}`, adminToken);
+  }
+
+  /** Refused (409, with the failing items in the error text) while the intake's gate is red. */
+  async makeOsIntakeCurrent(adminToken: string, intake: number): Promise<import('./os-coverage').OsIntake> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.adminJson(`/v1/os/admin/intakes/${intake}/current?${params}`, adminToken, { method: 'POST' });
+  }
+
   /** PAI OS admin: support cases. */
   async getOsSupportCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-replan').OsSupportCase[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
@@ -614,6 +632,24 @@ class WorkspaceApi {
     const body = await this.adminJson<{ cases: import('./os-consistency').OsConsistencyCase[] }>(
       `/v1/os/admin/consistency?${params}`, adminToken);
     return body.cases;
+  }
+
+  /** PAI OS: the approved sentences for reporting a fact as wrong (P2-T7). */
+  async getOsReportTexts(): Promise<unknown> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/report/texts?${params}`);
+  }
+
+  /** PAI OS: the source pages of the student's plan that have facts to report (P2-T7). */
+  async getOsReportSources(): Promise<unknown> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/report/sources?${params}`);
+  }
+
+  /** PAI OS: report the facts behind a source line as wrong (P2-T7, R-28). */
+  async reportOsSource(url: string, reason: string, text: string | null): Promise<{ status: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/sources/report?${params}`, { method: 'POST', body: JSON.stringify({ url, reason, text }) });
   }
 
   /**
@@ -664,7 +700,7 @@ class WorkspaceApi {
     return this.reviewerJson(this.reviewPath(`/items/${id}/collect`), token, { method: 'POST', body: JSON.stringify(body) });
   }
 
-  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed', note: string): Promise<import('./os-review').OsReviewResult> {
+  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed' | 'stands' | 'agrees', note: string): Promise<import('./os-review').OsReviewResult> {
     return this.reviewerJson(this.reviewPath(`/items/${id}/resolve`), token, {
       method: 'POST', body: JSON.stringify({ outcome, note }),
     });

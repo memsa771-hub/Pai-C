@@ -280,3 +280,57 @@ def test_a_programme_row_with_no_value_column_is_rejected(tmp_path):
 def test_a_rejected_row_does_not_shadow_a_later_valid_one(tmp_path):
     rows = plan(tmp_path, [inst(1)], [fact(1, "T-INST-001", language="Urdu"), fact(2, "T-INST-001")])
     assert rows[("Facts", "T-F-001")].reason == "bad_language" and rows[("Facts", "T-F-002")].bucket == "accepted"
+
+
+# --- official calendars: rows and dates (P2-T11) ----------------------------------------------------------------------
+
+
+def calendar_rows(**kw):
+    body = inst(1, ctype="admission_body", source_url="https://board.alpha.test/about", timezone="Asia/Karachi")
+    cal = inst(2, ctype="result_calendar", source_url="https://board.alpha.test/results", parent_id="T-INST-001", **kw)
+    return [body, cal]
+
+
+def test_a_calendar_row_has_its_kind_type_parent_and_zone(tmp_path):
+    rows = plan(tmp_path, calendar_rows())
+    cal = rows[("Institutions", "T-INST-002")]
+    assert cal.bucket == "accepted" and cal.payload["kind"] == "calendar" and cal.payload["calendar_type"] == "result"
+    assert cal.payload["entry"].entity_id == "cal:t-inst-002" and cal.payload["entry"].parent_id == "body:t-inst-001"
+    assert rows[("Institutions", "T-INST-001")].payload["timezone"] == "Asia/Karachi"
+    gone = plan(tmp_path, [calendar_rows()[1]])  # its parent is not loaded
+    assert gone[("Institutions", "T-INST-002")].reason == "parent_not_loaded"
+    assert plan(tmp_path, calendar_rows(timezone="Mars/Base"))[("Institutions", "T-INST-002")].reason == "bad_timezone"
+
+
+def test_a_date_of_a_calendar_is_checked_against_the_calendars_type_and_gets_a_zone(tmp_path):
+    cal = "T-INST-002"
+    rows = plan(tmp_path, calendar_rows(), [
+        fact(1, cal, field_="result_date", value="2031-05-20", intake="Fall 2031"),
+        fact(2, cal, field_="exam_date", value="2031-05-20", intake="Fall 2031"),  # a result calendar has no exam date
+        fact(3, cal, field_="result_date", value="20 May", intake="Fall 2032"),
+        fact(4, cal, field_="result_date", value="2031-05-20", intake="Fall 2033", unit="date"),
+    ])
+    ok = rows[("Facts", "T-F-001")]
+    assert ok.bucket == "accepted" and ok.payload["value"] == {"date": "2031-05-20", "tz": "Asia/Karachi"}  # the parent's
+    assert ok.payload["calendar"] == "schedule_date"
+    assert rows[("Facts", "T-F-002")].reason == "field_not_in_calendar"
+    assert rows[("Facts", "T-F-003")].reason == "not_a_date"
+    assert rows[("Facts", "T-F-004")].bucket == "accepted"
+
+
+def test_a_calendars_own_zone_wins_and_no_zone_anywhere_is_refused(tmp_path):
+    own = plan(tmp_path, calendar_rows(timezone="Etc/UTC"), [fact(1, "T-INST-002", field_="result_date",
+                                                                  value="2031-05-20", intake="Fall 2031")])
+    assert own[("Facts", "T-F-001")].payload["value"]["tz"] == "Etc/UTC"
+    body = inst(1, ctype="admission_body", source_url="https://board.alpha.test/about")  # no zone on the body either
+    cal = inst(2, ctype="result_calendar", source_url="https://board.alpha.test/results", parent_id="T-INST-001")
+    none = plan(tmp_path, [body, cal], [fact(1, "T-INST-002", field_="result_date", value="2031-05-20",
+                                             intake="Fall 2031")])
+    assert none[("Facts", "T-F-001")].reason == "no_timezone"
+
+
+def test_facts_about_other_entities_are_untouched_by_the_calendar_rules(tmp_path):
+    rows = plan(tmp_path, calendar_rows(), [fact(1, "T-INST-001", field_="exam_date", value="whenever",
+                                                 intake="Fall 2031")])
+    assert rows[("Facts", "T-F-001")].bucket == "accepted"  # the body is not a calendar: its value is kept as given
+    assert rows[("Facts", "T-F-001")].payload["value"] == {"value": "whenever", "unit": "date"}
