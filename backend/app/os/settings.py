@@ -20,12 +20,30 @@ class OsSettings:
     email_from: str | None = None  # Slice 9a: the From address for Resend (OS_EMAIL_FROM)
     email_allowlist: frozenset[str] = frozenset()  # Slice 9a: exact addresses, lower-cased; empty = nobody
     student_facts: str | None = None  # P1-T4: the worker's `module.path:callable` (OS_STUDENT_FACTS)
+    document_files: str | None = None  # P1-T7: the worker's `module.path:callable` (OS_DOCUMENT_FILES)
+    fact_conflicts: str | None = None  # P1-T8: the worker's `module.path:callable` (OS_FACT_CONFLICTS)
+    documents_enabled: str | None = None  # P1-T7: the worker's gate `module.path:callable` (OS_DOCUMENTS_ENABLED)
     recipient_lookup: str | None = None  # Slice 9b: the worker's `module.path:callable` (OS_RECIPIENT_LOOKUP)
     app_url: str | None = None  # Slice 9b: the student app's base URL for links in emails (OS_APP_URL); None = no link
     worker_id: str | None = None
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
+    render_shell_max_chars: int = 200  # P2-T4: a fetched page with fewer visible characters and scripts is a JavaScript shell
+    render_timeout_s: float = 30.0  # P2-T4: ONE wall-clock deadline for a whole render (start, load, read); then the browser is killed
+    render_max_requests: int = 60  # P2-T4: sub-requests (the page itself, scripts, data) one render may make
+    render_max_bytes: int = 20_000_000  # P2-T4: total bytes of those sub-requests
+    render_max_old_space_mb: int = 512  # P2-T4: the browser's JavaScript heap limit
+    render_max_memory_mb: int = 1024  # P2-T4: the browser's whole memory (cgroup memory limit, where the host allows one)
+    render_max_pids: int = 256  # P2-T4: processes and threads of the browser (cgroup pids limit, else RLIMIT_NPROC)
+    render_run_as_uid: int | None = 65534  # P2-T4: when the worker runs as root, the browser runs as this user (OS_RENDER_UID)
+    render_no_sandbox: bool = False  # P2-T4: only for hosts where Chromium cannot start its sandbox (OS_RENDER_NO_SANDBOX=1)
+    render_browser_path: str | None = None  # P2-T4: a Chromium executable; None = Playwright's own (OS_RENDER_BROWSER)
+    scan_min_pdf_chars: int = 20  # P2-T4: a PDF with less text than this is a scan (read by OCR when a scanner is set)
+    scan_max_pages: int = 10  # P2-T4: pages of a scanned PDF that are read
+    scan_max_pixels: int = 25_000_000  # P2-T4: a page image larger than this is refused (decompression bombs)
+    scan_timeout_s: float = 180.0  # P2-T4: how long a scan engine may take for one page
+    source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
     price_cheap_in: float | None = 0.75
@@ -102,12 +120,30 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         email_from=email_from,
         email_allowlist=allowlist,
         student_facts=(env.get("OS_STUDENT_FACTS") or "").strip() or None,
+        document_files=(env.get("OS_DOCUMENT_FILES") or "").strip() or None,
+        fact_conflicts=(env.get("OS_FACT_CONFLICTS") or "").strip() or None,
+        documents_enabled=(env.get("OS_DOCUMENTS_ENABLED") or "").strip() or None,
         recipient_lookup=(env.get("OS_RECIPIENT_LOOKUP") or "").strip() or None,
         app_url=(env.get("OS_APP_URL") or "").strip().rstrip("/") or None,
         worker_id=env.get("OS_WORKER_ID") or None,
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
+        render_shell_max_chars=int(env.get("OS_RENDER_SHELL_MAX_CHARS") or 200),
+        render_timeout_s=float(env.get("OS_RENDER_TIMEOUT_S") or 30.0),
+        render_max_requests=int(env.get("OS_RENDER_MAX_REQUESTS") or 60),
+        render_max_bytes=int(env.get("OS_RENDER_MAX_BYTES") or 20_000_000),
+        render_max_old_space_mb=int(env.get("OS_RENDER_MAX_OLD_SPACE_MB") or 512),
+        render_max_memory_mb=int(env.get("OS_RENDER_MAX_MEMORY_MB") or 1024),
+        render_max_pids=int(env.get("OS_RENDER_MAX_PIDS") or 256),
+        render_run_as_uid=int(env["OS_RENDER_UID"]) if (env.get("OS_RENDER_UID") or "").strip() else 65534,
+        render_no_sandbox=flag(env, "OS_RENDER_NO_SANDBOX"),
+        render_browser_path=(env.get("OS_RENDER_BROWSER") or "").strip() or None,
+        scan_min_pdf_chars=int(env.get("OS_SCAN_MIN_PDF_CHARS") or 20),
+        scan_max_pages=int(env.get("OS_SCAN_MAX_PAGES") or 10),
+        scan_max_pixels=int(env.get("OS_SCAN_MAX_PIXELS") or 25_000_000),
+        scan_timeout_s=float(env.get("OS_SCAN_TIMEOUT_S") or 180.0),
+        source_guard=flag(env, "OS_SOURCE_GUARD"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

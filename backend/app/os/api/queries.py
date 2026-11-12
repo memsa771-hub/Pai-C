@@ -135,6 +135,14 @@ def task_plan_and_template(engine: Engine, tenant_id: str, task_id: int) -> tupl
     return None if row is None else (row.plan_id, row.template_key)
 
 
+def task_plan_template_owner(engine: Engine, tenant_id: str, task_id: int) -> tuple[int, str, str] | None:
+    """`(plan id, template key, the plan's student)` of a task, or None when there is no such task."""
+    with engine.connect() as conn:
+        row = conn.execute(select(T.c.plan_id, T.c.template_key, P.c.student_ref).select_from(
+            T.join(P, P.c.id == T.c.plan_id)).where(T.c.tenant_id == tenant_id, T.c.id == task_id)).first()
+    return None if row is None else (row.plan_id, row.template_key, row.student_ref)
+
+
 def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mapping) -> list[dict]:
     """The student's steps that wait for a fact nobody has given yet (blocked `fact_missing:<field>`), or for a
     programme to take it from (blocked `no_candidate:<name>`: every programme said "not admitted"), each with what
@@ -244,7 +252,7 @@ def student_programmes(engine: Engine, tenant_id: str, student_ref: str) -> list
                 prog = conn.execute(select(G).where(G.c.tenant_id == tenant_id, G.c.ref == ref)).first()
                 facts = conn.execute(select(F).where(
                     F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
-                    F.c.intake_year == intake_year).order_by(F.c.field)).all()
+                    F.c.intake_year == intake_year, F.c.owner_ref == "").order_by(F.c.field)).all()
                 out.append({"ref": ref, "plan_id": plan_id, "rank": choice["rank"], "name": prog.name if prog else ref,
                             "university": prog.university if prog else None, "intake_year": intake_year,
                             "facts": [_fact_out(f, admin=False) for f in facts]})

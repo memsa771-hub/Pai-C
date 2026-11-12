@@ -1,0 +1,11 @@
+{
+  "schema": "pai.programme_list.v2",
+  "route_key": "fake_bs",
+  "intake": {"term": "fall", "year": 2027},
+  "programmes": [
+    {"programme_ref": "prog-alpha-bs-cs", "university": "Alpha University (fictional)", "name": "BS Computing",
+     "facts_confirmed": true, "coverage_level": "verified", "region": "north_region", "not_run_yet": false},
+    {"programme_ref": "prog-beta-bs-bio", "university": "Beta College (fictional)", "name": "BS Biology",
+     "facts_confirmed": false, "coverage_level": "listed", "region": null, "not_run_yet": true}
+  ]
+}

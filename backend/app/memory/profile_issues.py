@@ -1,5 +1,6 @@
 """Resolve profile conflicts through the canonical reconciliation path."""
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,13 +9,26 @@ from sqlalchemy import select
 from app.models import MemoryCandidate, ProfileIssue, VaultItem, Workspace
 from .candidates import MemoryCandidateService
 from .errors import MemoryDataError
+from .issue_answers import answers_of, drop
 from .reconciler import MemoryReconciler
 from .vault_intake import VaultAssertionService
 
 
+log = logging.getLogger("app.memory.profile_issues")
+
 # both_true: the new value holds now and the old one held before; the old
 # value is kept as past (VAULT_SPEC §Conflicts, the four card answers).
 ISSUE_ACTIONS = frozenset({"keep_current", "accept_proposed", "both_true", "provide_new"})
+
+#: Code above shared memory (the connection to PAI OS) hears that a card was closed. Shared memory never imports PAI C,
+#: so the capability loader registers the hook (`hook(db, issue)`, in the answering transaction), as it does for the
+#: reconciler's accept hooks (P1-T8, D-w14).
+_CLOSE_HOOKS: list = []
+
+
+def register_close_hook(hook) -> None:
+    if hook not in _CLOSE_HOOKS:
+        _CLOSE_HOOKS.append(hook)
 
 
 def _unwrap(value: Any) -> Any:
@@ -29,6 +43,38 @@ class ProfileIssueService:
         self.candidates = MemoryCandidateService(db)
         self.reconciler = MemoryReconciler(db)
 
+    def lock_open(self, workspace_id: str, issue_id: str) -> ProfileIssue | None:
+        """The open issue, locked; None when it is not found or already closed. Workspace before issue, the order every
+        Vault write takes its locks in, so an answer and a concurrent write cannot wait on each other."""
+        if self.db.get(Workspace, workspace_id, with_for_update=True) is None:
+            return None
+        return self.db.execute(
+            select(ProfileIssue).where(
+                ProfileIssue.id == issue_id,
+                ProfileIssue.workspace_id == workspace_id,
+                ProfileIssue.status == "open",
+            ).with_for_update().execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+
+    def settle(self, issue: ProfileIssue, *, note: str, answers: dict | None = None) -> None:
+        """Closes a card whose differing values were each answered one by one (P1-T8 owner ruling): the values the
+        student chose are written already, so nothing more is written. The card's own proposed record is not applied.
+        `issue` came from `lock_open`."""
+        original = None
+        if issue.candidate_id:
+            original = self.db.execute(select(MemoryCandidate).where(
+                MemoryCandidate.id == issue.candidate_id,
+                MemoryCandidate.workspace_id == issue.workspace_id,
+            )).scalar_one_or_none()
+        if original is not None and original.status in ("pending", "needs_review"):
+            self.candidates.mark_rejected(original, "Student answered value by value")
+            VaultAssertionService(self.db).refresh_decision(original)
+        self._close(issue, "answered_by_value", note, None)
+        if answers:
+            issue.resolution = {**issue.resolution, "answers": answers}
+        self._closed(issue)
+        self._replay_waiting_courses(issue, self._kept_education_id(issue))
+
     def resolve(
         self, workspace_id: str, issue_id: str, action: str, *,
         value: Any = None, note: str | None = None, capture: str | None = None,
@@ -36,17 +82,7 @@ class ProfileIssueService:
         """`capture` names the surface that took the answer (e.g. "vault_api") on its evidence."""
         if action not in ISSUE_ACTIONS:
             raise MemoryDataError("Unsupported issue resolution action")
-        # Workspace before issue, the order every Vault write takes its locks in,
-        # so an answer and a concurrent write cannot wait on each other.
-        if self.db.get(Workspace, workspace_id, with_for_update=True) is None:
-            raise MemoryDataError("Profile issue not found or already resolved")
-        issue = self.db.execute(
-            select(ProfileIssue).where(
-                ProfileIssue.id == issue_id,
-                ProfileIssue.workspace_id == workspace_id,
-                ProfileIssue.status == "open",
-            ).with_for_update()
-        ).scalar_one_or_none()
+        issue = self.lock_open(workspace_id, issue_id)
         if issue is None:
             raise MemoryDataError("Profile issue not found or already resolved")
         if issue.issue_type == "document_owner":
@@ -69,6 +105,7 @@ class ProfileIssueService:
                 if item is not None and item.status == "active":
                     item.conflict_state = "none"
             self._close(issue, action, note, None)
+            self._closed(issue)
             self._replay_waiting_courses(issue, self._kept_education_id(issue))
             return {"resolved": True, "action": action, "id": None}
 
@@ -79,7 +116,7 @@ class ProfileIssueService:
         if issue.affected_type == "vault_item" and issue.affected_id:
             # Answer about the entry the card names, never a loose look-alike.
             spec["entities"] = {**(spec["entities"] or {}), "item_id": issue.affected_id}
-        proposed_value = value if action == "provide_new" else spec["proposed_value"]
+        proposed_value = value if action == "provide_new" else drop(spec["proposed_value"], answers_of(issue))
         candidate = self.candidates.propose(
             workspace_id=workspace_id,
             candidate_type=spec["candidate_type"],
@@ -112,6 +149,7 @@ class ProfileIssueService:
             original.reconciled_at = datetime.now(timezone.utc)
             VaultAssertionService(self.db).refresh_decision(original)
         self._close(issue, action, note, candidate.id)
+        self._closed(issue)
         self._replay_waiting_courses(issue, result.result_id if spec["key"] == "education" else None)
         return {"resolved": True, "action": action, "id": result.result_id}
 
@@ -131,6 +169,7 @@ class ProfileIssueService:
             if not (isinstance(value, str) and any(same_person(value, name) for name in names)):
                 self._close(issue, "keep_current",
                             note or "The typed name does not match the name on the document.", None)
+                self._closed(issue)
                 return {"resolved": True, "action": "keep_current", "id": None}
         if action in ("accept_proposed", "provide_new"):
             if not file_id:
@@ -141,6 +180,7 @@ class ProfileIssueService:
                     payload={"file_id": file_id, "owner_confirmed": True, "owner_issue_id": issue.id},
                     idempotency_key=f"document.extract:owner_confirmed:{issue.id}")
         self._close(issue, action, note, None)
+        self._closed(issue)
         return {"resolved": True, "action": action, "id": None}
 
     def _kept_education_id(self, issue: ProfileIssue) -> str | None:
@@ -217,6 +257,32 @@ class ProfileIssueService:
                 "entities": entities,
             }
         raise MemoryDataError("This legacy issue has no resolvable candidate data")
+
+    def _closed(self, issue: ProfileIssue) -> None:
+        """Tells the registered hooks that the card is closed. A hook runs in a savepoint: its failure is logged by class
+        and never undoes the answer. What the hook wrote in that savepoint (a Vault version bump, a queued event) is
+        rolled back with it, so nothing is left to sweep; the OS hears the answer from its own recompile, which reads the
+        conflicts live (the answer route recomputes at once, the hourly recompile is the backstop)."""
+        if not _CLOSE_HOOKS:
+            try:
+                self._load_hooks()
+            except Exception as exc:  # noqa: BLE001  (class name only)
+                log.error("profile_issue_close_hooks_not_loaded error_type=%s", type(exc).__name__)
+        for hook in list(_CLOSE_HOOKS):
+            try:
+                with self.db.begin_nested():
+                    hook(self.db, issue)
+            except Exception as exc:  # noqa: BLE001  (class name only: no ids, no values)
+                log.error("profile_issue_close_hook_failed hook=%s error_type=%s", getattr(hook, "__name__", "hook"),
+                          type(exc).__name__)
+
+    @staticmethod
+    def _load_hooks() -> None:
+        """The capability loader registers the hooks (as `enqueue` does for the accept hooks). It is asked only while no
+        hook is registered, so a process that has them does not touch the registry on every close."""
+        from app.capabilities import get_capability_registry
+
+        get_capability_registry()
 
     @staticmethod
     def _close(issue: ProfileIssue, action: str, note: str | None, candidate_id: str | None) -> None:

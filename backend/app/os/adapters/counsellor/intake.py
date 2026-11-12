@@ -6,20 +6,22 @@ a refusal. Every plan change goes through the kernel (invariant 1). `process` ca
 from dataclasses import dataclass
 
 from pydantic import ValidationError
-from sqlalchemy import and_, insert, select
+from sqlalchemy import and_, insert, select, update
 
-from app.os import models
-from app.os.adapters.counsellor.escalation import intake_refused
+from app.os import clock, models
+from app.os.adapters.counsellor.escalation import REASON_CODES, intake_refused
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.compiler import CompileError
 from app.os.contracts.decision_record import DecisionRecordV1
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
-from app.os.kernel import StaleDraft
+from app.os.kernel import PlanIdentityTaken, StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
+from app.os.intakes import IntakeError
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
+from app.os.replan.store import OverrideStore, ProposalStore
 
 REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme", "self_serve_plan_open",
             "plan_closed")
@@ -81,15 +83,42 @@ def _intake_event(svc, plan_id: int, intake: Intake, reason: str) -> int:
             payload={"decision_id": intake.decision_id, "refused": reason}).returning(E.c.id)).scalar_one()
 
 
-def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> None:
+def _pause_reason(svc, plan_id: int) -> str | None:
+    """The reason code of the plan's newest `plan_paused` event (None when it has none)."""
+    E = models.events
+    with svc.engine.connect() as conn:
+        payload = conn.execute(select(E.c.payload).where(
+            E.c.tenant_id == svc.kernel.tenant_id, E.c.plan_id == plan_id, E.c.type == "plan_paused")
+            .order_by(E.c.id.desc()).limit(1)).scalar()
+    return (payload or {}).get("reason")
+
+
+def _choice_of(contract: RouteContract | RouteContractV2) -> tuple:
+    """What the student chose: route, places in order, intake. Not the contract version."""
+    intake = contract.target_intake
+    return (contract.origin_country, contract.destination_country, contract.level,
+            tuple((p.programme_ref, p.rank) for p in sorted(contract.programmes, key=lambda p: p.rank)),
+            None if intake is None else (intake.term, intake.year))
+
+
+def _resumes(svc, plan_id: int, contract: RouteContract | RouteContractV2) -> bool:
+    """A paused plan resumes when the decision brings it back (D-x8). A plan paused by an escalation (the Counsellor
+    took the student back to choosing) resumes only when the choice itself changed; a copy that only renews a consent
+    leaves it paused. A `consent_missing` pause resumes on any decision with the consent given."""
+    if _pause_reason(svc, plan_id) not in REASON_CODES:
+        return True
+    stored, _sha = svc.plans._contract(plan_id)
+    return _choice_of(stored) != _choice_of(contract)
+
+
+def _revise(svc, plan_id: int, contract: RouteContract | RouteContractV2, cause: str) -> int | None:
     """The same route with new places, order or intake: the plan's contract changes as a revision (like a Slice 4
     swap); started and done tasks are kept by the kernel's revision rules."""
     for _ in range(3):
         _, sha = svc.plans._contract(plan_id)
         draft = svc.plans.compile(contract, svc.plans._pinned(plan_id), plan_id)
         try:
-            svc.kernel.change_contract(plan_id, contract, draft, cause, based_on=sha)
-            return
+            return svc.kernel.change_contract(plan_id, contract, draft, cause, based_on=sha)
         except StaleDraft:
             continue
     raise StaleDraft(f"plan {plan_id} kept changing during the Counsellor revision")
@@ -109,7 +138,35 @@ def _close_all(svc, decision: DecisionRecordV2, cause: str, status: str) -> Inta
     closed = [p.id for p in _plans_of(svc, decision.student_ref, SOURCE) if p.status in PLAN_OPEN]
     for plan_id in closed:
         svc.kernel.close_plan(plan_id, f"{cause}:{decision.decision_id}")
+        _expire_requests(svc, plan_id)
     return IntakeResult(status, None, closed[-1] if closed else None)
+
+
+def _expire_requests(svc, plan_id: int) -> None:
+    """A plan that ended while a choice request of it was `requested`: the request cannot be applied (D-x3)."""
+    proposals = ProposalStore(svc.engine, svc.kernel.tenant_id)
+    for p in proposals.for_plan(plan_id):
+        if p.status == "requested":
+            proposals.expire_requested(p.id, None)
+
+
+def _refuse_v2(svc, intake: Intake, decision: DecisionRecordV2 | DecisionRecordV1, reason: str,
+               plan_id: int | None = None) -> IntakeResult:
+    """A refusal of a version that a choice request asked for: the request can never be applied, so it ends
+    `expired` (its `request_outcome` stays as delivered) and a later consent copy cannot settle it."""
+    result = _refuse(svc, intake, reason, plan_id)
+    if isinstance(decision, DecisionRecordV2):
+        proposals = ProposalStore(svc.engine, svc.kernel.tenant_id)
+        for plan in _plans_of(svc, decision.student_ref, SOURCE):
+            for p in proposals.for_plan(plan.id):
+                if (p.status == "requested" and p.requested_version is not None
+                        and p.requested_version <= decision.decision_version):
+                    proposals.expire_requested(p.id, None)
+    return result
+
+
+def _settle_requests(svc, plan_id: int, decision: DecisionRecordV2, revision: int | None) -> None:
+    ProposalStore(svc.engine, svc.kernel.tenant_id).settle_requested(plan_id, decision.decision_version, revision)
 
 
 def _withdraw(svc, decision: DecisionRecordV2) -> IntakeResult:
@@ -125,6 +182,82 @@ def _unsupported(svc, decision: DecisionRecordV2) -> IntakeResult:
 
 def _consent_missing(decision: DecisionRecordV2) -> bool:
     return decision.authorized_at is None or (decision.guardian_required and decision.guardian_authorized_at is None)
+
+
+def _contract_of(decision: DecisionRecordV2) -> RouteContract | RouteContractV2:
+    """The contract a v2 decision plans with: only the intermediate level needs the v2 contract (D-u)."""
+    return decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
+
+
+def _live_choice(svc, plan_id: int, contract: RouteContract | RouteContractV2) -> tuple:
+    """The choice of a plan as the student lives it: the contract's places minus those an active `cancel_programme`
+    override dropped, ranked 1..n (what the adoption offer shows and the decision carries)."""
+    cancelled = OverrideStore(svc.engine, svc.kernel.tenant_id).cancelled(plan_id)
+    refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank) if p.programme_ref not in cancelled]
+    intake = contract.target_intake
+    return (contract.origin_country, contract.destination_country, contract.level,
+            tuple((ref, i + 1) for i, ref in enumerate(refs)), None if intake is None else (intake.term, intake.year))
+
+
+def _adoptable(svc, decision: DecisionRecordV2, contract: RouteContract | RouteContractV2):
+    """The open self-serve plan this decision adopts (R-08, D-x6) as `(plan_id, contract_sha256)`, or None, or "refuse"
+    when it must not be adopted. All must hold: the student asked for it (an intent row, not yet used); the plan is
+    still the contract they agreed to (same SHA); the decision's route, places in order and intake equal the plan's live
+    ones; it is the student's ONLY open self-serve plan (the intake would refuse the decision while another is open, so
+    adopting one would leave the student half-adopted); and no plan holds the Counsellor identity already."""
+    A = models.plan_adoptions
+    tenant = svc.kernel.tenant_id
+    open_own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
+    with svc.engine.connect() as conn:
+        for plan in open_own:
+            intent = conn.execute(select(A.c.contract_sha256).where(
+                A.c.tenant_id == tenant, A.c.plan_id == plan.id, A.c.adopted_at.is_(None))).scalar()
+            if intent is None:
+                continue
+            stored, sha = svc.plans._contract(plan.id)
+            if sha != intent or _live_choice(svc, plan.id, stored) != _choice_of(contract):
+                continue
+            taken = conn.execute(select(P.c.id).where(
+                P.c.tenant_id == tenant, P.c.source == SOURCE, P.c.external_ref == contract.external_ref).limit(1)).first()
+            return "refuse" if taken is not None or len(open_own) != 1 else (plan.id, sha)
+    return None
+
+
+def _adopt(svc, intake: Intake, decision: DecisionRecordV2) -> IntakeResult | None:
+    """The student agreed to adopt their self-serve plan and the Counsellor's decision is the same choice: the plan
+    becomes the Counsellor's in place (kernel.adopt_plan: no rebuild, no task change), then the normal path below finds
+    it as `same`. A refusal here is the one intake gave before adoption existed: `self_serve_plan_open`. None when
+    nothing applies (the normal path decides, as before)."""
+    try:
+        book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
+                               decision.level)
+    except PlaybookError:
+        return None
+    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
+    if any(p.programme_ref not in known for p in decision.programmes):
+        return None
+    contract = _contract_of(decision)
+    found = _adoptable(svc, decision, contract)
+    if found is None:
+        return None
+    own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
+    def refused() -> IntakeResult:
+        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", own[-1].id if own else None)
+
+    if found == "refuse":
+        return refused()
+    plan_id, sha = found
+    try:
+        adopted = svc.kernel.adopt_plan(plan_id, contract.external_ref, contract, sha)
+    except PlanIdentityTaken:
+        return refused()
+    if not adopted:  # the plan changed or closed since: nothing was touched
+        return refused()
+    A = models.plan_adoptions
+    with svc.engine.begin() as conn:
+        conn.execute(update(A).where(A.c.tenant_id == svc.kernel.tenant_id, A.c.plan_id == plan_id,
+                                     A.c.adopted_at.is_(None)).values(adopted_at=clock.now()))
+    return None
 
 
 def _hold_or_pause(svc, decision: DecisionRecordV2) -> IntakeResult:
@@ -158,6 +291,9 @@ def process(svc, intake: Intake) -> IntakeResult:
         except ValidationError:
             return _refuse(svc, intake, "invalid_export")
     if isinstance(decision, DecisionRecordV2):
+        adoption = _adopt(svc, intake, decision)  # first, so a missing consent then pauses the adopted plan (6c)
+        if adoption is not None:
+            return adoption
         if _consent_missing(decision):
             return _hold_or_pause(svc, decision)
     elif decision.authorized_at is None:
@@ -166,13 +302,13 @@ def process(svc, intake: Intake) -> IntakeResult:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
                                decision.level)
     except PlaybookError:
-        return _refuse(svc, intake, "route_not_supported")
+        return _refuse_v2(svc, intake, decision, "route_not_supported")
     known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
     if any(p.programme_ref not in known for p in decision.programmes):
-        return _refuse(svc, intake, "unknown_programme")
+        return _refuse_v2(svc, intake, decision, "unknown_programme")
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]
     if own:
-        return _refuse(svc, intake, "self_serve_plan_open", own[-1].id)
+        return _refuse_v2(svc, intake, decision, "self_serve_plan_open", own[-1].id)
     if isinstance(decision, DecisionRecordV2):  # only the intermediate level needs the v2 contract (D-u)
         contract = decision.to_route_contract() if decision.level == "intermediate" else _v1_contract(decision)
     else:
@@ -180,18 +316,22 @@ def process(svc, intake: Intake) -> IntakeResult:
     theirs = _plans_of(svc, decision.student_ref, SOURCE)
     same = next((p for p in theirs if p.external_ref == contract.external_ref), None)
     if same is not None and same.status == PLAN_CLOSED:
-        return _refuse(svc, intake, "plan_closed", same.id)
+        return _refuse_v2(svc, intake, decision, "plan_closed", same.id)
     try:
         if same is not None:
-            if same.status == "paused":  # the consent is back (P1-D11)
+            if same.status == "paused" and _resumes(svc, same.id, contract):  # the consent is back (P1-D11)
                 svc.kernel.resume_plan(same.id)
-            _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
+            revision = _revise(svc, same.id, contract, f"counsellor:{decision.decision_id}")
             plan_id, status = same.id, "revised"
         else:
-            plan_id, status = svc.plans.start_plan(contract).plan_id, "planned"
-    except CompileError:
-        return _refuse(svc, intake, "route_not_supported")
+            started = svc.plans.start_plan(contract)
+            plan_id, status, revision = started.plan_id, "planned", None
+    except (CompileError, IntakeError):  # an intake not open for planning (R-63) is not a route the OS can run yet
+        return _refuse_v2(svc, intake, decision, "route_not_supported")
+    if isinstance(decision, DecisionRecordV2):  # the Counsellor's n+1 is applied: its requests are done (D-x3)
+        _settle_requests(svc, plan_id, decision, revision)
     others = [p for p in theirs if p.id != plan_id and p.status in PLAN_OPEN]
     for p in others:  # a new country or level: the old route's plan is over (S8-D8)
         svc.kernel.close_plan(p.id, f"superseded:{plan_id}")
+        _expire_requests(svc, p.id)
     return IntakeResult("replaced" if others else status, None, plan_id)

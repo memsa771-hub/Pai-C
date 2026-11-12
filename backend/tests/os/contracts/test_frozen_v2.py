@@ -10,6 +10,8 @@ import yaml
 from app.os.contracts.choice_request import ChoiceRequestV1
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
 from app.os.contracts.escalation_v2 import EscalationV2
+from app.os.contracts.fact_conflicts import FactConflictsV1
+from app.os.contracts.fact_proposal import FactProposalV1
 from app.os.contracts.os_event import OsEventV1
 from app.os.contracts.plan_view import PlanViewV1
 from app.os.contracts.route_contract_v2 import RouteContractV2
@@ -23,7 +25,8 @@ SAMPLES = CONTRACTS / "samples" / "v2"
 MODELS = {"decision_record.v2": DecisionRecordV2, "route_contract.v2": RouteContractV2,
           "escalation.v2": EscalationV2, "plan_view.v1": PlanViewV1, "os_event.v1": OsEventV1,
           "choice_request.v1": ChoiceRequestV1, "student_facts.v1": StudentFactsV1,
-          "vault_event.v1": VaultEventV1}
+          "vault_event.v1": VaultEventV1, "fact_proposal.v1": FactProposalV1,
+          "fact_conflicts.v1": FactConflictsV1}
 
 
 @pytest.mark.parametrize("stem", sorted(MODELS))
@@ -63,6 +66,10 @@ SCHEMA_SHA256 = {
         "dedcb360ef345efc55ccc6f116c65a51085b7ff9919a7c10b00bba99c9e91a04",
     "vault_event.v1":
         "b25d69e0009ea3efae78f19a4bea1c6773344e195abfc009435e0fae8d23c69d",
+    "fact_proposal.v1":
+        "e6303f9d5b5b7930edc0c9e0793001a797838cbfca637332f919578346b9cac1",
+    "fact_conflicts.v1":
+        "359e6772063bcf0d17f5b34c6f8644806b57ff6387bb0cda704fb1bb65edc877",
 }
 
 

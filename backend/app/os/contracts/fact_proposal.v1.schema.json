@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "ProposedFact": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[a-z_]+(\\.[a-z0-9_]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "title": "ProposedFact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.fact_proposal.v1",
+      "default": "pai.fact_proposal.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "key": {
+      "pattern": "^[a-z0-9_:.-]+$",
+      "title": "Key",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "document_ref": {
+      "minLength": 1,
+      "title": "Document Ref",
+      "type": "string"
+    },
+    "doc_type": {
+      "minLength": 1,
+      "title": "Doc Type",
+      "type": "string"
+    },
+    "confirmed_at": {
+      "format": "date-time",
+      "title": "Confirmed At",
+      "type": "string"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/ProposedFact"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Facts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "key",
+    "student_ref",
+    "document_ref",
+    "doc_type",
+    "confirmed_at",
+    "facts"
+  ],
+  "title": "FactProposalV1",
+  "type": "object"
+}

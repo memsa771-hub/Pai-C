@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowRight, Plane } from 'lucide-react';
+import { ArrowRight, ListChecks, Plane } from 'lucide-react';
+import { useMyPlan } from '@/components/os/my-plan-context';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import { docStatusLabel, typeLabel, type OsDocuments } from '@/lib/os-documents';
@@ -19,6 +20,7 @@ export function OsVaultStrip() {
 function OsVaultStripShown() {
   const workspaceId = useParams<{ workspaceId: string }>()?.workspaceId;  // null outside a workspace route
   const t = useT();
+  const { on } = useMyPlan();
   const [data, setData] = useState<OsDocuments | null>(null);
   useEffect(() => {
     let active = true;
@@ -27,11 +29,13 @@ function OsVaultStripShown() {
   }, []);
   const docs = (data?.documents ?? []).filter((d) => d.status !== 'deleted');
   if (!data || docs.length === 0 || !workspaceId) return null;
+  const name = t(on ? 'nav.myPlan' : 'nav.myPlanOff');
+  const Icon = on ? ListChecks : Plane;
   return (
-    <section aria-label={t('nav.studyAbroadPlan')} className="mb-4 shrink-0 rounded-[22px] bg-card p-4 shadow-card ring-1 ring-border/70">
+    <section aria-label={name} className="mb-4 shrink-0 rounded-[22px] bg-card p-4 shadow-card ring-1 ring-border/70">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold">
-          <Plane aria-hidden className="size-4 text-primary" />{t('nav.studyAbroadPlan')}
+          <Icon aria-hidden className="size-4 text-primary" />{name}
         </h2>
         <Link href={`/${workspaceId}/os-documents`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
           {t('nav.osDocuments')}<ArrowRight aria-hidden className="size-4" />

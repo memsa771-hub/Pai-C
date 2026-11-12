@@ -1,0 +1,5 @@
+# Fictional P2 samples (P2-T1). Each file validates as its contract. Institutions, domains and values are invented.
+- {file: programme_facts_alpha.json, contract: programme_facts.v1}
+- {file: merit_check_computed.json, contract: merit_check.v1}
+- {file: merit_check_not_confirmed.json, contract: merit_check.v1}
+- {file: programme_list_v2.json, contract: programme_list.v2}

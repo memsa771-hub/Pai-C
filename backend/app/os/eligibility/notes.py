@@ -15,10 +15,10 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.os import models
 from app.os.documents.store import ProfileStore
 from app.os.eligibility.evaluate import Card, evaluate
-from app.os.eligibility.facts import current_types, held_types, profile_from_facts
+from app.os.eligibility.facts import current_types, fact_fields, held_types, profile_from_facts
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.requests import visible_programmes
-from app.os.ports import student_facts
+from app.os.ports import document_files, student_facts
 
 P, SEEN, NOTES = models.plans, models.eligibility_seen, models.eligibility_notes
 
@@ -32,10 +32,15 @@ def profile_of(plans, student_ref: str) -> dict:
     if facts is None:
         return own
     types = current_types()
-    # interim: removed by T7. The overlay works per document type: a type the Vault speaks about at all (any of its
-    # mapped keys, even an unknown one) takes nothing from os_profile_values, so its fields never mix sources and an
-    # unknown stays "needs input". A type the Vault does not hold (e.g. a minimum-pass letter) still comes from
-    # os_profile_values until T7 sends those values to the Vault.
+    if document_files.enabled():
+        # One source per fact (P1-T7, D-y12, R-01): a field whose type names a StudentFacts key comes only from the
+        # Vault, so an unknown stays "needs input"; a field with no key (e.g. a minimum-pass letter, for which the
+        # Vault has no type) still comes from os_profile_values.
+        gone = fact_fields(types)
+        return {**{k: v for k, v in own.items() if k not in gone}, **profile_from_facts(facts, types)}
+    # Only the StudentFacts part is on: per document type. A type the Vault speaks about at all (any of its mapped
+    # keys, even an unknown one) takes nothing from os_profile_values, so its fields never mix sources and an unknown
+    # stays "needs input". A type the Vault does not hold still comes from os_profile_values.
     held = held_types(facts, types)
     overlay = {k: v for k, v in own.items() if k.split(".", 1)[0] not in held}
     return {**overlay, **profile_from_facts(facts, types)}

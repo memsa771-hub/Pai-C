@@ -82,3 +82,18 @@ def test_standalone_marker_selects_gate_tests():
     assert len(lines) >= 12, proc.stdout[-2000:] + proc.stderr[-1000:]
     assert any("test_slice7_gate.py" in ln for ln in lines)
     assert any("test_slice8_gate.py::test_standalone_suite_module_off" in ln for ln in lines)
+
+
+def test_standalone_suite_covers_every_p1_port():
+    """P1-T10 Task D1 (R-59, R-09): the `-m standalone` job runs the module-off tests of every P1 port, not only the
+    slice gates."""
+    env = {k: v for k, v in __import__("os").environ.items() if k != "PAI_API_KEY"}
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider", "-p", "no:tach",
+         "-m", "standalone", "tests/os"],
+        cwd=BACKEND, env=env, capture_output=True, text=True, timeout=300,
+    )
+    lines = [ln for ln in proc.stdout.splitlines() if "::" in ln]
+    for module in ("test_student_facts_port", "test_document_files_port", "test_choice_sink", "test_my_plan_off",
+                   "test_os_events", "test_escalation_port", "test_slice8_gate", "test_standalone_guard"):
+        assert any(f"{module}.py::" in ln for ln in lines), f"no standalone test from {module}\n" + proc.stdout[-1500:]

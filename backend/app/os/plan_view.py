@@ -9,11 +9,15 @@ from typing import Any
 from sqlalchemy import Connection, func, select
 
 from app.os import models
-from app.os.contracts.plan_view import (ConsentState, PlanChange, PlanRoute, PlanStep, PlanViewV1)
+from app.os.contracts.plan_view import (ConsentState, DocumentNeed, PlanChange, PlanRequest, PlanRoute, PlanStep,
+                                        PlanViewV1, StepNeed)
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX
 from app.os.kernel.states import PLAN_CLOSED
 from app.os.playbooks.loader import PlaybookError, select_playbook
+from app.os.ports import document_files
+from app.os.requests import gate, keys, store as request_store
 
+D = models.documents
 P, T, E, R, PR, EV, I, PIN = (models.plans, models.tasks, models.task_edges, models.plan_revisions, models.proposals,
                               models.events, models.counsellor_intake, models.playbook_pins)
 _CODE = re.compile(r"^[a-z_]+$")
@@ -71,6 +75,21 @@ def _steps(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanStep]:
         depends_on=deps.get(t.id, []), provisional=t.provisional, estimated=t.estimated, needs=[]) for t in rows]
 
 
+def _needs(step: PlanStep, book: Any) -> list[StepNeed]:
+    """What a step needs (P1-T8, R-17): a playbook step, from the pinned book's template; a step the compiler added for
+    a missing fact or document, from its key. A "result expected" step needs nothing itself."""
+    asked = keys.parse(step.instance_key)
+    if asked is not None:
+        return [StepNeed(kind=asked.need_kind, ref=asked.ref, evidence=asked.level)] if asked.level else []
+    template = next((t for t in getattr(book, "tasks", None) or [] if t.template_key == step.template_key), None)
+    return [StepNeed(kind=n.kind, ref=n.ref, evidence=n.evidence) for n in (template.needs if template else [])]
+
+
+def _requests(rows: list[request_store.Request]) -> list[PlanRequest]:
+    return [PlanRequest(request_id=r.id, need=StepNeed(kind=r.need_kind, ref=r.need_ref, evidence=r.evidence),
+                        status=r.status, due_at=r.due_at, due_tz=r.due_tz) for r in rows]
+
+
 def _changes(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanChange]:
     out = []
     for r in conn.execute(select(R).where(R.c.tenant_id == tenant_id, R.c.plan_id == plan_id, R.c.number >= 2)
@@ -81,6 +100,29 @@ def _changes(conn: Connection, tenant_id: str, plan_id: int) -> list[PlanChange]
                 if not _hidden(key):
                     out.append(PlanChange(revision=r.number, at=r.created_at, cause=cause, kind=kind, instance_key=key))
     return out
+
+
+_UPLOADED = ("uploaded", "reading", "read", "needs_student")  # a file is there and the student has not confirmed it
+
+
+def _documents_needed(svc: Any, student_ref: str, route_key: str) -> list[DocumentNeed]:
+    """The documents of the route's pack checklist, each missing, uploaded or confirmed (P1-T7, D-y14, R-16). Only
+    while the one upload is on; a route with no pack config, or a service without any, gives none."""
+    if not document_files.enabled():
+        return []
+    # route_key is the playbook key, which is also the pack-config key
+    cfg = (getattr(svc, "pack_configs", None) or {}).get(route_key)
+    if cfg is None:
+        return []
+    have: dict[str, str] = {}
+    with svc.engine.connect() as conn:
+        rows = conn.execute(select(D.c.doc_type, D.c.status).where(
+            D.c.tenant_id == svc.settings.tenant_id, D.c.student_ref == student_ref, D.c.status != "deleted")).all()
+    for doc_type, status in rows:
+        if status == "confirmed" or (status in _UPLOADED and have.get(doc_type) != "confirmed"):
+            have[doc_type] = "confirmed" if status == "confirmed" else "uploaded"
+    refs = list(dict.fromkeys(i.ref for i in cfg.checklist if i.kind == "document"))
+    return [DocumentNeed(doc_type=ref, status=have.get(ref, "missing")) for ref in refs]
 
 
 def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
@@ -96,8 +138,9 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
         waiting = conn.execute(select(func.count()).select_from(PR).where(
             PR.c.tenant_id == tenant_id, PR.c.plan_id == plan.id, PR.c.status == "pending")).scalar()
         version = decision.decision_version
-        pin = conn.execute(select(PIN.c.playbook_key).where(PIN.c.tenant_id == tenant_id, PIN.c.plan_id == plan.id)
-                           .order_by(PIN.c.version.desc(), PIN.c.id.desc()).limit(1)).scalar()
+        pin = conn.execute(select(PIN.c.playbook_key, PIN.c.version).where(
+            PIN.c.tenant_id == tenant_id, PIN.c.plan_id == plan.id)
+            .order_by(PIN.c.version.desc(), PIN.c.id.desc()).limit(1)).first()
         reason = None
         if plan.status == PLAN_CLOSED:
             cause = conn.execute(select(R.c.cause).where(
@@ -109,6 +152,7 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
                 .order_by(EV.c.id.desc()).limit(1)).scalar()
             reason = _code((payload or {}).get("reason"))
         changes = _changes(conn, tenant_id, plan.id)
+        requests = _requests(request_store.for_plan(conn, tenant_id, plan.id))
     if plan.status == "done":
         state = "finished"
     elif plan.status == PLAN_CLOSED or decision.status in _CLOSED_STATUSES:
@@ -126,16 +170,23 @@ def build_plan_view(svc: Any, student_ref: str) -> PlanViewV1:
                                               c["target_intake"])
     except (KeyError, TypeError) as e:
         raise ValueError(f"plan {plan.id} has a contract without its route") from e
-    if pin is None:  # no pin: the key of the playbook this route runs on
+    if pin is None:  # no pin: the playbook this route runs on (legacy: pins are written at compile, so this takes the newest version)
         try:
-            pin = select_playbook(svc.plans.playbooks, origin, destination, level).key
+            book = select_playbook(svc.plans.playbooks, origin, destination, level)
         except PlaybookError as e:
             raise ValueError(f"plan {plan.id} has no playbook pin and no playbook serves its route") from e
+        route_key, book_key = book.key, (book.key, book.version)
+    else:
+        route_key, book_key = pin.playbook_key, (pin.playbook_key, pin.version)
+    book = svc.plans.playbooks.get(book_key)
+    pages = [p.key for p in (getattr(book, "pages", None) or [])]  # D-z6
+    if gate.on(student_ref, engine=svc.engine, tenant_id=tenant_id) is not None:  # D-w1: no needs shown while the gate is off
+        steps = [s.model_copy(update={"needs": needs}) if (needs := _needs(s, book)) else s for s in steps]
     # consent is the applied row's: the Counsellor holds the newest consent itself and shows it from its own side
     return PlanViewV1(
         student_ref=student_ref, state=state, state_reason=reason, plan_id=plan.id, decision_version=version,
         revision=plan.current_revision,
-        route=PlanRoute(route_key=pin, origin_country=origin, destination_country=destination, level=level,
+        route=PlanRoute(route_key=route_key, origin_country=origin, destination_country=destination, level=level,
                         target_intake=intake),
-        pages=[], consent=_consent(decision.export or {}), steps=steps, requests=[], documents_needed=[],
-        changes=changes, proposals_waiting=waiting)
+        pages=pages, consent=_consent(decision.export or {}), steps=steps, requests=requests,
+        documents_needed=_documents_needed(svc, student_ref, route_key), changes=changes, proposals_waiting=waiting)

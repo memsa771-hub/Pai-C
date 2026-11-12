@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from sqlalchemy import exists, select
 
 from app.os.kernel.states import PLAN_OPEN
+from app.os.playbooks import newest_plain
 from app.os import models
 from app.os.api.queries import plan_out, removed_programmes
 from app.os.eligibility.evaluate import Card
@@ -19,11 +20,7 @@ G, F, RQ, P = models.programmes, models.knowledge_facts, models.programme_reques
 
 
 def newest_books(plans) -> dict:
-    out = {}
-    for (key, _), book in plans.playbooks.items():
-        if key not in out or book.version > out[key].version:
-            out[key] = book
-    return out
+    return newest_plain(plans.playbooks.values())  # a needs playbook is not listed (P1-T8): the bytes stay the same
 
 
 def routes_out(plans) -> list[dict]:
@@ -39,7 +36,7 @@ def _requested_by(plans, student_ref: str, route_key: str, year: int) -> list:
     """Programmes this student asked for that research has found nothing for yet (they see them as being researched)."""
     tenant = plans.kernel.tenant_id
     has_facts = exists(select(F.c.id).where(F.c.tenant_id == tenant, F.c.scope == "programme", F.c.ref == G.c.ref,
-                                            F.c.intake_year == year))
+                                            F.c.intake_year == year, F.c.owner_ref == ""))
     asked = select(RQ.c.programme_ref).where(RQ.c.tenant_id == tenant, RQ.c.student_ref == student_ref)
     with plans.engine.connect() as conn:
         rows = conn.execute(select(G).where(G.c.tenant_id == tenant, G.c.route_key == route_key,
@@ -60,7 +57,7 @@ def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list
     with plans.engine.connect() as conn:
         researched = set(conn.execute(select(F.c.ref).distinct().where(
             F.c.tenant_id == plans.kernel.tenant_id, F.c.scope == "programme", F.c.intake_year == year,
-            F.c.ref.in_([p.ref for p in visible]))).scalars())
+            F.c.owner_ref == "", F.c.ref.in_([p.ref for p in visible]))).scalars())
     out = []
     for p in visible:
         card, confirmed = cards.get(p.ref, (None, 0))

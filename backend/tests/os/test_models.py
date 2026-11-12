@@ -48,6 +48,24 @@ def test_os_tables_present():
         "os_consents",
         # P1-T4 (os_0020)
         "os_vault_events",
+        # P1-T6 (os_0021)
+        "os_plan_adoptions",
+        # P1-T8 (os_0023)
+        "os_student_requests",
+        # P1-T10 (os_0024)
+        "os_consistency_cases", "os_consistency_runs",
+        # P2-T1 (os_0025)
+        "os_fact_revisions",
+        # P2-T2 (os_0027)
+        "os_registry", "os_registry_revisions", "os_registry_links",
+        # P2-T5 (os_0026)
+        "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
+        # P2-T3 (os_0028)
+        "os_source_domains", "os_page_snapshots", "os_source_files",
+        # P2-T4 (os_0030)
+        "os_not_readable",
+        # P2-T8 (os_0029)
+        "os_intakes", "os_fact_slots",
     }
 
 

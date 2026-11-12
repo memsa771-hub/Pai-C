@@ -374,6 +374,12 @@ export const osPlanRoute: ChosenRoute = {
   choice: routeChoice(),
 };
 
+/** A request step (P1-T8): waits for the student's data, so it has no tick; the text is the backend's (request_texts.yaml). */
+export const osRequestStep: RouteStep = osStep("provide@fact:education.matric.marks_obtained:stated", "Your matric marks", {
+  owner: "student", tickable: false, status: "not", colour: "red",
+  request: { kind: "provide", evidence: "stated", text: "PAI needs this from you. Tell PAI in the chat or on your profile page." },
+});
+
 export const roadmapPage: RoadmapPage = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
@@ -428,4 +434,37 @@ export const mirrorEmpty: MirrorCard = {
     area: key, label: mirrorCard.areas.find((a) => a.key === key)!.label, question_key: `topic_text.${key}`, priority: i + 2 })),
   text: null,
   ready: false,
+};
+
+// My plan (P1-T9). Fictional route data in the shape of GET /v1/os/plan. Germany's pages are today's words.
+const pg = (key: string, label: string, title: string, noun: string | null = null) => ({ key, label, title, noun });
+export const myPlanGermany = {
+  state: 'active', source: 'self_serve', plan_id: 1, route_key: 'germany_master', abroad: true,
+  pages: [pg('start', 'Start', 'Start your plan'), pg('inbox', 'Inbox', 'Your next steps'),
+    pg('documents', 'Documents', 'Your documents'), pg('programmes', 'Programmes', 'Your programmes'),
+    pg('statements', 'Statements', 'Your statement and CV'), pg('pack', 'Pack', 'Your application packs', 'pack'),
+    pg('visa', 'Visa', 'Your visa file', 'visa file')],
+  sources: {},
+};
+export const myPlanPkBs = {
+  state: 'active', source: 'self_serve', plan_id: 2, route_key: 'pakistan_bs', abroad: false,
+  pages: [pg('inbox', 'Inbox', 'Your next steps'), pg('documents', 'Documents', 'Your documents'),
+    pg('programmes', 'Places', 'Your places')],
+  sources: {},
+};
+export const myPlanEmpty = { state: 'empty', source: null, plan_id: null, route_key: null, abroad: null, pages: [], sources: {} };
+
+/** GET /v1/uploads/options with the one upload on (P1-T7); the sentences are the approved ones. */
+export const uploadOptionsOn = {
+  one_upload: true as const,
+  doc_types: [{ key: "passport", label: "Passport" }, { key: "transcript", label: "Transcript" }],
+  text: {
+    type_label: "What is this document?", type_none: "Something else",
+    registered: "Saved. PAI will read it and ask you to check what it found.",
+    consent_needed: "Saved. To let PAI read it, first agree to the pilot terms on your study documents page.",
+    duplicate: "Saved. This file is already in your study documents.",
+    unknown_type: "Saved. PAI cannot read this kind of document yet.",
+    not_readable: "Saved. PAI can read PDF, JPEG, PNG or WebP files only.",
+    not_now: "Saved. PAI cannot read it right now.",
+  },
 };

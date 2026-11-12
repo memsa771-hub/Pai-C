@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import func, insert, select
 
 from app.os import models
@@ -140,3 +141,86 @@ def test_overdue_reminder_escalates(engine, clean):
         types = set(conn.execute(select(models.events.c.type)).scalars())
         keys = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
     assert "escalate" in types and any(":esc:" in k for k in keys)
+
+
+# --- P1-T8 (D-w1): the worker and the API must read the same needs gate --------------------------------------------
+
+@pytest.mark.req("R-17")
+def test_worker_refuses_student_facts_without_fact_conflicts(os_db, monkeypatch, capsys):
+    from app.os.runner import worker
+
+    monkeypatch.setenv("OS_DATABASE_URL", os_db)
+    monkeypatch.setenv("OS_WORKER_ID", "w-test")
+    monkeypatch.setenv("OS_STUDENT_FACTS", "json:dumps")
+    monkeypatch.delenv("OS_FACT_CONFLICTS", raising=False)
+    assert worker.main([]) == 2
+    err = capsys.readouterr().err
+    assert "OS_FACT_CONFLICTS" in err and "json:dumps" not in err
+
+
+@pytest.mark.req("R-17")
+def test_worker_refuses_a_bad_os_fact_conflicts(os_db, monkeypatch, capsys):
+    from app.os.runner import worker
+
+    monkeypatch.setenv("OS_DATABASE_URL", os_db)
+    monkeypatch.setenv("OS_WORKER_ID", "w-test")
+    monkeypatch.setenv("OS_FACT_CONFLICTS", "no.such.module:thing")
+    assert worker.main([]) == 2
+    assert "OS_FACT_CONFLICTS" in capsys.readouterr().err
+
+
+def test_fact_questions_port_reads_key_to_ref_and_is_empty_when_unconfigured():
+    import json
+
+    from app.os import ports
+    from app.os.ports import fact_questions
+    from app.os.settings import load_settings
+
+    fact_questions.configure()
+    assert fact_questions.conflicts("stu-1") == {}
+    fact_questions.configure(conflicts=lambda ref: {"schema": "pai.fact_conflicts.v1", "student_ref": ref, "vault_version": 1, "built_at": "2027-01-10T09:00:00+00:00", "conflicts": [{"ref": "profile_issue:3", "key": "education.matric.marks_obtained", "values": [{"side": "current", "value": 900, "evidence": "stated", "document_ref": None, "as_of": None}, {"side": "proposed", "value": 800, "evidence": "stated", "document_ref": None, "as_of": None}], "answers": ["keep_current", "accept_proposed"]}]})
+    assert fact_questions.conflicts("stu-1") == {"education.matric.marks_obtained": "profile_issue:3"}
+    fact_questions.configure(conflicts=lambda ref: None)
+    assert fact_questions.conflicts("stu-1") == {}
+    ports.configure(None)  # one reset for every port
+    assert fact_questions.conflicts("stu-1") == {}
+    assert fact_questions.load("json:dumps") is json.dumps
+    for spec in ("", "nocolon", "no.such.module:thing", "os:sep"):
+        with pytest.raises(fact_questions.FactQuestionsSourceError, match="OS_FACT_CONFLICTS"):
+            fact_questions.load(spec)
+    assert fact_questions.from_settings(load_settings({"DATABASE_URL": "x"})) is None
+    with pytest.raises(fact_questions.FactQuestionsSourceError, match="OS_FACT_CONFLICTS"):
+        fact_questions.from_settings(load_settings({"DATABASE_URL": "x", "OS_STUDENT_FACTS": "json:dumps"}))
+
+
+# --- P1-T8 Task 5 (R-22, D-w15 step 1): a request step past its date enters the unanswered ladder -----------------
+
+def _asked_plan(engine, student):
+    from app.os.compiler import compile_plan
+    from tests.os.kernel_helpers import kernel as plain_kernel
+    from tests.os.test_compile_needs import INTER2, contract as needs_contract, merit
+
+    k = plain_kernel(engine)
+    return k, k.create_plan(needs_contract(), compile_plan(needs_contract(), INTER2, {}, merit(), TODAY, student=student))
+
+
+@pytest.mark.req("R-22")
+def test_overdue_request_steps_record_document_missing_and_no_escalate(engine, clean):
+    from app.os.requests.state import QuestionRef, StudentState
+
+    asked = StudentState(questions={"fact:education.matric.marks_obtained": QuestionRef("vault", "profile_issue:1")})
+    _, ref = _asked_plan(engine, asked)  # a "which is right" step, and a "tell us" step for the other mark
+    box = Outbox(engine, "pai")
+    run_reminders(engine, box, datetime(2027, 9, 1, 8, tzinfo=timezone.utc), "pai")
+    with engine.connect() as conn:
+        late = {e.payload["instance_key"] for e in conn.execute(
+            select(models.events).where(models.events.c.type == "document_missing"))}
+        escalated = conn.execute(select(models.events).where(models.events.c.type == "escalate")).all()
+        mail = conn.execute(select(models.outbox.c.idempotency_key)).scalars().all()
+    assert late == {"which_is_right@fact:education.matric.marks_obtained:shown",
+                    "provide@fact:education.matric.marks_total:stated"}
+    assert escalated == [] and len(mail) == 2  # the student is still reminded; the ladder, not a support call, acts
+    run_reminders(engine, box, datetime(2027, 9, 2, 8, tzinfo=timezone.utc), "pai")
+    with engine.connect() as conn:  # the next day: one more reminder each, but the same two events
+        assert len(conn.execute(select(models.events).where(models.events.c.type == "document_missing")).all()) == 2
+

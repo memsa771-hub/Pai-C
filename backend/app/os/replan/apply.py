@@ -5,25 +5,27 @@ One plan's replans and the student's answers run one at a time (a per-plan advis
 the proposal, and a proposal by its event, so a repeated step or workflow finds its work already done (invariant 8).
 """
 
-from collections.abc import Callable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from pydantic import TypeAdapter
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, func, select
 
 from app.os import models
 from app.os import clock as shared_clock
 from app.os.adapters.standalone.escalation import StandaloneSink
 from app.os.compiler import CompileError
 from app.os.kernel import IllegalTransition, StaleDraft
+from app.os.contracts.route_contract import ProgrammeChoice
+from app.os.ports import choice_requests
 from app.os.ports.escalation import EscalationSink
 from app.os.replan.checks import check_operations, task_rows
 from app.os.replan.config import ReplanConfig
 from app.os.replan.events import Event
+from app.os.replan.lock import LOCK_CLASS, plan_lock  # noqa: F401  (LOCK_CLASS stays importable from here)
 from app.os.replan.ops import (
-    Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
+    CancelProgramme, Escalate, Op, Ops, RequestFromStudent, SwapProgramme, UpgradePlaybook, is_big, to_overrides,
 )
 from app.os.replan.rules import REASONS, PlanState
 from app.os.replan.store import OverrideStore, ProposalStore, SupportStore
@@ -35,8 +37,8 @@ DAILY_REVISIONS = 3  # replan revisions per plan per UTC day; the 4th pauses cha
 LIMIT_REASON = "Changes are paused: this plan reached today's limit of 3 automatic changes."
 REFUSED_REASON = "Every proposed change was refused by the plan's checks."
 BROKEN_REASON = "This plan no longer compiles: a person needs to check it."
+NO_PLACES_REASON = "This change would leave no places in the plan: a person needs to check it."
 PAUSED_REASON = "Changes are paused while a person checks your plan: try again once they are done."
-LOCK_CLASS = 7007  # pg_advisory_lock(LOCK_CLASS, plan id): one replan or answer per plan at a time
 _OPS = TypeAdapter(Ops)
 
 
@@ -73,17 +75,9 @@ class Replanner:
         # every support case goes through the port (Slice 8 S8-D12); standalone only unless the caller wires more
         self.escalations = escalations or StandaloneSink(engine, self.tenant, self.student_of)
 
-    @contextmanager
-    def plan_lock(self, plan_id: int) -> Iterator[None]:
-        """Holds the plan's replan lock (a session advisory lock) for the block (final review I2, I5)."""
-        with self.engine.connect() as conn:
-            conn.execute(text("SELECT pg_advisory_lock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
-            conn.commit()
-            try:
-                yield
-            finally:
-                conn.execute(text("SELECT pg_advisory_unlock(:c, :p)"), {"c": LOCK_CLASS, "p": plan_id})
-                conn.commit()
+    def plan_lock(self, plan_id: int):
+        """Holds the plan's replan lock for the block (final review I2, I5)."""
+        return plan_lock(self.engine, plan_id)
 
     # ------------------------------------------------------------------ state
 
@@ -112,7 +106,8 @@ class Replanner:
         firm = {ref for ref, card in cards.items()
                 if any(ln.status == "likely_below" and not ln.provisional for ln in card.lines)}
         self._expire_stale_removals(plan_id, firm)
-        held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id) if p.status == "pending"
+        held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id)
+                if p.status in ("pending", "requested")  # a removal asked of the Counsellor still holds its programme
                 for op in p.ops if op.get("op") == "cancel_programme"}
         return tuple(ref for ref in cards if ref in firm and ref not in held)
 
@@ -126,14 +121,55 @@ class Replanner:
                     and any(op.get("programme_ref") not in firm for op in p.ops):
                 self.proposals.expire_if_pending(p.id)
 
-    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False) -> PlanState:
+    def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False,
+              with_held: bool = False, without_need: str | None = None) -> PlanState:
+        """`with_held` is the unanswered ladder's view (P1-T8, R-22): the live places leave out those an accepted removal
+        already took (the contract still lists them), `held` and `held_in` show what proposals wait on, and
+        `without_need` (the request step's key) drops close matches that would wait for the same data."""
         contract, _ = self.plans._contract(plan_id)
         book = self.plans._pinned(plan_id)
         tasks = task_rows(self.engine, self.tenant, plan_id)
-        programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
+        gone = self.overrides.cancelled(plan_id) if with_held else set()
+        programmes = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)
+                      if p.programme_ref not in gone]
         suggestions = {ref: self._suggestions(contract, book, ref) for ref in programmes} if with_suggestions else {}
+        if without_need is not None:
+            suggestions = {ref: [m for m in found if not self._needs_same(plan_id, contract, book, ref, m, without_need)]
+                           for ref, found in suggestions.items()}
+        held, held_in = self.held(plan_id) if with_held else ((), ())
         return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version,
-                         self.below(plan_id) if with_below else ())
+                         self.below(plan_id) if with_below else (), held, held_in)
+
+    def _needs_same(self, plan_id: int, contract, book, out_ref: str, in_ref: str, key: str) -> bool:
+        """Whether the plan, with `in_ref` in the place of `out_ref`, has a step of `in_ref` that hard-depends on the
+        same fact or document as the request step `key`: a close match that waits for the same missing data is no
+        way out. A plan that does not compile with it is not one either."""
+        from app.os.requests import keys
+
+        want = keys.parse(key)
+        swapped = type(contract).model_validate({**contract.model_dump(mode="json"), "programmes": [
+            {**p.model_dump(), "programme_ref": in_ref if p.programme_ref == out_ref else p.programme_ref}
+            for p in contract.programmes]})
+        try:
+            draft = self.plans.compile(swapped, book, plan_id)
+        except CompileError:
+            return True
+        for t in draft.tasks:
+            if t.programme_ref != in_ref:
+                continue
+            for dep, hard in t.depends_on:
+                parsed = keys.parse(dep) if hard else None
+                if parsed is not None and (parsed.need_kind, parsed.ref) == (want.need_kind, want.ref):
+                    return True
+        return False
+
+    def held(self, plan_id: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """(the places, the places brought in) of the swaps and removals that wait for the student (or the Counsellor),
+        so the unanswered ladder does not propose them twice (P1-T8, R-22)."""
+        ops = [op for p in self.proposals.for_plan(plan_id) if p.status in ("pending", "requested") for op in p.ops
+               if op.get("op") in ("swap_programme", "cancel_programme")]
+        out = {op.get("out_ref") or op.get("programme_ref") for op in ops}
+        return tuple(sorted(r for r in out if r)), tuple(sorted(op["in_ref"] for op in ops if op.get("in_ref")))
 
     def _suggestions(self, contract, book, ref: str) -> list[str]:
         """Up to 3 programmes on the route the student likely meets, not in the plan, most confirmed facts first."""
@@ -153,7 +189,7 @@ class Replanner:
         with self.engine.connect() as conn:
             return bool(conn.execute(select(func.count()).select_from(F).where(
                 F.c.tenant_id == self.tenant, F.c.scope == "programme", F.c.ref == ref, F.c.intake_year == year,
-                F.c.status == "confirmed")).scalar())
+                F.c.owner_ref == "", F.c.status.in_(("confirmed", "verified")))).scalar())
 
     def check(self, plan_id: int, ops: list[Op]) -> tuple[list[Op], list[dict]]:
         """(kept, refused). Raises CompileError when the plan does not compile even without the operations."""
@@ -241,8 +277,11 @@ class Replanner:
         raw = [op.model_dump(mode="json") for op in kept]
         sha, revision = self._base(plan_id)
         if any(is_big(op, tasks, book) for op in kept):
+            with self.engine.connect() as conn:  # a Counsellor plan: the choice the proposal was made against
+                version = choice_requests.decision_version_of(conn, self.tenant, plan_id)
             pid = self.proposals.create(plan_id, event_ids, source, raw, refused, big=True,
-                                        expires_at=self._expires(plan_id, kept), based_on=sha, base_revision=revision)
+                                        expires_at=self._expires(plan_id, kept), based_on=sha, base_revision=revision,
+                                        base_decision_version=version)
             return Decision("pending", pid)
         if any(_writes(op) for op in kept) and self.plans.kernel.replan_revisions_today(plan_id) >= DAILY_REVISIONS:
             pid = self._refuse(plan_id, event_ids, source, raw, refused, {"why": LIMIT_REASON, "limit": True})
@@ -271,11 +310,13 @@ class Replanner:
 
     # ------------------------------------------------------------------ applying
 
-    def apply(self, proposal_id: int, status: str) -> int | None:
+    def apply(self, proposal_id: int, status: str | None, ops_filter: Callable[[Op], bool] | None = None) -> int | None:
         """Applies a proposal's operations. The overrides and the revision are one kernel transaction (final review
-        I3); a repeat finds them stored and recompiles to no change. Raises ReplanFailed if it cannot be written."""
+        I3); a repeat finds them stored and recompiles to no change. Raises ReplanFailed if it cannot be written.
+        `ops_filter` keeps only the operations it accepts (P1-T6: a choice change on a Counsellor plan is requested,
+        not applied); with `status` None the proposal's status is left to the caller."""
         p = self.proposals.get(proposal_id)
-        ops, plan_id = ops_of(p.ops), p.plan_id
+        ops, plan_id = [o for o in ops_of(p.ops) if ops_filter is None or ops_filter(o)], p.plan_id
         stored = bool(self.overrides.for_proposal(proposal_id))
         new = [] if stored else [o for op in ops for o in to_overrides(op)]
         cause = f"replan:{proposal_id}"
@@ -310,7 +351,8 @@ class Replanner:
         # still records the plan's revision: it is shown, and a repeated step does not apply it again.
         made = made or self._revised_by(plan_id, cause) or not all(_writes(op) for op in ops)
         revision = self._base(plan_id)[1] if made else None
-        self.proposals.set_status(proposal_id, status, revision=revision)
+        if status is not None:
+            self.proposals.set_status(proposal_id, status, revision=revision)
         return revision
 
     def _revised_by(self, plan_id: int, cause: str) -> bool:
@@ -366,10 +408,62 @@ class Replanner:
                 raise ProposalStale("your plan changed since this was suggested") from None
             if len(kept) != len(ops):
                 raise ProposalStale("your plan changed since this was suggested: " + refused[0]["why"])
+            with self.engine.connect() as conn:
+                to_counsellor = any(isinstance(op, (SwapProgramme, CancelProgramme)) for op in ops) \
+                    and choice_requests.applies(conn, self.tenant, p.plan_id)
+            if to_counsellor and self._request_open(p.plan_id):  # one change with the Counsellor at a time (the builder
+                raise ProposalStale("request_open")  # answers the same code)
             try:
+                if to_counsellor:
+                    return self._request_choice(p, ops)
                 return self.apply(p.id, "accepted")
             except ReplanFailed as e:
                 raise ProposalStale(f"your plan changed since this was suggested ({e})") from None
+
+    def _request_open(self, plan_id: int) -> bool:
+        """True while a choice request of this plan is with the Counsellor (a `requested` proposal). Called under the
+        plan lock."""
+        return any(x.status == "requested" for x in self.proposals.for_plan(plan_id))
+
+    def _request_choice(self, p, ops: list[Op]) -> int | None:
+        """A choice change on a Counsellor plan is never applied here (R-07): the other operations apply now (D-x2),
+        and the swap / removal goes to the Counsellor as one choice_request, written in the same transaction as the
+        proposal's new status `requested`. Called under the plan lock."""
+        choice = (SwapProgramme, CancelProgramme)
+        contract, _ = self.plans._contract(p.plan_id)
+        cancelled = self.overrides.cancelled(p.plan_id)  # live programmes only: an override may have dropped one
+        places = [x.programme_ref for x in sorted(contract.programmes, key=lambda x: x.rank)
+                  if x.programme_ref not in cancelled]
+        for op in ops:
+            if isinstance(op, SwapProgramme) and op.out_ref in places and op.in_ref not in places:
+                places[places.index(op.out_ref)] = op.in_ref
+            elif isinstance(op, CancelProgramme) and op.programme_ref in places:
+                places.remove(op.programme_ref)
+        if not places:  # R-22: dropping every place is an escalation, not a choice request
+            self.proposals.set_status(p.id, "refused")
+            self.support(p.plan_id, p.event_ids, NO_PLACES_REASON, p.id)
+            return None
+        with self.engine.connect() as conn:
+            base = p.base_decision_version or choice_requests.decision_version_of(conn, self.tenant, p.plan_id)
+        if base is None:
+            raise ProposalStale("your plan is not ready to change yet")
+        chosen = [ProgrammeChoice(programme_ref=ref, rank=i + 1) for i, ref in enumerate(places)]
+        try:
+            choice_requests.check_places(chosen)  # a list the contract cannot carry is refused before anything is done
+        except ValueError:
+            raise ReplanFailed("this change cannot be sent to your counsellor") from None
+        # In a mixed proposal the other operations commit FIRST, in their own kernel transaction; only the status and
+        # the request row below are one transaction. If that fails the proposal stays pending, and a retry finds the
+        # other operations already applied (stored overrides, a revision with this cause) and applies nothing twice.
+        revision = self.apply(p.id, None, ops_filter=lambda op: not isinstance(op, choice))
+        with self.engine.begin() as conn:  # the status and the request row commit together, or not at all
+            if not self.proposals.request(conn, p.id, revision):
+                raise ProposalStale("this suggestion is no longer waiting for you")
+            try:
+                choice_requests.emit(conn, self.tenant, p.plan_id, p.id, base, chosen, self.clock())
+            except ValueError:  # a pydantic ValidationError: the transaction rolls back, the proposal stays pending
+                raise ReplanFailed("this change cannot be sent to your counsellor") from None
+        return revision
 
     def decline(self, student_ref: str, proposal_id: int) -> None:
         p = self.proposals.get(proposal_id)
@@ -384,9 +478,8 @@ class Replanner:
         with self.engine.connect() as conn:
             ids = conn.execute(select(PR.c.id).where(PR.c.tenant_id == self.tenant, PR.c.status == "pending",
                                                      PR.c.expires_at <= now)).scalars().all()
-        for pid in ids:
-            self.proposals.set_status(pid, "expired")
-        return len(ids)
+        # only a row that is still pending: one that turned `requested` since the select is left alone
+        return sum(self.proposals.expire_if_pending(pid) for pid in ids)
 
     def retry(self, plan_id: int, instance_key: str) -> bool:
         """One retry of a failed step through the kernel; False if it is no longer failed."""

@@ -24,10 +24,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import config
 from app.database import get_db
 from app.os.api import mount_os
-from app.pai_os_bridge import recipient_email, student_facts
+from app.pai_os_bridge import (answer_fact_question, choice_enabled, deliver_choice_request_now, deliver_fact_proposal_now, document_file_bytes, documents_enabled,
+                               fact_conflicts, my_plan_enabled, on_os_document_deleted, recipient_email, request_choice, student_facts)
 from app.security.errors import EmailNotVerified, IdentityUnavailable
 from app.api.response import ResponseCode, json_response
-from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, guardian, network, notifications, operator, roadmap, search, shares, student_requests, tasks, vault, workflows, workspaces
+from app.routers import counselor_possibilities, account, app_version, auth, counselor_summary, counselor_voice, decision_records, escalations, events, feedback, fetch, files, guardian, network, notifications, operator, roadmap, search, shares, student_requests, tasks, uploads, vault, workflows, workspaces
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -157,14 +158,18 @@ async def lifespan(app: FastAPI):
 
     # PAI OS ↔ Counsellor glue (PAI OS Slice 8): only when PAI OS is mounted.
     os_sweep = None
+    os_consistency = None
     if OS_MOUNTED:
-        from app.pai_os_bridge import start_sweep
+        from app.pai_os_bridge import start_consistency, start_sweep
         os_sweep = start_sweep()
+        os_consistency = start_consistency()  # P1-T10: the nightly consistency job (R-05)
 
     logger.info("LIFESPAN: yielding (startup complete)")
     yield
     if os_sweep is not None:
         os_sweep.cancel()
+    if os_consistency is not None:
+        os_consistency.cancel()
     maintenance_task.cancel()
     try:
         await maintenance_task
@@ -421,6 +426,7 @@ app.include_router(search.router)
 app.include_router(shares.router)
 app.include_router(student_requests.router)
 app.include_router(tasks.router)
+app.include_router(uploads.router)
 app.include_router(vault.router)
 app.include_router(workflows.router)
 app.include_router(workspaces.router)
@@ -475,7 +481,12 @@ def _os_student_ref_for_write(
 
 
 OS_MOUNTED = mount_os(app, student_dependency=_os_student_ref, student_write_dependency=_os_student_ref_for_write,
-                      recipient_lookup=recipient_email, student_facts=student_facts)
+                      recipient_lookup=recipient_email, student_facts=student_facts,
+                      choice_enabled=choice_enabled, on_choice_request=deliver_choice_request_now,
+                      choice_sink=request_choice, choice_sink_enabled=choice_enabled,
+                      document_files=document_file_bytes, documents_enabled=documents_enabled,
+                      on_document_deleted=on_os_document_deleted, on_fact_proposal=deliver_fact_proposal_now,
+                      my_plan_enabled=my_plan_enabled, fact_conflicts=fact_conflicts, fact_answer=answer_fact_question)
 
 
 @app.get("/health")

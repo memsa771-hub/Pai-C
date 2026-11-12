@@ -322,3 +322,88 @@ def test_empty_plan_view_holds_nothing():
         PlanViewV1.model_validate(plan_view(documents_needed=[{"doc_type": "transcript", "status": "missing"}]))
     with pytest.raises(ValidationError, match="empty plan view"):
         PlanViewV1.model_validate(plan_view(route=ROUTE))
+
+
+# ---- P1-T7 Task 3: fact_proposal ----
+
+from app.os.contracts.fact_proposal import FactProposalV1  # noqa: E402
+
+
+def fact_proposal(**over) -> dict:
+    base = {"schema": "pai.fact_proposal.v1", "key": "fact_proposal:1:1", "student_ref": "ws-1",
+            "document_ref": "file-1", "doc_type": "hssc_certificate", "confirmed_at": "2027-01-10T09:00:00+00:00",
+            "facts": [{"key": "education.intermediate.marks_obtained", "value": 900}]}
+    return {**base, **over}
+
+
+@pytest.mark.req("R-16")
+def test_fact_proposal_valid_and_strict():
+    ok = FactProposalV1.model_validate(fact_proposal())
+    assert ok.facts[0].value == 900
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(extra="x"))  # extra="forbid"
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": "education.x", "value": 1, "note": "n"}]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(confirmed_at="2027-01-10T09:00:00"))  # must be aware
+
+
+@pytest.mark.req("R-16")
+def test_fact_proposal_facts_bounded_and_unique():
+    one = {"key": "education.intermediate.marks_obtained", "value": 1}
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[]))
+    with pytest.raises(ValidationError, match="duplicate"):
+        FactProposalV1.model_validate(fact_proposal(facts=[one, one]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": f"a.k{i}", "value": 1} for i in range(21)]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(facts=[{"key": "Bad Key", "value": 1}]))
+    with pytest.raises(ValidationError):
+        FactProposalV1.model_validate(fact_proposal(key="Fact Proposal"))
+
+
+# ---- P1-T8 Task 4: fact_conflicts ----
+
+from app.os.contracts.fact_conflicts import FactConflictsV1  # noqa: E402
+
+
+def _side(side, value, evidence="stated", **over):
+    return {"side": side, "value": value, "evidence": evidence, "document_ref": None, "as_of": None, **over}
+
+
+def fact_conflicts(**over) -> dict:
+    conflict = {"ref": "profile_issue:abc-123", "key": "education.bachelor.gpa",
+                "values": [_side("current", 3.4), _side("proposed", 3.2, "shown", document_ref="file-1")],
+                "answers": ["keep_current", "accept_proposed", "provide_new"]}
+    base = {"schema": "pai.fact_conflicts.v1", "student_ref": "ws-1", "vault_version": 3,
+            "built_at": "2027-01-10T09:00:00+00:00", "conflicts": [conflict]}
+    return {**base, **over}
+
+
+@pytest.mark.req("R-21")
+def test_contract_rejects_extra_and_needs_two_values():
+    ok = FactConflictsV1.model_validate(fact_conflicts())
+    assert ok.conflicts[0].values[1].document_ref == "file-1"
+    one = fact_conflicts()["conflicts"][0]
+    for bad in (
+        {**one, "extra": "x"},  # extra="forbid"
+        {**one, "values": one["values"][:1]},  # needs two values
+        {**one, "values": [*one["values"], _side("current", 1)]},  # and no more
+        {**one, "values": [_side("current", 3.4), _side("current", 3.2)]},  # one of each side
+        {**one, "values": [_side("current", 3.4), _side("proposed", None)]},  # a value is needed
+        {**one, "values": [_side("current", 3.4), {**_side("proposed", 3.2), "note": "n"}]},
+        {**one, "ref": "finding:1"},  # only a Vault card
+        {**one, "key": "Full Name"},  # a fact key
+        {**one, "answers": []},
+        {**one, "answers": ["both_true"]},  # the OS offers three answers
+        {**one, "answers": ["keep_current", "keep_current"]},
+    ):
+        with pytest.raises(ValidationError):
+            FactConflictsV1.model_validate(fact_conflicts(conflicts=[bad]))
+    with pytest.raises(ValidationError):
+        FactConflictsV1.model_validate(fact_conflicts(extra="x"))
+    with pytest.raises(ValidationError):
+        FactConflictsV1.model_validate(fact_conflicts(built_at="2027-01-10T09:00:00"))  # must be aware
+    with pytest.raises(ValidationError, match="duplicate"):
+        FactConflictsV1.model_validate(fact_conflicts(conflicts=[one, one]))

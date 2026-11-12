@@ -92,20 +92,25 @@ def _facts_for(engine: Engine, tenant_id: str, ref: str, intake_year: int) -> bo
     with engine.connect() as conn:
         return conn.execute(select(exists(select(F.c.id).where(
             F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == ref,
-            F.c.intake_year == intake_year)))).scalar()
+            F.c.intake_year == intake_year, F.c.owner_ref == "")))).scalar()  # research's own rows, not a body's
 
 
-def _has_facts(tenant_id: str, intake_year: int | None = None):
-    q = select(F.c.id).where(F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == P.c.ref)
+def _has_facts(tenant_id: str, intake_year: int | None = None, intake_term: str | None = None):
+    q = select(F.c.id).where(F.c.tenant_id == tenant_id, F.c.scope == "programme", F.c.ref == P.c.ref,
+                             F.c.owner_ref == "")  # P2-T2: a body's row about the programme is not research of it
+    if intake_term is not None:  # P2-T8, R-62: a fact of another term does not make it visible (not recorded counts)
+        q = q.where(F.c.intake_term.in_([intake_term, ""]))
     return exists(q.where(F.c.intake_year == intake_year) if intake_year is not None else q)
 
 
-def visible_programmes(engine: Engine, tenant_id: str, route_key: str, intake_year: int) -> list[Programme]:
-    """The route's programmes a student can choose: active ones, and requested ones with facts for the year."""
+def visible_programmes(engine: Engine, tenant_id: str, route_key: str, intake_year: int,
+                       intake_term: str | None = None) -> list[Programme]:
+    """The route's programmes a student can choose: active ones, and requested ones with facts for the year (and the
+    term, when given)."""
     with engine.connect() as conn:
         rows = conn.execute(select(P).where(
             P.c.tenant_id == tenant_id, P.c.route_key == route_key,
-            (P.c.status == "active") | ((P.c.status == "requested") & _has_facts(tenant_id, intake_year)),
+            (P.c.status == "active") | ((P.c.status == "requested") & _has_facts(tenant_id, intake_year, intake_term)),
         ).order_by(P.c.ref)).all()
     return [_programme(r) for r in rows]
 

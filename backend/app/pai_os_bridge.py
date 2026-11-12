@@ -28,13 +28,17 @@ from app.config import config
 # (`pai_route_decisions`), which has the same id / workspace_id / chosen_at the sweep reads.
 from app.models import OsOutbox, RouteDecision, User, VaultVersion, Workspace
 from app.os import ports
+from app.os.ports import choice_requests as os_choice_requests
 from app.os.ports import escalation as os_escalation
 from app.os.ports import os_events as os_events_port
 from app.os.contracts.decision_record_v2 import DecisionRecordV2
-from app.os.ports import plan_source, student_facts as os_student_facts
+from app.os.ports import document_files as os_document_files, plan_source, student_facts as os_student_facts
+from app.os.ports import fact_proposals as os_fact_proposals
 from app.os.contracts.vault_event import VaultEventV1
 from app.pai_c.connect import outbox
-from app.pai_c.connect.flags import part_on
+from app.pai_c.connect import consistency as consistency_rules
+from app.pai_c.connect.flags import PARTS, part_on
+from app.os.ports import consistency as os_consistency
 
 log = logging.getLogger("app.pai_os_bridge")
 SWEEP_SECONDS = 300
@@ -82,6 +86,188 @@ def deliver_pending(db, workspace_id: str | None = None) -> dict:
         db.commit()
         got["delivered"] += 1
     return got
+
+
+def choice_enabled() -> bool:
+    """True when the OS may send choice requests to the Counsellor: the hand-off part is on (P1-T6, R-07). The OS reads
+    it through `mount_os(choice_enabled=)`; it cannot read host flags itself."""
+    return part_on("CONNECT_HANDOFF")
+
+
+def my_plan_enabled() -> bool:
+    """True when the My plan part is on (P1-T9, R-53). The OS reads it through `mount_os(my_plan_enabled=)`; it cannot
+    read host flags itself."""
+    return part_on("CONNECT_MY_PLAN")
+
+
+def request_choice(student_ref: str, origin: str, destination: str, level: str, intake: dict,
+                   choices: list[dict]) -> dict | None:
+    """The route builder's ChoiceSink (P1-T6, R-09): with the hand-off part on, the student's route, intake and places
+    are written through the decision service and the new version goes to PAI OS. None while the part is off (then the
+    builder works standalone). Opens its own session: PAI OS calls it from a request thread. Returns `{"outcome":
+    "written" | "unchanged" | "refused", "decision_version", "code"}`; an error rolls back and is raised, so nothing
+    is half written."""
+    if not choice_enabled():
+        return None
+    from app.database import new_session
+    from app.pai_c.roadmap.decisions import RouteDecisionService  # lazy: decisions.py imports this module
+
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return {"outcome": "refused", "decision_version": None, "code": "choose_field_first"}
+    with new_session() as db:
+        try:
+            outcome, version, code = RouteDecisionService(db).request_from_builder(
+                workspace_id, origin, destination, level, intake, choices)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if outcome in ("written", "unchanged"):
+            try:  # best effort: the decision is committed, and the sweep delivers it anyway
+                deliver_pending(db, workspace_id)
+            except Exception as exc:  # noqa: BLE001
+                log.error("PAI OS could not take the builder's decision now: %s", type(exc).__name__)
+    return {"outcome": outcome, "decision_version": version, "code": code}
+
+
+def self_serve_plan(workspace_id: str, journey_id: str | None = None) -> dict | None:
+    """The student's open self-serve plan as `plan_query.self_serve_plan` gives it (P1-T6, R-08), for the adoption offer.
+    `journey_id` is the student's active journey: without it the plan never reads as `identity_taken`.
+    None when there is none, when the `counsellor` module is off, when PAI OS is not mounted and on any failure (logged by
+    type only)."""
+    if not counsellor_module_on():
+        return None
+    try:
+        from app.os.ports import plan_query
+
+        return plan_query.self_serve_plan(str(workspace_id), journey_id)
+    except ports.OsUnavailable:
+        return None
+    except Exception as exc:  # noqa: BLE001
+        log.error("the self-serve plan could not be read: %s", type(exc).__name__)
+        return None
+
+
+def request_adoption(workspace_id: str, plan_id: int, contract_sha256: str) -> str:
+    """Records the student's agreement to adopt their self-serve plan on the OS side (P1-T6, R-08): "recorded",
+    "not_found", "changed" (the plan is no longer the contract `contract_sha256` that was offered) or "module_off". "module_off" too when PAI OS is not mounted. Raises on any other failure, so the caller
+    writes no decision for an agreement the OS did not take."""
+    try:
+        return plan_source.request_adoption(str(workspace_id), plan_id, contract_sha256)
+    except ports.OsUnavailable:
+        return "module_off"
+
+
+def _deliver_choice_request(db, request) -> str:
+    """Hands one choice request to the decision service and marks the answer on the OS side. The app transaction
+    commits first, then the new version goes to the OS, then the OS is told (a crash in between repeats harmlessly:
+    the request key makes the repeat a `duplicate`). Returns the outcome; an exception rolls back and leaves the row
+    pending."""
+    from app.pai_c.roadmap.decisions import RouteDecisionService  # lazy: decisions.py imports this module
+
+    if not os_choice_requests.is_open(request.key):  # its proposal moved on: never applied again
+        os_choice_requests.mark_delivery(request.key, "skipped")
+        return "skipped"
+    try:
+        workspace_id = str(uuid.UUID(request.student_ref))
+    except ValueError:
+        outcome, detail = "refused", "no_decision"
+    else:
+        try:
+            outcome, detail = RouteDecisionService(db).apply_choice_request(
+                workspace_id, request.model_dump(mode="json", by_alias=True))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if outcome in ("written", "duplicate"):
+            deliver_pending(db, workspace_id)
+    os_choice_requests.mark_delivery(request.key, outcome, detail if outcome in ("written", "duplicate") else None)
+    return outcome
+
+
+def deliver_choice_requests(db) -> dict:
+    """Delivers the pending choice requests, oldest first (P1-T6, R-07). Only while CONNECT_HANDOFF is on. One failure
+    leaves its row pending and never stops the others."""
+    got = {"written": 0, "duplicate": 0, "stale": 0, "refused": 0, "failed": 0, "skipped": 0}
+    if not choice_enabled():
+        return got
+    for request in os_choice_requests.pending():
+        try:
+            got[_deliver_choice_request(db, request)] += 1
+        except ports.OsUnavailable:
+            break
+        except Exception as exc:  # noqa: BLE001  (class name only, no student data; the next sweep tries again)
+            log.error("PAI OS choice request could not be delivered: %s", type(exc).__name__)
+            got["failed"] += 1
+    return got
+
+
+def deliver_choice_request_now(key: str) -> None:
+    """The post-commit nudge after the student accepted (`mount_os(on_choice_request=)`): delivers that one request
+    in its own session, so the decision does not wait for the sweep. Never raises past the OS port's guard."""
+    if not choice_enabled():
+        return
+    from app.database import new_session
+
+    request = next((r for r in os_choice_requests.pending() if r.key == key), None)
+    if request is None:
+        return
+    with new_session() as db:
+        _deliver_choice_request(db, request)
+
+
+def deliver_fact_proposals(db) -> dict:
+    """Hands the pending fact proposals (P1-T7, R-16, D-y9) to the Vault's sink, oldest first. Only while the
+    CONNECT_ONE_UPLOAD part is on. Each row: the sink writes its candidates, the app transaction commits, then the OS
+    row is marked (a crash in between repeats harmlessly: the proposal key makes the repeat a `duplicate`). An error
+    rolls back and leaves the row pending; one failure never stops the others."""
+    from app.pai_c.connect import document_facts  # lazy: Counsellor code
+
+    got = {"written": 0, "duplicate": 0, "refused": 0, "failed": 0}
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return got
+    for proposal in os_fact_proposals.pending():
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+            os_fact_proposals.mark(proposal.key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
+            got[outcome] += 1
+        except ports.OsUnavailable:
+            db.rollback()
+            break
+        except Exception as exc:  # noqa: BLE001  (class name only, no student data; the next sweep tries again)
+            db.rollback()
+            log.error("PAI OS fact proposal could not be delivered: %s", type(exc).__name__)
+            got["failed"] += 1
+            try:  # after MAX_ATTEMPTS the row is set aside, so it cannot starve the newer ones
+                os_fact_proposals.record_failure(proposal.key)
+            except Exception as inner:  # noqa: BLE001
+                log.error("PAI OS fact proposal failure could not be counted: %s", type(inner).__name__)
+    return got
+
+
+def deliver_fact_proposal_now(key: str) -> None:
+    """The post-commit nudge after the student confirmed a document (`mount_os(on_fact_proposal=)`): delivers that one
+    proposal in its own session, so the facts do not wait for the sweep. Never raises past the OS port's guard."""
+    if not part_on("CONNECT_ONE_UPLOAD"):
+        return
+    from app.database import new_session
+    from app.pai_c.connect import document_facts
+
+    proposal = next((p for p in os_fact_proposals.pending() if p.key == key), None)
+    if proposal is None:
+        return
+    with new_session() as db:
+        try:
+            outcome, detail = document_facts.apply(db, proposal.model_dump(mode="json", by_alias=True))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        os_fact_proposals.mark(key, f"refused:{detail[0]}" if outcome == "refused" else outcome)
 
 
 def _backfill(db) -> None:
@@ -138,6 +324,14 @@ def _backfill_vault(db) -> None:
             log.error("PAI OS vault backfill failed for one student: %s", type(exc).__name__)
 
 
+def _is_fact_change(e) -> bool:
+    """Whether the escalation was raised for a Vault fact change (R-22): a hand-off-only route problem."""
+    try:
+        return os_escalation.event_type_of(e.key) == "student_fact_changed"
+    except ports.OsUnavailable:
+        return False
+
+
 def _deliver(db) -> dict:
     from app.routers.escalations import EscalationInput, escalate
 
@@ -146,9 +340,28 @@ def _deliver(db) -> dict:
         if not config.PAI_OS_SERVICE_TOKEN:
             got["waiting"] += 1  # not configured: tried again on the next sweep
             continue
+        handoff = part_on("CONNECT_HANDOFF")
+        if not handoff:
+            try:
+                fact_change = _is_fact_change(e)
+                if fact_change:
+                    # A fact change is a route problem only for the hand-off (R-22); without it the Counsellor was
+                    # never told and still is not: no endpoint call; the row is dropped, the case left as it was.
+                    os_escalation.drop_counsellor_escalation(e.key, "handoff_off")
+            except Exception as exc:  # noqa: BLE001  (one bad row never ends the sweep; class name only)
+                log.error("PAI OS escalation could not be checked for the hand-off: %s", type(exc).__name__)
+                got["waiting"] += 1
+                continue
+            if fact_change:
+                got["refused"] += 1
+                continue
         try:
-            body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id,
-                                   reason_type=_TODAY.get(e.reason, "route_not_possible"), details=e.note)
+            if handoff:  # the five reasons go as they are, with the decision version they belong to
+                body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id, reason_type=e.reason,
+                                       details=e.note, decision_version=e.decision_version)
+            else:
+                body = EscalationInput(workspace_id=e.student_ref, journey_id=e.journey_id,
+                                       reason_type=_TODAY.get(e.reason, "route_not_possible"), details=e.note)
             escalate(body, db, x_pai_service_token=config.PAI_OS_SERVICE_TOKEN)
         except ValidationError:
             db.rollback()
@@ -162,9 +375,24 @@ def _deliver(db) -> dict:
             else:
                 got["waiting"] += 1
         else:
+            if handoff:
+                _pause_after_escalation(e)
             os_escalation.mark_counsellor_delivery(e.key, "sent")
             got["sent"] += 1
     return got
+
+
+def _pause_after_escalation(e) -> None:
+    """D-x7: the Counsellor took the escalation, so the student's plan pauses with the reason. A failure here never
+    undoes the delivery (the Counsellor has the escalation), and the pause is not retried: the row is marked sent, so
+    a plan that was not paused stays as it is. Both a failure and a plan not paused are logged."""
+    try:
+        paused = plan_source.pause_for_escalation(e.student_ref, e.decision_version, e.reason)
+    except Exception as exc:  # noqa: BLE001  (class name only, no student data)
+        log.error("PAI OS plan could not be paused after an escalation: %s", type(exc).__name__)
+        return
+    if not paused:
+        log.warning("PAI OS plan was not paused after an escalation (%s): no open plan took it", e.reason)
 
 
 OS_EVENT_TEXTS = Path(__file__).parent / "pai_c" / "connect" / "os_event_texts.yaml"
@@ -215,8 +443,21 @@ def sweep_once(db) -> dict:
         return {"mounted": False}
     delivered = failed = 0
     try:
+        if part_on("CONNECT_ONE_UPLOAD"):
+            try:  # before the pending vault events go out, so the events these proposals raise leave in this sweep
+                os_fact_proposals.backfill()
+                deliver_fact_proposals(db)
+            except Exception as exc:  # noqa: BLE001  (class name only; the rest of the sweep still runs)
+                db.rollback()
+                log.error("PAI OS sweep could not deliver fact proposals: %s", type(exc).__name__)
         handoff, facts = part_on("CONNECT_HANDOFF"), part_on("CONNECT_STUDENT_FACTS")
         if handoff or facts:
+            if handoff:
+                try:
+                    deliver_choice_requests(db)  # before the pending decisions, so n+1 goes out in this sweep
+                except Exception as exc:  # noqa: BLE001  (class name only; the decisions below still go out)
+                    db.rollback()
+                    log.error("PAI OS sweep could not deliver choice requests: %s", type(exc).__name__)
             first = deliver_pending(db)
             if handoff:
                 _backfill(db)
@@ -260,6 +501,109 @@ def start_sweep() -> asyncio.Task:
     return asyncio.create_task(loop())
 
 
+def consistency_students(db) -> list[str]:
+    """The students the check looks at: Counsellor workspaces with a decision or a Vault version, and every student
+    PAI OS holds a Counsellor plan or intake row for."""
+    from app.models import RouteDecision, VaultVersion
+
+    ours = {str(w) for w in db.scalars(select(RouteDecision.workspace_id).distinct()).all()}
+    ours |= {str(w) for w in db.scalars(select(VaultVersion.workspace_id).where(VaultVersion.version > 0)).all()}
+    return sorted(ours | set(os_consistency.students()))
+
+
+def consistency_run(db, *, mode: str = "nightly", open_cases: bool = True, now: datetime | None = None) -> dict:
+    """The consistency check of master 9.3 rules 1-8 (P1-T10, R-05). Reads both sides, repairs nothing and writes only
+    its own case rows (R-01). `mode` is `nightly` or `settled` (the end-of-test check). A mismatch opens one case for a
+    person when `open_cases`; the same mismatch next time only touches it. Logs carry rule numbers and counts only."""
+    try:
+        ports.services()
+    except ports.OsUnavailable:
+        return {"mounted": False}
+    if not part_on("CONNECT_HANDOFF"):  # also false while the `counsellor` module is off
+        return {"skipped": "off"}
+    now = now or datetime.now(timezone.utc)
+    parts = frozenset(p for p in PARTS if part_on(p))
+    findings: dict[int, int] = {}
+    opened = touched = errors = 0
+    students = consistency_students(db)
+    for student in students:
+        try:
+            side = consistency_rules.counsellor_side(db, student)
+            theirs = os_consistency.side(student, side.export)
+            for f in consistency_rules.check(side, theirs, mode=mode, now=now, parts=parts):
+                findings[f.rule] = findings.get(f.rule, 0) + 1
+                if open_cases:
+                    _, created = os_consistency.open_case(student, f.rule, f.plan_id, list(f.codes))
+                    opened, touched = opened + created, touched + (not created)
+        except Exception as exc:  # noqa: BLE001  (one student never stops the others; class name only, no student data)
+            db.rollback()
+            errors += 1
+            log.error("PAI OS consistency check failed for one student: %s", type(exc).__name__)
+    if findings:
+        log.warning("PAI OS consistency (%s): findings per rule %s", mode, dict(sorted(findings.items())))
+    return {"students": len(students), "findings": findings, "opened": opened, "touched": touched, "errors": errors}
+
+
+def next_consistency_run(now: datetime, hour: int) -> datetime:
+    """The next time the nightly job is due: `hour`:00 UTC, today if it is still ahead, else tomorrow. Pure."""
+    at = now.astimezone(timezone.utc).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return at if at > now else at + timedelta(days=1)
+
+
+def consistency_due_now(now: datetime, hour: int) -> bool:
+    """Whether today's run time has already passed: a process that starts after `hour`:00 UTC runs today's check at once
+    (the claim lets it run only if no replica finished it). Pure."""
+    now = now.astimezone(timezone.utc)
+    return now >= now.replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
+def consistency_nightly(db, today=None) -> dict | None:
+    """One nightly run: the winner of today's claim runs the check and records its counts. None when the job is off or
+    another replica holds today's run. The claim is taken after the off check, so an off day is not used up."""
+    try:
+        ports.services()
+    except ports.OsUnavailable:
+        return None
+    if not part_on("CONNECT_HANDOFF"):
+        return None
+    day = today or datetime.now(timezone.utc).date()
+    run_id = os_consistency.claim_run(day, "nightly")
+    if run_id is None:
+        return None
+    counts = consistency_run(db, mode="nightly", open_cases=True)
+    os_consistency.finish_run(run_id, {k: ({str(r): n for r, n in v.items()} if isinstance(v, dict) else v)
+                                       for k, v in counts.items()})
+    return counts
+
+
+def _consistency_with_session() -> dict | None:
+    from app.database import SessionLocal
+
+    with SessionLocal() as db:
+        return consistency_nightly(db)
+
+
+def start_consistency() -> asyncio.Task:
+    """Started from the app's lifespan only when PAI OS is mounted, beside the sweep. It sleeps until the next
+    CONNECT_CONSISTENCY_HOUR_UTC and runs once per date: the run row's unique date lets one replica win."""
+    async def run() -> None:
+        try:
+            await asyncio.to_thread(_consistency_with_session)
+        except Exception:  # noqa: BLE001  (logged; the next start or tomorrow's run tries again)
+            log.exception("PAI OS consistency job failed")
+
+    async def loop() -> None:
+        hour = config.CONNECT_CONSISTENCY_HOUR_UTC
+        if consistency_due_now(datetime.now(timezone.utc), hour):
+            await run()  # started after the run time on a day with no finished run (or a dead claim): run today
+        while True:
+            now = datetime.now(timezone.utc)
+            await asyncio.sleep(max(1.0, (next_consistency_run(now, hour) - now).total_seconds()))
+            await run()
+
+    return asyncio.create_task(loop())
+
+
 def recipient_email(student_ref: str) -> str | None:
     """The email address of the student's PAI account: the active workspace `student_ref` names, then its owner. None
     for an unknown or inactive workspace and for one with no owner (agent-made or legacy); PAI OS then blocks the
@@ -293,6 +637,156 @@ def student_facts(student_ref: str) -> dict | None:
 
     with new_session() as db:
         return builder.build(db, workspace_id)
+
+
+def fact_conflicts(student_ref: str) -> dict | None:
+    """The student's open Vault conflicts on a mark or a test score, for PAI OS (P1-T8, D-w12; a dict valid as
+    `FactConflictsV1`; `mount_os(fact_conflicts=)` and the worker's `OS_FACT_CONFLICTS`). None while the
+    CONNECT_STUDENT_FACTS flag is off and for a reference that names no workspace. Reads the plain flag, as
+    `student_facts` does, so the API and the worker agree. Opens its own session: PAI OS calls it on its worker thread.
+    A database error raises, so PAI OS retries."""
+    if not config.CONNECT_STUDENT_FACTS:
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import fact_conflicts as builder
+
+    with new_session() as db:
+        return builder.build(db, workspace_id)
+
+
+def answer_fact_question(student_ref: str, ref: str, key: str, choice: str, value=None, request_id=None) -> dict | None:
+    """The student's answer to a "which is right" request, written to the Vault (P1-T8, D-w13; `mount_os(fact_answer=)`).
+    Returns `{"status": "resolved" | "gone" | "refused", "code"}`, or None while the CONNECT_STUDENT_FACTS part is off
+    (PAI OS answers 404) and for a reference that names no workspace. An unexpected failure (logged by type only) is
+    `{"status": "error"}`, which PAI OS answers 503, so it is not taken for "this does not exist". Opens its own session
+    and commits only a resolved answer, so a refused one writes nothing. `request_id` is the OS request, named on the
+    evidence of the value written."""
+    if not part_on("CONNECT_STUDENT_FACTS"):
+        return None
+    try:
+        workspace_id = str(uuid.UUID(student_ref))
+    except (TypeError, ValueError):
+        return None
+    from app.database import new_session
+    from app.pai_c.connect import fact_conflicts as builder
+
+    with new_session() as db:
+        try:
+            outcome = builder.answer(db, workspace_id, ref, key, choice, value, request_id)
+            if outcome["status"] == "resolved":
+                db.commit()
+            else:
+                db.rollback()
+        except Exception as exc:  # noqa: BLE001  (class name only: no ids, no values)
+            db.rollback()
+            log.error("a fact question could not be answered: %s", type(exc).__name__)
+            return {"status": "error"}
+    return outcome
+
+
+def documents_enabled() -> bool:
+    """True when the one upload entry point is on: the CONNECT_ONE_UPLOAD part (P1-T7, R-01). The OS reads it through
+    `mount_os(documents_enabled=)`; it cannot read host flags itself."""
+    return part_on("CONNECT_ONE_UPLOAD")
+
+
+def documents_flag() -> bool:
+    """The plain CONNECT_ONE_UPLOAD flag, for the worker's OS_DOCUMENTS_ENABLED (P1-T7, R-01). Not `part_on`: PAI OS
+    checks the `counsellor` module row itself, and the worker cannot ask the API for it."""
+    return bool(config.CONNECT_ONE_UPLOAD)
+
+
+def document_file_bytes(student_ref: str, file_ref: str) -> bytes:
+    """The bytes of the student's stored file `file_ref`, for the OS reader (P1-T7, D-y6; `mount_os(document_files=)`
+    and the worker's OS_DOCUMENT_FILES). The file must exist, belong to the workspace `student_ref` and be active (not
+    trashed or deleted); anything else is `KeyError`, so another student's bytes are never returned. Opens its own
+    session: PAI OS calls it on its worker thread. A storage failure raises; the port turns it into KeyError."""
+    from app.database import new_session
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref) or record.status != "active":
+            raise KeyError(file_ref)
+        storage_key = record.storage_key
+    return get_file_store().read(storage_key)
+
+
+def register_os_document(student_ref: str, doc_type: str, file_ref: str, filename: str, data: bytes) -> dict:
+    """Makes the stored file an OS document of `doc_type` (P1-T7, R-01): `{"id", "status"}`, or `{"refused": code}`
+    (`not_on`, `unknown_type`, `consent_needed`, `terms_not_set`, `not_readable`, `duplicate`). `not_on` too when PAI
+    OS is not mounted. Any other failure is raised."""
+    try:
+        return os_document_files.register(str(student_ref), doc_type, str(file_ref), filename, data)
+    except ports.OsUnavailable:
+        return {"refused": "not_on"}
+    except os_document_files.Refused as refused:
+        return {"refused": refused.code}
+
+
+def forget_os_document(workspace_id: str, file_id: str) -> bool:
+    """Deletes the OS document linked to a Counsellor file the student trashed or deleted (P1-T7, D-y7). False when
+    there is none and when PAI OS is not mounted. Raises on any other failure (the caller logs it by class name)."""
+    try:
+        return os_document_files.forget(str(workspace_id), str(file_id))
+    except ports.OsUnavailable:
+        return False
+
+
+def document_types() -> list[dict]:
+    """The document types a student can name on upload, `{key, label}` sorted by key (P1-T7, D-y5). `[]` when PAI OS is
+    not mounted, and on any failure (logged)."""
+    try:
+        types = ports.services().document_types
+        return [{"key": k, "label": types[k].label} for k in sorted(types)]
+    except ports.OsUnavailable:
+        return []
+    except Exception:
+        log.exception("document types could not be read; treated as none")
+        return []
+
+
+def _emit_file_deleted(db, workspace, file_id: str, filename: str) -> None:
+    from app.security.event_identity import emit_internal_event
+
+    try:
+        asyncio.run(emit_internal_event(db, workspace, type="workspace.file.deleted", source="system:pai-os",
+                                        target="core", payload={"file_id": file_id, "filename": filename}))
+        db.commit()
+    except Exception as exc:  # noqa: BLE001  (class name only)
+        db.rollback()
+        log.error("the file event of an OS delete could not be emitted: %s", type(exc).__name__)
+
+
+def on_os_document_deleted(student_ref: str, file_ref: str) -> None:
+    """The OS deleted a linked document: purge the Counsellor file the way `purge_trash` does (P1-T7, D-y7): its bytes,
+    its document state, the unindex job and the record. Idempotent: a file that is already gone is a no-op. A failure
+    is raised before the record is deleted, so the OS delete stays `deleted` and the file record stays. Opens its own
+    session: PAI OS calls it on its request thread."""
+    from app.database import new_session
+    from app.documents.service import DocumentArtifactService
+    from app.files.storage import get_file_store
+    from app.models import FileRecord
+    from app.routers.files import _enqueue_document_unindex
+
+    with new_session() as db:
+        record = db.get(FileRecord, str(file_ref))
+        if record is None or str(record.workspace_id) != str(student_ref):
+            return
+        get_file_store().delete(record.storage_key)  # a missing object is a no-op in both stores
+        DocumentArtifactService(db).purge_for_files(str(student_ref), [record.id])
+        _enqueue_document_unindex(db, str(student_ref), [record.id])
+        workspace = db.get(Workspace, str(student_ref))
+        filename, record_id = record.filename, record.id
+        db.delete(record)
+        db.commit()
+        if workspace is not None:  # the same file event the trash purge emits; a failure here never undoes the purge
+            _emit_file_deleted(db, workspace, record_id, filename)
 
 
 def counsellor_module_on() -> bool:
@@ -332,8 +826,9 @@ def list_routes() -> list[dict]:
 
 
 class StepError(Exception):
-    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required or
-    unavailable (PAI OS is not mounted or failed)."""
+    """A step could not be completed through PAI OS. `code` is not_found, not_yours, not_waiting, review_required,
+    answer_required (a request step closes by the answer, never by a tick) or unavailable
+    (PAI OS is not mounted or failed)."""
 
     def __init__(self, code: str):
         super().__init__(code)

@@ -379,7 +379,10 @@
       "Letters"
     ],
     "privacy": "Only you and PAI can see your documents. Nothing is shared with a university.",
-    "backToFolders": "Back to folders"
+    "backToFolders": "Back to folders",
+    "readThis": "Let PAI read this",
+    "readThisType": "What is this file?",
+    "readThisHelp": "Say what this file is, and PAI will read it and ask you to check what it found."
   },
   "settings": {
     "intro": "Your account, how PAI looks and sounds, and your data.",
@@ -943,6 +946,62 @@
         "question": "Which subjects or study tasks do you do well in?",
         "topic": "I want to tell you what I do well."
       }
+    }
+  },
+  "connect": {
+    "start": {
+      "preparing": "Your choice was sent. Your plan will appear here when it is ready.",
+      "unchanged": "Your plan already matches this choice.",
+      "choose_field_first": "Choose your field in PAI first, then start your plan.",
+      "too_many_places": "Your choice has more places than PAI can hold. Remove some places and try again.",
+      "adopt_first": "Keep your current plan as your PAI plan first.",
+      "adopt_first_link": "Go to your journey",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes."
+    },
+    "change": {
+      "refused": "The Counsellor could not take that change. Your plan stays as it is.",
+      "sent_title": "Changes waiting for an answer",
+      "requested": "Your change was sent. It will show here once it is done.",
+      "request_open": "A change is already waiting. Wait for it to finish before asking for another."
+    },
+    "adoption": {
+      "linked": "Your plan is now your PAI plan.",
+      "linking_wait": "This can take a few minutes.",
+      "several_plans": "You have more than one plan, so PAI cannot keep one of them yet.",
+      "identity_taken": "PAI already has a plan for this route, so it cannot keep this one.",
+      "no_places": "Your plan has no places that PAI can keep.",
+      "no_intake": "Your plan has no start date that PAI can keep.",
+      "plan_changed": "Your plan changed. Look at it again, then keep it.",
+      "no_plan": "That plan is no longer there.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "other": "Your plan could not be kept. Please try again."
+    },
+    "requests": {
+      "use": "Use this value",
+      "kinds": { "vault": "Saved in PAI", "document": "From your document", "said": "What you told PAI" },
+      "levels": { "stated": "you told PAI", "shown": "shown in a document", "confirmed": "you confirmed it" },
+      "asOf": "as of {date}",
+      "pending": "This step closes by itself when PAI has what it needs.",
+      "gone": "That question is no longer there. Your list has been updated.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "failed": "That did not save. Please try again."
+    },
+    "myPlan": {
+      "empty": "Your plan will appear here once you choose a path.",
+      "emptyLink": "Go to your journey",
+      "notInPlanTitle": "Not part of your plan",
+      "notInPlan": "This page is not part of your plan.",
+      "notInPlanLink": "Go to your plan",
+      "levels": {
+        "verified": "Verified",
+        "confirmed": "Confirmed",
+        "not_confirmed": "Not confirmed",
+        "estimated": "Estimated"
+      },
+      "checked": "Checked {date}",
+      "checkedUnknown": "Date checked not recorded",
+      "source": "Source",
+      "dateSource": "Where this date comes from"
     }
   }
 }

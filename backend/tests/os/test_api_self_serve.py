@@ -31,12 +31,12 @@ def api(engine, clean, os_db):
     return build_api(engine, os_db)
 
 
-def build_api(engine, os_db, terms_dir=TEST_TERMS, rehearsal=False) -> TestClient:
+def build_api(engine, os_db, terms_dir=TEST_TERMS, rehearsal=False, extra_books=None) -> TestClient:
     """The self-serve test app (Slice 9a Task 5: the pilot terms folder and rehearsal mode can be chosen)."""
     settings = load_settings({"OS_DATABASE_URL": os_db, "OS_ADMIN_TOKEN": TOKEN, "OS_ENABLED": "true",
                               "OS_REHEARSAL": "on" if rehearsal else ""})
     fake = FakeClient()
-    books = load_playbook_dir(FAKE) | load_playbook_dir(PLAYBOOK_DIR)
+    books = load_playbook_dir(FAKE) | load_playbook_dir(PLAYBOOK_DIR) | (extra_books or {})
     svc = make_services(settings, engine=engine, playbooks=books, today=lambda: date(2027, 3, 1),
                         dbos_client=lambda: fake, terms_dir=terms_dir)
     store, kb = ProgrammeStore(engine, "pai"), SqlKnowledge(engine, "pai")

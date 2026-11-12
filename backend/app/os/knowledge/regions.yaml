@@ -1,0 +1,17 @@
+# One vocabulary for regions (master R-76, P2 spec §4.1). Research, the import and Knowledge use only these codes.
+# Keys are ISO 3166-1 alpha-2 country codes (R-77: abroad countries add their own block). `name` is the display name
+# from master R-76; `aliases` are the other spellings the import accepts and normalises to the code. Any other
+# spelling is rejected (never guessed). Matching ignores case, spaces, hyphens, dots and "&"/"and".
+version: 1
+countries:
+  PK:
+    regions:
+      - {code: punjab, name: Punjab, aliases: []}
+      - {code: sindh, name: Sindh, aliases: []}
+      - {code: khyber_pakhtunkhwa, name: Khyber Pakhtunkhwa, aliases: [KP, KPK, Khyber-Pakhtunkhwa]}
+      - {code: balochistan, name: Balochistan, aliases: [Baluchistan]}
+      - {code: islamabad_capital_territory, name: Islamabad Capital Territory, aliases: [ICT, Islamabad]}
+      - {code: azad_jammu_and_kashmir, name: Azad Jammu and Kashmir, aliases: [AJK, Azad Kashmir]}
+      - {code: gilgit_baltistan, name: Gilgit-Baltistan, aliases: [GB]}
+      - {code: national, name: National, aliases: []}
+      - {code: federal_institution, name: Federal institution, aliases: [federal-institution]}

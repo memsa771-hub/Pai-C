@@ -86,3 +86,29 @@ def test_ports_unavailable_when_not_mounted():
     assert mount_os(FastAPI(), env={"OS_DATABASE_URL": "postgresql://unused/x", "OS_ENABLED": "true"}) is True
     assert ports.services().settings.os_enabled is True
     ports.configure(None)
+
+
+@pytest.mark.req("R-11")
+def test_pending_reads_stored_v1_rows(engine, clean):
+    """A row written before T6 (EscalationV1) is read as v2 with no decision version."""
+    from app.os.contracts.escalation import EscalationV1
+    from app.os.contracts.escalation_v2 import EscalationV2
+    from app.os.ports.escalation import pending_counsellor_escalations
+
+    svc = SimpleNamespace(engine=engine, settings=SimpleNamespace(tenant_id="pai"))
+    old = EscalationV1(key="escalation:3", case_id=3, journey_id="j-1", student_ref="ws-1", reason="blocking_gap",
+                       note="Fixed note.", raised_at="2027-01-10T09:00:00+05:00").model_dump(mode="json", by_alias=True)
+    new = EscalationV2(key="escalation:4", case_id=4, journey_id="j-1", student_ref="ws-1", decision_version=2,
+                       reason="other", note="Fixed note.", raised_at="2027-01-10T09:00:00+05:00"
+                       ).model_dump(mode="json", by_alias=True)
+    with engine.begin() as conn:
+        for p in (old, new):
+            conn.execute(insert(models.outbox).values(tenant_id="pai", idempotency_key=p["key"], channel="counsellor",
+                                                      recipient="ws-1", template="escalation", payload=p))
+    ports.configure(svc)
+    try:
+        got = pending_counsellor_escalations()
+    finally:
+        ports.configure(None)
+    assert [type(e) for e in got] == [EscalationV2, EscalationV2]
+    assert [(e.key, e.decision_version) for e in got] == [("escalation:3", None), ("escalation:4", 2)]

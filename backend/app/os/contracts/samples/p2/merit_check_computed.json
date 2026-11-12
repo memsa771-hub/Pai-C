@@ -1,0 +1,25 @@
+{
+  "schema": "pai.merit_check.v1",
+  "student_ref": "ws-fictional-1",
+  "programme_ref": "prog-alpha-bs-cs",
+  "intake": {"term": "fall", "year": 2027},
+  "category": "seat:alpha-open",
+  "status": "computed",
+  "formula": {
+    "parts": [{"name": "school", "marks_part": "part_one", "weight": 0.5},
+              {"name": "entry_test", "marks_part": "test_total", "weight": 0.5}],
+    "total": 100, "owner_ref": "body:fictional-admission-board", "level": "verified",
+    "source": {"url": "https://board.fictional-region.test/merit-formula", "quote": "Merit = 50% Part-I marks + 50% test",
+               "checked_at": "2027-04-01T10:00:00+00:00"}
+  },
+  "aggregate": 67.27,
+  "marks_used": [{"key": "part_one", "value": 410, "out_of": 550, "evidence": "shown"},
+                 {"key": "test_total", "value": 120, "out_of": 200, "evidence": "stated"}],
+  "parts": [{"name": "school", "status": "known"}, {"name": "entry_test", "status": "known"}],
+  "closing_merits": [
+    {"intake": {"term": "fall", "year": 2026}, "value": 71.5, "list_number": 2, "list_complete": false,
+     "level": "verified",
+     "source": {"url": "https://admissions.alpha-university.test/merit-2026", "quote": "Second merit list: lowest 71.5",
+                "checked_at": "2026-10-01T10:00:00+00:00"}}
+  ]
+}

@@ -138,6 +138,7 @@ def test_proposal_waiting_only_when_pending(engine, on):
     assert [r["key"] for r in got] == [f"os_event:{ref.plan_id}:proposal_waiting:{pid}"]
 
 
+@pytest.mark.standalone
 def test_module_off_emits_nothing(engine, clean):
     manifest.set_enabled(engine, "pai", False)
     k, ref = make_plan(engine)
@@ -149,6 +150,7 @@ def test_module_off_emits_nothing(engine, clean):
     assert rows(engine) == []
 
 
+@pytest.mark.standalone
 def test_module_row_missing_emits_nothing(engine, clean):
     make_plan(engine)
     assert rows(engine) == []

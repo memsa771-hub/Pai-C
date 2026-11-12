@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "ConflictValue": {
+      "additionalProperties": false,
+      "properties": {
+        "side": {
+          "enum": [
+            "current",
+            "proposed"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Value"
+        },
+        "evidence": {
+          "enum": [
+            "stated",
+            "shown",
+            "confirmed",
+            "unknown"
+          ],
+          "title": "Evidence",
+          "type": "string"
+        },
+        "document_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Ref"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "side",
+        "value",
+        "evidence"
+      ],
+      "title": "ConflictValue",
+      "type": "object"
+    },
+    "FactConflict": {
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "pattern": "^profile_issue:[A-Za-z0-9-]+$",
+          "title": "Ref",
+          "type": "string"
+        },
+        "key": {
+          "pattern": "^[a-z_]+(\\.[a-z0-9_]+)*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/ConflictValue"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Values",
+          "type": "array"
+        },
+        "answers": {
+          "items": {
+            "enum": [
+              "keep_current",
+              "accept_proposed",
+              "provide_new"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Answers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ref",
+        "key",
+        "values",
+        "answers"
+      ],
+      "title": "FactConflict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.fact_conflicts.v1",
+      "default": "pai.fact_conflicts.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "vault_version": {
+      "minimum": 0,
+      "title": "Vault Version",
+      "type": "integer"
+    },
+    "built_at": {
+      "format": "date-time",
+      "title": "Built At",
+      "type": "string"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/FactConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "student_ref",
+    "vault_version",
+    "built_at",
+    "conflicts"
+  ],
+  "title": "FactConflictsV1",
+  "type": "object"
+}

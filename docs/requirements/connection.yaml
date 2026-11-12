@@ -18,48 +18,50 @@
 
 phases:
   P0: {name: "Setup and Counsellor fixes", status: done}
-  P1: {name: "Connection core", status: current}
-  P2: {name: "National data system", status: planned}
+  P1: {name: "Connection core", status: done}
+  P2: {name: "National data system", status: current}
   P3: {name: "Intermediate family", status: planned}
   P4: {name: "Bachelor's family", status: planned}
   P5: {name: "Launch", status: planned}
   P6: {name: "Abroad", status: planned}
 
 requirements:
-  R-01: {title: "One owner per data piece; others read live via port", phases: [P1], built: false}
+  R-01: {title: "One owner per data piece; others read live via port", phases: [P1], built: true}
   R-02: {title: "Choice changes carry an ever-increasing decision_version", phases: [P1], built: true}
   R-03: {title: "Decision change and outbox row in one transaction, plus sweep", phases: [P1], built: true}
-  R-04: {title: "Every change shows the same result in both products", phases: [P1], built: false}
-  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: false}
+  R-04: {title: "Every change shows the same result in both products", phases: [P1], built: true}
+  R-05: {title: "Nightly consistency job and end-of-test check run all rules", phases: [P1], built: true}
   R-06: {title: "Withdrawing a choice stops the plan, closed as withdrawn", phases: [P1], built: true}
-  R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: false}
-  R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: false}
-  R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: false}
+  R-07: {title: "OS never changes the choice; proposals go via choice_request", phases: [P1], built: true}
+  R-08: {title: "Self-serve plan is adopted when Counsellor on and student agrees", phases: [P1], built: true}
+  R-09: {title: "With Counsellor on, route builder writes through decision service", phases: [P1], built: true}
   R-10: {title: "Hand-off consent required; guardian consent by email for under-18s", phases: [P1, P5], built: true}
-  R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: false}
+  R-11: {title: "Escalations accept all five reasons and return student to choosing", phases: [P1], built: true}
   R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: true}
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: true}
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: true}
+  # R-15 stays false: every Counsellor reader is done in P1 (rule 8 of the consistency check covers them); the OS side moves to
+  # P2 (owner ruling Q4, 2026-11-07, recorded in docs/connect/handoff/p1-handoff.md). Rule 8 opens a case, so it is never silent.
   R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: false}
-  R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: false}
-  R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: false}
-  R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: false}
-  R-19: {title: "One open request per fact per student", phases: [P1], built: false}
-  R-20: {title: "Not-yet-existing data becomes a dated result-expected step", phases: [P1], built: false}
-  R-21: {title: "Conflicting data becomes a which-is-right step with both sources", phases: [P1], built: false}
-  R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: false}
+  R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: true}
+  R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: true}
+  R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: true}
+  R-19: {title: "One open request per fact per student", phases: [P1], built: true}
+  R-20: {title: "Not-yet-existing data becomes a dated result-expected step", phases: [P1], built: true}
+  R-21: {title: "Conflicting data becomes a which-is-right step with both sources", phases: [P1], built: true}
+  R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: true}
   R-23: {title: "Outside facts are Knowledge records with URL and quote", phases: [P2], built: false}
   R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
-  R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: false}
+  R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: true}
   R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: false}
   R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: false}
   R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: false}
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
   R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: false}
   R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: false}
-  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: false}
-  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: false}
-  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: false}
+  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
+  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: true}
+  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: true}
   R-35: {title: "Launch gate: denominator, verified floor and per-region coverage", phases: [P2, P5], built: false}
   R-36: {title: "Two route families as data: pk_intermediate and pk_bachelor", phases: [P3, P4], built: false}
   R-37: {title: "Bachelor family covers every admission system", phases: [P4], built: false}
@@ -67,20 +69,24 @@ requirements:
   R-39: {title: "New replan events for merit lists, fees, results, schedules", phases: [P3, P4], built: false}
   R-40: {title: "New document types as data", phases: [P3, P4], built: false}
   R-41: {title: "Contract level gains intermediate (contract v2)", phases: [P1], built: true}
-  R-42: {title: "Review queue for data checkers with two-person rule", phases: [P2], built: false}
-  R-43: {title: "Counsellor prompts, policy and pipeline frozen in connection work", phases: [P1], built: false}
+  R-42: {title: "Review queue for data checkers with two-person rule", phases: [P2], built: true}
+  R-43: {title: "Counsellor prompts, policy and pipeline frozen in connection work", phases: [P1], built: true}
   R-44: {title: "Counsellor reads OS data in the same shape as today", phases: [P1], built: true}
   R-45: {title: "OS adds no chat messages", phases: [P1], built: true}
+  # R-46 stays false; the owner decides whether to flip it. The P1 live run (docs/local-test/live-run-2026-11-07-p1.md)
+  # passed the bar, but it showed two permanently failed analyses, a wrong possible_without_scholarship, a garbled budget
+  # sentence and a duplicated reply, the route was never chosen, and one run is weak evidence. The offline replays and
+  # the stage A-I replay are done and tagged.
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
   R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
-  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: false}
-  R-51: {title: "Each route declares its plan pages", phases: [P1], built: false}
-  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: false}
-  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: false}
-  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: false}
-  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: false}
+  R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
+  R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}
+  R-52: {title: "Step, page and pack wording come from route data", phases: [P1], built: true}
+  R-53: {title: "My plan visible from the start with an empty state", phases: [P1], built: true}
+  R-54: {title: "Every fact on screen shows source, date and level", phases: [P1], built: true}
+  R-55: {title: "Label test fails on another route's country, body or document", phases: [P1], built: true}
   R-56: {title: "Every phase: spec, plan, build, gate, handoff, sign-off", phases: [P5], built: false}
   R-57: {title: "Requirement traceability check in CI", phases: [P0], built: true}
   R-58: {title: "Fake routes stay in tests; red-flag search for country names", phases: [P0], built: true}

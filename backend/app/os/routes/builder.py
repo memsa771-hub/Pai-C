@@ -6,21 +6,29 @@ route's origin, destination and level come from its playbook, and the task the b
 """
 
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.os import clock, models
+from app.os.adapters.counsellor import manifest
 from app.os.contracts.route_contract import IntakeRef, ProgrammeChoice, RouteContract
 from app.os.eligibility.notes import on_profile_change
+from app.os.intakes import IntakeStore
 from app.os.kernel import PlanRef, contract_sha256
-from app.os.kernel.states import is_started
+from app.os.kernel.states import PLAN_OPEN, is_started
 from app.os.knowledge.requests import visible_programmes
+from app.os.playbooks import newest_plain
+from app.os.ports import choice_requests, choice_sink
+from app.os.replan.ops import CancelProgramme, SwapProgramme
+from app.os.replan.lock import plan_lock
+from app.os.replan.store import OverrideStore, ProposalStore
 
 log = logging.getLogger(__name__)
 CHANGES_PER_DAY = 3  # swaps and removals per plan (S4-D10); the kernel has no revision limit yet (Slice 7)
-P, T, R, F = models.plans, models.tasks, models.plan_revisions, models.knowledge_facts
+P, T, R, F, PR = models.plans, models.tasks, models.plan_revisions, models.knowledge_facts, models.proposals
 
 
 class NotAllowed(ValueError):
@@ -35,30 +43,82 @@ class PlanExists(NotAllowed):
     """The student already has a plan for this route and intake (the API answers 409)."""
 
 
+class RequestOpen(NotAllowed):
+    """A change of this plan is already with the Counsellor (the API answers 409 `request_open`)."""
+
+
+class ChoiceRefused(Exception):
+    """With the Counsellor on, the decision service would not take the choice (the API answers 409 with the code:
+    `choose_field_first` or `too_many_places`). Not a NotAllowed: the message is a code, not a sentence."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+class CounsellorUnavailable(Exception):
+    """With the Counsellor on, the host could not take the choice (it raised before anything was written). The API
+    answers 503; the builder never falls back to a plan of its own."""
+
+
+@dataclass(frozen=True)
+class Preparing:
+    """With the Counsellor on, the choice went to the decision service as `decision_version`; the plan comes from the
+    intake of that version, not from the builder (the API answers 202). `state` is "unchanged" when the choice was
+    already the student's and an OS plan already holds that version."""
+
+    decision_version: int
+    state: str = "preparing"
+
+
 class SwapLimit(NotAllowed):
     """CHANGES_PER_DAY programme changes in the last 24 hours."""
 
 
 def _route(plans, route_key: str):
-    books = [b for (key, _), b in plans.playbooks.items() if key == route_key]
-    if not books:
+    book = newest_plain(plans.playbooks.values()).get(route_key)
+    if book is None:
         raise NotAllowed(f"unknown route '{route_key}'")
-    return max(books, key=lambda b: b.version)
+    return book
 
 
-def _check_programmes(plans, route_key: str, year: int, refs: list[str]) -> None:
-    visible = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year)}
+def _check_programmes(plans, route_key: str, year: int, refs: list[str], term: str | None = None) -> None:
+    visible = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term)}
     unknown = [r for r in refs if r not in visible]
     if unknown:
         raise NotAllowed(f"not a programme of this route for {year}: {', '.join(unknown)}")
 
 
-def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: list[ProgrammeChoice]) -> PlanRef:
-    """Starts the student's plan for a route and intake (or returns the one they already have)."""
+def _open_self_serve(plans, student_ref: str) -> bool:
+    with plans.engine.connect() as conn:
+        return conn.execute(select(P.c.id).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.source == "self_serve",
+            P.c.status.in_(PLAN_OPEN)).limit(1)).first() is not None
+
+
+def _state(plans, student_ref: str, answer: dict) -> str:
+    """"unchanged" when the choice was already the student's and an OS plan already holds that version."""
+    if answer["outcome"] != "unchanged":
+        return "preparing"
+    with plans.engine.begin() as conn:
+        ids = conn.execute(select(P.c.id).where(P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref,
+                                                P.c.source == "counsellor", P.c.status.in_(PLAN_OPEN))).scalars().all()
+        applied = max((choice_requests.decision_version_of(conn, plans.kernel.tenant_id, i) or 0 for i in ids), default=0)
+    return "unchanged" if applied >= answer["decision_version"] else "preparing"
+
+
+def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
+          choices: list[ProgrammeChoice]) -> PlanRef | Preparing:
+    """Starts the student's plan for a route and intake (or returns the one they already have). With the `counsellor`
+    module on and a host that takes it (P1-T6, R-09), it writes nothing itself: the choice goes through the decision
+    service (ChoiceSink) and `Preparing(decision_version)` is returned; `ChoiceRefused` when the host refuses. A host
+    answer of None (its part is off, or no host) leaves everything below as it always was."""
     book = _route(plans, route_key)
     if len(choices) > 10:
         raise NotAllowed("choose at most 10 programmes")
-    _check_programmes(plans, route_key, intake.year, [c.programme_ref for c in choices])
+    _check_programmes(plans, route_key, intake.year, [c.programme_ref for c in choices], intake.term)
+    if not IntakeStore(plans.engine, plans.kernel.tenant_id).plannable(intake.term, intake.year):  # R-63
+        raise NotAllowed(f"the {intake.term} {intake.year} intake is not open for planning yet")
     try:
         contract = RouteContract.model_validate({
             "contract_version": "1", "source": "self_serve",
@@ -71,6 +131,19 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef, choices: l
     existing = plans._existing_plan(contract)
     if existing is not None and plans._contract(existing)[1] != contract_sha256(contract):
         raise PlanExists("you already have a plan for this route and intake; change its programmes with swap or remove")
+    if manifest.is_enabled(plans.engine, plans.kernel.tenant_id) and choice_sink.enabled():
+        if _open_self_serve(plans, student_ref):  # the intake would refuse the decision it makes (adoption is Task 6)
+            raise ChoiceRefused("adopt_first")
+        try:
+            answer = choice_sink.request(student_ref, book.route.origin, book.route.destination, book.route.level,
+                                         intake.model_dump(), [c.model_dump() for c in choices])
+        except Exception as exc:  # noqa: BLE001  the host's message can carry student data: log the type only
+            log.error("the Counsellor could not take the route builder's choice: %s", type(exc).__name__)
+            raise CounsellorUnavailable() from None
+        if answer is not None:
+            if answer["outcome"] == "refused":
+                raise ChoiceRefused(answer["code"])
+            return Preparing(answer["decision_version"], _state(plans, student_ref, answer))
     ref = plans.start_plan(contract)
     task = book.self_serve.choose_task if book.self_serve else None
     if task and ref.created:
@@ -115,12 +188,51 @@ def _within_limit(plans, plan_id: int) -> None:
         n = conn.execute(select(func.count()).select_from(R).where(
             R.c.plan_id == plan_id, R.c.created_at > clock.now() - timedelta(hours=24),
             R.c.cause.like("programmes:%"))).scalar()
+        # a change on a Counsellor plan is a request, not a revision: count those too (none exist with the host part off)
+        n += conn.execute(select(func.count()).select_from(PR).where(
+            PR.c.plan_id == plan_id, PR.c.source == "student", PR.c.created_at > clock.now() - timedelta(hours=24))
+        ).scalar()
     if n >= CHANGES_PER_DAY:
         raise SwapLimit(f"at most {CHANGES_PER_DAY} programme changes a day; try again tomorrow")
 
 
-def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> int | None:
-    """Replaces one programme with another at the same rank, with the student's OK (the screens ask first)."""
+def _request(plans, plan_id: int, op, places: list[str]) -> tuple[str, int] | None:
+    """On a Counsellor plan the builder does not change the choice (R-07): it records the student's change as a
+    proposal in status `requested` and writes its choice_request row, in one transaction. None when the plan is not
+    one the Counsellor chooses for (the host part is off, or a self-serve plan): the caller edits the plan as before.
+    Under the plan's replan lock: one open request per plan, and the daily limit holds."""
+    tenant = plans.kernel.tenant_id
+    with plans.engine.connect() as conn:
+        if not choice_requests.applies(conn, tenant, plan_id):
+            return None
+    with plan_lock(plans.engine, plan_id):
+        with plans.engine.begin() as conn:
+            if conn.execute(select(PR.c.id).where(PR.c.tenant_id == tenant, PR.c.plan_id == plan_id,
+                                                  PR.c.status == "requested")).first() is not None:
+                raise RequestOpen("request_open")
+        _within_limit(plans, plan_id)  # again, under the lock
+        cancelled = OverrideStore(plans.engine, tenant).cancelled(plan_id)  # live programmes only
+        chosen = [ProgrammeChoice(programme_ref=r, rank=i + 1) for i, r in enumerate(x for x in places if x not in cancelled)]
+        try:
+            choice_requests.check_places(chosen)
+        except ValueError:
+            raise NotAllowed("this change cannot be sent to your counsellor") from None
+        with plans.engine.begin() as conn:
+            base = choice_requests.decision_version_of(conn, tenant, plan_id)
+            if base is None:
+                raise NotAllowed("your plan is not ready to change yet")
+            sha, revision = conn.execute(select(P.c.contract_sha256, P.c.current_revision).where(
+                P.c.id == plan_id, P.c.tenant_id == tenant)).one()
+            pid = ProposalStore(plans.engine, tenant).create(
+                plan_id, [], "student", [op.model_dump(mode="json")], [], big=True, expires_at=None,
+                status="requested", based_on=sha, base_revision=revision, base_decision_version=base, conn=conn)
+            choice_requests.emit(conn, tenant, plan_id, pid, base, chosen, clock.now())
+    return "requested", pid
+
+
+def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> int | tuple[str, int] | None:
+    """Replaces one programme with another at the same rank, with the student's OK (the screens ask first). On a
+    Counsellor plan it only requests the change: `("requested", proposal_id)`."""
     contract = _own(plans, student_ref, plan_id)
     refs = [p.programme_ref for p in contract.programmes]
     if out_ref not in refs:
@@ -133,11 +245,16 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
     with plans.engine.connect() as conn:
         facts = conn.execute(select(func.count()).select_from(F).where(
             F.c.tenant_id == plans.kernel.tenant_id, F.c.scope == "programme", F.c.ref == in_ref,
-            F.c.intake_year == year)).scalar()
+            F.c.intake_year == year, F.c.owner_ref == "")).scalar()  # research's rows, not a body's
     if not facts:
         raise NotAllowed(f"{in_ref} is still being researched")
     _not_started(plans, plan_id, out_ref)
     _within_limit(plans, plan_id)
+    ordered = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
+    requested = _request(plans, plan_id, SwapProgramme(out_ref=out_ref, in_ref=in_ref, reason="student_swap"),
+                         [in_ref if r == out_ref else r for r in ordered])
+    if requested is not None:
+        return requested
 
     def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
         refs_now = [p.programme_ref for p in current.programmes]
@@ -153,8 +270,9 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
     return revision
 
 
-def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
-    """Drops one programme while nothing for it has started; at least one stays (Q3)."""
+def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | tuple[str, int] | None:
+    """Drops one programme while nothing for it has started; at least one stays (Q3). On a Counsellor plan it only
+    requests the change: `("requested", proposal_id)`."""
     contract = _own(plans, student_ref, plan_id)
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     if ref not in refs:
@@ -163,6 +281,10 @@ def remove(plans, student_ref: str, plan_id: int, ref: str) -> int | None:
         raise NotAllowed("this is the last programme in your plan; swap it instead")
     _not_started(plans, plan_id, ref)
     _within_limit(plans, plan_id)
+    requested = _request(plans, plan_id, CancelProgramme(programme_ref=ref, reason="student_remove"),
+                         [r for r in refs if r != ref])
+    if requested is not None:
+        return requested
 
     def edit(current: RouteContract) -> list[ProgrammeChoice]:  # re-applied to the current list on every retry
         now = [p.programme_ref for p in sorted(current.programmes, key=lambda p: p.rank)]

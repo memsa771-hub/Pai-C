@@ -183,3 +183,147 @@ def test_flags_off_an_os_supported_row_ticks_locally_and_asks_nothing_of_the_os(
     assert ticked["steps_done"] == ["apply"] == page["steps_done"]
     assert set(ticked) == CHOOSE_KEYS and set(page) == CHOOSE_KEYS
     assert touched.mock_calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-07")
+async def test_t6_sweep_and_roadmap_unchanged(monkeypatch):
+    """P1-T6 Task 3: with the hand-off off the sweep delivers no choice request and reports the same counts as before
+    this task (the dict below was captured from the code before it), the pending request rows are not read, and the
+    /v1/roadmap bodies equal the captured fixture."""
+    import json
+    from pathlib import Path
+
+    from app.os.ports import choice_requests
+    from tests.roadmap_snapshots import walk
+
+    touched = MagicMock()
+    touched.pending.return_value = []
+    monkeypatch.setattr(ports, "services", touched.services)
+    monkeypatch.setattr(choice_requests, "pending", touched.choice_pending)
+    monkeypatch.setattr(choice_requests, "mark_delivery", touched.mark_delivery)
+    monkeypatch.setattr(plan_source, "submit_decision", touched.submit_decision)
+    monkeypatch.setattr(os_escalation, "pending_counsellor_escalations", touched.pending)
+    async with confirmed_student() as (client, student, db, _j):
+        with_routes(student, db)
+        choose(client, student, "electrical_engineering")
+        got = bridge.sweep_once(db)
+        assert got == {"submitted": 0, "failed": 0, "sent": 0, "refused": 0, "waiting": 0}
+        assert bridge.deliver_choice_requests(db) == {"written": 0, "duplicate": 0, "stale": 0, "refused": 0,
+                                                      "failed": 0, "skipped": 0}
+        assert touched.choice_pending.mock_calls == [] and touched.mark_delivery.mock_calls == []
+        assert touched.submit_decision.mock_calls == [] and outbox_count(db) == 0
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
+    walked = walk()
+    assert json.dumps(walked, sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+@pytest.mark.req("R-11")
+def test_t6_roadmap_paused_unchanged():
+    """P1-T6 Task 4: with the plan-view flag on and the hand-off off, a paused plan's body carries no `reason_text`,
+    even in rehearsal and with an escalation reason code."""
+    from unittest.mock import patch
+
+    from tests.test_plan_adapter import STEPS, page, plan_client, view_of
+
+    for reason in ("not_eligible", "other", "consent_missing"):
+        with patch.object(config, "CONNECT_HANDOFF", False, create=True), \
+                patch.object(config, "CONNECT_CONSENT_DRAFT", True), \
+                plan_client(view_of(STEPS, state="paused", reason=reason)) as (client, _, params, _f, _):
+            plan = page(client, params)["plan"]
+        assert set(plan) == {"state", "state_reason", "revision", "decision_version", "proposals_waiting", "changes"}
+        assert plan["state_reason"] == reason
+
+
+@pytest.mark.asyncio
+@pytest.mark.req("R-08")
+async def test_t6_no_adoption_route_effect(monkeypatch):
+    """P1-T6 Task 6: with the hand-off or My plan part off, the adoption offer is `{offer: false}` and the agreement is
+    refused with today's hand-off message, and PAI OS is asked nothing; the roadmap bodies equal the captured fixture."""
+    import json
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from tests.roadmap_snapshots import walk
+
+    touched = MagicMock()
+    monkeypatch.setattr(bridge, "self_serve_plan", touched.self_serve_plan)
+    monkeypatch.setattr(bridge, "request_adoption", touched.request_adoption)
+    monkeypatch.setattr(plan_source, "request_adoption", touched.port_request_adoption)
+    async with confirmed_student() as (client, student, db, _j):
+        with_routes(student, db)
+        choose(client, student, "electrical_engineering")
+        params = {"network": student.workspace_id}
+        with patch.object(config, "CONNECT_MY_PLAN", True, create=True):  # My plan on, hand-off off
+            got = client.get("/v1/roadmap/adoption", params=params, headers=TOKEN)
+            assert got.status_code == 200 and got.json()["data"] == {"offer": False}
+        for handoff in (False, True):  # hand-off on but My plan off: no offer either
+            with patch.object(config, "CONNECT_HANDOFF", handoff, create=True), \
+                    patch.object(config, "CONNECT_MY_PLAN", False, create=True):
+                assert client.get("/v1/roadmap/adoption", params=params, headers=TOKEN).json()["data"] == {
+                    "offer": False}
+        posted = client.post("/v1/roadmap/adoption", params=params, headers=TOKEN, json={"plan_id": 1})
+        assert posted.status_code == 409 and posted.json() == {"detail": "The connection to PAI OS is not on"}
+        assert touched.mock_calls == [] and outbox_count(db) == 0
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "roadmap_pre_adapter.json").read_text())
+    assert json.dumps(walk(), sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+@pytest.mark.req("R-01")
+def test_t7_upload_responses_unchanged(tmp_path, monkeypatch):
+    """P1-T7: with CONNECT_ONE_UPLOAD off every upload, file and delete route answers as it did before the branch (the
+    fixtures were captured from the code before the change; ids and times are masked). A `doc_type` field is ignored,
+    no PAI OS document function is called, and the parse job is still followed by an extract job."""
+    import json
+    from pathlib import Path
+
+    from tests.one_upload_support import jobs, masked, post_base64, post_file, post_folder, run_parse_job, upload_world
+
+    def boom(*args, **kwargs):
+        raise AssertionError("a PAI OS document function was called while the part is off")
+
+    for name in ("document_file_bytes", "register_os_document", "forget_os_document", "document_types",
+                 "on_os_document_deleted", "documents_enabled"):
+        monkeypatch.setattr(bridge, name, boom)
+    expected = json.loads((Path(__file__).parent / "fixtures" / "connect" / "t7_upload_responses_before.json").read_text())
+    got = {}
+    with upload_world(tmp_path) as (client, student, auth):
+        plain = post_file(client, student, auth)
+        got["post_plain"] = masked(plain)
+        got["post_typed"] = masked(post_file(client, student, auth, name="typed.pdf", doc_type="transcript"))
+        got["folder_plain"] = masked(post_folder(client, student, auth, name="a.pdf"))
+        got["folder_typed"] = masked(post_folder(client, student, auth, name="b.pdf", doc_type="transcript"))
+        got["base64"] = masked(post_base64(client, student, auth))
+        first = post_file(client, student, auth, name="del.pdf").json()["data"]["id"]
+        got["delete"] = masked(client.delete(f"/v1/files/{first}", headers=auth))
+        second = post_file(client, student, auth, name="trash.pdf").json()["data"]["id"]
+        got["trash"] = masked(client.post("/v1/files/trash", headers=auth,
+                                          json={"network": student.workspace_id, "file_ids": [second]}))
+        assert got == expected
+        assert all("os_document" not in json.dumps(v) for v in got.values())
+        file_id = plain.json()["data"]["id"]
+        assert all("extract" not in payload for _, payload in jobs(student, "document.parse"))
+        assert run_parse_job(student, file_id)["parsed"] is True
+        extract = [p for _, p in jobs(student, "document.extract") if p.get("file_id") == file_id]
+        assert extract == [{"file_id": file_id}]  # today's job, unchanged
+
+
+@pytest.mark.req("R-44")
+@pytest.mark.req("R-19")
+def test_t8_plan_steps_unchanged():
+    """P1-T8 Task 6: a plan with no request step (every plan while the needs part is off) answers exactly as before: each
+    step dict equals the one the adapter built before T8 (tests/fixtures/connect/plan_steps_pre_t8.json, captured from
+    commit 7f16bce), and the roadmap bodies equal the fixture captured before the adapter."""
+    import json
+    from pathlib import Path
+
+    from app.pai_c.roadmap import plan_adapter
+    from tests.roadmap_snapshots import walk
+    from tests.test_plan_adapter import STEPS, view_of
+
+    here = Path(__file__).parent / "fixtures" / "connect"
+    before = json.loads((here / "plan_steps_pre_t8.json").read_text())
+    now = json.loads(json.dumps(plan_adapter.steps_of(view_of(STEPS)), default=str, sort_keys=True))
+    assert now == before
+    assert json.dumps(walk(), sort_keys=True) == json.dumps(
+        json.loads((here / "roadmap_pre_adapter.json").read_text()), sort_keys=True)

@@ -23,6 +23,11 @@ import {
   collapseNotices,
 } from '@/lib/os-inbox';
 import { statusLabel, type FactStatus } from '@/lib/os-programmes';
+import { factLevel, stepLevel, weakerLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { isNumeric, sourceParts, typedValue, type OsRequest, type RequestWords } from '@/lib/os-requests';
+import copy from '@/components/counselor/workspace/copy.json';
+import { useMyPlan } from './my-plan-context';
 import { checkLabel, chipLabel, chipTone, lineText, type OsNote } from '@/lib/os-self-serve';
 
 interface InboxListProps {
@@ -43,6 +48,41 @@ interface InboxListProps {
   /** The page asks the student first (swapPrompt), then swaps. */
   onSwap?: (note: OsNote, inRef: string) => void;
   onReadNote?: (note: OsNote) => void;
+  /** P1-T8: the student's answer to a "which is right" request: a choice id, and a typed value for `new`. */
+  onAnswer?: (request: OsRequest, choice: string, value?: string | number) => void;
+}
+
+const words = copy.connect.requests as RequestWords;
+
+/** The two values of a "which is right" request as buttons, each with where it is held, and a field for the right
+ * value when the API allows it (P1-T8, R-21). Sentences come from the API; the few words it does not send, from copy.json. */
+function WhichIsRight({ request, busy, onAnswer }: { request: OsRequest; busy: boolean; onAnswer?: InboxListProps['onAnswer'] }) {
+  const [typed, setTyped] = useState('');
+  const id = `new-${request.id}`;
+  const numeric = isNumeric(request);
+  const value = typedValue(typed, numeric);
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      {request.choices.map((c) => (
+        <Button key={c.choice} type="button" variant="outline" disabled={busy || !onAnswer}
+                className="h-auto w-full flex-col items-start gap-0.5 whitespace-normal break-words py-2 text-left"
+                onClick={() => onAnswer?.(request, c.choice, undefined)}>
+          <span className="text-sm font-semibold">{String(c.value)}</span>
+          <span className="text-xs font-normal">{c.label}</span>
+          <span className="text-xs font-normal text-muted-foreground">{sourceParts(c, words).join(' · ')}</span>
+        </Button>
+      ))}
+      {request.allow_new && (
+        <form className="flex flex-wrap items-end gap-2"
+              onSubmit={(e) => { e.preventDefault(); if (value !== null) onAnswer?.(request, 'new', value); }}>
+          <label htmlFor={id} className="w-full text-xs text-muted-foreground">{request.new_label}</label>
+          <input id={id} value={typed} onChange={(e) => setTyped(e.target.value)} inputMode={numeric ? "decimal" : "text"} disabled={busy}
+                 className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" />
+          <Button type="submit" size="sm" disabled={busy || !onAnswer || value === null}>{words.use}</Button>
+        </form>
+      )}
+    </div>
+  );
 }
 
 function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Record<string, string>;
@@ -74,11 +114,12 @@ function NoteCard({ note, names, onSwap, onReadNote }: { note: OsNote; names: Re
 
 /** The PAI OS student inbox (Slice 1 spec §4.11): mobile-first, one action per item. */
 export function InboxList({ items, now, onComplete, busyId = null, factStatus = {}, programmesHref, basePath, notes = [],
-                            names = {}, onSwap, onReadNote }: InboxListProps) {
+                            names = {}, onSwap, onReadNote, onAnswer }: InboxListProps) {
   // an answer that asks first (Slice 9 Task 11): "Not admitted" names the programme and waits for a second tap
   const [asking, setAsking] = useState<{ id: number; action: CompleteAction } | null>(null);
   // focus (batch B review): into the question when it opens, back to the button that opened it on Cancel
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const { on } = useMyPlan();
   const root = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -116,7 +157,7 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
             {groupItemsList.map((item) => {
               const due = formatDue(item);
               const fact = item.programme_ref ? factStatus[item.programme_ref] : null;
-              const labels = [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
+              const labels = on ? [] : [...dateLabels(item), ...(due && fact ? [statusLabel(fact)] : [])];
               const source = item.citations[0];
               const prog = programmeName(item, names);
               const hint = actionHint(item);
@@ -140,6 +181,9 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         </ul>
                       )}
                       {hint && <p className="mt-1 break-words text-xs text-muted-foreground">{hint}</p>}
+                      {item.request?.kind === 'which_is_right' && (
+                        <WhichIsRight request={item.request} busy={busyId === item.id} onAnswer={onAnswer} />
+                      )}
                       {(due || labels.length > 0) && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {due}
@@ -151,7 +195,15 @@ export function InboxList({ items, now, onComplete, busyId = null, factStatus = 
                         </p>
                       )}
                       {note && <p className="mt-0.5 break-words text-xs text-muted-foreground">{note}</p>}
-                      {source && (
+                      {on && (due || source) && (
+                        <p className="mt-1">
+                          <FactSource
+                            level={due ? (fact ? weakerLevel(stepLevel(item), factLevel(fact)) : stepLevel(item)) : null}
+                            url={source?.url}
+                          />
+                        </p>
+                      )}
+                      {!on && source && (
                         <a
                           href={source.url}
                           target="_blank"

@@ -82,6 +82,19 @@ def _standing_level(db, workspace_id: str) -> str | None:
     return student_standing([c["value"] for c in cards]).level
 
 
+def run_is_served(db, run, excluded: dict) -> bool:
+    """Whether a completed programme search is still offered: false when its path's study field is one the student ruled
+    out and did not restore (R-15). The one filter for the places the Counsellor serves and for the consistency check."""
+    from app.models import PaiPossibility
+    from app.pai_c.paths.exclusions import _restored
+
+    if not excluded:
+        return True
+    path = db.get(PaiPossibility, (run.constraints or {}).get("possibility_id"))
+    option = excluded.get((path.study_field or {}).get("key")) if path is not None else None
+    return option is None or _restored(path, option)
+
+
 def _stage_h_programs(db, workspace_id: str) -> list[dict]:
     """The student's current stage H programs (newest completed search first, each still fresh), as the programs
     endpoint shows them: `opportunity_id`, `title`, `country`."""
@@ -89,14 +102,18 @@ def _stage_h_programs(db, workspace_id: str) -> list[dict]:
 
     from app.models import ExecutionRun
     from app.pai_c.memory import MemoryService
+    from app.pai_c.paths.exclusions import excluded_fields
     from app.pai_c.paths.programs import current_programs
 
     runs = db.scalars(select(ExecutionRun).where(
         ExecutionRun.workspace_id == workspace_id, ExecutionRun.task_type == "program_search",
         ExecutionRun.status == "completed").order_by(ExecutionRun.created_at.desc())).all()
     facts = MemoryService(db).comparable_facts(workspace_id)
+    excluded = excluded_fields(db, workspace_id)  # R-15: a field the student ruled out offers no places
     seen, found = set(), []
     for run in runs:
+        if not run_is_served(db, run, excluded):
+            continue
         result = ((run.result or {}).get("capability_result") or {})
         current, _ = current_programs(db, workspace_id, result, facts)
         for program in current["programs"]:

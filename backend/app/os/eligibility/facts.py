@@ -37,6 +37,12 @@ def held_types(facts: StudentFactsV1, types: Mapping[str, DocumentType]) -> set[
     return {t.key for t in types.values() if any(f.fact in keys for f in t.fields if f.fact)}
 
 
+def fact_fields(types: Mapping[str, DocumentType]) -> set[str]:
+    """`<doc_type>.<field>` of every field whose type names a StudentFacts key: the fields the host's facts alone
+    answer once the one upload is on (P1-T7, D-y12)."""
+    return {f"{t.key}.{f.name}" for t in types.values() for f in t.fields if f.fact is not None}
+
+
 def profile_from_facts(facts: StudentFactsV1, types: Mapping[str, DocumentType]) -> dict:
     """`{"<doc_type>.<field>": value}` for every field whose `fact:` key holds a value in `facts`."""
     held = {f.key: f.value for f in facts.facts if f.evidence != "unknown" and f.value is not None}

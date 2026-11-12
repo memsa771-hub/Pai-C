@@ -31,7 +31,7 @@ from app.os.db import make_engine
 from app.os.kernel import Kernel
 from app.os.knowledge.profile import PROFILE_DIR, load_profile_dir
 from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
-from app.os.ports import recipients, student_facts
+from app.os.ports import document_files, fact_questions, recipients, student_facts
 from app.os.rehearsal.store import install_clock
 from app.os.rehearsal.tick import register_tick
 from app.os.runner.enqueue import enqueue_pending
@@ -64,6 +64,55 @@ def _models_on(settings: OsSettings, test_model: str) -> bool:
     return bool(test_model or settings.openai_api_key or settings.model_mode == "offline")
 
 
+def _source_guard(settings: OsSettings, engine: Engine, kernel: Kernel):
+    """P2-T3: the source guard (allow-lists, integrity checks, snapshots, suspect flow) when OS_SOURCE_GUARD=1; None
+    otherwise, and the gateway then behaves exactly as before. The reviewed lists are loaded (idempotently) at start."""
+    if not settings.source_guard:
+        return None
+    from app.os.knowledge.changes import after_fact_change
+    from app.os.knowledge.sources.allowlist import SourceDomains, load_allowlist
+    from app.os.knowledge.sources.snapshots import SnapshotStore
+    from app.os.knowledge.sources.suspect import SourceGuard
+    from app.os.workers.jobs import _service
+
+    tenant = settings.tenant_id
+    domains = SourceDomains(engine, tenant)
+    service = _service(settings, engine, kernel)
+
+    def after_change(scope, ref, field, fact_id, status, intake_year) -> None:
+        after_fact_change(service, kernel, scope, ref, field, fact_id, status, intake_year, complete=False)
+
+    guard = SourceGuard(engine, tenant, domains=domains, after_change=after_change,
+                        snapshots=SnapshotStore(engine, tenant, max_bytes=settings.page_max_bytes))
+    guard.sync(load_allowlist())  # the one-body-one-domain rule goes through the suspect flow (review I3)
+    guard.complete_drops()  # a drop cut off by a restart is completed (review I2)
+    return guard
+
+
+def _reading_adapters(settings: OsSettings):
+    """P2-T4: the headless renderer (OS_RENDER=1) and the scan engine (OS_SCAN_ENGINE=tesseract|docling). Both off by
+    default, and an engine that is not installed is left out with a warning: reading then behaves as before."""
+    renderer = scanner = None
+    if os.environ.get("OS_RENDER", "").strip() == "1":
+        from app.os.knowledge.research.pages import USER_AGENT
+        from app.os.knowledge.research.render import PlaywrightRenderer
+
+        from app.os.knowledge.research.render import RenderLimits
+
+        renderer = PlaywrightRenderer(RenderLimits.from_settings(settings, USER_AGENT))
+    engine = os.environ.get("OS_SCAN_ENGINE", "").strip().lower()
+    if engine:
+        from app.os.knowledge.research.scan import DoclingScanText, TesseractScanText
+
+        makers = {"tesseract": lambda: TesseractScanText(timeout_s=settings.scan_timeout_s), "docling": DoclingScanText}
+        candidate = makers.get(engine)
+        if candidate is None or not candidate().available():
+            log.warning("OS_SCAN_ENGINE=%s is unknown or not installed: scans are not read", engine)
+        else:
+            scanner = candidate()
+    return renderer, scanner
+
+
 def register_research_if_configured(settings: OsSettings, engine: Engine, kernel: Kernel) -> bool:
     """Registers os.research (readers built once, before launch). False when no model key is set.
 
@@ -91,8 +140,16 @@ def register_research_if_configured(settings: OsSettings, engine: Engine, kernel
 
         gateway = OfflinePages()
     else:
-        gateway = PageGateway(engine, settings.tenant_id, settings)
-    register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles)
+        renderer, scanner = _reading_adapters(settings)
+        gateway = PageGateway(engine, settings.tenant_id, settings, sources=_source_guard(settings, engine, kernel),
+                              renderer=renderer, scanner=scanner)
+    not_readable = None
+    if gateway is not None and (getattr(gateway, "renderer", None) or getattr(gateway, "scanner", None)):
+        from app.os.knowledge.research.readability import NotReadableStore
+
+        not_readable = NotReadableStore(engine, settings.tenant_id)  # P2-T4: only when reading is switched on
+    register_research(engine, settings, kernel, _service(settings, engine, kernel), gateway, readers, spec, profiles,
+                      not_readable=not_readable)
     return True
 
 
@@ -200,6 +257,8 @@ def register_replan_always(settings: OsSettings, engine: Engine, kernel: Kernel,
 def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     recipients.configure(recipients.from_settings(settings))  # Slice 9b: before the deliver job is made; may refuse
     student_facts.configure(student_facts.from_settings(settings))  # P1-T4: the host's StudentFacts adapter, if any
+    fact_questions.configure(conflicts=fact_questions.from_settings(settings))  # P1-T8: and its open Vault conflicts
+    host_files = document_files.from_settings(settings)  # P1-T7: the host's file reader, if any
     registry = default_registry()
     for module in _extra_modules(os.environ.get("OS_EXTRA_MODULES", "")):
         registry.register(module)
@@ -216,6 +275,12 @@ def build(settings: OsSettings) -> tuple[Registry, Kernel, DBOSClient, Engine]:
     pack_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles)  # and an invalid pack config (S6a-D12)
     visa_configs = load_checked_pack_configs(PACK_SOURCE, types, books, profiles, kind="visa")  # or visa file (S6b-D3)
     engine = make_engine(settings)
+    from app.os.adapters.counsellor import manifest as os_manifest
+
+    host_gate = document_files.gate_from_settings(  # P1-T7: the one upload gate; also needs the OS's module row
+        settings, lambda: os_manifest.is_enabled(engine, settings.tenant_id))
+    if host_files is not None or host_gate is not None:  # unset leaves the port as it is
+        document_files.configure(read=host_files, enabled=host_gate)
     install_clock(settings, engine)  # Slice 9a: rehearsal mode reads the stored offset (loud warning); else real time
     kernel = Kernel(engine, settings.tenant_id)
     DBOS(config=dbos_config(settings, settings.worker_id))
@@ -272,7 +337,10 @@ def main(argv: list[str] | None = None) -> int:
     try:  # Slice 9b: checked first, so a resend worker without a recipient lookup never starts
         recipients.from_settings(settings)
         student_facts.from_settings(settings)  # P1-T4: so does an OS_STUDENT_FACTS that cannot be loaded
-    except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError) as e:
+        document_files.from_settings(settings)  # P1-T7: and an OS_DOCUMENT_FILES
+        fact_questions.from_settings(settings)  # P1-T8: and an OS_STUDENT_FACTS without its OS_FACT_CONFLICTS (D-w1)
+    except (recipients.RecipientLookupError, student_facts.StudentFactsSourceError,
+            document_files.DocumentFilesSourceError, fact_questions.FactQuestionsSourceError) as e:
         print(str(e), file=sys.stderr)
         return 2
     parent = int(os.environ["OS_PARENT_PID"]) if os.environ.get("OS_PARENT_PID") else None

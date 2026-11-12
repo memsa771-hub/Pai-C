@@ -806,9 +806,15 @@ class RouteDecision(Base):
     guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     # The consent text version the student agreed to with `authorized_at` (R-10); None while consent is missing.
     consent_version = Column(Text, nullable=True)
+    # The OS choice request that made this version (`choice_request:{proposal_id}`); None for every other version and
+    # never copied by a consent change (P1-T6, R-07).
+    request_key = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),
+        Index("uq_route_decision_request_key", "workspace_id", "request_key", unique=True,
+              postgresql_where=text("request_key IS NOT NULL"),
+              sqlite_where=text("request_key IS NOT NULL")),
         Index("uq_route_decision_active", "workspace_id", unique=True,
               postgresql_where=text("withdrawn_at IS NULL"),
               sqlite_where=text("withdrawn_at IS NULL")),
@@ -848,6 +854,20 @@ class VaultVersion(Base):
     version = Column(Integer, nullable=False, default=0, server_default=text("0"))
     key_versions = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+
+class DocumentProposal(Base):
+    """A delivered fact proposal from a confirmed PAI OS document (P1-T7, R-16, D-y9): `key` is the proposal's key,
+    unique, so a repeat delivery proposes nothing. `candidate_ids` are the Vault candidates it made. No file bytes,
+    no values: IDs only."""
+    __tablename__ = "pai_document_proposals"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    key = Column(Text, nullable=False, unique=True)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    file_id = Column(Text, nullable=True)  # the Counsellor file; null for an OS-only document
+    candidate_ids = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
 
 
 class GuardianConsent(Base):

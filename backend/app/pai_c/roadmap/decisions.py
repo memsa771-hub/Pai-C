@@ -7,6 +7,8 @@ away. The row keeps the verdict and route as they were at choose time; the
 page shows the live status beside that snapshot instead of rewriting it.
 """
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from types import EllipsisType
 from typing import TYPE_CHECKING
@@ -33,6 +35,7 @@ STEP_REFUSALS = {  # PAI OS refusals of a tick: (words for the student, HTTP sta
     "not_found": ("No such step on this route", 404), "not_yours": ("No such step on this route", 404),
     "not_waiting": ("This step is not waiting for you, so it cannot be ticked.", 409),
     "review_required": ("Approve the file to finish this step; it cannot be ticked.", 409),
+    "answer_required": ("This step closes by itself when PAI has what it needs.", 409),  # P1-T8: a request is answered, not ticked; a test holds this sentence equal to requests/texts.yaml
     "unavailable": ("PAI could not update your plan just now; try again later.", 503)}
 
 
@@ -86,6 +89,14 @@ def serialize(row: RouteDecision, cards: list[dict]) -> dict:
             "live_status": card["status"] if card else "unknown"}
 
 
+def choice_of(row: RouteDecision) -> tuple:
+    """What the student chose, apart from consent: field, route, places in order, intake."""
+    intake = row.intake or None
+    return (row.field_key, row.origin_country, row.destination_country, row.level,
+            tuple((p["programme_ref"], p["rank"]) for p in sorted(row.places or [], key=lambda p: p["rank"])),
+            None if intake is None else (intake.get("term"), intake.get("year")))
+
+
 class RouteDecisionService:
     def __init__(self, db):
         self.db = db
@@ -117,8 +128,23 @@ class RouteDecisionService:
         """Called by the stage sync once the journey is in PROPOSED: an
         active route decision (made before the paths) takes it on to CHOSEN."""
         journey, row = self._journey(workspace_id), self.active(workspace_id)
-        if journey is not None and row is not None:
+        if journey is not None and row is not None and not self._escalated(journey, row):
             self._enter_chosen(journey, row, actor)
+
+    def _escalated(self, journey: StudentJourney, row: RouteDecision) -> bool:
+        """PAI OS sent the student back to choosing (D-x9): the newest route entry is an escalation with a decision
+        version (a legacy entry has none), made for this decision or for an earlier version of the same choice. A
+        new choice, or a choice request that changed the places, ends it."""
+        newest = next((d for d in reversed(journey.decisions or [])
+                       if str(d.get("kind", "")).startswith("route_")), None)
+        if newest is None or newest["kind"] != "route_escalation" or newest.get("decision_version") is None:
+            return False
+        version = newest["decision_version"]
+        if version >= row.decision_version:
+            return True
+        then = self.db.scalar(select(RouteDecision).where(
+            RouteDecision.workspace_id == row.workspace_id, RouteDecision.decision_version == version))
+        return then is not None and choice_of(then) == choice_of(row)
 
     def _record_choice(self, workspace_id: str, row: RouteDecision, previous: RouteDecision | None) -> None:
         """The choice syncs the stage (journey_sync, reason "chosen"): it is
@@ -270,6 +296,160 @@ class RouteDecisionService:
         outbox.record(self.db, new, consent_only=True)
         with plan_adapter.pinned_read(new):
             return plan_adapter.chosen(new, RoadmapEngine(self.db).build(workspace_id)["fields"])
+
+    def apply_choice_request(self, workspace_id: str, request: dict) -> tuple[str, "int | None | str"]:
+        """Writes an accepted PAI OS choice request (`choice_request.v1`, R-07) as the next decision version, once, and
+        only while the choice it was made against is still the newest. Returns `("written", n+1)`,
+        `("duplicate", version)` for a request already written (its key is on a row; asked FIRST, so a repeat after
+        n+1 never reads as stale), `("stale", None)` and `("refused", code)` (`no_decision`, `not_supported`).
+        A consent copy in between does not make a request stale. Like `update_consent` it makes no journey,
+        possibility or check-in change. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        key = request["key"]
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "duplicate", done.decision_version
+        newest = self.newest(workspace_id)
+        if newest is None:
+            return "refused", "no_decision"
+        base = self.db.scalar(select(RouteDecision).where(
+            RouteDecision.workspace_id == workspace_id, RouteDecision.decision_version == request["based_on_version"]))
+        if (base is None or newest.status != "chosen" or newest.withdrawn_at is not None
+                or choice_of(base) != choice_of(newest)):
+            return "stale", None
+        if not newest.os_supported:
+            return "refused", "not_supported"
+        values = {name: getattr(newest, name) for name in self._COPIED}
+        # D-x4: recomputed, never copied. A route PAI OS no longer runs is still written (the student's choice stands);
+        # the hand-off then closes the old plan through the unsupported path.
+        values["os_supported"] = pai_os_bridge.route_supported(
+            values["origin_country"], values["destination_country"], values["level"])
+        if request.get("programmes"):
+            ordered = sorted(request["programmes"], key=lambda p: p["rank"])
+            values["places"] = [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(ordered)]
+        if request.get("target_intake"):
+            values["intake"] = {"term": request["target_intake"]["term"], "year": request["target_intake"]["year"]}
+        newest.withdrawn_at = datetime.now(timezone.utc)
+        self.db.flush()  # the old row leaves the partial unique index before the new one enters
+        new = RouteDecision(workspace_id=workspace_id, decision_version=self._next_version(workspace_id),
+                            status="chosen", request_key=key, **values)
+        self.db.add(new)
+        self.db.flush()
+        outbox.record(self.db, new)
+        self._after_os_write(workspace_id, "system:os_choice_request")
+        return "written", new.decision_version
+
+    def _after_os_write(self, workspace_id: str, actor: str) -> None:
+        """A choice the OS wrote after an escalation (D-x9): a journey held at PROPOSED follows the active decision
+        to CHOSEN at once; `_escalated` still holds it for a consent copy or the same choice. No commit."""
+        journey = self._journey(workspace_id)
+        if journey is not None and journey.current_stage == "PROPOSED":
+            self.follow_active(workspace_id, actor=actor)
+
+    MAX_PLACES = 5  # decision_record.v2 holds at most five places
+
+    def request_from_builder(self, workspace_id: str, origin: str, destination: str, level: str, intake: dict,
+                             places: list[dict]) -> tuple[str, "int | None", "str | None"]:
+        """The OS route builder's choice (R-09), written as the next decision version. Returns `(outcome, version,
+        code)`: `("written", n+1, None)`, `("unchanged", n, None)` when the active row already has this route, these
+        places in this order and this intake (or this exact request was written), or `("refused", None, code)` with
+        `choose_field_first` (no active decision: the builder knows no field, D-x4) or `too_many_places`. The new
+        version copies everything else from the active row, field and consent included. The key is
+        `builder:{sha256 of the base version, route, intake and places}`: the base version keeps a student who goes back
+        to an earlier choice from being read as a repeat. The key lookup is only a backstop (the unique index is the
+        final guard); the "unchanged" comparison with the active row is the real guard against a repeat. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        active = self.active(workspace_id)
+        if active is None:
+            return "refused", None, "choose_field_first"
+        if len(places) > self.MAX_PLACES:
+            return "refused", None, "too_many_places"
+        ordered = sorted(places, key=lambda p: p["rank"])
+        wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(ordered)]
+        want_intake = {"term": intake["term"], "year": intake["year"]}
+        have = [{"programme_ref": p["programme_ref"], "rank": i + 1}
+                for i, p in enumerate(sorted(active.places or [], key=lambda p: p["rank"]))]
+        if ((active.origin_country, active.destination_country, active.level, have, active.intake)
+                == (origin, destination, level, wanted, want_intake)):
+            return "unchanged", active.decision_version, None
+        key = "builder:" + hashlib.sha256(json.dumps(
+            [active.decision_version, origin, destination, level, want_intake, wanted], sort_keys=True).encode()
+        ).hexdigest()
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "unchanged", done.decision_version, None
+        return self._write_from(active, key, origin, destination, level, wanted, want_intake, "system:os_builder")
+
+    def _write_from(self, active: RouteDecision, key: str, origin: str, destination: str, level: str,
+                    wanted: list[dict], want_intake: dict, actor: str) -> tuple[str, "int | None", "str | None"]:
+        """The next version after `active`, copying everything but the route, places and intake from it (D-x4). The
+        old row leaves the partial unique index before the new one enters. No commit."""
+        values = {name: getattr(active, name) for name in self._COPIED}
+        same_path = (active.destination_country, active.level) == (destination, level)
+        values.update(origin_country=origin, destination_country=destination, level=level, places=wanted,
+                      intake=want_intake, path_ref=values["path_ref"] if same_path else None,
+                      os_supported=pai_os_bridge.route_supported(origin, destination, level))
+        active.withdrawn_at = datetime.now(timezone.utc)
+        self.db.flush()
+        new = RouteDecision(workspace_id=active.workspace_id, decision_version=self._next_version(active.workspace_id),
+                            status="chosen", request_key=key, **values)
+        self.db.add(new)
+        self.db.flush()
+        outbox.record(self.db, new)
+        self._after_os_write(active.workspace_id, actor)
+        return "written", new.decision_version, None
+
+    def adoption_state(self, workspace_id: str, plan: dict, *, lock: bool = False) -> str:
+        """Whether the student can keep their self-serve plan now: `ready`, `no_journey`, `several_plans` (more than one
+        open self-serve plan: the intake would refuse), `identity_taken` (a Counsellor plan already holds the identity the
+        adoption would take: the intake would refuse), `no_places` (every place was dropped), `no_intake` (a plan with
+        no intake cannot become a decision; a self-serve contract always has one, this only guards a damaged row),
+        `choose_field_first` or `too_many_places`. With `lock` it takes the workspace lock first, so the answer holds
+        until the caller commits."""
+        if lock:
+            self._lock(workspace_id)
+        if self._journey(workspace_id) is None:
+            return "no_journey"
+        if plan.get("open_plans", 1) > 1:
+            return "several_plans"
+        if plan.get("identity_taken"):
+            return "identity_taken"
+        if not plan["programmes"]:
+            return "no_places"
+        if not plan.get("intake"):
+            return "no_intake"
+        if self.active(workspace_id) is None:
+            return "choose_field_first"
+        return "too_many_places" if len(plan["programmes"]) > self.MAX_PLACES else "ready"
+
+    def adopt(self, workspace_id: str, plan: dict) -> tuple[str, "int | str | None"]:
+        """The student agreed to keep their open self-serve plan (`plan` as `plan_query.self_serve_plan` gives it,
+        R-08): the next decision version holds the plan's route, places and intake, with the student's field and consent
+        copied from the active row (D-x4; a consent is copied, never invented). Returns `("written", n+1)`,
+        `("duplicate", version)` for the same plan and contract (its key is on a row), or `("refused", code)`:
+        `no_journey`, `choose_field_first` (no active decision) or `too_many_places` (more than a decision holds). The
+        key is `adopt:{plan_id}:{contract_sha256}`. No commit: the caller commits, then delivers the outbox row."""
+        self._lock(workspace_id)
+        if self._journey(workspace_id) is None:
+            return "refused", "no_journey"
+        active = self.active(workspace_id)
+        if active is None:
+            return "refused", "choose_field_first"
+        if len(plan["programmes"]) > self.MAX_PLACES:
+            return "refused", "too_many_places"
+        key = f"adopt:{plan['plan_id']}:{plan['contract_sha256']}"
+        done = self.db.scalar(select(RouteDecision).where(RouteDecision.workspace_id == workspace_id,
+                                                          RouteDecision.request_key == key))
+        if done is not None:
+            return "duplicate", done.decision_version
+        wanted = [{"programme_ref": p["programme_ref"], "rank": i + 1}
+                  for i, p in enumerate(sorted(plan["programmes"], key=lambda p: p["rank"]))]
+        _, version, _ = self._write_from(active, key, plan["origin"], plan["destination"], plan["level"], wanted,
+                                         {"term": plan["intake"]["term"], "year": plan["intake"]["year"]},
+                                         "system:os_adoption")
+        return "written", version
 
     def set_step(self, workspace_id: str, done: bool, *, key: str | None = None, index: int | None = None,
                  is_human=None) -> dict:

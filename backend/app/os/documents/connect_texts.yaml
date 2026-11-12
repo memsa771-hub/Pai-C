@@ -1,0 +1,7 @@
+# P1-T7 (D-y15): student sentences for the one-upload connection. Approved by the owner (chat, 2026-11-05: "just
+# update it directly"). Copy lives here, never in code.
+version: 1
+approved: true
+texts:
+  use_documents_page: "Upload your documents from the Documents page."
+  vault_differs: "PAI has a different value saved for this. Check which one is right."

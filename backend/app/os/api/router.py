@@ -5,10 +5,12 @@ import logging
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
+from fastapi.responses import JSONResponse
 
-from datetime import date
+from datetime import date, timedelta
 
-from app.os import clock
+from app.os import clock, my_plan as my_plan_view
+from app.os.ports import my_plan as my_plan_gate
 from app.os.costs import cost_report
 from app.os.api.deps import check_admin, current_student_ref, current_student_ref_for_write
 from app.os.api.queries import (
@@ -33,12 +35,14 @@ from app.os.api.schemas import (
     ConsentOut,
     CompleteOut,
     ConfirmDocumentIn,
+    VaultCheckOut,
     ConfirmIn,
     ConfirmOut,
     DocumentOut,
     DocumentsOut,
     FindingOut,
     InboxOut,
+    MyPlanOut,
     OpenFactsOut,
     PlanOut,
     ProfileOut,
@@ -48,6 +52,9 @@ from app.os.api.schemas import (
     EligibilityOut,
     RequestIn,
     RequestOut,
+    RequestAnswerIn,
+    RequestAnswerOut,
+    RequestsOut,
     RouteProgrammesOut,
     RoutesOut,
     SelfPlanOut,
@@ -78,10 +85,13 @@ from dataclasses import asdict
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
-from app.os.consent import ConsentStore, current_terms
+from app.os.consent import ConsentStore, current_terms, gate
 from app.os.compiler import CompileError
+from app.os.service import NothingNewer
 from app.os.contracts.route_contract import RouteContract
 from app.os.documents.confirm import NotConfirmable, confirm_document, delete_document, resolve_finding
+from app.os.documents import connect_texts
+from app.os.documents.vault_check import compare as vault_compare
 from app.os.documents.intake import MAX_BYTES, UploadError, check_upload
 from app.os.documents.run import enqueue_document
 from app.os.documents.store import DocumentStore, DuplicateDocument, FindingStore, ProfileStore
@@ -90,12 +100,20 @@ from app.os.api import self_serve
 from app.os import inbox_actions
 from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
+from app.os.api.consistency import add_consistency_routes
+from app.os.api.registry import add_registry_routes
+from app.os.api.review import add_review_routes
 from app.os.api.replan import add_replan_routes, changes_paused, student_proposals
 from app.os.knowledge.requests import RequestLimit, request_programme
+from app.os.ports import choice_requests, document_files, fact_proposals, student_facts
+from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
+from app.os.intakes import IntakeError
 from app.os.playbooks import PlaybookError
+from app.os.requests import answers as request_answers, gate as needs_gate, store as request_store, texts as request_texts
+from app.os.requests.refresh import refresh
 from app.os.workers import confirm_fact, open_confirm_tasks, supply_fact
 
 log = logging.getLogger(__name__)
@@ -114,9 +132,7 @@ def refusal(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": code, "message": message})
 
 
-def _accepts(svc: Services, terms) -> bool:
-    """Placeholder terms can be agreed to, and count, only in rehearsal mode (Slice 9a spec §3.2)."""
-    return not terms.placeholder or svc.settings.rehearsal
+_accepts = gate.accepts  # placeholder terms count only in rehearsal mode (Slice 9a spec §3.2)
 
 
 def build_router(get_services: Callable[[], Services]) -> APIRouter:
@@ -134,11 +150,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                           svc: Services = Depends(services)) -> str:
         """A dependency, so it runs before the body is validated and before any write or enqueue. Only a new start
         and an upload are refused: the inbox and changes to a running plan keep working (Review Focus 3)."""
-        terms = current_terms(svc.terms_dir)
-        if not _accepts(svc, terms):  # a placeholder row made in a rehearsal never counts outside it
-            raise refusal("terms_not_set", "the pilot terms are not written yet")
-        if not ConsentStore(svc.engine, svc.settings.tenant_id).has(student, terms.version):
-            raise refusal("consent_needed", "Please agree to the pilot terms first.")
+        code = gate.upload_refusal(svc, student)
+        if code is not None:
+            raise refusal(code, gate.MESSAGES[code])
         return student
 
     @router.get("/consent", response_model=ConsentOut)
@@ -163,7 +177,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def post_plan(contract: RouteContract, response: Response, svc: Services = Depends(services)) -> dict:
         try:
             ref = svc.plans.start_plan(contract)
-        except (PlaybookError, CompileError) as e:
+        except (PlaybookError, CompileError, IntakeError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         if not ref.created:
             response.status_code = 200
@@ -182,6 +196,8 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             return {"revision": svc.plans.upgrade(plan_id)}
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
+        except NothingNewer as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
 
     def drop_empty_notices(svc: Services, student: str, items: list[dict]) -> list[dict]:
         """A "Your plan was updated" item whose revision changed none of the student's steps has nothing to tell
@@ -230,6 +246,58 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
                                 detail=e.message) from None
         return {"completed": done}
 
+    # --- P1-T8: the student's requests (R-19, D-w19). Only while the needs gate is on (D-w1). ---
+
+    @router.get("/requests", response_model=RequestsOut)
+    def requests(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """The student's open requests, and those answered in the last 7 days. The step's title and date, the way it
+        closes in words; never a value. 404 while the gate is off, as if the route did not exist."""
+        tenant = svc.settings.tenant_id
+        if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        found = request_store.open_for(svc.engine, tenant, student, answered_since=clock.now() - timedelta(days=7))
+        asked = request_answers.choices_for(svc, student, found)  # P1-T8: both values, read live from where they are held
+        out = []
+        for r in found:
+            c = asked.get(r.id, request_answers.Choices())
+            out.append({
+                "id": r.id, "task_id": r.task_id, "kind": r.kind,
+                "need": {"kind": r.need_kind, "ref": r.need_ref, "evidence": r.evidence}, "status": r.status,
+                "due_at": r.due_at, "due_tz": r.due_tz, "title": r.title,
+                "how": request_texts.how(r.kind, r.need_kind, r.evidence, impossible=c.impossible,
+                                  documents=bool(c.ref and c.ref.startswith("finding:"))),
+                "ref": c.ref, "seen": c.seen, "choices": c.choices, "allow_new": c.allow_new,
+                "new_label": request_texts.text("new_label") if c.allow_new else None})
+        return {"requests": out}
+
+    @router.post("/requests/{request_id}/answer", response_model=RequestAnswerOut)
+    def answer_request(request_id: int, body: RequestAnswerIn, student: str = Depends(current_student_ref_for_write),
+                       svc: Services = Depends(services)) -> dict:
+        """The student's answer to a "which is right" request (D-w13). A Vault conflict is answered through the host's own
+        card resolution, a value above its total by a new value, two documents that differ by `resolve_finding`; then the
+        plan is recomputed, so the step is done before this returns. 404 for another student's request and while the gate
+        is off; 409 `already_answered`, `answer_elsewhere` for a request that asks for information, or `answer_changed` (with
+        a note) when the question is not the one the student saw (`ref`); 503 `counsellor_unavailable` when the host failed."""
+        tenant = svc.settings.tenant_id
+        if needs_gate.on(student, engine=svc.engine, tenant_id=tenant) is None:
+            raise HTTPException(status_code=404, detail="Not Found")
+        found = request_store.get(svc.engine, tenant, request_id)
+        if found is None or found.student_ref != student:
+            raise HTTPException(status_code=404, detail="Not Found")
+        if found.status != "open":
+            raise HTTPException(status_code=409, detail="already_answered")
+        if found.kind != "which_is_right":
+            raise HTTPException(status_code=409, detail="answer_elsewhere")  # a provide request closes when PAI has the data
+        try:
+            request_answers.answer(svc, student, found, body.ref, body.seen, body.choice, body.value)
+        except request_answers.AnswerError as e:
+            if e.note:
+                return JSONResponse(status_code=e.status, content={"detail": e.detail, "note": e.note})
+            raise HTTPException(status_code=e.status, detail=e.detail) from None
+        refresh(svc, student, "request_answered")
+        after = request_store.get(svc.engine, tenant, request_id)
+        return {"status": "answered" if after is not None and after.status == "answered" else "still_open"}
+
     @router.post("/facts/{fact_id}/confirm", response_model=ConfirmOut, dependencies=[Depends(require_admin)])
     def confirm(fact_id: int, body: ConfirmIn, svc: Services = Depends(services)) -> dict:
         try:
@@ -275,6 +343,14 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
 
     # --- Slice 4: self-serve start and eligibility (spec §4). Eligibility warns, never blocks (S4-D5). ----------
 
+    def my_plan_on() -> None:
+        if not my_plan_gate.enabled():  # P1-T9: off, the route does not exist (the body FastAPI gives an unknown one)
+            raise HTTPException(status_code=404, detail="Not Found")
+
+    @router.get("/plan", response_model=MyPlanOut, dependencies=[Depends(my_plan_on)])
+    def my_plan(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        return my_plan_view.build_my_plan(svc, student)
+
     @router.get("/routes", response_model=RoutesOut)
     def routes(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return {"routes": self_serve.routes_out(svc.plans)}
@@ -302,19 +378,30 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             ref = builder.start(svc.plans, student, body.route, body.intake, body.choices)
         except builder.PlanExists as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        except builder.ChoiceRefused as e:  # the Counsellor is on and would not take the choice (R-09)
+            return JSONResponse(status_code=409, content={"detail": e.code, "note": choice_texts.note(e.code, svc.settings)})
+        except builder.CounsellorUnavailable:
+            return JSONResponse(status_code=503, content={"detail": "counsellor_unavailable"})
         except (builder.NotAllowed, PlaybookError, CompileError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
+        if isinstance(ref, builder.Preparing):  # no plan yet: it comes from the intake of the decision version
+            note = choice_texts.note("preparing", svc.settings) if ref.state == "preparing" else None
+            return JSONResponse(status_code=202, content={"state": ref.state, "decision_version": ref.decision_version,
+                                                          "note": note})
         if not ref.created:
             response.status_code = 200
         return self_serve.self_plan_out(svc.plans, ref.plan_id)
 
-    def _change(svc: Services, plan_id: int, do) -> dict:
+    def _change(svc: Services, plan_id: int, do):
         try:
-            do()
+            done = do()
         except builder.NotYourPlan:
             raise HTTPException(status_code=404, detail="plan not found") from None
         except builder.NotAllowed as e:  # includes SwapLimit
             raise HTTPException(status_code=409, detail=str(e)) from None
+        if isinstance(done, tuple) and done[0] == "requested":  # a Counsellor plan: the change goes to the Counsellor
+            choice_requests.notify(choice_requests.key_of(done[1]))  # the transaction is committed
+            return JSONResponse(status_code=202, content={"state": "requested", "proposal_id": done[1]})
         return self_serve.self_plan_out(svc.plans, plan_id)
 
     @router.post("/plans/{plan_id}/swap", response_model=SelfPlanOut)
@@ -361,6 +448,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def upload_document(file: UploadFile = File(...), doc_type: str = Form(...),
                         student: str = Depends(consented_student),
                         svc: Services = Depends(services)) -> dict:
+        # P1-T7: the one upload is POST /v1/files. The body still arrives; this guard only avoids reading it into memory.
+        if document_files.enabled():
+            raise HTTPException(status_code=409, detail=connect_texts.text("use_documents_page"))
         t = svc.document_types.get(doc_type)
         if t is None:
             raise HTTPException(status_code=422, detail=f"unknown document type: {doc_type}")
@@ -385,21 +475,41 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def documents(student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
         return documents_out(svc.engine, svc.settings.tenant_id, student, svc.document_types)
 
+    @router.get("/documents/{doc_id}/vault-check", response_model=VaultCheckOut)
+    def vault_check(doc_id: int, student: str = Depends(current_student_ref), svc: Services = Depends(services)) -> dict:
+        """Every field with a Vault key compared with the Vault, live (P1-T7, D-y11, R-16). Nothing is stored. Without
+        the one upload or without the host's answer there is nothing to compare with: 404 (no standalone fallback)."""
+        doc = own_document(svc, doc_id, student)
+        t = svc.document_types.get(doc.doc_type)
+        tenant = svc.settings.tenant_id
+        facts = (student_facts.host_facts(student, engine=svc.engine, tenant_id=tenant)
+                 if document_files.enabled() and t is not None else None)
+        if facts is None:
+            raise HTTPException(status_code=404, detail="nothing to compare with")
+        values = {f["field"]: f["value_confirmed"] if f["confirmed_at"] else f["value_read"]
+                  for f in DocumentStore(svc.engine, tenant).fields(doc_id)}
+        fields = vault_compare(t, values, facts)
+        differs = any(f["outcome"] == "differs" for f in fields)
+        return {"fields": fields, "note": connect_texts.text("vault_differs") if differs else None}
+
     @router.post("/documents/{doc_id}/confirm", response_model=DocumentOut)
     def confirm_doc(doc_id: int, body: ConfirmDocumentIn, student: str = Depends(current_student_ref_for_write),
                     svc: Services = Depends(services)) -> dict:
         doc = own_document(svc, doc_id, student)
         tenant = svc.settings.tenant_id
         try:
-            confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
+            proposal_key = confirm_document(svc.engine, tenant, svc.document_types, svc.name_variants, doc, body.fields)
         except NotConfirmable as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: a note if a programme's eligibility changed
+        refresh(svc, student, "document_changed")  # P1-T8: a confirmed document may answer a request
         store = DocumentStore(svc.engine, tenant)
         findings = [finding_out(f) for f in FindingStore(svc.engine, tenant).list_open(student)]
-        return document_out(store, store.get(doc_id), findings, svc.document_types)
+        out = document_out(store, store.get(doc_id), findings, svc.document_types)
+        fact_proposals.notify(proposal_key)  # P1-T7: after the answer is built; the host's sweep is the backup
+        return out
 
     @router.post("/documents/findings/{finding_id}/resolve", response_model=FindingOut)
     def resolve(finding_id: int, body: ResolveIn, student: str = Depends(current_student_ref_for_write),
@@ -415,6 +525,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         _notify(svc.plans, student)  # Slice 4: the resolved value may change eligibility
+        refresh(svc, student, "document_changed")  # P1-T8: a resolved mismatch unblocks the steps it paused
         return finding_out(resolved)
 
     @router.delete("/documents/{doc_id}", status_code=204)
@@ -423,6 +534,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
         doc = own_document(svc, doc_id, student)
         delete_document(svc.engine, svc.settings.tenant_id, svc.document_types, svc.name_variants, doc,
                         client=svc.dbos_client())
+        refresh(svc, student, "document_changed")  # P1-T8: a deleted document is asked for again
         return Response(status_code=204)
 
     @router.get("/profile", response_model=ProfileOut)
@@ -576,6 +688,9 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_pack_routes(router, services)  # Slice 6a (spec §4)
     add_visa_routes(router, services)  # Slice 6b (spec §4)
     add_replan_routes(router, services, require_admin)  # Slice 7 (spec §4)
+    add_consistency_routes(router, services, require_admin)  # P1-T10 (R-05)
+    add_registry_routes(router, services, require_admin)  # P2-T2 (R-32, R-33, R-34)
+    add_review_routes(router, services, require_admin)  # P2-T5 (R-25, R-42)
     if get_services().settings.rehearsal:  # Slice 9a (spec §2.2): absent on a pilot server, so 404
         from app.os.rehearsal.api import add_rehearsal_routes
 

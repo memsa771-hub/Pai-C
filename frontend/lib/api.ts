@@ -38,6 +38,7 @@ function mapFileResponse(raw: Record<string, unknown>): WorkspaceFile {
     channelName: (raw.channel_name ?? raw.channelName ?? null) as string | null,
     status: (raw.status || 'active') as string,
     createdAt: (raw.created_at || raw.createdAt || null) as string | null,
+    ...(raw.os_document ? { os_document: raw.os_document as import('./os-documents').OsDocumentResult } : {}),
   };
 }
 
@@ -199,6 +200,36 @@ class WorkspaceApi {
     return body.items;
   }
 
+  /** P1-T8: what the plan asks of the student, and the choices of each "which is right" question. A 404 (the part is
+   * off) is `null`: the inbox is today's. Any other error throws. */
+  async getOsRequests(): Promise<import('./os-requests').OsRequest[] | null> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    try {
+      const body = await this.requestJson<{ requests?: import('./os-requests').OsRequest[] }>(`/v1/os/requests?${params}`);
+      return Array.isArray(body.requests) ? body.requests : null;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('API 404:')) return null;
+      throw e;
+    }
+  }
+
+  /** P1-T8: the student's answer to a "which is right" request. `choice` is the choice id (`current`, `proposed`, `new`
+   * or `doc:<id>`); `question` carries the `ref` and `seen` of the choices the student saw (the API requires both). */
+  async answerOsRequest(id: number, choice: string, question: { ref: string; seen: string },
+                        value?: string | number): Promise<{ status: 'answered' | 'still_open' }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/requests/${id}/answer?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ choice, ref: question.ref, seen: question.seen, ...(value === undefined ? {} : { value }) }),
+    });
+  }
+
+  /** P1-T9: the student's plan page list. Throws on anything but 200 (404 while the My plan part is off). */
+  async getMyPlan(): Promise<import('./os-my-plan').MyPlan> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/plan?${params}`);
+  }
+
   async completeOsInboxItem(id: number, payload: Record<string, unknown> = {}): Promise<{ completed: boolean }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/inbox/${id}/complete?${params}`, {
@@ -241,9 +272,30 @@ class WorkspaceApi {
       try {
         detail = (JSON.parse(text) as { detail?: string }).detail ?? text;
       } catch { /* not JSON: keep the text */ }
-      throw new Error(`API ${res.status}: ${detail}`);
+      throw Object.assign(new Error(`API ${res.status}: ${detail}`), { status: res.status, detail });
     }
     return (await res.json()) as import('./os-documents').OsDocument;
+  }
+
+  /** The one upload entry point: is it on, and which types and sentences (P1-T7, D-y5). Off, or any error: off. */
+  async getUploadOptions(): Promise<import('./os-documents').UploadOptions> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request(`/v1/uploads/options?${params}`);
+  }
+
+  /** Makes a file already stored an OS document of the picked type (P1-T7, D-y3). */
+  async registerOsDocument(fileId: string, docType: string): Promise<import('./os-documents').OsDocumentResult> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.request<{ os_document: import('./os-documents').OsDocumentResult }>(
+      `/v1/uploads/${encodeURIComponent(fileId)}/os-document?${params}`,
+      { method: 'POST', body: JSON.stringify({ doc_type: docType }) });
+    return body.os_document;
+  }
+
+  /** PAI OS: a document's fields compared with the Vault, live (P1-T7, D-y11). 404 means nothing to compare. */
+  async getOsVaultCheck(id: number): Promise<import('./os-documents').VaultCheck> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.requestJson(`/v1/os/documents/${id}/vault-check?${params}`);
   }
 
   /** PAI OS: confirm or correct every field of one document. */
@@ -277,6 +329,20 @@ class WorkspaceApi {
   // ---------------------------------------------------------------------------
   // PAI OS self-serve start and eligibility (Slice 4 spec §4)
   // ---------------------------------------------------------------------------
+
+  /** PAI OS: the whole inbox in one request: items, eligibility notes and suggestions (P1-T6 fix: one GET, not three). */
+  async getOsInboxAll(): Promise<{ items: import('./os-inbox').OsInboxItem[]; notes: import('./os-self-serve').OsNote[]; proposals: import('./os-replan').OsProposal[] }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ items: import('./os-inbox').OsInboxItem[]; notes?: import('./os-self-serve').OsNote[]; proposals?: import('./os-replan').OsProposal[] }>(`/v1/os/inbox?${params}`);
+    return { items: body.items, notes: body.notes ?? [], proposals: body.proposals ?? [] };
+  }
+
+  /** PAI OS: the suggestions in the inbox, requested ones and recently expired requests included (P1-T6). */
+  async getOsInboxProposals(): Promise<import('./os-replan').OsProposal[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.requestJson<{ proposals?: import('./os-replan').OsProposal[] }>(`/v1/os/inbox?${params}`);
+    return body.proposals ?? [];
+  }
 
   /** PAI OS: the student's eligibility change notes (the inbox's `notes`). */
   async getOsInboxNotes(): Promise<import('./os-self-serve').OsNote[]> {
@@ -340,7 +406,7 @@ class WorkspaceApi {
 
   /** PAI OS: start the student's own plan (or get the one they already have). */
   async startOsPlan(route: string, intake: { term: string; year: number },
-                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan> {
+                    choices: { programme_ref: string; rank: number }[]): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsStartPending> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/self?${params}`, {
       method: 'POST', body: JSON.stringify({ route, intake, choices }),
@@ -348,7 +414,7 @@ class WorkspaceApi {
   }
 
   /** PAI OS: swap one programme for another (the screen asks the student first). */
-  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan> {
+  async swapOsProgramme(planId: number, outRef: string, inRef: string): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsChangeRequested> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/${planId}/swap?${params}`, {
       method: 'POST', body: JSON.stringify({ out: outRef, in: inRef }),
@@ -356,7 +422,7 @@ class WorkspaceApi {
   }
 
   /** PAI OS: drop one programme from the plan while nothing for it has started. */
-  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan> {
+  async removeOsProgramme(planId: number, ref: string): Promise<import('./os-self-serve').OsSelfPlan | import('./os-connect').OsChangeRequested> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/plans/${planId}/programmes/${encodeURIComponent(ref)}?${params}`, {
       method: 'DELETE',
@@ -504,7 +570,7 @@ class WorkspaceApi {
     return this.requestJson(`/v1/os/changes?${params}`);
   }
 
-  async acceptOsProposal(id: number): Promise<{ status: string; revision: number | null }> {
+  async acceptOsProposal(id: number): Promise<{ status: 'accepted' | 'requested' | 'refused'; revision: number | null }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.requestJson(`/v1/os/proposals/${id}/accept?${params}`, { method: 'POST' });
   }
@@ -539,6 +605,90 @@ class WorkspaceApi {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.adminJson(`/v1/os/admin/support/${id}/resolve?${params}`, adminToken, {
       method: 'POST', body: JSON.stringify({ note, unpause }),
+    });
+  }
+
+  /** PAI OS admin: consistency cases (P1-T10, R-05). A 404 means the check is not part of this deployment. */
+  async getOsConsistencyCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-consistency').OsConsistencyCase[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });
+    const body = await this.adminJson<{ cases: import('./os-consistency').OsConsistencyCase[] }>(
+      `/v1/os/admin/consistency?${params}`, adminToken);
+    return body.cases;
+  }
+
+  /**
+   * PAI OS review queue (P2-T5): a reviewer's own token goes in its own header, never in a URL. A 401 means a wrong
+   * reviewer token, so it never signs the user out.
+   */
+  private async reviewerFetch(path: string, reviewerToken: string, options: RequestInit = {}, json = true): Promise<Response> {
+    const headers: Record<string, string> = { 'X-OS-Reviewer-Token': reviewerToken };
+    if (json) headers['Content-Type'] = 'application/json';
+    Object.assign(headers, await this.authHeaders());
+    const res = await fetch(`${API_URL}${path}`, { ...options, credentials: 'include', cache: 'no-store', headers });
+    if (!res.ok) {
+      const text = await res.text();
+      let detail = text;
+      try { detail = (JSON.parse(text) as { detail?: string }).detail ?? text; } catch { /* keep the text */ }
+      throw Object.assign(new Error(`API ${res.status}: ${detail}`), { status: res.status, detail });
+    }
+    return res;
+  }
+
+  private async reviewerJson<T>(path: string, reviewerToken: string, options: RequestInit = {}): Promise<T> {
+    return (await (await this.reviewerFetch(path, reviewerToken, options)).json()) as T;
+  }
+
+  private reviewPath(path: string, extra: Record<string, string> = {}): string {
+    return `/v1/os/review${path}?${new URLSearchParams({ network: this.requireWorkspace(), ...extra })}`;
+  }
+
+  async getOsReviewer(token: string): Promise<import('./os-review').OsReviewer> {
+    return this.reviewerJson(this.reviewPath('/me'), token);
+  }
+
+  async getOsReviewItems(token: string, status: 'open' | 'closed' = 'open', kind?: string): Promise<import('./os-review').OsReviewItem[]> {
+    const body = await this.reviewerJson<{ items: import('./os-review').OsReviewItem[] }>(
+      this.reviewPath('/items', { status, ...(kind ? { kind } : {}) }), token);
+    return body.items;
+  }
+
+  async getOsReviewItem(token: string, id: number): Promise<import('./os-review').OsReviewDetail> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}`), token);
+  }
+
+  async postOsReview(token: string, id: number, body: Record<string, unknown>): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/review`), token, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async collectOsReview(token: string, id: number, body: Record<string, unknown>): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/collect`), token, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async resolveOsReview(token: string, id: number, outcome: 'resolved' | 'dismissed', note: string): Promise<import('./os-review').OsReviewResult> {
+    return this.reviewerJson(this.reviewPath(`/items/${id}/resolve`), token, {
+      method: 'POST', body: JSON.stringify({ outcome, note }),
+    });
+  }
+
+  async uploadOsReviewEvidence(token: string, id: number, file: File): Promise<import('./os-review').OsReviewFile> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await this.reviewerFetch(this.reviewPath(`/items/${id}/evidence`), token, { method: 'POST', body: form }, false);
+    return (await res.json()) as import('./os-review').OsReviewFile;
+  }
+
+  async getOsReviewFile(token: string, fileId: number): Promise<Blob> {
+    return (await this.reviewerFetch(this.reviewPath(`/files/${fileId}`), token, {}, false)).blob();
+  }
+
+  async attestOsReviewBatch(token: string, batchRef: string): Promise<{ batch_ref: string; new: boolean }> {
+    return this.reviewerJson(this.reviewPath(`/batches/${encodeURIComponent(batchRef)}/attest`), token, { method: 'POST' });
+  }
+
+  async resolveOsConsistencyCase(adminToken: string, id: number, note: string): Promise<import('./os-consistency').OsConsistencyCase> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.adminJson(`/v1/os/admin/consistency/${id}/resolve?${params}`, adminToken, {
+      method: 'POST', body: JSON.stringify({ note }),
     });
   }
 
@@ -660,6 +810,17 @@ class WorkspaceApi {
   async chooseRoute(fieldKey: string, details?: import('./roadmap').ChoiceDetails): Promise<import('./roadmap').ChooseAnswer> {
     return this.request(`/v1/roadmap/choose?network=${this.requireWorkspace()}`,
       { method: 'POST', body: JSON.stringify(details ? { field_key: fieldKey, details } : { field_key: fieldKey }) });
+  }
+
+  /** Whether the student can keep a plan they built themselves as their PAI plan (R-08). `{offer: false}` when off. */
+  async getAdoption(): Promise<import('./os-connect').Adoption> {
+    return this.request(`/v1/roadmap/adoption?network=${this.requireWorkspace()}`);
+  }
+
+  /** The student agrees to keep their plan: 200 `{state, decision_version}`, or 409 with a code. */
+  async adoptPlan(planId: number): Promise<import('./os-connect').AdoptionDone> {
+    return this.request(`/v1/roadmap/adoption?network=${this.requireWorkspace()}`,
+      { method: 'POST', body: JSON.stringify({ plan_id: planId }) });
   }
 
   /** What the choice screens offer; `{handoff: false}` when the hand-off to PAI OS is off. */
@@ -1059,11 +1220,14 @@ class WorkspaceApi {
       /** Fraction uploaded, 0–1. Never fires if the browser can't measure it. */
       onProgress?: (fraction: number) => void;
       signal?: AbortSignal;
+      /** The document type the student picked (P1-T7); left out, nothing is sent. */
+      docType?: string;
     },
   ): Promise<WorkspaceFile> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('network', this.workspaceId);
+    if (options?.docType) formData.append('doc_type', options.docType);
     if (channelName) formData.append('channel_name', channelName);
 
     return this.authHeaders().then((headers) => new Promise<WorkspaceFile>((resolve, reject) => {

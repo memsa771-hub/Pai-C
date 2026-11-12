@@ -3,8 +3,14 @@
 from app.memory.student_snapshot import StudentSnapshotService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.permissions import capabilities_for_agent
+from app.memory.candidates import MemoryCandidateService  # noqa: F401  re-exported for PAI C (P1-T7 fact proposals)
 from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
+from app.memory.vault_view import VaultView  # noqa: F401  re-exported for PAI C (P1-T8 fact conflicts)
+from app.memory import issue_answers  # noqa: F401  re-exported for PAI C (P1-T8: per-value answers on a card)
+from app.memory.errors import MemoryDataError  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.profile_issues import ProfileIssueService  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.reconciler import MemoryReconciler  # noqa: F401  re-exported for PAI C (P1-T8)
 from app.memory.vault_view import _result_text as result_text, display_text  # noqa: F401  re-exported for PAI C
 from app.memory.student_schema import RECORD_SPECS  # noqa: F401  re-exported for PAI C
 from app.memory.completeness import relevance_version  # noqa: F401  re-exported for PAI C
@@ -32,6 +38,13 @@ PROFILE_RECORD_KINDS = (
     "skill", "certification", "research", "achievement", "goal", "financial_sponsor",
     "scholarship_application", "application", "visa", "document",
 )
+
+
+def reconcile_job_type() -> str:
+    """The durable job that reconciles Vault candidates (loaded late: the handlers register on import)."""
+    from app.memory.handlers import JOB_RECONCILE
+
+    return JOB_RECONCILE
 
 
 def labelled_value(type_key, value):

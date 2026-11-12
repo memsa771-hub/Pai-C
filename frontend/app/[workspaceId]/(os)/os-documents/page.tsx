@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageTitle } from '@/lib/os-my-plan';
 import { ConsentCard } from '@/components/os/consent-card';
 import { DocumentConfirm } from '@/components/os/document-confirm';
 import { DocumentList } from '@/components/os/documents';
@@ -10,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
 import type { OsConsent } from '@/lib/os-consent';
-import { typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
+import { documentNote, refusedNote, typeLabel, type OsDocuments, type OsDocument } from '@/lib/os-documents';
+import { useUploadOptionsState } from '@/hooks/use-upload-options';
 import { usePaiAuth } from '@/lib/pai-auth-context';
 import { goToSignIn } from '@/lib/auth-redirects';
 
@@ -31,6 +35,8 @@ function reason(e: unknown, fallback: string): string {
 /** PAI OS documents: /<workspace>/os-documents. Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsDocumentsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'documents');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [data, setData] = useState<OsDocuments | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -38,6 +44,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState<OsConsent | null>(null);
   const [refused, setRefused] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);  // the server's note when a document was registered
 
   // Slice 9a: uploading needs consent to the current pilot terms; the card shows until the student agrees.
   const loadConsent = useCallback(() => workspaceApi.getOsConsent().then(
@@ -51,7 +58,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
   ), []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -60,7 +67,10 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
     void loadConsent();
-  }, [loading, user, idToken, workspaceId, load, loadConsent]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load, loadConsent]);
+
+  // P1-T7: on, every upload goes to the one endpoint. Declared after the effect that configures the client.
+  const { options, refresh: refreshOptions } = useUploadOptionsState(OS_UI_ENABLED && !outOfPlan && !loading && !!user);
 
   const waiting = data?.documents.some((d) => d.status === 'uploaded' || d.status === 'reading') ?? false;
   useEffect(() => {
@@ -83,12 +93,47 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
     }
   }
 
+  /** The one endpoint: the file is saved, then registered or refused; the server's note is shown either way. */
+  async function uploadOne(file: File, docType: string) {
+    const saved = await workspaceApi.uploadFile(file, undefined, { docType });
+    await load();  // load() clears the error line, so the note is set after it
+    const got = saved.os_document;
+    if (got && refusedNote(got) !== null) {  // the file is saved; the server's note says why it is not a study document
+      const now = 'refused' in got && got.refused === 'consent_needed' ? await loadConsent() : null;
+      if (now && !now.agreed) { setRefused(true); setError(null); } else setError(got.note);
+    } else {
+      setNotice(documentNote(got));
+    }
+  }
+
   async function upload(file: File, docType: string) {
     setBusy(true);
+    setNotice(null);
     try {
-      await workspaceApi.uploadOsDocument(file, docType);
-      await load();
+      if (options.one_upload) {
+        await uploadOne(file, docType);
+      } else {
+        await workspaceApi.uploadOsDocument(file, docType);
+        await load();
+      }
     } catch (e) {
+      const status = (e as { status?: number } | null)?.status;
+      const detail = (e as { detail?: unknown } | null)?.detail;
+      if (status === 409 && typeof detail === 'string' && !options.one_upload) {
+        // A sentence, not a consent object: either the server has the one upload on (this page was loaded before
+        // it was) or the file is a duplicate. Ask again, and retry through the one endpoint only if it is on.
+        const fresh = await refreshOptions();
+        if (fresh.one_upload) {
+          try {
+            await uploadOne(file, docType);
+          } catch (e2) {
+            setError(reason(e2, 'Could not upload. Please try again.'));
+          }
+        } else {
+          setError(reason(e, 'Could not upload. Please try again.'));
+        }
+        return;
+      }
       const now = await loadConsent();
       if (now && !now.agreed) {  // refused for missing consent (the terms may have changed): the card asks
         setRefused(true);
@@ -103,11 +148,14 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
 
   const open: OsDocument | undefined = data?.documents.find((d) => d.id === openId);
 
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
       <OsHeader workspaceId={workspaceId} current="os-documents"
-                title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : 'Your documents'} />
+                title={open && data ? `Check what we read: ${typeLabel(open.doc_type, data.doc_types)}` : pageTitle(plan, 'documents', 'Your documents')} />
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="mb-3 break-words text-sm">{notice}</p>}
       {consent && !consent.agreed && !open && (
         <div className="mb-4">
           <ConsentCard consent={consent} refused={refused} onAgreed={loadConsent} onChanged={loadConsent} />
@@ -117,7 +165,7 @@ export default function OsDocumentsPage({ params }: { params: Promise<{ workspac
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : open ? (
         <>
-          <DocumentConfirm key={open.id} document={open} busy={busy} onBack={() => setOpenId(null)}
+          <DocumentConfirm key={open.id} document={open} busy={busy} options={options} onBack={() => setOpenId(null)}
                            onConfirm={(values) => act(async () => {
                              await workspaceApi.confirmOsDocument(open.id, values);
                              setOpenId(null);

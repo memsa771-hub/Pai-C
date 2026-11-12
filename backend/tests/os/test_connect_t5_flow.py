@@ -25,6 +25,7 @@ from tests.os.test_counsellor_intake_v2 import svc  # noqa: F401 - the fixture i
 from tests.test_roadmap_api import TOKEN, data, roadmap_client
 from tests.test_roadmap_choice_api import FIELD, choose_with, post, vault
 from tests.test_roadmap_engine import fsc
+from tests.os.connect_check import assert_consistent
 
 pytestmark = [pytest.mark.req("R-04"), pytest.mark.req("R-44"), pytest.mark.req("R-45")]
 
@@ -117,6 +118,7 @@ def level(name):
         yield
 
 
+@pytest.mark.connect_row("6.1", "6.2", "6.4", "6.11")
 def test_germany_route(world):
     svc = world  # noqa: F811
     with germany_student() as (client, who, params), level("master"):
@@ -182,6 +184,7 @@ def test_germany_route(world):
         assert "plan_stopped" in [kind for kind, _ in bell(who)]
 
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
 def test_fake_pakistan_intermediate_route_is_planned(world):
@@ -203,8 +206,36 @@ def test_fake_pakistan_intermediate_route_is_planned(world):
             bridge.deliver_os_events(db)
         assert bell(who) and "chat" not in " ".join(t for _, t in bell(who)).lower()
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
 
 
+@pytest.mark.req("R-19")
+def test_flags_off_no_request_rows(world):
+    """P1-T8 Task 3: with the needs gate off a whole flow leaves the request table empty, and the plan view has no
+    needs and no requests on any step (the Germany route and the fake intermediate route)."""
+    svc = world  # noqa: F811
+    from tests.test_roadmap_api import pre_eng
+
+    with germany_student() as (client, who, params), level("master"):
+        vault((client, who, params))
+        data(choose_with(client, params, destination="DE", places=[{"ref": "ovgu-eeit", "rank": 1}], intake=WINTER))
+        assert run_os(svc) == [("planned", None)]
+        view = bridge.plan_view(who.workspace_id)
+        assert view["steps"] and view["requests"] == [] and all(s["needs"] == [] for s in view["steps"])
+    with pre_eng() as (client, who, params), level("intermediate"):
+        vault((client, who, params))
+        data(choose_with(client, params, destination="PK", places=[{"ref": "pk-i1", "rank": 1}], intake=WINTER))
+        assert run_os(svc) == [("planned", None)]
+        view = bridge.plan_view(who.workspace_id)
+        assert view["steps"] and view["requests"] == [] and all(s["needs"] == [] for s in view["steps"])
+        assert not [s for s in view["steps"] if s["template_key"] in ("provide", "which_is_right", "result_expected")]
+    with svc.engine.connect() as conn:
+        assert conn.execute(select(func.count()).select_from(models.student_requests)).scalar() == 0
+        pins = conn.execute(select(models.playbook_pins.c.version)).scalars().all()
+    assert pins and set(pins) == {1}  # the gate off keeps version 1
+
+
+@pytest.mark.connect_row("6.14")
 def test_a_route_the_os_cannot_run_keeps_the_labelled_checklist(world):
     svc = world  # noqa: F811
     from tests.test_roadmap_api import pre_eng
@@ -229,3 +260,4 @@ def test_a_route_the_os_cannot_run_keeps_the_labelled_checklist(world):
             assert bridge.deliver_os_events(db) == {"sent": 0, "refused": 0, "waiting": 0, "stale": 0}
         assert bell(who) == []
         no_chat(who, before)
+        assert_consistent(who.factory)  # the end-of-test check (R-04, R-05)
