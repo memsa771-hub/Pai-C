@@ -18,6 +18,7 @@ from app.os.requests.state import StudentState
 from app.os.service import PlanService
 from app.os.settings import load_settings
 from app.os.workers import supply_fact
+from tests.os.intake_helpers import make_current
 from tests.os.test_compile_needs import INTER2
 
 pytestmark = pytest.mark.req("R-61")
@@ -52,7 +53,7 @@ def world(engine, clean):
     kb.upsert("programme", "p1", "deadline_close", f(2026, "2026-12-15"))
     s = IntakeStore(engine, "pai")
     i = s.create("r_one", "masters", "winter", 2026, state="open")
-    s.set_state(i.id, "current", gate_passed_at=GATE)
+    make_current(engine, i.id, GATE)
     return svc, kb, kernel, s
 
 
@@ -99,7 +100,7 @@ def test_rollover_proof_2026_to_2027(world, engine):
 def test_gate_closes_the_fallback(world, engine):
     svc, _kb, _kernel, s = world
     res = rollover(engine, "pai", region="r_one", family="masters", term="winter", year=2027)
-    s.set_state(res.intake.id, "current", gate_passed_at=datetime(2026, 11, 19, tzinfo=UTC))
+    make_current(engine, res.intake.id, datetime(2026, 11, 19, tzinfo=UTC))
     assert not s.fallback_applies("winter", 2027)
     plan_id = svc.start_plan(contract(2027)).plan_id  # the strict read again: no fact, so blocked, nothing borrowed
     assert tasks_of(engine, plan_id)["apply@p1"].blocked_reason == "fact_missing:deadline_close"
