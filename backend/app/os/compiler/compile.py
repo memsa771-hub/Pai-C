@@ -248,6 +248,16 @@ def compile_plan(
             return route_facts.get(name), ("route", route_key, name)
         return programme_facts.get((ref, name)), ("programme", ref, name)
 
+    year = contract.target_intake.year
+
+    def firm(fact: Fact | None) -> bool:
+        """Confirmed, and for this plan's own intake: a fact of another year (the labelled previous-year read, P2-D24,
+        R-26) is never firm, so what it dates stays provisional and its value is checked again."""
+        return fact is not None and fact.confirmed and fact.intake_year == year
+
+    def other_year(fact: Fact | None) -> bool:
+        return fact is not None and fact.intake_year != year
+
     def need_confirm(fref: tuple[str, str, str]) -> None:
         _, ref, name = fref
         confirms[f"confirm_fact@{ref}:{name}"] = (ref, name)
@@ -265,13 +275,13 @@ def compile_plan(
             if t.condition:
                 fact, fref = lookup(ref, t.condition.fact)
                 result = evaluate(t.condition, fact)
-                if result is False and fact is not None and fact.confirmed:
+                if result is False and firm(fact):
                     continue
                 if result is False:  # decided by an unconfirmed fact: drop, but keep the decision checkable
                     need_confirm(fref)
                     continue
                 inst.fact_refs.append(fref)
-                if fact is None or not fact.confirmed:
+                if not firm(fact):
                     inst.provisional = True
                     need_confirm(fref)
             lead_days = 0
@@ -297,8 +307,10 @@ def compile_plan(
                     if fact is None or fact.value is None:
                         need_confirm(fref)
                         continue
-                    if not fact.confirmed:
+                    if not firm(fact):
                         need_confirm(fref)
+                    if other_year(fact) and date_of(fact.value, f"{fref[1]}:{fref[2]}")[0] < today:
+                        continue  # last year's date is already past: it dates nothing for this intake
                     usable.append((date_of(fact.value, f"{fref[1]}:{fref[2]}"), fact))
                 if not sources:  # every programme is out (none admitted the student): nothing to date it from
                     inst.blocked_reason = f"no_candidate:{t.anchor.programme}"
@@ -314,6 +326,8 @@ def compile_plan(
                     passed = lead_date < today and bool(t.anchor.note_passed or t.anchor.note_passed_earliest)
                     if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
                         cite = {"source": f"fact:{t.anchor.fact}", "url": fact.url}
+                        if other_year(fact):
+                            cite["intake_year"] = fact.intake_year  # R-26: another year's fact always says so
                         if passed:
                             note = t.anchor.note_passed_earliest if several and t.anchor.note_passed_earliest \
                                 else t.anchor.note_passed
@@ -326,13 +340,18 @@ def compile_plan(
                                 days_left=max((d - today).days, 0))
                         inst.citations.insert(0, cite)
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=0 if passed else lead_days)
-                    if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
+                    if not firm(fact) or len(sources) > 1:  # several: it may move once one is chosen
                         inst.provisional = True
             if t.citation_from_fact:
                 fact, fref = lookup(ref, t.citation_from_fact)
                 inst.fact_refs.append(fref)
                 if fact is not None and fact.url:
-                    inst.citations.append({"source": f"fact:{t.citation_from_fact}", "url": fact.url})
+                    cite = {"source": f"fact:{t.citation_from_fact}", "url": fact.url}
+                    if other_year(fact):
+                        cite["intake_year"] = fact.intake_year
+                    inst.citations.append(cite)
+                    if other_year(fact):
+                        need_confirm(fref)
                 else:
                     need_confirm(fref)
             insts[inst.key] = inst
