@@ -958,3 +958,68 @@ consistency_runs = Table(
     Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
+
+# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0028) ---------------------------------
+
+SOURCE_TIERS = ("regulator", "board", "admission_body", "institution")
+SOURCE_STATES = ("active", "suspect")
+SNAPSHOT_READ_METHODS = ("fetch", "render", "ocr", "human")
+
+# P2-D10: the reviewed allow-list (loaded from YAML) and each domain's runtime state. A row with `region`, `family` and
+# `route_key` all '' is not an allow-list entry: it records that a domain outside the lists (for example a route
+# profile's) was flagged suspect.
+source_domains = Table(
+    "os_source_domains", md,
+    _id(), _tenant(),
+    Column("domain", Text, nullable=False),
+    Column("region", Text, nullable=False, server_default=""),
+    Column("family", Text, nullable=False, server_default=""),
+    Column("route_key", Text, nullable=False, server_default=""),
+    Column("body_ref", Text, nullable=False, server_default=""),  # registry id of the body (T2); '' = not named
+    Column("tier", Text),
+    Column("list_ref", Text, nullable=False, server_default=""),  # the official list or page that names the domain
+    Column("reviewed_by", Text, nullable=False, server_default=""),
+    Column("state", Text, nullable=False, server_default="active"),
+    Column("state_reason", Text),
+    Column("state_since", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "domain", "region", "family", "route_key", name="uq_os_source_domains_entry"),
+    CheckConstraint("tier IS NULL OR tier IN ('regulator', 'board', 'admission_body', 'institution')",
+                    name="ck_os_source_domains_tier"),
+    _in("state", SOURCE_STATES, "ck_os_source_domains_state"),
+    Index("ix_os_source_domains_domain", "tenant_id", "domain"),
+)
+
+# P2-D11: what was read, as text (the review queue shows it; monitoring compares it). `flagged` is the integrity
+# failure code of the read, NULL for a clean page; only clean snapshots are used as "the last snapshot".
+page_snapshots = Table(
+    "os_page_snapshots", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("sha256", Text, nullable=False),  # of the text (normalised whitespace)
+    Column("text", Text, nullable=False),
+    Column("content_type", Text, nullable=False, server_default=""),
+    Column("read_method", Text, nullable=False, server_default="fetch"),
+    Column("language", Text),
+    Column("links_total", Integer, nullable=False, server_default="0"),
+    Column("links_off_list", Integer, nullable=False, server_default="0"),
+    Column("flagged", Text),
+    Column("original_too_large", Boolean, nullable=False, server_default=text("false")),  # PDF or image over the cap (review M5)
+    Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
+    _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),
+    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,3}$'", name="ck_os_page_snapshots_language"),
+    Index("ix_os_page_snapshots_url", "tenant_id", "url", "fetched_at"),
+)
+
+source_files = Table(
+    "os_source_files", md,
+    _id(), _tenant(),
+    Column("snapshot_id", BigInteger, ForeignKey("os.os_page_snapshots.id", ondelete="RESTRICT"), nullable=False),
+    Column("sha256", Text, nullable=False),  # of the bytes
+    Column("content_type", Text, nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("content", LargeBinary, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "snapshot_id", name="uq_os_source_files_snapshot"),
+)

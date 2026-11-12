@@ -1,0 +1,6 @@
+route_key: route_one
+bodies:
+  - tier: board
+    domains: [exam-board.test]
+    list_ref: profile:official_sources
+    reviewed_by: tester-1
