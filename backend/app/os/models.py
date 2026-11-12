@@ -239,7 +239,7 @@ knowledge_facts = Table(
     Column("fact_class", Text),
     Column("read_method", Text),
     Column("language", Text),
-    # P2-T7 (os_0030): why a fact that went back to unconfirmed is being checked again (monitor or a student report).
+    # P2-T7 (os_0032): why a fact that went back to unconfirmed is being checked again (monitor or a student report).
     Column("recheck_reason", Text),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
                      name="uq_os_knowledge_facts"),
@@ -970,7 +970,7 @@ consistency_cases = Table(
     "os_consistency_cases", md,
     _id(), _tenant(),
     Column("student_ref", Text, nullable=False),
-    Column("rule", SmallInteger, nullable=False),  # master 9.3 rule 1-8
+    Column("rule", SmallInteger, nullable=False),  # master 9.3 rule 1-12
     Column("plan_id", BigInteger, ForeignKey("os.os_plans.id", ondelete="SET NULL")),
     Column("codes", JSONB, nullable=False, server_default=text("'[]'::jsonb")),  # finding codes: never a value
     Column("status", Text, nullable=False, server_default="open"),
@@ -978,7 +978,7 @@ consistency_cases = Table(
     Column("first_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("last_seen_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("resolved_at", DateTime(timezone=True)),
-    CheckConstraint("rule BETWEEN 1 AND 8", name="ck_os_consistency_cases_rule"),
+    CheckConstraint("rule BETWEEN 1 AND 12", name="ck_os_consistency_cases_rule"),  # 9-12: P2-T12 (os_0033)
     _in("status", ("open", "resolved"), "ck_os_consistency_cases_status"),
     Index("uq_os_consistency_cases_open", "tenant_id", "student_ref", "rule", text("coalesce(plan_id, 0)"), unique=True,
           postgresql_where=text("status = 'open'")),
@@ -1096,28 +1096,6 @@ monitor_runs = Table(
     UniqueConstraint("tenant_id", "run_date", name="uq_os_monitor_runs_day"),
 )
 
-# --- P2-T4: sources that could not be read, waiting for a human to collect the value (os_0030) -----------------------
-
-NOT_READABLE_STATES = ("open", "collected", "readable")
-
-# R-72: `field = ''` is the source itself; one more row per field the source should have answered. T5's `collect`
-# review item reads the open rows; a later successful read marks them `readable`.
-not_readable = Table(
-    "os_not_readable", md,
-    _id(), _tenant(),
-    Column("url", Text, nullable=False),
-    Column("reason", Text, nullable=False),  # not_readable:render | not_readable:ocr | http_401 | unreadable_pdf ...
-    Column("programme_ref", Text, nullable=False, server_default=""),
-    Column("field", Text, nullable=False, server_default=""),
-    Column("intake_year", Integer, nullable=False, server_default="0"),
-    Column("snapshot_id", BigInteger),
-    Column("state", Text, nullable=False, server_default="open"),
-    Column("first_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    Column("last_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    UniqueConstraint("tenant_id", "url", "programme_ref", "field", "intake_year", name="uq_os_not_readable"),
-    _in("state", NOT_READABLE_STATES, "ck_os_not_readable_state"),
-)
-
 # P2-T8 (os_0029): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
 INTAKE_STATES = ("planned", "open", "current", "closed")
 
@@ -1151,4 +1129,26 @@ fact_slots = Table(
     Column("fact_class", Text),
     _created(),
     UniqueConstraint("tenant_id", "intake_id", "scope", "ref", "field", "owner_ref", name="uq_os_fact_slots_key"),
+)
+
+# --- P2-T4: sources that could not be read, waiting for a human to collect the value (os_0030) -----------------------
+
+NOT_READABLE_STATES = ("open", "collected", "readable")
+
+# R-72: `field = ''` is the source itself; one more row per field the source should have answered. T5's `collect`
+# review item reads the open rows; a later successful read marks them `readable`.
+not_readable = Table(
+    "os_not_readable", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("reason", Text, nullable=False),  # not_readable:render | not_readable:ocr | http_401 | unreadable_pdf ...
+    Column("programme_ref", Text, nullable=False, server_default=""),
+    Column("field", Text, nullable=False, server_default=""),
+    Column("intake_year", Integer, nullable=False, server_default="0"),
+    Column("snapshot_id", BigInteger),
+    Column("state", Text, nullable=False, server_default="open"),
+    Column("first_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", "programme_ref", "field", "intake_year", name="uq_os_not_readable"),
+    _in("state", NOT_READABLE_STATES, "ck_os_not_readable_state"),
 )

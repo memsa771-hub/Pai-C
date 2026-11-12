@@ -593,6 +593,24 @@ class WorkspaceApi {
     return (await res.json()) as T;
   }
 
+  /** PAI OS admin: the intakes and the coverage report of one (P2-T9, R-35, R-66). */
+  async getOsIntakes(adminToken: string): Promise<import('./os-coverage').OsIntake[]> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    const body = await this.adminJson<{ intakes: import('./os-coverage').OsIntake[] }>(`/v1/os/admin/intakes?${params}`, adminToken);
+    return body.intakes;
+  }
+
+  async getOsCoverage(adminToken: string, intake: number): Promise<import('./os-coverage').OsCoverage> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), intake: String(intake) });
+    return this.adminJson(`/v1/os/admin/coverage?${params}`, adminToken);
+  }
+
+  /** Refused (409, with the failing items in the error text) while the intake's gate is red. */
+  async makeOsIntakeCurrent(adminToken: string, intake: number): Promise<import('./os-coverage').OsIntake> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.adminJson(`/v1/os/admin/intakes/${intake}/current?${params}`, adminToken, { method: 'POST' });
+  }
+
   /** PAI OS admin: support cases. */
   async getOsSupportCases(adminToken: string, status?: 'open' | 'resolved'): Promise<import('./os-replan').OsSupportCase[]> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), ...(status ? { status } : {}) });

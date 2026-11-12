@@ -18,6 +18,7 @@ from app.os.intakes.rollover import (
 from app.os.knowledge.port import Fact
 from app.os.knowledge.store import SqlKnowledge
 from app.os.playbooks import load_playbook
+from tests.os.intake_helpers import make_current
 from tests.os.test_compiler import FAKE
 
 pytestmark = pytest.mark.req("R-61")
@@ -39,7 +40,7 @@ def seed_2026(engine):
     k.upsert("programme", "p1", "deadline_close", fact(2025, {"date": "2025-12-15"}))  # an older year: not copied
     s = IntakeStore(engine, "pai")
     i = s.create("r_one", "undergrad", "fall", 2026, state="open")
-    s.set_state(i.id, "current", gate_passed_at=GATE)
+    make_current(engine, i.id, GATE)
     return k, s, i
 
 

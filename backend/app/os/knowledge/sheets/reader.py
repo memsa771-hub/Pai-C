@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from app.os.knowledge.sheets.format import Format, load_format
+from app.os.knowledge.sheets.safe import unsafe_cell
 
 SHEETS = ("Institutions", "Programmes", "Facts")
 
@@ -42,7 +43,7 @@ def _clean(v: Any) -> Any:
     if v is None:
         return None
     if isinstance(v, str):
-        v = v.strip()
+        v = unsafe_cell(v).strip()  # a cell we neutralised on export comes back as written
         return v or None
     return v
 

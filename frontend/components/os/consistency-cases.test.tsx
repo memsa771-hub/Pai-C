@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ConsistencyCases } from './consistency-cases';
-import { isMissingEndpoint, type OsConsistencyCase } from '@/lib/os-consistency';
+import { isMissingEndpoint, ruleLabel, type OsConsistencyCase } from '@/lib/os-consistency';
 
 afterEach(cleanup);
 
@@ -14,6 +14,11 @@ const kase: OsConsistencyCase = {
 };
 
 describe('consistency cases', () => {
+  it('names the rules about what a student is shown (9 to 12)', () => {
+    expect([9, 10, 11, 12].map(ruleLabel)).toEqual(['Source not on the allow-list', 'High-stakes fact not verified',
+      'Other intake shown without its year', 'Source marked suspect']);
+  });
+
   it('shows the rule, the codes, the student, the plan and both times', () => {
     render(<ConsistencyCases cases={[kase]} busy={false} onResolve={() => {}} />);
     expect(screen.getByRole('heading', { name: 'Consistency checks' })).toBeTruthy();

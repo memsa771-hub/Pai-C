@@ -12,6 +12,7 @@ from app.os.intakes.rollover import backfill_intake_terms, rollover
 from app.os.knowledge.port import Fact
 from app.os.knowledge.store import SqlKnowledge
 from app.os.playbooks import Playbook, load_playbook
+from tests.os.intake_helpers import make_current
 from tests.os.test_compiler import FAKE, IE
 from tests.os.test_p2_intakes_proof import contract, world  # noqa: F401  (fixture)
 
@@ -79,7 +80,7 @@ def test_fallback_reads_only_the_opened_from_year_else_the_year_before(engine, c
     s = IntakeStore(engine, "pai")
     assert s.fallback_year("fall", 2028) is None  # no intake registered: no fallback
     i26 = s.create("r_one", "ug", "fall", 2026, state="open")
-    s.set_state(i26.id, "current", gate_passed_at=AT)
+    make_current(engine, i26.id, AT)
     s.create("r_one", "ug", "fall", 2028, state="open", opened_from_id=i26.id)  # 2027 was skipped
     assert s.fallback_year("fall", 2028) == 2026
     s.create("r_two", "ug", "fall", 2029, state="open")  # opened from nothing: the year before

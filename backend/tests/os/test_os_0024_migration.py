@@ -75,7 +75,7 @@ def test_the_open_case_is_unique_per_plan_too(engine, clean):
 
 
 def test_checks_on_rule_and_status(engine, clean):
-    for bad in ({"rule": 0}, {"rule": 9}, {"status": "closed"}):
+    for bad in ({"rule": 0}, {"rule": 13}, {"status": "closed"}):  # 9 to 12 are P2's (os_0033); 13 is P4's
         with pytest.raises(IntegrityError):
             _case(engine, **bad)
 
