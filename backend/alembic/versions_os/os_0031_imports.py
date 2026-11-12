@@ -1,8 +1,8 @@
 """P2-T6: the import log (P2 spec §4.6 step 5; master R-68): one row per spreadsheet import, with the file's sha256,
 who ran it, in which mode and what it did. Undo reads the revisions the import wrote (cause_ref `import-<id>`).
 
-Revision ID: os_0030
-Revises: os_0029
+Revision ID: os_0031
+Revises: os_0030
 Create Date: 2026-11-07
 
 Self-contained on purpose: it does not import app.os, so later model changes cannot rewrite history.
@@ -13,8 +13,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from alembic import op
 
-revision = "os_0030"
-down_revision = "os_0029"
+revision = "os_0031"
+down_revision = "os_0030"
 branch_labels = None
 depends_on = None
 
@@ -56,6 +56,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_imports LIMIT 1")).first():
-        raise RuntimeError("os_0030 downgrade refused: the import log holds rows (no silent loss)")
+        raise RuntimeError("os_0031 downgrade refused: the import log holds rows (no silent loss)")
     op.drop_index("uq_os_imports_live", "os_imports", schema=S)
     op.drop_table("os_imports", schema=S)
