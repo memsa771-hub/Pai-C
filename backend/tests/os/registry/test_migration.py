@@ -59,10 +59,10 @@ def test_downgrade_refuses_with_data_then_round_trips(os_db, engine, clean):
     with engine.begin() as conn:
         conn.execute(insert(models.registry).values(**reg()))
     with pytest.raises(Exception):
-        run_alembic(["downgrade", "os_0025"], os_db)
+        run_alembic(["downgrade", "os_0026"], os_db)
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM os.os_registry"))
-    run_alembic(["downgrade", "os_0025"], os_db)
+    run_alembic(["downgrade", "os_0026"], os_db)
     try:
         assert "os_registry" not in inspect(engine).get_table_names(schema="os")
         assert "institution_id" not in {c["name"] for c in inspect(engine).get_columns("os_programmes", schema="os")}
