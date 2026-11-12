@@ -58,6 +58,8 @@ def test_os_tables_present():
         "os_fact_revisions",
         # P2-T2 (os_0027)
         "os_registry", "os_registry_revisions", "os_registry_links",
+        # P2-T6 (os_0031)
+        "os_imports",
         # P2-T5 (os_0026)
         "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
         # P2-T3 (os_0028)
