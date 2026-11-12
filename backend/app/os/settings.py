@@ -31,6 +31,20 @@ class OsSettings:
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
     monitor: bool = False  # P2-T7: the daily season monitoring job (OS_MONITOR)
     reports: bool = False  # P2-T7: students report a fact as wrong, and the steps wait for it (OS_REPORTS)
+    render_shell_max_chars: int = 200  # P2-T4: a fetched page with fewer visible characters and scripts is a JavaScript shell
+    render_timeout_s: float = 30.0  # P2-T4: ONE wall-clock deadline for a whole render (start, load, read); then the browser is killed
+    render_max_requests: int = 60  # P2-T4: sub-requests (the page itself, scripts, data) one render may make
+    render_max_bytes: int = 20_000_000  # P2-T4: total bytes of those sub-requests
+    render_max_old_space_mb: int = 512  # P2-T4: the browser's JavaScript heap limit
+    render_max_memory_mb: int = 1024  # P2-T4: the browser's whole memory (cgroup memory limit, where the host allows one)
+    render_max_pids: int = 256  # P2-T4: processes and threads of the browser (cgroup pids limit, else RLIMIT_NPROC)
+    render_run_as_uid: int | None = 65534  # P2-T4: when the worker runs as root, the browser runs as this user (OS_RENDER_UID)
+    render_no_sandbox: bool = False  # P2-T4: only for hosts where Chromium cannot start its sandbox (OS_RENDER_NO_SANDBOX=1)
+    render_browser_path: str | None = None  # P2-T4: a Chromium executable; None = Playwright's own (OS_RENDER_BROWSER)
+    scan_min_pdf_chars: int = 20  # P2-T4: a PDF with less text than this is a scan (read by OCR when a scanner is set)
+    scan_max_pages: int = 10  # P2-T4: pages of a scanned PDF that are read
+    scan_max_pixels: int = 25_000_000  # P2-T4: a page image larger than this is refused (decompression bombs)
+    scan_timeout_s: float = 180.0  # P2-T4: how long a scan engine may take for one page
     source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
@@ -117,6 +131,20 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
+        render_shell_max_chars=int(env.get("OS_RENDER_SHELL_MAX_CHARS") or 200),
+        render_timeout_s=float(env.get("OS_RENDER_TIMEOUT_S") or 30.0),
+        render_max_requests=int(env.get("OS_RENDER_MAX_REQUESTS") or 60),
+        render_max_bytes=int(env.get("OS_RENDER_MAX_BYTES") or 20_000_000),
+        render_max_old_space_mb=int(env.get("OS_RENDER_MAX_OLD_SPACE_MB") or 512),
+        render_max_memory_mb=int(env.get("OS_RENDER_MAX_MEMORY_MB") or 1024),
+        render_max_pids=int(env.get("OS_RENDER_MAX_PIDS") or 256),
+        render_run_as_uid=int(env["OS_RENDER_UID"]) if (env.get("OS_RENDER_UID") or "").strip() else 65534,
+        render_no_sandbox=flag(env, "OS_RENDER_NO_SANDBOX"),
+        render_browser_path=(env.get("OS_RENDER_BROWSER") or "").strip() or None,
+        scan_min_pdf_chars=int(env.get("OS_SCAN_MIN_PDF_CHARS") or 20),
+        scan_max_pages=int(env.get("OS_SCAN_MAX_PAGES") or 10),
+        scan_max_pixels=int(env.get("OS_SCAN_MAX_PIXELS") or 25_000_000),
+        scan_timeout_s=float(env.get("OS_SCAN_TIMEOUT_S") or 180.0),
         source_guard=flag(env, "OS_SOURCE_GUARD"),
         monitor=flag(env, "OS_MONITOR"),
         reports=flag(env, "OS_REPORTS"),

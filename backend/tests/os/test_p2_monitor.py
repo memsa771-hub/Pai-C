@@ -643,7 +643,7 @@ def test_os_0030_goes_back_and_refuses_to_lose_records(engine, clean, os_db):
     kb.revise(fid, status="unconfirmed", recheck="monitor", cause="monitor")
     engine.dispose()
     with pytest.raises(Exception):  # a fact is being re-checked: nothing is thrown away silently
-        run_alembic(["downgrade", "os_0029"], os_db)
+        run_alembic(["downgrade", "os_0031"], os_db)
     from tests.os.conftest import truncate_os_tables
     from sqlalchemy import create_engine
 
@@ -652,5 +652,5 @@ def test_os_0030_goes_back_and_refuses_to_lose_records(engine, clean, os_db):
         truncate_os_tables(eng)
     finally:
         eng.dispose()
-    run_alembic(["downgrade", "os_0029"], os_db)
+    run_alembic(["downgrade", "os_0031"], os_db)
     run_alembic(["upgrade", "os@head"], os_db)

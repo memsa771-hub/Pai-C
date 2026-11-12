@@ -64,6 +64,10 @@ def test_os_tables_present():
         "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
         # P2-T7 (os_0032)
         "os_fact_reports", "os_monitor_runs", "os_monitor_seen",
+        # P2-T6 (os_0031)
+        "os_imports",
+        # P2-T4 (os_0030)
+        "os_not_readable",
         # P2-T8 (os_0029)
         "os_intakes", "os_fact_slots",
     }

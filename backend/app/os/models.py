@@ -333,6 +333,34 @@ registry_links = Table(  # an admission system's tests, seat categories and what
     Index("ix_os_registry_links_to", "tenant_id", "to_kind", "to_id"),
 )
 
+# P2-T6 (os_0031): one row per spreadsheet import (P2 spec §4.6). Undo replays the revisions with cause_ref `import-<id>`.
+imports = Table(
+    "os_imports", md,
+    _id(), _tenant(),
+    Column("file_name", Text, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("mode", Text, nullable=False),
+    Column("decision_ref", Text),
+    Column("batch_ref", Text, nullable=False, server_default=""),
+    Column("actor", Text, nullable=False),
+    Column("note_actor", Text),
+    Column("status", Text, nullable=False, server_default="running"),
+    Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("programmes_created", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("report_path", Text),
+    Column("report_csv", Text),
+    Column("error", Text),
+    Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("finished_at", DateTime(timezone=True)),
+    Column("undone_at", DateTime(timezone=True)),
+    Column("undone_by", Text),
+    _in("mode", ("owner_accepted", "reviewers"), "ck_os_imports_mode"),
+    _in("status", ("running", "done", "failed", "undone"), "ck_os_imports_status"),
+    CheckConstraint("mode <> 'owner_accepted' OR decision_ref IS NOT NULL", name="ck_os_imports_decision"),
+    Index("uq_os_imports_live", "tenant_id", "sha256", unique=True,
+          postgresql_where=text("status IN ('running', 'done', 'failed')")),
+)
+
 # P2-T5 (os_0026, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
 reviewers = Table(
     "os_reviewers", md,
@@ -464,7 +492,10 @@ pages = Table(
     Column("links", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
     Column("blocked", Text),
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("read_method", Text, nullable=False, server_default="fetch"),  # P2-T4 (os_0030): how the text was read
+    Column("language", Text),  # P2-T4: set only for a script the data maps to a language
     UniqueConstraint("tenant_id", "url", name="uq_os_pages_url"),
+    _in("read_method", ("fetch", "render", "ocr", "human"), "ck_os_pages_read_method"),
 )
 
 research_runs = Table(
@@ -1013,7 +1044,7 @@ page_snapshots = Table(
     Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
     _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),
-    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,3}$'", name="ck_os_page_snapshots_language"),
+    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,4}$'", name="ck_os_page_snapshots_language"),
     Index("ix_os_page_snapshots_url", "tenant_id", "url", "fetched_at"),
 )
 
@@ -1029,7 +1060,7 @@ source_files = Table(
     UniqueConstraint("tenant_id", "snapshot_id", name="uq_os_source_files_snapshot"),
 )
 
-# P2-T7 (os_0030, P2 §4.7, P2-D22): what students reported, and one row per monitoring run.
+# P2-T7 (os_0032, P2 §4.7, P2-D22): what students reported, and one row per monitoring run.
 fact_reports = Table(
     "os_fact_reports", md,
     _id(), _tenant(),
@@ -1063,6 +1094,28 @@ monitor_runs = Table(
     Column("finished_at", DateTime(timezone=True)),
     Column("counts", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     UniqueConstraint("tenant_id", "run_date", name="uq_os_monitor_runs_day"),
+)
+
+# --- P2-T4: sources that could not be read, waiting for a human to collect the value (os_0030) -----------------------
+
+NOT_READABLE_STATES = ("open", "collected", "readable")
+
+# R-72: `field = ''` is the source itself; one more row per field the source should have answered. T5's `collect`
+# review item reads the open rows; a later successful read marks them `readable`.
+not_readable = Table(
+    "os_not_readable", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("reason", Text, nullable=False),  # not_readable:render | not_readable:ocr | http_401 | unreadable_pdf ...
+    Column("programme_ref", Text, nullable=False, server_default=""),
+    Column("field", Text, nullable=False, server_default=""),
+    Column("intake_year", Integer, nullable=False, server_default="0"),
+    Column("snapshot_id", BigInteger),
+    Column("state", Text, nullable=False, server_default="open"),
+    Column("first_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("last_seen", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", "programme_ref", "field", "intake_year", name="uq_os_not_readable"),
+    _in("state", NOT_READABLE_STATES, "ck_os_not_readable_state"),
 )
 
 # P2-T8 (os_0029): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
