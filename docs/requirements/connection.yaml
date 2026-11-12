@@ -18,8 +18,8 @@
 
 phases:
   P0: {name: "Setup and Counsellor fixes", status: done}
-  P1: {name: "Connection core", status: current}
-  P2: {name: "National data system", status: planned}
+  P1: {name: "Connection core", status: done}
+  P2: {name: "National data system", status: current}
   P3: {name: "Intermediate family", status: planned}
   P4: {name: "Bachelor's family", status: planned}
   P5: {name: "Launch", status: planned}
@@ -52,16 +52,16 @@ requirements:
   R-22: {title: "Unanswered requests escalate in order; plan never fails silently", phases: [P1], built: true}
   R-23: {title: "Outside facts are Knowledge records with URL and quote", phases: [P2], built: false}
   R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
-  R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: false}
+  R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: true}
   R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: false}
   R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: false}
   R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: false}
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
   R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: false}
   R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: false}
-  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: false}
-  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: false}
-  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: false}
+  R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
+  R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: true}
+  R-34: {title: "Every institution shows its coverage level", phases: [P2], built: true}
   R-35: {title: "Launch gate: denominator, verified floor and per-region coverage", phases: [P2, P5], built: false}
   R-36: {title: "Two route families as data: pk_intermediate and pk_bachelor", phases: [P3, P4], built: false}
   R-37: {title: "Bachelor family covers every admission system", phases: [P4], built: false}
@@ -69,7 +69,7 @@ requirements:
   R-39: {title: "New replan events for merit lists, fees, results, schedules", phases: [P3, P4], built: false}
   R-40: {title: "New document types as data", phases: [P3, P4], built: false}
   R-41: {title: "Contract level gains intermediate (contract v2)", phases: [P1], built: true}
-  R-42: {title: "Review queue for data checkers with two-person rule", phases: [P2], built: false}
+  R-42: {title: "Review queue for data checkers with two-person rule", phases: [P2], built: true}
   R-43: {title: "Counsellor prompts, policy and pipeline frozen in connection work", phases: [P1], built: true}
   R-44: {title: "Counsellor reads OS data in the same shape as today", phases: [P1], built: true}
   R-45: {title: "OS adds no chat messages", phases: [P1], built: true}
