@@ -1,0 +1,92 @@
+inst_id,check1,note
+PB-MED-001,n/a,unmatched in source file; not checked
+PB-MED-002,correct,Serial 137 read in PMDC PDF; PMDC name 'Allama Iqbal Medical College' equals the batch name once the trailing city is removed.
+PB-MED-003,correct,Serial 148 read in PMDC PDF; PMDC name 'Nishtar Medical College' equals the batch name once the trailing city is removed.
+PB-MED-004,n/a,unmatched in source file; not checked
+PB-MED-005,correct,Serial 154 read in PMDC PDF; PMDC name 'Services Institute of Medical Sciences' equals the batch name once the trailing city is removed.
+PB-MED-006,correct,Serial 149 read in PMDC PDF; PMDC name 'Punjab Medical College' equals the batch name once the trailing city is removed.
+PB-MED-007,correct,Serial 151 read in PMDC PDF; PMDC name 'Rawalpindi Medical College' equals the batch name once the trailing city is removed.
+PB-MED-008,correct,Serial 150 read in PMDC PDF; PMDC name 'Quaid-e-Azam Medical College' equals the batch name once the trailing city is removed.
+PB-MED-009,correct,"Serial 156; PMDC reads 'Sheikh Zayed Medical College,Rahim Yar Khan' (no space after comma, wraps); name equals batch minus ', Rahim Yar Khan'."
+PB-MED-010,correct,Serial 153 read in PMDC PDF; PMDC name 'Sargodha Medical College' equals the batch name once the trailing city is removed.
+PB-MED-011,correct,Serial 147 read in PMDC PDF; PMDC name 'Nawaz Sharif Medical College' equals the batch name once the trailing city is removed.
+PB-MED-012,correct,Serial 152 read in PMDC PDF; PMDC name 'Sahiwal Medical College' equals the batch name once the trailing city is removed.
+PB-MED-013,correct,Serial 143 read in PMDC PDF; PMDC name 'Gujranwala Medical College' equals the batch name once the trailing city is removed.
+PB-MED-014,correct,Serial 140 read in PMDC PDF; PMDC name 'D.G. Khan Medical College' equals the batch name once the trailing city is removed.
+PB-MED-015,correct,Serial 144 read in PMDC PDF; PMDC name 'Khawaja Muhammad Safdar Medical College' equals the batch name once the trailing city is removed.
+PB-MED-016,n/a,unmatched in source file; not checked
+PB-MED-017,n/a,unmatched in source file; not checked
+PB-MED-018,correct,"spelling: batch ""de' Montmorency"" vs PMDC ""De'montmorency"" (serial 178 on PDF); explained in note."
+PB-MED-019,n/a,unmatched in source file; not checked
+PB-MED-020,n/a,unmatched in source file; not checked
+PB-MED-021,n/a,unmatched in source file; not checked
+PB-MED-022,n/a,unmatched in source file; not checked
+PB-MED-023,n/a,unmatched in source file; not checked
+PB-MED-024,n/a,unmatched in source file; not checked
+PB-MED-025,n/a,unmatched in source file; not checked
+PB-MED-026,correct,Serial 48 read in PMDC PDF; PMDC name 'Shalamar Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-027,correct,Serial 49 read in PMDC PDF; PMDC name 'Sharif Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-028,correct,Serial 38 read in PMDC PDF; PMDC name 'Lahore Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-029,correct,Serial 44 read in PMDC PDF; PMDC name 'Rashid Latif Medical College' equals the batch name once the trailing city is removed.
+PB-MED-030,correct,Serial 15 read in PMDC PDF; PMDC name 'Akhtar Saeed Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-031,correct,Serial 30 read in PMDC PDF; PMDC name 'FMH College of Medicine & Dentistry' equals the batch name once the trailing city is removed.
+PB-MED-032,correct,spelling: 'Al-Aleem' vs PMDC 'Al Aleem' (serial 16); explained in note.
+PB-MED-033,n/a,unmatched in source file; not checked
+PB-MED-034,correct,spelling: 'Central Park' vs PMDC 'Central Parks' (serial 23); explained in note.
+PB-MED-035,correct,Serial 42 read in PMDC PDF; PMDC name 'Rahbar Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-036,n/a,unmatched in source file; not checked
+PB-MED-037,n/a,unmatched in source file; not checked
+PB-MED-038,correct,Serial 28 read in PMDC PDF; PMDC name 'Continental Medical College' equals the batch name once the trailing city is removed.
+PB-MED-039,correct,Serial 74 read in PMDC PDF; PMDC name 'Abu Umara Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-040,correct,Serial 19 read in PMDC PDF; PMDC name 'Avicenna Medical College' equals the batch name once the trailing city is removed.
+PB-MED-041,correct,Serial 22 read in PMDC PDF; PMDC name 'Bakhtawar Amin Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-042,correct,Serial 39 read in PMDC PDF; PMDC name 'M. Islam Medical College' equals the batch name once the trailing city is removed.
+PB-MED-043,correct,"Serial 20 'Aziz Fatimah Medical & Dental College' (Faisalabad) read on PDF p.2 image. Batch 'Aziz Fatima ... , Faisalabad' differs only by the final 'h'; the note explains it. City agrees (Faisalabad, hospital Aziz Fatimah Trust Hospital)."
+PB-MED-044,correct,Serial 51 read in PMDC PDF; PMDC name 'Sialkot Medical College' equals the batch name once the trailing city is removed.
+PB-MED-045,wrong,"Serial 53 and the name 'University Medical & Dental College' are right, but the batch name is 'University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad)'. Removing a trailing ', City' does not leave the PMDC name; the extra '(For Women Only) (University of Faisalabad)' is not a spelling difference and the note is empty. Rule not met as written (likely same college by address, Faisalabad); needs an explicit note or unmatched."
+PB-MED-046,correct,Serial 40 read in PMDC PDF; PMDC name 'Multan Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-047,correct,Serial 41 read in PMDC PDF; PMDC name 'Niazi Medical & Dental College' equals the batch name once the trailing city is removed.
+PB-MED-048,unclear,"Serial 56 and the name 'Pak Red Crescent Medical & Dental College' are right and the name matches once ', Kasur' is removed. But PMDC gives the address as '2-Shahra-e-Fatima Jinnah, Lahore' and the hospital as 'Pak Red Crescent Teaching Hospital, Dina Nath, Lahore'. The PDF never says Kasur, so it does not show the batch city (Kasur) is the same campus. Name rule met; city conflict stays open for a person."
+PB-MED-049,correct,Serial 43 read in PMDC PDF; PMDC name 'Rai Medical College' equals the batch name once the trailing city is removed.
+PB-MED-050,correct,Serial 46 read in PMDC PDF; PMDC name 'Sahara Medical College' equals the batch name once the trailing city is removed.
+PB-MED-051,correct,Serial 47 read in PMDC PDF; PMDC name 'Shahida Islam Medical College' equals the batch name once the trailing city is removed.
+PB-MED-052,correct,Serial 34 read in PMDC PDF; PMDC name 'Independent Medical College' equals the batch name once the trailing city is removed.
+PB-MED-053,correct,Serial 35 read in PMDC PDF; PMDC name 'Islam Medical College' equals the batch name once the trailing city is removed.
+PB-MED-054,correct,"Serial 18 and name right; name matches after removing ', Sheikhupura'. PMDC address line says Lahore (M-2 Motorway), but the listed hospital is in Sheikhupura, which agrees with the batch city. Not noted in the file; worth a glance."
+PB-MED-055,correct,Serial 14 read in PMDC PDF; PMDC name 'Abwa Medical College' equals the batch name once the trailing city is removed.
+PB-MED-056,correct,Serial 55 read in PMDC PDF; PMDC name 'Watim Medical College' equals the batch name once the trailing city is removed.
+PB-MED-057,n/a,unmatched in source file; not checked
+PB-MED-058,correct,Serial 84 read in PMDC PDF; PMDC name 'Avicenna Dental College' equals the batch name once the trailing city is removed.
+PB-MED-059,correct,Serial 108 read in PMDC PDF; PMDC name 'Azra Naheed Dental College' equals the batch name once the trailing city is removed.
+PB-MED-060,n/a,unmatched in source file; not checked
+PB-MED-061,correct,"Serial 92; PMDC 'Dental College, Niazi Medical & Dental College Sargodha' (no comma, wraps); equals batch minus ', Sargodha'."
+PB-MED-062,correct,"Serial 94 read in PMDC PDF; PMDC name 'Dental College, University College of Medicine & Dentistry' equals the batch name once the trailing city is removed."
+PB-MED-063,n/a,unmatched in source file; not checked
+PB-MED-064,correct,"Serial 88 read in PMDC PDF; PMDC name 'Dental Section, FMH College of Medicine & Dentistry' equals the batch name once the trailing city is removed."
+PB-MED-065,n/a,unmatched in source file; not checked
+PB-MED-066,correct,"Serial 96 read in PMDC PDF; PMDC name 'Dental Section, Multan Medical & Dental College' equals the batch name once the trailing city is removed."
+PB-MED-067,n/a,unmatched in source file; not checked
+PB-MED-068,n/a,unmatched in source file; not checked
+PB-MED-069,correct,Serial 97 read in PMDC PDF; PMDC name 'Faryal Dental College' equals the batch name once the trailing city is removed.
+PB-MED-070,correct,Serial 102 read in PMDC PDF; PMDC name 'Islam Dental College' equals the batch name once the trailing city is removed.
+PB-MED-071,n/a,unmatched in source file; not checked
+PB-MED-072,correct,"Serial 122; PMDC name includes ', Lahore' and equals the batch name exactly."
+PB-MED-073,correct,Serial 105 read in PMDC PDF; PMDC name 'Rashid Latif Dental College' equals the batch name once the trailing city is removed.
+PB-MED-074,correct,Serial 107 read in PMDC PDF; PMDC name 'Shahida Islam Dental College' equals the batch name once the trailing city is removed.
+PB-MED-075,correct,Serial 106 read in PMDC PDF; PMDC name 'Watim Dental College' equals the batch name once the trailing city is removed.
+SD-MED-01,n/a,unmatched in source file; not checked
+SD-MED-02,n/a,unmatched in source file; not checked
+SD-MED-03,correct,Serial 164 read in PMDC PDF; PMDC name 'Liaquat University of Medical & Health Sciences' equals the batch name once the trailing city is removed.
+SD-MED-04,correct,"Serial 166; PMDC 'Peoples University of Medical & Health Sciences for Women' (wraps); equals batch minus ', SBA' (abbreviation of Shaheed Benazirabad, which PMDC gives in the address)."
+SD-MED-05,n/a,unmatched in source file; not checked
+SD-MED-06,n/a,unmatched in source file; not checked
+SD-MED-07,correct,Serial 161 read in PMDC PDF; PMDC name 'Gambat Medical College' equals the batch name once the trailing city is removed.
+SD-MED-08,correct,Serial 169 read in PMDC PDF; PMDC name 'Khairpur Medical College' equals the batch name once the trailing city is removed.
+SD-MED-09,correct,"Serial 167; PMDC name 'Shaheed Mohtarma Benazir Bhutto Medical College' (wraps), then address 'Behind Lyari General Hospital'; equals batch minus ', Lyari'."
+BL-MED-01,correct,Serial 126 read in PMDC PDF; PMDC name 'Bolan Medical College' equals the batch name once the trailing city is removed.
+BL-MED-02,n/a,unmatched in source file; not checked
+BL-MED-03,n/a,unmatched in source file; not checked
+BL-MED-04,n/a,unmatched in source file; not checked
+IC-MED-01,correct,Serial 142 read in PMDC PDF; PMDC name 'Federal Medical College' equals the batch name once the trailing city is removed.
+IC-MED-02,correct,Serial 155 read in PMDC PDF; PMDC name 'Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College' equals the batch name once the trailing city is removed.
+IC-MED-03,n/a,unmatched in source file; not checked

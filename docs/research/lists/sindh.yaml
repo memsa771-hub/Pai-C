@@ -1,0 +1,84 @@
+# H3, Sindh part (P2 spec §6.2; master R-35a). Researched by Claude, 2026-11-07.
+# Counts were got from the official pages themselves; count_quote is null where no sentence states the count.
+# Check 2 (independent re-download, 2026-11-07) recomputed every count. Walkthroughs: docs/research/walkthroughs/sindh-*.md
+region: sindh
+retrieved: 2026-11-07
+lists:
+  - id: biek-affiliated-government-colleges
+    body: BIEK
+    name: Government Affiliated Colleges
+    url: https://www.biek.edu.pk/gmaleCol.asp
+    institution_type: public_college
+    family: intermediate
+    date: null
+    row_count: 181
+    count_quote: null
+    count_method: counted serials 1-181 in the page text, no gaps
+    read_method: curl + HTML text strip
+    scope: Karachi (BIEK jurisdiction) only
+    check2: correct
+  - id: biek-affiliated-private-colleges
+    body: BIEK
+    name: Private Affiliated Colleges
+    url: https://www.biek.edu.pk/PMaleCol.asp
+    institution_type: private_college
+    family: intermediate
+    date: null
+    row_count: 174
+    count_quote: null
+    count_method: counted serials 1-174 in the page text, no gaps
+    read_method: curl + HTML text strip
+    scope: Karachi (BIEK jurisdiction) only
+    check2: correct
+  - id: seccap-participating-colleges
+    body: College Education Department, Sindh (SECCAP)
+    name: List of Colleges
+    url: https://seccap.dgcs.gos.pk/colleges
+    institution_type: public_college
+    family: intermediate
+    date: null
+    row_count: null
+    status: not_readable   # JavaScript app; batch 3 v4 read 364 (home) vs 376 (directory)
+  - id: hec-recognised-sindh
+    body: HEC
+    name: Recognised Universities (Province = Sindh)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 83   # 35 public, 48 private
+    count_quote: null
+    count_method: markup_count - counted list items with Province='Sindh' in the HTML (unconfirmed on import)
+    read_method: curl + HTML markup count
+    check2: correct
+not_found:
+  - what: College affiliation lists of BISE Hyderabad, Sukkur, Larkana, Mirpurkhas, Shaheed Benazirabad
+    note: not read in this pass
+  - what: A-level schools in Sindh (P2 §11 Q4)
+    note: no official list found
+  - what: Universities & Boards Department, Sindh
+    url: https://www.ubd.gos.pk/
+    note: not readable (proxy 502) on 2026-11-07
+domains:
+  - body: College Education Department, Sindh (SECCAP)
+    domains: [seccap.dgcs.gos.pk]
+    evidence: "page text: 'the official admissions portal of the College Education Department (DGCS), Government of Sindh'"
+  - body: School Education Department, Sindh
+    domains: [sindheducation.gov.pk]
+    evidence: page fetched; lists the BISE boards in its menu
+  - body: BIEK
+    domains: [biek.edu.pk, www.biek.edu.pk]
+    evidence: results, board members and affiliated college pages fetched from it
+  - body: SMBBMU (MBBS/BDS prospectus 2026-27)
+    domains: [admissions.smbbmu.edu.pk, smbbmu.edu.pk]
+    evidence: prospectus PDF fetched; the prospectus lists www.smbbmu.edu.pk
+  - body: other Sindh medical processing universities
+    domains: [duhs.edu.pk, lumhs.edu.pk, pumhs.edu.pk, kmdc.edu.pk]
+    status: candidate
+    evidence: "named in the 2026-27 prospectus contents (e.g. 'www.lumhs.edu.pk'); not fetched"
+  - body: NED UET
+    domains: [neduet.edu.pk, www.neduet.edu.pk]
+    evidence: admission schedule and FAQ PDFs fetched
+  - body: other Sindh boards (BSEK, BISE Hyderabad, Sukkur, Larkana, Mirpurkhas, Shaheed Benazirabad)
+    status: candidate
+    note: domains are in batch 1 v4; not re-read in this pass

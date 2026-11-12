@@ -1,0 +1,17 @@
+# H3, Gilgit-Baltistan part. Researched by Claude, 2026-11-07. Check 2 v2 recomputed every count.
+region: gilgit_baltistan
+retrieved: 2026-11-07
+lists:
+  - {id: gb-doec-public-colleges, body: "Directorate of Education (Colleges) GB", name: List of Public Sector Govenment Colleges in Gilgit Baltistan, url: "https://www.doecgb.gov.pk/institutions", institution_type: public_college, family: intermediate, date: null, row_count: 27, count_quote: null, count_method: counted rows (serials 1-27), check2: correct}
+  - {id: hec-recognised-gb, body: HEC, name: Recognised Universities (Province = Gilgit Baltistan), url: "https://www.hec.gov.pk/english/universities/pages/recognised.aspx", institution_type: university_or_dai, family: bachelor, date: null, row_count: 2, count_quote: null, count_method: markup_count - counted list items in the HTML (unconfirmed on import) (2 public), check2: correct}
+not_found:
+  - what: KIU external examinations 'Affiliated Institutions' list (private colleges / A-level, P2 §11 Q4)
+    note: not opened in this pass
+  - what: Intermediate merit rules, quotas and calendar for GB colleges
+domains:
+  - body: Directorate of Education (Colleges) / Higher Education GB
+    domains: [doecgb.gov.pk, www.doecgb.gov.pk]
+    evidence: institutions, criteria and seat pages fetched
+  - body: Karakoram International University (examinations and admissions)
+    domains: [kiu.edu.pk, examinations.kiu.edu.pk, dapr.kiu.edu.pk]
+    evidence: examinations notifications and BS admission procedure pages fetched

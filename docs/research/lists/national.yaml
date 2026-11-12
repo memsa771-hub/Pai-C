@@ -1,0 +1,107 @@
+# H3, national part (P2 spec §6.2; master R-35a). Researched by Claude, 2026-11-07.
+# Every count was got from the official page itself (see count_method). count_quote is the text that
+# states the count, or null where the page states none and the rows were counted.
+# Check 2 (independent re-download, 2026-11-07) recomputed every count below and got the same numbers.
+# Walkthrough: docs/research/walkthroughs/national.md (lines N-26 to N-29 and the Lists table).
+region: national
+retrieved: 2026-11-07
+lists:
+  - id: hec-recognised-universities
+    body: HEC
+    name: Recognised Universities
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    date: null   # no publication date on the page; HTTP Last-Modified 2026-11-07
+    row_count: 285
+    count_quote: null
+    count_method: "counted list items id='TobeAppend1'..'TobeAppend285' in the HTML; the visible counter ('out of results') is JavaScript-filled"
+    read_method: curl + HTML markup count
+    note: "Batch 1 v4 read 'out of 284 results' on 2026-11-02. Sector attribute: 165 Public, 120 Private."
+    check2: correct
+  - id: hec-recognised-campuses
+    body: HEC
+    name: Recognised campuses of public and private sector universities/DAIs
+    url: https://www.hec.gov.pk/english/universities/Pages/DAIs/HEC-recognized-Campuses.aspx
+    institution_type: university_campus
+    date: null
+    row_count: null   # conflict on the page itself
+    count_quote: "Total No. of Campuses (Both Public and Private) = 96+55=151"
+    count_conflict_quote: "Total: 54"
+    count_method: stated on page; the private section total (54) disagrees with the summary line (55)
+    read_method: curl + HTML text strip
+    status: conflict
+    check2: correct   # the quote is on the page; the conflict is the page's own
+  - id: pmdc-colleges-with-hospitals
+    body: PMDC
+    name: "List of Medical & Dental Colleges with Attached Teaching Hospital(s)"
+    url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf"
+    institution_type: medical_dental_college
+    date: 2026-05-19   # PDF creation date (metadata); the file name says 07-11-2025
+    row_count: 190
+    count_quote: null
+    count_method: "counted serials 1-190 across four sections (private medical 1-77, private dental 78-122, public medical 123-172, public dental 173-190), none missing"
+    read_method: curl + pdftotext (PDF text layer)
+    note: "The list's own note: 'Errors & omissions will be acceptable, if any.' and 'The Recognition status of each medical /dental College is available separately on PM&DC website.'"
+    check2: correct
+  - id: ibcc-registered-qabs
+    body: IBCC
+    name: Registered QABs/Foreign Examination Boards
+    url: https://ibcc.edu.pk/registered-qabs-foreign-examination-boards/
+    institution_type: foreign_qualification_awarding_body
+    date: null   # no update date; latest registration date shown is May 07, 2026
+    row_count: 11
+    count_quote: null
+    count_method: counted table rows, serials 1.-11.
+    read_method: curl + HTML table count
+    check2: correct
+  - id: ibcc-forum-members
+    body: IBCC
+    name: IBCC Forum Members
+    url: https://ibcc.edu.pk/ibcc-forum-members/
+    institution_type: examination_board
+    date: null
+    row_count: 40   # 38 distinct names; 'BISE Larkana' and 'BTBB' appear twice
+    count_quote: null
+    count_method: "counted names in the page text: 24 boards of secondary education, 7 technical boards, 9 other boards"
+    read_method: curl + HTML text strip
+    note: "Not a complete list of boards: it omits BISE Bahawalpur, D.G. Khan, Hyderabad, BSE Karachi, Khuzdar and Turbat, which other sources name. Use the provincial lists as the board denominator."
+    check2: correct
+  - id: hec-accreditation-councils
+    body: HEC
+    name: Accreditation Councils
+    url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+    institution_type: professional_regulator
+    date: null
+    row_count: 15   # 10 existing councils/professional bodies + 5 established by HEC
+    count_quote: null
+    count_method: counted names under the two headings on the page
+    read_method: curl + HTML text strip
+    check2: correct
+not_found:
+  - what: Official list of schools registered for O/A levels (A-level denominator, P2 §11 Q4)
+    note: No national official list found in this pass; record per region (P2 §11 Q4 default).
+  - what: PEC list of accredited engineering programmes
+    url: https://www.pec.org.pk/
+    note: not_readable, HTTP 403 to curl and WebFetch on 2026-11-07; a person must collect it.
+
+# Allow-list domains (R-24). evidence = where the domain was seen on 2026-11-07.
+domains:
+  - body: HEC
+    domains: [hec.gov.pk, www.hec.gov.pk]
+    evidence: pages above fetched from www.hec.gov.pk
+  - body: HEC Education Testing Council
+    domains: [etc.hec.gov.pk]
+    evidence: "HEC ETC FAQ page: 'Candidates can visit https://etc.hec.gov.pk/#/webpage to initiate registration process.'"
+  - body: IBCC
+    domains: [ibcc.edu.pk, equivalence.ibcc.edu.pk, attest.ibcc.edu.pk]
+    evidence: pages fetched from ibcc.edu.pk; the two portals are linked from the IBCC home page
+  - body: PMDC
+    domains: [pmdc.pk, institutions.pmdc.pk]
+    evidence: pages fetched from pmdc.pk; institutions.pmdc.pk is linked from the PMDC home page
+    note: "The MDCAT portal is printed as 'rndcat.prndc.pk' in the OCR text of the registration notice (likely mdcat.pmdc.pk); not added until read on a clean source."
+  - body: FBISE
+    domains: [fbise.edu.pk, www.fbise.edu.pk]
+    evidence: www.fbise.edu.pk returned the page titled 'WELCOME TO FBISE' (HTTP 200)
+  - body: PEC
+    domains: [pec.org.pk, www.pec.org.pk]
+    status: candidate   # site refused reading (403); confirm before activating
