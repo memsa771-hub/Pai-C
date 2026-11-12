@@ -1,4 +1,4 @@
-"""P2-T7: season monitoring, notice windows, the re-check marker, student notices and reports (R-27, R-28; rows 6.23,
+﻿"""P2-T7: season monitoring, notice windows, the re-check marker, student notices and reports (R-27, R-28; rows 6.23,
 6.24). Fictional `.test` sites served by the fixture server; fictional programmes. Verified facts only through review."""
 
 from datetime import UTC, date, datetime
@@ -635,7 +635,7 @@ def test_only_a_high_stakes_fact_under_recheck_blocks_a_step(w):
 
 # --- the migration --------------------------------------------------------------------------------------------------------
 
-def test_os_0030_goes_back_and_refuses_to_lose_records(engine, clean, os_db):
+def test_os_0032_goes_back_and_refuses_to_lose_records(engine, clean, os_db):
     from tests.os.conftest import run_alembic
 
     kb = SqlKnowledge(engine, "pai")
