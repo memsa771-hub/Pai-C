@@ -239,7 +239,7 @@ knowledge_facts = Table(
     Column("fact_class", Text),
     Column("read_method", Text),
     Column("language", Text),
-    # P2-T7 (os_0030): why a fact that went back to unconfirmed is being checked again (monitor or a student report).
+    # P2-T7 (os_0032): why a fact that went back to unconfirmed is being checked again (monitor or a student report).
     Column("recheck_reason", Text),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
                      name="uq_os_knowledge_facts"),
