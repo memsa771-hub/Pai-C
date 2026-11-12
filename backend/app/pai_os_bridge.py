@@ -869,6 +869,21 @@ def complete_step(student_ref: str, task_id: int, payload: dict | None = None) -
         raise StepError("unavailable") from None
 
 
+def merit_check(student_ref: str, programme_ref: str, term: str, year: int) -> dict | None:
+    """PAI OS MeritCheck for one chosen place (a dict valid as `merit_check.v1`; P2 freeze exception 2, R-48). None
+    when PAI OS is not mounted, and on any failure (logged): the Counsellor then shows no merit item."""
+    try:
+        from app.os.contracts.route_contract import IntakeRef
+        from app.os.ports import plan_query
+
+        return plan_query.merit_check(student_ref, programme_ref, IntakeRef(term=term, year=year)).model_dump(mode="json")
+    except ports.OsUnavailable:
+        return None
+    except Exception:
+        log.exception("merit check could not be read; treated as none")
+        return None
+
+
 def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
     """The places for a route and intake, `{ref, name, university}`. `[]` when PAI OS is not mounted, and on any
     failure (logged)."""
