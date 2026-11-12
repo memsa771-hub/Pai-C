@@ -28,7 +28,6 @@ import ctypes
 import glob
 import json
 import os
-import resource
 import select
 import shutil
 import signal
@@ -39,6 +38,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    import resource
+except ImportError:  # not POSIX (Windows): the module still imports, the renderer reports itself unavailable
+    resource = None
 
 CHILD_SCRIPT = Path(__file__).with_name("render_child.py")
 # What a request may be answered with: status, headers, body. None refuses the request.
@@ -271,6 +275,8 @@ class PlaywrightRenderer:
         return self.limits.browser_path or os.environ.get("OS_RENDER_BROWSER") or None
 
     def available(self) -> bool:
+        if resource is None:  # the isolation above needs POSIX (own session, rlimits, process-group kill)
+            return False
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
@@ -297,6 +303,8 @@ class PlaywrightRenderer:
             raise RenderFailed("no browser to run") from e
 
     def render(self, url: str, fetch: Callable[[str, SubLimits], Fetched | None]) -> Rendered:
+        if resource is None:
+            raise RenderFailed("rendering needs a POSIX host (process isolation)")
         lim = self.limits
         deadline = time.monotonic() + lim.timeout_s
         exe = self._executable_or_default()
