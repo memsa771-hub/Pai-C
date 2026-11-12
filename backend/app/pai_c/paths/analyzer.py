@@ -31,6 +31,7 @@ from app.pai_c.deep.analysis import _workspace_lock
 from app.pai_c.deep.context import _json
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.memory import RECORD_SPECS, MemoryService, display_text, result_text as _result_text, vault_catalog
+from app.pai_c.connect import merit
 from app.pai_c.paths import exclusions
 from app.pai_c.paths.fields import Candidate, candidate_fields, current_education, read_education, study_fields
 from app.pai_c.planner.view import build_planner_view
@@ -621,6 +622,7 @@ async def path_analysis_job(job, db) -> dict:
         if analysis is None:
             return {"status": "invalid", "model_calls": 2}
         paths = sanitize(analysis, evidence, dismissed, offered, own, vault=vault)
+        paths = merit.attach(db, job.workspace_id, paths)  # CONNECT_MERIT_ANSWERS (R-48); unchanged while off
         workspace = db.scalar(select(Workspace).where(
             Workspace.id == job.workspace_id, Workspace.status == "active").with_for_update())
         if workspace is None:

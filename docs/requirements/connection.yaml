@@ -54,11 +54,11 @@ requirements:
   R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
   R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: true}
   R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: false}
-  R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: false}
-  R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: false}
+  R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: true}
+  R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: true}
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
-  R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: false}
-  R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: false}
+  R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: true}
+  R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: true}
   R-32: {title: "Institution registry built only from official lists", phases: [P2], built: true}
   R-33: {title: "Registry holds programmes, bodies, systems, tests, categories, calendars", phases: [P2], built: true}
   R-34: {title: "Every institution shows its coverage level", phases: [P2], built: true}
@@ -79,7 +79,7 @@ requirements:
   # the stage A-I replay are done and tagged.
   R-46: {title: "Proof per PR and phase: replays unchanged, live graded run", phases: [P1], built: false}
   R-47: {title: "Counsellor fixes from the live run", phases: [P0], built: true}
-  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: false}
+  R-48: {title: "Merit and admission answers come from MeritCheck and ProgrammeFacts", phases: [P2], built: true}
   R-49: {title: "Stage H lists places from OS registry with coverage level", phases: [P3, P4], built: false}
   R-50: {title: "Study abroad plan renamed My plan everywhere", phases: [P1], built: true}
   R-51: {title: "Each route declares its plan pages", phases: [P1], built: true}

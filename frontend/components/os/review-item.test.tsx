@@ -143,6 +143,24 @@ describe('review item', () => {
     expect(screen.queryByRole('form', { name: 'Your review' })).toBeNull();
   });
 
+  it('a report can be dismissed as "fact stands" or agreed with; a change can stand', () => {
+    const a = actions();
+    render(<ReviewItem detail={detail({ fact: null, snapshot: null }, { kind: 'report' })} reviewer={who('checker')} busy={false} actions={a} />);
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'the page still says so' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fact stands' }));
+    expect(a.resolve).toHaveBeenCalledWith(7, 'stands', 'the page still says so');
+    fireEvent.click(screen.getByRole('button', { name: 'Agree: it is wrong' }));
+    expect(a.resolve).toHaveBeenCalledWith(7, 'agrees', 'the page still says so');
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
+    cleanup();
+    const b = actions();
+    render(<ReviewItem detail={detail({ fact: null, snapshot: null }, { kind: 'change' })} reviewer={who('checker')} busy={false} actions={b} />);
+    expect(screen.queryByRole('button', { name: 'Agree: it is wrong' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'typo fixed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fact stands' }));
+    expect(b.resolve).toHaveBeenCalledWith(7, 'stands', 'typo fixed');
+  });
+
   it('opens an evidence file', () => {
     const a = actions();
     const d = detail({ files: [{ id: 5, filename: 'notice.pdf', content_type: 'application/pdf', size: 10, uploaded_by: 'amina' }] });

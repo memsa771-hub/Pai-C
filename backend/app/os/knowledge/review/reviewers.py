@@ -96,6 +96,12 @@ class ReviewerStore:
             row = conn.execute(select(R).where(R.c.tenant_id == self.tenant_id, R.c.id == reviewer_id)).first()
         return _reviewer(row) if row else None
 
+    def is_approver(self, person: str) -> bool:
+        """Whether `person` (a reviewer ref, any case) is an active approver or admin. This is the `is_approver` check
+        T3's `SourceDomains.reactivate` takes: only a reviewer with that role can set a suspect domain back to active."""
+        row = self.get((person or "").strip().casefold())
+        return row is not None and row.active and row.role in ("approver", "admin")
+
     def list(self) -> list[Reviewer]:
         with self.engine.connect() as conn:
             rows = conn.execute(select(R).where(R.c.tenant_id == self.tenant_id).order_by(R.c.id)).all()

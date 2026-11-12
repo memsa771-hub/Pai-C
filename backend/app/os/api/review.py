@@ -168,6 +168,18 @@ def add_review_routes(router: APIRouter, services: Callable[[], Services], requi
             "Content-Disposition": safe_disposition("inline" if inline else "attachment", meta["filename"]),
             "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "no-store"})
 
+    @router.get("/review/snapshots/{snapshot_id}/original")
+    def snapshot_original(snapshot_id: int, who: Reviewer = Depends(reviewer),
+                          svc: Services = Depends(services)) -> Response:
+        """The PDF or image a snapshot was read from (T3 stores those two kinds only), for the review screen."""
+        try:
+            data, ctype = queue_for(svc).snapshot_original(snapshot_id)
+        except ReviewError as e:
+            raise _fail(e) from None
+        return Response(content=data, media_type=ctype, headers={
+            "Content-Disposition": safe_disposition("inline", f"original-{snapshot_id}"),
+            "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox", "Cache-Control": "no-store"})
+
     @router.post("/review/batches/{batch_ref}/attest")
     def attest(batch_ref: str, who: Reviewer = Depends(reviewer), svc: Services = Depends(services)) -> dict:
         try:
