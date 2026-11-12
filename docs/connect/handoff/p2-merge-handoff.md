@@ -1,5 +1,7 @@
 # P2 merge handoff: where the P2 task branches stand (2026-11-12)
 
+> **Superseded for the work after T8** by `p2-local-handoff.md` (2026-11-12). Sections 1 and 5 (local setup) still apply.
+
 **A new session reads this first, then `docs/connect/handoff/p1-handoff.md` and the P2 spec.** The spec is
 `docs/superpowers/specs/2026-11-07-p2-national-data-design.md`; §5 has the rules for every P2 task and §6 lists the
 task groups. This note covers only where the merges into `pai-connect` stand and how to finish them.
