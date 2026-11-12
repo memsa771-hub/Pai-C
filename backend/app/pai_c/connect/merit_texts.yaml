@@ -1,0 +1,31 @@
+# What the student reads in a path's merit item when CONNECT_MERIT_ANSWERS is on (P2 freeze exception 2, R-48,
+# P2 spec §4.10). Every number comes from MeritCheck, never from the model. Plain English. No country, institution or
+# date in the text itself: names, numbers and years are filled in from MeritCheck and the student's chosen places.
+# Student sentences: standing owner approval (listed in the PR body). If `approved` is set to false, no merit item is
+# shown unless CONNECT_CONSENT_DRAFT is on (rehearsal).
+version: "1"
+approved: true
+
+label: "Merit for {place}"
+place_fallback: "your choice {rank}"
+
+status:
+  computed: "By the published formula your merit aggregate is {aggregate} out of {total}."
+  missing: "PAI cannot work out your merit yet: your {parts} marks are missing. Add them to your Vault."
+  not_confirmed_marks: "PAI cannot work out your merit yet: some of your marks do not add up. PAI will ask which is right."
+  not_confirmed_formula: "The merit formula for this place is not confirmed yet, so PAI does not work out a number."
+
+# The weakest evidence among the marks used (T10 note M5): a stated-only aggregate is never shown as firm.
+evidence:
+  stated: "It uses marks you told PAI; upload your result card to confirm them."
+  shown: "It uses marks from a document you uploaded."
+  confirmed: ""
+
+closing:
+  verified: "Closing merit {intake}: {value}."
+  partial_list: "Lowest merit on list {list} {intake}: {value}."
+  not_confirmed: "Closing merit {intake}: not confirmed."
+  term_not_recorded: "term not recorded"
+
+# Always said: MeritCheck never predicts a chance (R-31).
+no_chance: "This is not a chance of admission."
