@@ -54,9 +54,10 @@ Figma board (locked): https://www.figma.com/board/NjVJfdxERWfRHPycy1wDkF
   squash-merged. Nothing merges into `pai-merge` until the whole plan is complete (owner, P0-D14); then merge with a
   merge commit. Phase handoffs are signed off by the owner alone (P0-D13).
 
-## Current direction (4 Nov 2026)
-- Connection work per the master spec. P0 done (signed off 4 Nov). Now: phase P1 (connection core), phase spec
-  docs/superpowers/specs/2026-11-04-p1-connection-core-design.md. Next: P2.
+## Current direction (7 Nov 2026)
+- Connection work per the master spec. P0 done (signed off 4 Nov). P1 done (signed off 7 Nov; handoff
+  docs/connect/handoff/p1-handoff.md). Now: phase P2 (national data system); its phase spec is drafted and awaits the
+  owner's approval. Research batches 1-5 (v4) are on branch pc/p2-research-batches. Next: P3.
 
 ## PAI OS working rules
 These rules apply to PAI OS work: code under `backend/app/os`, `backend/app/pai_os_bridge.py`,
