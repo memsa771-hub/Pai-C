@@ -467,3 +467,19 @@ the dashboard's workload figure replaces them.
   - The rule that the two checks must be independent stays: check 2 never sees check 1's verdict before it gives its own.
   - The review queue keeps reviewer identities (P2-D15), so people can take over later without changing the code.
 - **Q4 (the A-level denominator)** takes the default.
+
+### 11.3 Owner rulings on the batch import (chat, 2026-11-08)
+- **Model- or image-read rows in batches 1–5 v4** (34 facts in the dry run, about 39 once all lists are loaded): both AI checks accepted these rows, so the owner accepts them as `verified` **without** the R-68 re-fetch quote match. This is an owner-accepted deviation from R-68, and it applies only to the `--owner-accepted` import of these batches. It is recorded in the provenance of each fact and in the P2 handoff. Later batches still need the re-fetch.
+- **Rows whose intake is "standing", "current" or "previous cycle":** they go to the review queue as `intake_unresolved`, and a check assigns the intake year from the source. Nothing is guessed.
+- **Intake text rules (2026-11-08):** approved as proposed in T6 `format.yaml`.
+  - `Fall|Spring|Summer|Autumn|Winter YYYY` becomes that term and year.
+  - `Session YYYY-YY` and `YYYY-YY` become term `session` and the first year.
+  - `Batch YYYY` and `Annual YYYY` become term `batch` or `annual` and year YYYY.
+  - A bare `YYYY` becomes the year with no term.
+  - Anything else is queued as `intake_unresolved`.
+- **Sindh seat rows (2026-11-08):** 110 rows carry the seat number only inside their quote. Research re-enters each value from its quote into the value column, and both AI checks then re-check those rows. Nothing is parsed automatically.
+- **Student reports on shared facts (2026-11-08, refines P2-D22/R-28):**
+  - When a student reports a fact, it shows as "not confirmed" to everyone at once.
+  - Only the reporting student's own steps wait.
+  - Other students' steps keep running until a reviewer agrees, or until 3 different students report the same fact.
+  - A report the reviewer dismisses puts the fact back to the status it had before.
