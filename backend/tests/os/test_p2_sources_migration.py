@@ -1,4 +1,4 @@
-"""P2-T3: migration os_0027 (`os_source_domains`, `os_page_snapshots`, `os_source_files`). Fictional data."""
+"""P2-T3: migration os_0028 (`os_source_domains`, `os_page_snapshots`, `os_source_files`). Fictional data."""
 
 import subprocess
 
@@ -32,12 +32,12 @@ def test_downgrade_refused_with_rows_then_clean(os_db, engine, clean):
         conn.execute(insert(models.source_domains).values(tenant_id="pai", domain="a.test"))
     engine.dispose()
     with pytest.raises(subprocess.CalledProcessError):
-        run_alembic(["downgrade", "os_0026"], os_db)
+        run_alembic(["downgrade", "os_0027"], os_db)
     eng = create_engine(os_db)
     with eng.begin() as conn:
         conn.execute(models.source_domains.delete())
     eng.dispose()
-    run_alembic(["downgrade", "os_0026"], os_db)
+    run_alembic(["downgrade", "os_0027"], os_db)
     try:
         eng = create_engine(os_db)
         try:
