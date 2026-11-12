@@ -211,12 +211,30 @@ class SourceCheck(_Model):
 _SOURCE_ID = re.compile(r"S\d+")
 
 
+class AppliesTo(_Model):
+    """P2-D25 / R-65: the intakes a playbook version is for. `term` (any term when left out) and `from_year`: the first
+    intake year it applies to. A version with no `applies_to` applies to every intake. Pinned plans do not move."""
+    term: str | None = None
+    from_year: int = Field(ge=2000)
+
+    @field_validator("term")
+    @classmethod
+    def _plain_term(cls, term: str | None) -> str | None:
+        if term is not None and not re.fullmatch(r"[a-z_]+", term):
+            raise ValueError(f"intake term '{term}' must be lowercase letters and underscores")
+        return term
+
+    def covers(self, term: str, year: int) -> bool:
+        return (self.term is None or self.term == term) and year >= self.from_year
+
+
 class Playbook(_Model):
     key: str
     version: int = Field(ge=1)
     route: Route
     default_timezone: str
     require_citations: bool = False
+    applies_to: AppliesTo | None = None  # P2-D25: the intakes this version is for; None = all
     intake_terms: list[str] = []  # the intake terms the route offers (D-g), e.g. one lowercase word per term
     constants: dict[str, Constant] = {}
     tasks: list[TaskTemplate]
@@ -249,6 +267,13 @@ class Playbook(_Model):
         except (ZoneInfoNotFoundError, ValueError):
             raise ValueError(f"unknown timezone '{tz}'") from None
         return tz
+
+    @model_validator(mode="after")
+    def _applies_to_a_declared_term(self) -> "Playbook":
+        if self.applies_to and self.applies_to.term and self.intake_terms \
+                and self.applies_to.term not in self.intake_terms:
+            raise ValueError(f"applies_to term '{self.applies_to.term}' is not one of intake_terms")
+        return self
 
     @model_validator(mode="after")
     def _references_resolve(self) -> "Playbook":

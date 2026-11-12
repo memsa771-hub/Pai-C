@@ -2,8 +2,8 @@
 `os_pages` gains `read_method` (default 'fetch') and `language`, so a cached OCR page is never mistaken for a
 fetched one. New table `os_not_readable`.
 
-Revision ID: os_0027
-Revises: os_0026
+Revision ID: os_0030
+Revises: os_0029
 Create Date: 2026-11-07
 
 Self-contained on purpose: it does not import app.os, so later model changes cannot rewrite history.
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "os_0027"
-down_revision = "os_0026"
+revision = "os_0030"
+down_revision = "os_0029"
 branch_labels = None
 depends_on = None
 
@@ -53,11 +53,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.{N} LIMIT 1")).first():
-        raise RuntimeError("os_0027 downgrade refused: os_not_readable holds rows (no silent loss)")
+        raise RuntimeError("os_0030 downgrade refused: os_not_readable holds rows (no silent loss)")
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_pages WHERE read_method <> 'fetch' LIMIT 1")).first():
-        raise RuntimeError("os_0027 downgrade refused: cached pages record how they were read")
+        raise RuntimeError("os_0030 downgrade refused: cached pages record how they were read")
     if conn.execute(sa.text(f"SELECT 1 FROM {S}.os_page_snapshots WHERE length(language) = 4 LIMIT 1")).first():
-        raise RuntimeError("os_0027 downgrade refused: snapshots carry script tags")
+        raise RuntimeError("os_0030 downgrade refused: snapshots carry script tags")
     op.drop_constraint("ck_os_page_snapshots_language", "os_page_snapshots", schema=S)
     op.create_check_constraint("ck_os_page_snapshots_language", "os_page_snapshots",
                                "language IS NULL OR language ~ '^[a-z]{2,3}$'", schema=S)

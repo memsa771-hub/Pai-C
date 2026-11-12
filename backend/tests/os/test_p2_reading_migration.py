@@ -1,4 +1,4 @@
-"""P2-T4: migration os_0027 (`os_pages.read_method/language`, `os_not_readable`, script tags on snapshots)."""
+"""P2-T4: migration os_0030 (`os_pages.read_method/language`, `os_not_readable`, script tags on snapshots)."""
 
 import subprocess
 
@@ -40,19 +40,19 @@ def test_downgrade_refuses_with_rows_then_restores_the_old_shape(os_db, engine, 
         conn.execute(insert(models.not_readable).values(tenant_id="pai", url="u", reason="x"))
     engine.dispose()
     with pytest.raises(subprocess.CalledProcessError):
-        run_alembic(["downgrade", "os_0026"], os_db)
+        run_alembic(["downgrade", "os_0029"], os_db)
     eng = create_engine(os_db)
     with eng.begin() as conn:
         conn.execute(models.not_readable.delete())
         conn.execute(insert(models.page_snapshots).values(snap(language="arab")))
     eng.dispose()
     with pytest.raises(subprocess.CalledProcessError):
-        run_alembic(["downgrade", "os_0026"], os_db)  # a snapshot carries a script tag: no silent loss
+        run_alembic(["downgrade", "os_0029"], os_db)  # a snapshot carries a script tag: no silent loss
     eng = create_engine(os_db)
     with eng.begin() as conn:
         conn.execute(models.page_snapshots.delete())
     eng.dispose()
-    run_alembic(["downgrade", "os_0026"], os_db)
+    run_alembic(["downgrade", "os_0029"], os_db)
     try:
         eng = create_engine(os_db)
         try:
