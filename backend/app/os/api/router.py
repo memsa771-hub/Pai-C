@@ -111,6 +111,7 @@ from app.os.replan import choice_texts
 from app.os.routes import builder
 from app.os.kernel import IllegalTransition
 from app.os.kernel.revisions import NOTICE_PREFIX
+from app.os.intakes import IntakeError
 from app.os.playbooks import PlaybookError
 from app.os.requests import answers as request_answers, gate as needs_gate, store as request_store, texts as request_texts
 from app.os.requests.refresh import refresh
@@ -177,7 +178,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     def post_plan(contract: RouteContract, response: Response, svc: Services = Depends(services)) -> dict:
         try:
             ref = svc.plans.start_plan(contract)
-        except (PlaybookError, CompileError) as e:
+        except (PlaybookError, CompileError, IntakeError) as e:
             raise HTTPException(status_code=422, detail=str(e)) from None
         if not ref.created:
             response.status_code = 200

@@ -5,6 +5,7 @@ from app.os.playbooks.loader import (
 )
 from app.os.playbooks.models import (
     Anchor,
+    AppliesTo,
     Ask,
     Citation,
     Condition,
@@ -23,7 +24,7 @@ from app.os.playbooks.models import (
 )
 
 __all__ = [
-    "PAGE_KEYS", "PLAYBOOK_DIR", "REQUEST_TEMPLATES", "Anchor", "Ask", "Citation", "Condition", "Constant",
+    "PAGE_KEYS", "PLAYBOOK_DIR", "REQUEST_TEMPLATES", "Anchor", "AppliesTo", "Ask", "Citation", "Condition", "Constant",
     "Dependency", "Expected", "LeadTime", "Need", "Page", "Playbook", "PlaybookError", "Route", "SourceCheck",
     "TaskTemplate", "load_playbook", "load_playbook_dir", "newest_plain", "select_playbook",
 ]

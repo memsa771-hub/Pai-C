@@ -61,14 +61,18 @@ def load_playbook_dir(directory: Path = PLAYBOOK_DIR) -> dict[tuple[str, int], P
 
 
 def select_playbook(
-    books: Mapping[tuple[str, int], Playbook], origin: str, destination: str, level: str, *, with_needs: bool = False
+    books: Mapping[tuple[str, int], Playbook], origin: str, destination: str, level: str, *, with_needs: bool = False,
+    intake: tuple[str, int] | None = None,
 ) -> Playbook:
     """The newest playbook for the route. A playbook that declares `needs` is chosen only when the caller asks
-    (`with_needs`), and the caller asks only while the student's needs gate is on (P1-T8, D-w3)."""
+    (`with_needs`), and the caller asks only while the student's needs gate is on (P1-T8, D-w3).
+    `intake` (term, year): a version whose `applies_to` does not cover it is left out (P2-D25, R-65); without it
+    `applies_to` is ignored and the newest wins, as before."""
     matches = [
         b for b in books.values()
         if (b.route.origin, b.route.destination, b.route.level) == (origin, destination, level)
         and (with_needs or not b.declares_needs)
+        and (intake is None or b.applies_to is None or b.applies_to.covers(*intake))
     ]
     if not matches:
         raise PlaybookError(f"no playbook for {origin}->{destination} {level}")
