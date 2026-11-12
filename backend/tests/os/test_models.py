@@ -56,13 +56,13 @@ def test_os_tables_present():
         "os_consistency_cases", "os_consistency_runs",
         # P2-T1 (os_0025)
         "os_fact_revisions",
-        # P2-T2 (os_0026)
+        # P2-T2 (os_0027)
         "os_registry", "os_registry_revisions", "os_registry_links",
-        # P2-T3 (os_0027)
+        # P2-T3 (os_0028)
         "os_source_domains", "os_page_snapshots", "os_source_files",
-        # P2-T5 (os_0028)
+        # P2-T5 (os_0026)
         "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
-        # P2-T7 (os_0030)
+        # P2-T7 (os_0032)
         "os_fact_reports", "os_monitor_runs", "os_monitor_seen",
         # P2-T8 (os_0029)
         "os_intakes", "os_fact_slots",
