@@ -101,6 +101,7 @@ from app.os import inbox_actions
 from app.os.inbox_actions import StepActionError
 from app.os.api.packs import add_pack_routes, add_visa_routes, complete_ready_packs
 from app.os.api.consistency import add_consistency_routes
+from app.os.api.coverage import add_coverage_routes
 from app.os.api.registry import add_registry_routes
 from app.os.api.report import add_report_routes
 from app.os.api.imports import add_import_routes
@@ -692,6 +693,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     add_replan_routes(router, services, require_admin)  # Slice 7 (spec §4)
     add_consistency_routes(router, services, require_admin)  # P1-T10 (R-05)
     add_registry_routes(router, services, require_admin)  # P2-T2 (R-32, R-33, R-34)
+    add_coverage_routes(router, services, require_admin)  # P2-T9 (R-34, R-35, R-66)
     add_import_routes(router, services, require_admin)  # P2-T6 (R-67, R-68)
     add_review_routes(router, services, require_admin)  # P2-T5 (R-25, R-42)
     if get_services().settings.reports:  # P2-T7 (R-28): absent without OS_REPORTS, so 404

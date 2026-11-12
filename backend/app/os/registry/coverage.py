@@ -50,6 +50,50 @@ def _high_stakes(field: str, explicit: str | None) -> bool:
         return is_high_stakes(UNCLASSIFIED)
 
 
+def ownership(conn, tenant_id: str, insts) -> tuple[dict, set]:
+    """Whose facts count for which institution (the one resolution used by the level and by the launch gate): the map
+    (fact scope, ref) -> institutions it counts for, and the set of the institutions' own refs (the institutions, their
+    campuses and their programmes). Admission systems that admit an institution, a campus or one of its programmes, with
+    their tests, seat categories, calendars and children, are shared, not own."""
+    owned: dict[tuple[str, str], set[str]] = defaultdict(set)  # (fact scope, ref) -> institutions it counts for
+    own: set[tuple[str, str]] = set()  # the institutions, campuses and programmes: facts of the institution itself
+    for i in insts:
+        owned[("registry", i)].add(i)
+        own.add(("registry", i))
+    campus_of: dict[str, str] = {}
+    for r in conn.execute(select(R.c.entity_id, R.c.parent_id).where(
+            R.c.tenant_id == tenant_id, R.c.kind == "campus", R.c.parent_id.in_(list(insts)))):
+        owned[("registry", r.entity_id)].add(r.parent_id)
+        campus_of[r.entity_id] = r.parent_id
+        own.add(("registry", r.entity_id))
+    for r in conn.execute(select(P.c.ref, P.c.institution_id).where(
+            P.c.tenant_id == tenant_id, P.c.institution_id.in_(list(insts)))):
+        owned[("programme", r.ref)].add(r.institution_id)
+        own.add(("programme", r.ref))
+    # admission systems that admit an institution, a campus, or one of its programmes
+    admitted: dict[str, set[str]] = defaultdict(set)  # system -> institutions
+    for r in conn.execute(select(L.c.from_id, L.c.to_kind, L.c.to_id).where(
+            L.c.tenant_id == tenant_id, L.c.rel == "admits")):
+        if r.to_kind == "registry":
+            target = r.to_id if r.to_id in insts else campus_of.get(r.to_id)
+            if target:
+                admitted[r.from_id].add(target)
+        else:
+            admitted[r.from_id].update(owned.get(("programme", r.to_id), ()))
+    admitted = {k: v for k, v in admitted.items() if v}
+    if admitted:
+        for system, owners in admitted.items():
+            owned[("registry", system)].update(owners)
+        for r in conn.execute(select(L.c.from_id, L.c.to_id).where(
+                L.c.tenant_id == tenant_id, L.c.rel.in_(("uses_test", "has_category")),
+                L.c.from_id.in_(list(admitted)), L.c.to_kind == "registry")):
+            owned[("registry", r.to_id)].update(admitted[r.from_id])
+        for r in conn.execute(select(R.c.entity_id, R.c.parent_id).where(
+                R.c.tenant_id == tenant_id, R.c.parent_id.in_(list(admitted)))):
+            owned[("registry", r.entity_id)].update(admitted[r.parent_id])
+    return owned, own
+
+
 def coverage_map(engine: Engine, tenant_id: str, intake_year: int, *, intake_term: str | None = None,
                  region: str | None = None) -> dict[str, Coverage]:
     """The coverage of every active institution (of one region if given) for the intake. `intake_term=None` reads
@@ -62,42 +106,7 @@ def coverage_map(engine: Engine, tenant_id: str, intake_year: int, *, intake_ter
         insts = {r.entity_id: bool(r.attrs.get("not_readable")) for r in conn.execute(q.order_by(R.c.id))}
         if not insts:
             return {}
-        owned: dict[tuple[str, str], set[str]] = defaultdict(set)  # (fact scope, ref) -> institutions it counts for
-        own: set[tuple[str, str]] = set()  # the institutions, campuses and programmes: facts of the institution itself
-        for i in insts:
-            owned[("registry", i)].add(i)
-            own.add(("registry", i))
-        campus_of: dict[str, str] = {}
-        for r in conn.execute(select(R.c.entity_id, R.c.parent_id).where(
-                R.c.tenant_id == tenant_id, R.c.kind == "campus", R.c.parent_id.in_(list(insts)))):
-            owned[("registry", r.entity_id)].add(r.parent_id)
-            campus_of[r.entity_id] = r.parent_id
-            own.add(("registry", r.entity_id))
-        for r in conn.execute(select(P.c.ref, P.c.institution_id).where(
-                P.c.tenant_id == tenant_id, P.c.institution_id.in_(list(insts)))):
-            owned[("programme", r.ref)].add(r.institution_id)
-            own.add(("programme", r.ref))
-        # admission systems that admit an institution, a campus, or one of its programmes
-        admitted: dict[str, set[str]] = defaultdict(set)  # system -> institutions
-        for r in conn.execute(select(L.c.from_id, L.c.to_kind, L.c.to_id).where(
-                L.c.tenant_id == tenant_id, L.c.rel == "admits")):
-            if r.to_kind == "registry":
-                target = r.to_id if r.to_id in insts else campus_of.get(r.to_id)
-                if target:
-                    admitted[r.from_id].add(target)
-            else:
-                admitted[r.from_id].update(owned.get(("programme", r.to_id), ()))
-        admitted = {k: v for k, v in admitted.items() if v}
-        if admitted:
-            for system, owners in admitted.items():
-                owned[("registry", system)].update(owners)
-            for r in conn.execute(select(L.c.from_id, L.c.to_id).where(
-                    L.c.tenant_id == tenant_id, L.c.rel.in_(("uses_test", "has_category")),
-                    L.c.from_id.in_(list(admitted)), L.c.to_kind == "registry")):
-                owned[("registry", r.to_id)].update(admitted[r.from_id])
-            for r in conn.execute(select(R.c.entity_id, R.c.parent_id).where(
-                    R.c.tenant_id == tenant_id, R.c.parent_id.in_(list(admitted)))):
-                owned[("registry", r.entity_id)].update(admitted[r.parent_id])
+        owned, own = ownership(conn, tenant_id, insts)
         by_scope: dict[str, list[str]] = defaultdict(list)
         for scope, ref in owned:
             by_scope[scope].append(ref)
