@@ -29,6 +29,7 @@ class OsSettings:
     fetch_host_interval_s: float = 2.0  # research: minimum seconds between requests to one host
     page_ttl_h: float = 24.0  # research: how long a fetched page is reused
     page_max_bytes: int = 5_000_000  # research: larger pages are refused
+    source_guard: bool = False  # P2-T3: allow-lists, integrity checks and snapshots in the page gateway (OS_SOURCE_GUARD)
     # List prices, USD per 1M tokens (parent §9; cheap checked 2026-10-13, strong 2026-10-21 on
     # developers.openai.com/api/docs/pricing, under 272K context). None = not known yet: cost() refuses.
     price_cheap_in: float | None = 0.75
@@ -114,6 +115,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         fetch_host_interval_s=float(env.get("OS_FETCH_HOST_INTERVAL_S") or 2.0),
         page_ttl_h=float(env.get("OS_PAGE_TTL_H") or 24.0),
         page_max_bytes=int(env.get("OS_PAGE_MAX_BYTES") or 5_000_000),
+        source_guard=flag(env, "OS_SOURCE_GUARD"),
         price_cheap_in=_price(env, "OS_PRICE_CHEAP_IN", 0.75),
         price_cheap_cached=_price(env, "OS_PRICE_CHEAP_CACHED", 0.075),
         price_cheap_out=_price(env, "OS_PRICE_CHEAP_OUT", 4.50),

@@ -38,8 +38,20 @@ FACT_SOURCES = ("seed", "manual", "research")
 FACT_STATUSES = ("confirmed", "unconfirmed", "stale", "verified")  # P2-D6: `verified` is confirmed + two reviews
 READ_METHODS = ("fetch", "render", "ocr", "human", "model")  # P2-D11/D18: how the fact's source text was read
 REVISION_ACTIONS = ("insert", "change", "status", "undo")
-REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover",
-                    "backfill")
+REVIEWER_ROLES = ("checker", "approver", "admin")  # P2-D15
+REVIEWER_KINDS = ("person", "ai")  # owner ruling 2026-11-07: an AI check may count as a check; a person can replace it
+REVIEW_ITEM_KINDS = ("verify", "report", "change", "suspect_domain", "collect", "conflict", "import_dispute")
+REVIEW_STEPS = ("check", "approve", "collect")
+REVIEW_OUTCOMES = ("correct", "wrong", "unclear", "approve", "reject", "collected")
+REVISION_CAUSES = ("seed", "manual", "research", "import", "review", "monitor", "report", "rollover")
+FACT_REVISION_CAUSES = (*REVISION_CAUSES, "backfill")  # P2-T8: the intake_term backfill (fact revisions only)
+FACT_SCOPES = ("route", "programme", "registry")  # P2-T2: `registry` = a fact about a registry entity
+REGISTRY_KINDS = ("regulator", "board", "admission_body", "admission_system", "entry_test", "institution", "campus",
+                  "seat_category", "calendar", "official_list")  # P2 spec §4.1: generic concepts; instances are data
+REGISTRY_STATUSES = ("active", "closed", "merged", "renamed")
+REGISTRY_LINK_RELS = ("uses_test", "has_category", "admits")
+REGISTRY_LINK_TO = ("registry", "programme")
+REGISTRY_REVISION_KINDS = ("entity", "link", "programme")  # what a registry revision is about (subject says which)
 
 md = OsBase.metadata
 
@@ -229,7 +241,7 @@ knowledge_facts = Table(
     Column("language", Text),
     UniqueConstraint("tenant_id", "scope", "ref", "field", "intake_term", "intake_year", "owner_ref",
                      name="uq_os_knowledge_facts"),
-    _in("scope", ("route", "programme"), "ck_os_knowledge_facts_scope"),
+    _in("scope", FACT_SCOPES, "ck_os_knowledge_facts_scope"),
     _in("status", FACT_STATUSES, "ck_os_knowledge_facts_status"),
     _in("source", FACT_SOURCES, "ck_os_knowledge_facts_source"),
     _in("read_method", READ_METHODS, "ck_os_knowledge_facts_read_method"),
@@ -249,9 +261,166 @@ fact_revisions = Table(
     Column("actor", Text),
     Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     _in("action", REVISION_ACTIONS, "ck_os_fact_revisions_action"),
-    _in("cause", REVISION_CAUSES, "ck_os_fact_revisions_cause"),
+    _in("cause", FACT_REVISION_CAUSES, "ck_os_fact_revisions_cause"),
     Index("ix_os_fact_revisions_fact", "tenant_id", "fact_id", "id"),
     Index("ix_os_fact_revisions_cause", "tenant_id", "cause", "cause_ref"),
+)
+
+# P2-T2 (P2 spec §4.1, P2-D2): the registry of institutions, bodies, systems, tests, categories, calendars and the
+# official lists they came from. Standing facts are columns (P2-D4); cycle-bound facts are Knowledge facts of scope
+# `registry`. Rows are never deleted: a closed or merged entity keeps its row (R-60).
+registry = Table(
+    "os_registry", md,
+    _id(), _tenant(),
+    Column("entity_id", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("parent_id", Text),
+    Column("region", Text),
+    Column("institution_type", Text),
+    Column("name", Text, nullable=False),
+    Column("aliases", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("official_domains", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("status", Text, nullable=False, server_default="active"),
+    Column("successor_id", Text),
+    Column("list_ids", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("source_url", Text, nullable=False),
+    Column("quote", Text, nullable=False, server_default=""),
+    Column("checked_at", DateTime(timezone=True), nullable=False),
+    Column("attrs", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    _created(),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "entity_id", name="uq_os_registry_entity"),
+    _in("kind", REGISTRY_KINDS, "ck_os_registry_kind"),
+    _in("status", REGISTRY_STATUSES, "ck_os_registry_status"),
+    Index("ix_os_registry_kind_region", "tenant_id", "kind", "region"),
+    Index("ix_os_registry_parent", "tenant_id", "parent_id"),
+)
+
+registry_revisions = Table(  # append only, like os_fact_revisions (P2-D9)
+    "os_registry_revisions", md,
+    _id(), _tenant(),
+    Column("registry_id", BigInteger, ForeignKey("os.os_registry.id", ondelete="RESTRICT"), nullable=False),
+    Column("kind", Text, nullable=False, server_default="entity"),  # entity | link | programme (what was changed)
+    Column("subject", Text),  # link: 'rel:to_kind:to_id'; programme: its ref; entity: NULL
+    Column("action", Text, nullable=False),
+    Column("before", JSONB),
+    Column("after", JSONB, nullable=False),
+    Column("cause", Text, nullable=False),
+    Column("cause_ref", Text),
+    Column("actor", Text),
+    Column("at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    _in("kind", REGISTRY_REVISION_KINDS, "ck_os_registry_revisions_kind"),
+    _in("action", REVISION_ACTIONS, "ck_os_registry_revisions_action"),
+    _in("cause", REVISION_CAUSES, "ck_os_registry_revisions_cause"),
+    Index("ix_os_registry_revisions_entity", "tenant_id", "registry_id", "id"),
+)
+
+registry_links = Table(  # an admission system's tests, seat categories and what it admits (P2 spec §4.1)
+    "os_registry_links", md,
+    _id(), _tenant(),
+    Column("from_id", Text, nullable=False),
+    Column("rel", Text, nullable=False),
+    Column("to_kind", Text, nullable=False),
+    Column("to_id", Text, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "from_id", "rel", "to_kind", "to_id", name="uq_os_registry_links"),
+    _in("rel", REGISTRY_LINK_RELS, "ck_os_registry_links_rel"),
+    _in("to_kind", REGISTRY_LINK_TO, "ck_os_registry_links_to_kind"),
+    Index("ix_os_registry_links_to", "tenant_id", "to_kind", "to_id"),
+)
+
+# P2-T5 (os_0026, P2 §4.5, P2-D15, P2-D16): reviewers, the review queue, every check, evidence files, attestations.
+reviewers = Table(
+    "os_reviewers", md,
+    _id(), _tenant(),
+    Column("ref", Text, nullable=False),  # the reviewer's id in checks and spreadsheets, e.g. a name or ai_check_1
+    Column("display_name", Text, nullable=False),
+    Column("identity", Text, nullable=False),  # the person or the model and prompt behind the ref; checks need two
+    Column("role", Text, nullable=False),
+    Column("kind", Text, nullable=False, server_default="person"),
+    Column("token_hash", Text, nullable=False),  # sha256 of the personal token (the token is shown once)
+    Column("active", Boolean, nullable=False, server_default=text("true")),
+    _created(),
+    Column("disabled_at", DateTime(timezone=True)),
+    UniqueConstraint("tenant_id", "ref", name="uq_os_reviewers_ref"),
+    UniqueConstraint("token_hash", name="uq_os_reviewers_token"),
+    _in("role", REVIEWER_ROLES, "ck_os_reviewers_role"),
+    _in("kind", REVIEWER_KINDS, "ck_os_reviewers_kind"),
+)
+
+review_items = Table(
+    "os_review_items", md,
+    _id(), _tenant(),
+    Column("kind", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default="open"),
+    Column("resolution", Text),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT")),
+    Column("subject", Text, nullable=False, server_default=""),  # what a fact-less item is about (a domain, a source)
+    Column("field", Text),
+    Column("intake_term", Text, nullable=False, server_default=""),
+    Column("intake_year", Integer),
+    Column("owner_ref", Text, nullable=False, server_default=""),
+    Column("summary", Text, nullable=False, server_default=""),
+    Column("payload", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("batch_ref", Text),
+    Column("dedupe_key", Text, nullable=False),
+    Column("join_count", Integer, nullable=False, server_default="0"),  # the same thing reported again joins the item
+    Column("opened_by", Text, nullable=False, server_default="manual"),
+    _created(),
+    Column("closed_at", DateTime(timezone=True)),
+    Column("closed_by", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT")),
+    _in("kind", REVIEW_ITEM_KINDS, "ck_os_review_items_kind"),
+    _in("status", ("open", "closed"), "ck_os_review_items_status"),
+    Index("uq_os_review_items_open", "tenant_id", "dedupe_key", unique=True, postgresql_where=text("status = 'open'")),
+    Index("ix_os_review_items_list", "tenant_id", "status", "kind", "id"),
+    Index("ix_os_review_items_batch", "tenant_id", "batch_ref"),
+)
+
+review_files = Table(
+    "os_review_files", md,
+    _id(), _tenant(),
+    Column("item_id", BigInteger, ForeignKey("os.os_review_items.id", ondelete="RESTRICT"), nullable=False),
+    Column("uploaded_by", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("filename", Text, nullable=False),
+    Column("content_type", Text, nullable=False),
+    Column("size", Integer, nullable=False),
+    Column("sha256", Text, nullable=False),
+    Column("data", LargeBinary, nullable=False),
+    _created(),
+    Index("ix_os_review_files_item", "tenant_id", "item_id"),
+)
+
+fact_reviews = Table(
+    "os_fact_reviews", md,
+    _id(), _tenant(),
+    Column("item_id", BigInteger, ForeignKey("os.os_review_items.id", ondelete="RESTRICT"), nullable=False),
+    Column("fact_id", BigInteger, ForeignKey("os.os_knowledge_facts.id", ondelete="RESTRICT")),
+    Column("reviewer_id", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("step", Text, nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("corrected_value", JSONB),
+    Column("corrected_quote", Text),
+    Column("note", Text),
+    Column("evidence_file_id", BigInteger, ForeignKey("os.os_review_files.id", ondelete="RESTRICT")),
+    Column("high_stakes", Boolean, nullable=False, server_default=text("true")),  # the need as of this review
+    Column("fact_digest", Text),  # sha256 of the value, quote and URL the reviewer saw: a changed fact voids the item
+    _created(),
+    UniqueConstraint("item_id", "reviewer_id", name="uq_os_fact_reviews_reviewer"),
+    _in("step", REVIEW_STEPS, "ck_os_fact_reviews_step"),
+    _in("outcome", REVIEW_OUTCOMES, "ck_os_fact_reviews_outcome"),
+    CheckConstraint("(step = 'check' AND outcome IN ('correct', 'wrong', 'unclear')) OR "
+                    "(step = 'approve' AND outcome IN ('approve', 'reject')) OR "
+                    "(step = 'collect' AND outcome = 'collected')", name="ck_os_fact_reviews_step_outcome"),
+    Index("ix_os_fact_reviews_item", "tenant_id", "item_id"),
+)
+
+review_attestations = Table(
+    "os_review_attestations", md,
+    _id(), _tenant(),
+    Column("reviewer_id", BigInteger, ForeignKey("os.os_reviewers.id", ondelete="RESTRICT"), nullable=False),
+    Column("batch_ref", Text, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "reviewer_id", "batch_ref", name="uq_os_review_attestations"),
 )
 
 # --- Slice 2: Knowledge (spec 2026-10-19 §5) -------------------------------------------------------
@@ -269,7 +438,15 @@ programmes = Table(
     Column("status", Text, nullable=False, server_default="active"),
     Column("notes", Text),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # P2-T2 (os_0027): the programme level of the registry (P2 spec §4.1). All NULL for programmes outside it.
+    Column("institution_id", Text),
+    Column("campus_id", Text),
+    Column("level", Text),
+    Column("field", Text),
+    Column("family", Text),
+    Column("region", Text),
     UniqueConstraint("tenant_id", "ref", name="uq_os_programmes_ref"),
+    Index("ix_os_programmes_institution", "tenant_id", "institution_id"),
     _in("status", ("active", "excluded", "requested"), "ck_os_programmes_status"),  # requested: Slice 4
 )
 
@@ -783,7 +960,73 @@ consistency_runs = Table(
     UniqueConstraint("tenant_id", "run_date", name="uq_os_consistency_runs_date"),
 )
 
-# P2-T8 (os_0026): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
+# --- P2-T3: official-source allow-lists, page snapshots and original files (os_0028) ---------------------------------
+
+SOURCE_TIERS = ("regulator", "board", "admission_body", "institution")
+SOURCE_STATES = ("active", "suspect")
+SNAPSHOT_READ_METHODS = ("fetch", "render", "ocr", "human")
+
+# P2-D10: the reviewed allow-list (loaded from YAML) and each domain's runtime state. A row with `region`, `family` and
+# `route_key` all '' is not an allow-list entry: it records that a domain outside the lists (for example a route
+# profile's) was flagged suspect.
+source_domains = Table(
+    "os_source_domains", md,
+    _id(), _tenant(),
+    Column("domain", Text, nullable=False),
+    Column("region", Text, nullable=False, server_default=""),
+    Column("family", Text, nullable=False, server_default=""),
+    Column("route_key", Text, nullable=False, server_default=""),
+    Column("body_ref", Text, nullable=False, server_default=""),  # registry id of the body (T2); '' = not named
+    Column("tier", Text),
+    Column("list_ref", Text, nullable=False, server_default=""),  # the official list or page that names the domain
+    Column("reviewed_by", Text, nullable=False, server_default=""),
+    Column("state", Text, nullable=False, server_default="active"),
+    Column("state_reason", Text),
+    Column("state_since", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "domain", "region", "family", "route_key", name="uq_os_source_domains_entry"),
+    CheckConstraint("tier IS NULL OR tier IN ('regulator', 'board', 'admission_body', 'institution')",
+                    name="ck_os_source_domains_tier"),
+    _in("state", SOURCE_STATES, "ck_os_source_domains_state"),
+    Index("ix_os_source_domains_domain", "tenant_id", "domain"),
+)
+
+# P2-D11: what was read, as text (the review queue shows it; monitoring compares it). `flagged` is the integrity
+# failure code of the read, NULL for a clean page; only clean snapshots are used as "the last snapshot".
+page_snapshots = Table(
+    "os_page_snapshots", md,
+    _id(), _tenant(),
+    Column("url", Text, nullable=False),
+    Column("sha256", Text, nullable=False),  # of the text (normalised whitespace)
+    Column("text", Text, nullable=False),
+    Column("content_type", Text, nullable=False, server_default=""),
+    Column("read_method", Text, nullable=False, server_default="fetch"),
+    Column("language", Text),
+    Column("links_total", Integer, nullable=False, server_default="0"),
+    Column("links_off_list", Integer, nullable=False, server_default="0"),
+    Column("flagged", Text),
+    Column("original_too_large", Boolean, nullable=False, server_default=text("false")),  # PDF or image over the cap (review M5)
+    Column("fetched_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "url", "sha256", name="uq_os_page_snapshots_url_hash"),
+    _in("read_method", SNAPSHOT_READ_METHODS, "ck_os_page_snapshots_read_method"),
+    CheckConstraint("language IS NULL OR language ~ '^[a-z]{2,3}$'", name="ck_os_page_snapshots_language"),
+    Index("ix_os_page_snapshots_url", "tenant_id", "url", "fetched_at"),
+)
+
+source_files = Table(
+    "os_source_files", md,
+    _id(), _tenant(),
+    Column("snapshot_id", BigInteger, ForeignKey("os.os_page_snapshots.id", ondelete="RESTRICT"), nullable=False),
+    Column("sha256", Text, nullable=False),  # of the bytes
+    Column("content_type", Text, nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("content", LargeBinary, nullable=False),
+    _created(),
+    UniqueConstraint("tenant_id", "snapshot_id", name="uq_os_source_files_snapshot"),
+)
+
+
+# P2-T8 (os_0029): intakes as rows (P2-D23) and the keys a new intake expects (§4.8).
 INTAKE_STATES = ("planned", "open", "current", "closed")
 
 intakes = Table(

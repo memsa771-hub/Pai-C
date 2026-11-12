@@ -76,7 +76,9 @@ def _note(found: dict, url: str, day: date, confirmed: bool) -> None:
 def _knowledge_sources(svc: Any, route_key: str, refs: list[str], year: int | None, found: dict) -> None:
     if year is None:
         return
-    with svc.engine.connect() as conn:  # every field the Knowledge has for these, not a list of ours
+    # every field the Knowledge has for these, not a list of ours. Any owner's rows count (P2-T2): the port read below
+    # takes owner_ref=None (the general row first, else a body's), so a source an owner set is dated like any other.
+    with svc.engine.connect() as conn:
         rows = conn.execute(select(K.c.scope, K.c.ref, K.c.field).where(
             K.c.tenant_id == svc.settings.tenant_id, K.c.intake_year == year,
             ((K.c.scope == "route") & (K.c.ref == route_key)) | ((K.c.scope == "programme") & K.c.ref.in_(refs))
