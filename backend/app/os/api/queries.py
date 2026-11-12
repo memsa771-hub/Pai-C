@@ -159,7 +159,8 @@ def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mappi
                             .where(T.c.tenant_id == tenant_id, P.c.student_ref == student_ref, T.c.kind == "student",
                                    P.c.status.in_(PLAN_OPEN), T.c.state == "blocked",
                                    T.c.blocked_reason.like("fact_missing:%")
-                                   | T.c.blocked_reason.like("no_candidate:%"))
+                                   | T.c.blocked_reason.like("no_candidate:%")
+                                   | T.c.blocked_reason.like("fact_rechecking:%"))
                             .order_by(T.c.id)).all()
     out = []
     for r in rows:
@@ -171,6 +172,10 @@ def waiting_items(engine: Engine, tenant_id: str, student_ref: str, books: Mappi
             said = anchor.waiting
         elif anchor and r.blocked_reason == f"no_candidate:{anchor.programme}":
             said = anchor.waiting_none
+        elif r.blocked_reason.startswith("fact_rechecking:"):  # P2-D20: the date is being checked again
+            from app.os.monitor.config import text as monitor_text
+
+            said = monitor_text("fact_rechecking_waiting")
         out.append({**task_out(r), "programme_name": r.programme_name, "university": r.university, "changes": [],
                     "waiting_for": said})
     return out

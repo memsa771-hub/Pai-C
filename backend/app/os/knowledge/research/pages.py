@@ -22,8 +22,10 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
 from app.os import clock as shared_clock
+from app.os.knowledge.research import reading
 from app.os.knowledge.research.links import domain_of, rank_links
-from app.os.knowledge.research.text import html_to_text, pdf_to_text
+from app.os.knowledge.research.scan import IMAGE_TYPES
+from app.os.knowledge.research.text import detect_language, html_to_text, pdf_to_text
 from app.os.knowledge.sources.integrity import is_tls_failure
 from app.os.settings import OsSettings
 
@@ -56,6 +58,12 @@ class Page:
     fetched_at: datetime | None = None
     from_cache: bool = field(default=False, compare=False)
     snapshot_id: int | None = field(default=None, compare=False)  # the os_page_snapshots row of this read (guard on)
+    read_method: str = "fetch"  # P2-T4: fetch | render | ocr (how the text was read)
+    language: str | None = None  # P2-T4: set when the text's script maps to a language (normalise.yaml)
+
+    def __post_init__(self) -> None:
+        if self.language is None and self.text:
+            object.__setattr__(self, "language", detect_language(self.text))
 
     @property
     def ok(self) -> bool:
@@ -71,9 +79,11 @@ def _sleep(seconds: float) -> None:
 class PageGateway:
     def __init__(self, engine: Engine, tenant_id: str, settings: OsSettings, client: httpx.Client | None = None,
                  clock: Callable[[], datetime] = shared_clock.now, sleep: Callable[[float], None] = _sleep,
-                 sources: "SourceGuard | None" = None) -> None:
+                 sources: "SourceGuard | None" = None, renderer=None, scanner=None) -> None:
         self.engine, self.tenant_id, self.settings = engine, tenant_id, settings
         self.sources = sources
+        self._host_clock: dict[str, datetime] = {}  # P2-T4: when this gateway last asked each host (pages and render sub-requests)
+        self.renderer, self.scanner = renderer, scanner  # P2-T4: None = off (JavaScript shells and scans read as before)
         self.client = client or httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True,
                                              timeout=20.0)
         self.clock, self.sleep = clock, sleep
@@ -88,11 +98,12 @@ class PageGateway:
             return None
         return Page(url=row.url, final_url=row.final_url, http_status=row.http_status, text=row.text,
                     links=tuple(tuple(x) for x in row.links), blocked=row.blocked, fetched_at=row.fetched_at,
-                    from_cache=True)
+                    from_cache=True, read_method=row.read_method, language=row.language)
 
     def _store(self, conn, page: Page) -> Page:
         values = {"final_url": page.final_url, "http_status": page.http_status, "text": page.text,
-                  "links": [list(x) for x in page.links], "blocked": page.blocked, "fetched_at": page.fetched_at}
+                  "links": [list(x) for x in page.links], "blocked": page.blocked, "fetched_at": page.fetched_at,
+                  "read_method": page.read_method, "language": page.language}
         conn.execute(insert(P).values(tenant_id=self.tenant_id, url=page.url, **values)
                      .on_conflict_do_update(constraint="uq_os_pages_url", set_=values))
         return page
@@ -134,10 +145,24 @@ class PageGateway:
             func.split_part(P.c.url, "/", 3) == host,
             (P.c.blocked.is_(None)) | (P.c.blocked.not_in(_NO_REQUEST)),
         )).scalar()
+        mine = self._host_clock.get(host)  # a render's sub-requests count too (they are not rows of os_pages)
+        last = max((t for t in (last, mine) if t is not None), default=None)
         if last is not None:
             wait = self.settings.fetch_host_interval_s - (self.clock() - last).total_seconds()
             if wait > 0:
                 self.sleep(wait)
+        self._host_clock[host] = self.clock()
+
+    def pace(self, host: str, max_wait_s: float) -> None:
+        """For a sub-request of a render: waits out the host interval on the same per-host clock the page fetches use,
+        for at most `max_wait_s`, then stamps the host. (The stamp lives in this process; the page rows in os_pages are
+        what other workers see.)"""
+        last = self._host_clock.get(host)
+        if last is not None:
+            wait = self.settings.fetch_host_interval_s - (self.clock() - last).total_seconds()
+            if wait > 0:
+                self.sleep(min(wait, max_wait_s))
+        self._host_clock[host] = self.clock()
 
     def _download(self, url: str) -> tuple[httpx.Response, bytes | None]:
         """The body, or None when it is over the size limit."""
@@ -156,15 +181,16 @@ class PageGateway:
     # --- public -------------------------------------------------------------------------------------
 
     def fetch(self, url: str, own_domains: Sequence[str], shared_domains: Sequence[str],
-              scope: "Scope | None" = None) -> Page:
+              scope: "Scope | None" = None, refresh: bool = False) -> Page:
         """`scope` (region and family, or route) is used only with a source guard: a domain on the reviewed
-        allow-list for that scope is official too, besides the lists the caller passes."""
+        allow-list for that scope is official too, besides the lists the caller passes. `refresh` skips the cache and
+        reads the page again (season monitoring, P2-T7)."""
         guard = self.sources
         if guard is not None and guard.is_suspect(url):  # before the cache: nothing is taken from a suspect domain
             return Page(url=url, blocked="suspect_domain", fetched_at=self.clock())  # not cached: the state can change
         if guard is not None and urlsplit(url).scheme.lower() != "https":  # review I6: https only with the guard
             return Page(url=url, blocked="insecure_scheme", fetched_at=self.clock())
-        cached = self._cached(url)
+        cached = None if refresh else self._cached(url)
         if cached is not None and not (guard is not None and (cached.blocked or "").startswith(
                 ("integrity:", "tls_", "suspect_domain"))):
             return cached  # (a cached integrity block is read again once the domain is active: only approvers get it so)
@@ -223,12 +249,19 @@ class PageGateway:
                 text = pdf_to_text(body)
             except Exception:  # a broken PDF is a page we cannot read, not a retry
                 return Page(**base, blocked="unreadable_pdf")
+            if self.scanner is not None and len(text.strip()) < self.settings.scan_min_pdf_chars:  # a scan (P2-T4)
+                return reading.scanned(self, Page(**base), body, ctype or "application/pdf", allowed, official, flags)
             return self._inspected(Page(**base, text=text), ctype or "application/pdf", allowed, official, body,
                                    flags=flags)
         if "html" in ctype or not ctype:
-            text, links = html_to_text(body.decode(r.encoding or "utf-8", errors="replace"), str(r.url))
+            html = body.decode(r.encoding or "utf-8", errors="replace")
+            text, links = html_to_text(html, str(r.url))
+            if self.renderer is not None and reading.looks_like_js_shell(html, text, self.settings.render_shell_max_chars):
+                return reading.rendered(self, Page(**base), r, html, ctype or "text/html", allowed, official, flags)  # P2-T4
             return self._inspected(Page(**base, text=text, links=tuple(links)), ctype or "text/html", allowed,
                                    official, flags=flags)
+        if self.scanner is not None and ctype in IMAGE_TYPES:  # an image-only notice (P2-T4)
+            return reading.scanned(self, Page(**base), body, ctype, allowed, official, flags)
         return Page(**base, blocked=f"unsupported:{ctype}")
 
     def _inspected(self, page: Page, ctype: str, allowed: Callable[[str], bool] | None, official: set[str],
@@ -251,10 +284,10 @@ class PageGateway:
         return replace(page, snapshot_id=got.snapshot_id)
 
     def fetch_or_record(self, url: str, own_domains: Sequence[str], shared_domains: Sequence[str],
-                        scope: "Scope | None" = None) -> Page:
+                        scope: "Scope | None" = None, refresh: bool = False) -> Page:
         """For callers outside a DBOS step: one try, and a transient failure is recorded as a blocked page."""
         try:
-            return self.fetch(url, own_domains, shared_domains, scope)
+            return self.fetch(url, own_domains, shared_domains, scope, refresh)
         except TransientFetchError as e:
             return self.record_failure(url, str(e))
 

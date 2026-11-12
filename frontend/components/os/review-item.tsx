@@ -10,7 +10,7 @@ import {
 export interface ReviewActions {
   review: (id: number, body: Record<string, unknown>) => Promise<void>;
   collect: (id: number, body: Record<string, unknown>) => Promise<void>;
-  resolve: (id: number, outcome: 'resolved' | 'dismissed', note: string) => Promise<void>;
+  resolve: (id: number, outcome: 'resolved' | 'dismissed' | 'stands' | 'agrees', note: string) => Promise<void>;
   upload: (id: number, file: File) => Promise<number>;
   openFile: (fileId: number) => void;
 }
@@ -63,7 +63,7 @@ export function ReviewItem({ detail, reviewer, busy, actions }: {
         <VerifyForm detail={detail} reviewer={reviewer} busy={busy} actions={actions} />
       )}
       {!closed && item.kind === 'collect' && <CollectForm detail={detail} busy={busy} actions={actions} />}
-      {!closed && item.kind !== 'verify' && item.kind !== 'collect' && <ResolveForm id={item.id} busy={busy} actions={actions} />}
+      {!closed && item.kind !== 'verify' && item.kind !== 'collect' && <ResolveForm id={item.id} kind={item.kind} busy={busy} actions={actions} />}
     </article>
   );
 }
@@ -208,15 +208,19 @@ function CollectForm({ detail, busy, actions }: { detail: OsReviewDetail; busy: 
   );
 }
 
-function ResolveForm({ id, busy, actions }: { id: number; busy: boolean; actions: ReviewActions }) {
+function ResolveForm({ id, kind, busy, actions }: { id: number; kind: string; busy: boolean; actions: ReviewActions }) {
   const [note, setNote] = useState('');
+  const reported = kind === 'report' || kind === 'change';
+  const go = (outcome: 'resolved' | 'dismissed' | 'stands' | 'agrees') => void actions.resolve(id, outcome, note.trim());
   return (
     <form className="mt-4 flex flex-col gap-2" aria-label="Close this item" onSubmit={(e) => e.preventDefault()}>
       <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What you checked" aria-label="Note"
                 className="w-full min-w-0 rounded-md border bg-background px-2 py-1" />
-      <div className="flex gap-2">
-        <Button size="sm" type="button" disabled={busy || !note.trim()} onClick={() => void actions.resolve(id, 'resolved', note.trim())}>Resolved</Button>
-        <Button size="sm" variant="outline" type="button" disabled={busy || !note.trim()} onClick={() => void actions.resolve(id, 'dismissed', note.trim())}>Dismiss</Button>
+      <div className="flex flex-wrap gap-2">
+        {reported && <Button size="sm" type="button" disabled={busy || !note.trim()} onClick={() => go('stands')}>Fact stands</Button>}
+        {kind === 'report' && <Button size="sm" variant="outline" type="button" disabled={busy || !note.trim()} onClick={() => go('agrees')}>Agree: it is wrong</Button>}
+        <Button size="sm" variant={reported ? 'outline' : 'primary'} type="button" disabled={busy || !note.trim()} onClick={() => go('resolved')}>Resolved</Button>
+        {kind !== 'report' && <Button size="sm" variant="outline" type="button" disabled={busy || !note.trim()} onClick={() => go('dismissed')}>Dismiss</Button>}
       </div>
     </form>
   );

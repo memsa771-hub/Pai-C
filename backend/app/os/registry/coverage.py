@@ -20,7 +20,7 @@ level only reads what exists."""
 from collections import defaultdict
 from dataclasses import dataclass
 
-from sqlalchemy import Engine, and_, or_, select
+from sqlalchemy import Engine, and_, func, or_, select
 
 from app.os import models
 from app.os.knowledge.fact_classes import UNCLASSIFIED, fact_class, is_high_stakes
@@ -115,7 +115,9 @@ def coverage_map(engine: Engine, tenant_id: str, intake_year: int, *, intake_ter
             or_(*[and_(F.c.scope == scope, F.c.ref.in_(refs)) for scope, refs in by_scope.items()]))
         if intake_term is not None:
             fq = fq.where(F.c.intake_term == intake_term)
-        facts = conn.execute(fq).all()
+        # a fact withdrawn by an import undo (stale, empty value) is not a fact for the intake (P2-T6)
+        withdrawn = and_(F.c.status == "stale", or_(F.c.value.is_(None), func.jsonb_typeof(F.c.value) == "null"))
+        facts = conn.execute(fq.where(~withdrawn)).all()
     count = {i: [0, 0, 0, 0] for i in insts}  # facts, own high-stakes, own high-stakes verified, shared facts
     for f in facts:
         is_own = (f.scope, f.ref) in own

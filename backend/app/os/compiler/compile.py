@@ -105,6 +105,14 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
     return route, programme
 
 
+
+def _being_rechecked(fact: Fact, field: str) -> bool:
+    """A high-stakes fact that went back to unconfirmed because a page changed or a student reported it (P2-D20): the
+    steps it dates wait (blocked `fact_rechecking`) instead of running on a date nobody stands behind."""
+    from app.os.knowledge.fact_classes import fact_class, is_high_stakes
+
+    return fact.recheck is not None and fact.status == "unconfirmed" and is_high_stakes(fact_class(field, fact.fact_class))
+
 def date_of(value, label: str) -> tuple[date, str | None]:
     """A date fact: "YYYY-MM-DD", or {"date": "YYYY-MM-DD", "tz": "Area/City"}. CompileError otherwise."""
     raw, tz = (value.get("date"), value.get("tz")) if isinstance(value, dict) else (value, None)
@@ -301,11 +309,16 @@ def compile_plan(
                 else:
                     sources = [ref]
                 usable = []
+                rechecking = False
                 for src in sources:
                     fact, fref = lookup(src, t.anchor.fact)
                     inst.fact_refs.append(fref)
                     if fact is None or fact.value is None:
                         need_confirm(fref)
+                        continue
+                    if _being_rechecked(fact, fref[2]):  # P2-D20: a page changed or a student reported it
+                        need_confirm(fref)
+                        rechecking = True
                         continue
                     if not firm(fact):
                         need_confirm(fref)
@@ -315,7 +328,8 @@ def compile_plan(
                 if not sources:  # every programme is out (none admitted the student): nothing to date it from
                     inst.blocked_reason = f"no_candidate:{t.anchor.programme}"
                 elif not usable:
-                    inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
+                    inst.blocked_reason = (f"fact_rechecking:{t.anchor.fact}" if rechecking
+                                           else f"fact_missing:{t.anchor.fact}")
                 else:
                     (d, tz), fact = min(usable, key=lambda u: u[0][0])
                     inst.tz = tz or playbook.default_timezone

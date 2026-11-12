@@ -54,8 +54,8 @@ requirements:
   R-24: {title: "Only listed official domains count as sources", phases: [P2], built: false}
   R-25: {title: "Three trust levels: unconfirmed, confirmed, verified", phases: [P2], built: true}
   R-26: {title: "Intake year is strict; other years shown labelled", phases: [P2], built: false}
-  R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: false}
-  R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: false}
+  R-27: {title: "Daily admission-season monitoring of official pages", phases: [P2], built: true}
+  R-28: {title: "Students and parents can report a fact as wrong", phases: [P2], built: true}
   R-29: {title: "AI never supplies a fact from its own knowledge", phases: [P2], built: false}
   R-30: {title: "Durations without an official figure are marked estimated", phases: [P2], built: true}
   R-31: {title: "Merit formulas and closing merits are facts; MeritCheck never predicts", phases: [P2], built: true}
@@ -98,8 +98,8 @@ requirements:
   R-64: {title: "Student can start a new plan for the next intake", phases: [P2], built: false}
   R-65: {title: "Playbooks versioned per intake; running plans stay pinned", phases: [P2], built: false}
   R-66: {title: "Coverage dashboard and launch gate are per intake", phases: [P2], built: true}
-  R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: false}
-  R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: false}
+  R-67: {title: "One fixed spreadsheet format for research batches", phases: [P2], built: true}
+  R-68: {title: "Import script validates returned spreadsheets; failures listed", phases: [P2], built: true}
   R-69: {title: "Review queue export uses the same spreadsheet format", phases: [P2], built: false}
   R-70: {title: "Merit shown only in student login handled by share-position step", phases: [P4], built: false}
   R-71: {title: "Content integrity checks, not only domain, before using a page", phases: [P2], built: false}

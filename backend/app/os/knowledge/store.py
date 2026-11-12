@@ -30,7 +30,7 @@ def _fact(row) -> Fact:
         value=row.value, quote=row.quote, url=row.url, checked_at=row.checked_at,
         intake_year=row.intake_year, status=row.status, conflict_note=row.conflict_note, id=row.id,
         intake_term=row.intake_term, owner_ref=row.owner_ref, fact_class=row.fact_class,
-        read_method=row.read_method, language=row.language,
+        read_method=row.read_method, language=row.language, recheck=row.recheck_reason,
     )
 
 
@@ -108,7 +108,8 @@ def _void_reviews(conn, tenant_id: str, fact_id: int, except_item: int | None, a
                           .values(status="closed", resolution="void", closed_at=func.now())
                           .returning(RI.c.batch_ref, RI.c.payload)).all()
     checkable = after.status == "confirmed" or (
-        after.status == "unconfirmed" and after.read_method in load_policy().compare_with_original)
+        after.status == "unconfirmed" and (after.read_method in load_policy().compare_with_original
+                                           or after.recheck_reason is not None))
     if voided and checkable:
         old = voided[0]
         author = (old.payload or {}).get("author_ref")
@@ -257,6 +258,8 @@ class SqlKnowledge:
                 if before.status == "verified":
                     same = before.value == fact.value and before.quote == fact.quote
                     values["status"] = "verified" if same else "unconfirmed"
+                if values["status"] in CONFIRMED_LEVELS:
+                    values["recheck_reason"] = None  # confirmed again: no longer being re-checked
                 conn.execute(update(T).where(T.c.id == fact_id).values(**values, updated_at=func.now()))
             _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), cause or source, cause_ref, actor)
             return fact_id
@@ -310,7 +313,8 @@ class SqlKnowledge:
         return row.scope, row.ref, row.field, _fact(row)
 
     def set_status(self, fact_id: int, status: str, *, cause: str, cause_ref: str | None = None,
-                   actor: str | None = None, expected_digest: str | None = None, conn=None) -> Fact:
+                   actor: str | None = None, expected_digest: str | None = None, conn=None,
+                   recheck: str | None = None) -> Fact:
         """Moves a fact to another trust level with its cause (P2-D6, D9). The trust rule is checked on the locked
         row: `confirmed` and `verified` need a quote and URL, and `verified` needs cause `review`. With
         `expected_digest` the write is refused (StaleFact) if the locked row's reading is not the one decided on."""
@@ -321,14 +325,16 @@ class SqlKnowledge:
             if before is None:
                 raise KeyError(fact_id)
             _check_digest(before, expected_digest)
-            Fact(**{**_fact(before).__dict__, "status": status})  # validates
+            Fact(**{**_fact(before).__dict__, "status": status, **({"recheck": recheck} if recheck else {})})  # validates
+            marker = {"recheck_reason": None} if status in CONFIRMED_LEVELS else (
+                {"recheck_reason": recheck} if recheck else {})  # confirmed clears it; `recheck` sets it
             c.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
-                      .values(status=status, updated_at=func.now()))
+                      .values(status=status, updated_at=func.now(), **marker))
             after = self._row(c, fact_id)
             _revise(c, self.tenant_id, fact_id, before, after, cause, cause_ref, actor)
         return _fact(after)
 
-    _REVISABLE = ("value", "quote", "url", "status", "conflict_note", "read_method", "language")
+    _REVISABLE = ("value", "quote", "url", "status", "conflict_note", "read_method", "language", "recheck")
 
     def revise(self, fact_id: int, *, cause: str, cause_ref: str | None = None, actor: str | None = None,
                expected_digest: str | None = None, except_item: int | None = None, conn=None,
@@ -350,8 +356,10 @@ class SqlKnowledge:
             old = _fact(before)
             if old.status == "verified" and {"value", "quote", "url"} & set(changes) and "status" not in changes:
                 changes = {**changes, "status": "unconfirmed"}  # a changed reading is no longer verified (T1 rule)
+            if changes.get("status") in CONFIRMED_LEVELS and "recheck" not in changes:
+                changes = {**changes, "recheck": None}  # confirmed again: no longer being re-checked
             Fact(**{**old.__dict__, **changes})  # validates
-            values = dict(changes)
+            values = {("recheck_reason" if k == "recheck" else k): v for k, v in changes.items()}
             if {"value", "quote", "url"} & set(changes):
                 values["checked_at"] = clock.now()
             c.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id)
@@ -387,6 +395,7 @@ class SqlKnowledge:
             conn.execute(update(T).where(T.c.id == fact_id, T.c.tenant_id == self.tenant_id).values(
                 value=value, quote=quote, url=url, status=status, conflict_note=conflict_note,
                 checked_at=stamp, updated_at=stamp, source="manual",
+                **({"recheck_reason": None} if status in CONFIRMED_LEVELS else {}),
             ))
             _revise(conn, self.tenant_id, fact_id, before, self._row(conn, fact_id), "manual", None, "admin")
         return new
