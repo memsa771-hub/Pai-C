@@ -69,8 +69,8 @@ def test_a_disabled_reviewer_is_refused(api, engine):
 
 
 def test_admin_syncs_the_queue_and_lists_reviewers(api):
-    assert api.post("/v1/os/admin/review/sync", headers=ADMIN, json={}).json() == {"opened": 1}
-    assert api.post("/v1/os/admin/review/sync", headers=ADMIN, json={}).json() == {"opened": 0}
+    assert api.post("/v1/os/admin/review/sync", headers=ADMIN, json={}).json() == {"opened": 1, "collect_opened": 0}
+    assert api.post("/v1/os/admin/review/sync", headers=ADMIN, json={}).json() == {"opened": 0, "collect_opened": 0}
     refs = [r["ref"] for r in api.get("/v1/os/admin/review/reviewers", headers=ADMIN).json()["reviewers"]]
     assert refs == ["ai_check_1", "ai_check_2", "amina", "owner"]
     bad = api.post("/v1/os/admin/review/items", headers=ADMIN, json={"kind": "verify", "dedupe_key": "x"})

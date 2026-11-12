@@ -131,9 +131,11 @@ class Need(_Model):
 
 class Expected(_Model):
     """`fact`: a route Knowledge fact holding the date the result comes out (the calendar); `title`: the step shown
-    until then (R-20)."""
+    until then (R-20). With `calendar` (a registry calendar id, `cal:<slug>`), `fact` is instead the date field of that
+    official calendar, read by its registry id (P2-T11); without it the ask reads the route fact exactly as before."""
     fact: str
     title: str = Field(min_length=1)
+    calendar: str | None = Field(default=None, pattern=r"^cal:[a-z0-9][a-z0-9_-]*$")
 
 
 class Ask(_Model):

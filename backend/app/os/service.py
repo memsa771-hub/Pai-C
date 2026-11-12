@@ -6,7 +6,7 @@ from datetime import date
 from sqlalchemy import Engine, and_, select
 
 from app.os import models
-from app.os.compiler import PlanDraft, compile_plan, date_of, needed_fields
+from app.os.compiler import PlanDraft, compile_plan, date_of, needed_calendars, needed_fields
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.intakes import IntakeNotOpen, IntakeStore
@@ -83,6 +83,10 @@ class PlanService:
         source = IntakeStore(self.engine, self.kernel.tenant_id).fallback_year(term, year)
         read = ({"intake_term": term, "fallback_previous": True, "fallback_year": source}
                 if source is not None else {})
+        calendars = needed_calendars(playbook)  # P2-T11: official calendars named by the playbook, read by registry id
+        calendar_facts = ({k: f for k, f in self.knowledge.registry_facts(
+            sorted({c for c, _ in calendars}), sorted({n for _, n in calendars}), year, **read).items()
+            if k in calendars} if calendars else {})
         from app.os.monitor.reports import for_student  # imported here: the report module imports the review queue
 
         route_facts, programme_facts = for_student(  # owner ruling 2026-11-08: a reported fact holds only the reporters' steps
@@ -94,6 +98,7 @@ class PlanService:
             self.today(), self.disabled_types(),
             overrides=overrides, chosen={"visa": self.visa_programme(contract, plan_id, overrides)},
             excluded={"visa": self.not_visa_programmes(contract, plan_id)}, student=student,
+            calendar_facts=calendar_facts,
         )
 
     def needs_gate(self, contract: RouteContract | RouteContractV2, with_needs: bool | None = None) -> bool:

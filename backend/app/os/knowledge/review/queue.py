@@ -45,6 +45,7 @@ FL = models.review_files
 AT = models.review_attestations
 F = models.knowledge_facts
 RW = models.reviewers
+NR = models.not_readable
 P = models.pages
 POSITIVE = ("correct", "approve")
 # what a student-facing change hook is told: scope, ref, field, fact id, new status, intake year, complete waiting tasks
@@ -146,6 +147,24 @@ class ReviewQueue:
                     author_ref: str | None = None) -> tuple[int, bool]:
         return self.open_item("verify", dedupe_key=f"verify:{fact_id}", fact_id=fact_id, batch_ref=batch_ref,
                               opened_by=opened_by, payload={"author_ref": author_ref} if author_ref else {})
+
+    def sync_not_readable(self) -> int:
+        """Opens a `collect` item for every field of a source nobody could read by machine (T4's open `os_not_readable`
+        rows, R-72): a person reads the original and collects the value with evidence. Rows without a programme, field or
+        intake year are the source itself and open nothing. Returns how many items were opened."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(NR).where(NR.c.tenant_id == self.tenant_id, NR.c.state == "open",
+                                                 NR.c.programme_ref != "", NR.c.field != "", NR.c.intake_year > 0)
+                                .order_by(NR.c.id)).all()
+        opened = 0
+        for r in rows:
+            opened += self.open_item(
+                "collect", dedupe_key=f"collect:programme:{r.programme_ref}:{r.field}:{r.intake_year}",
+                field=r.field, intake_year=r.intake_year, opened_by="monitor", subject=r.url,
+                summary=f"The source could not be read by machine ({r.reason}); read the original and collect the value",
+                payload={"scope": "programme", "ref": r.programme_ref, "reason": r.reason, "url": r.url,
+                         "snapshot_id": r.snapshot_id})[1]
+        return opened
 
     def _void_stale(self, conn, item_id: int | None = None) -> int:
         """Closes (as void) open verify items with a review of another reading than the fact has now. A writer skips an
@@ -564,6 +583,9 @@ class ReviewQueue:
             verify_id, _ = self.open_item("verify", dedupe_key=f"verify:{fact_id}", fact_id=fact_id,
                                           batch_ref=item.batch_ref, opened_by="review",
                                           payload={"author_ref": reviewer.ref}, conn=conn)
+            conn.execute(update(NR).where(  # the source is no longer waiting for a person (T4's not_readable rows)
+                NR.c.tenant_id == self.tenant_id, NR.c.programme_ref == ref, NR.c.field == field,
+                NR.c.intake_year == year, NR.c.state == "open").values(state="collected"))
         self._changed(scope, ref, field, fact_id, "unconfirmed", year, False)
         return {"item_id": item_id, "item_status": "closed", "resolution": "collected", "fact_id": fact_id,
                 "verify_item_id": verify_id}
