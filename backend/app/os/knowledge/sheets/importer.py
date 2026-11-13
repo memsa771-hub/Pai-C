@@ -118,6 +118,22 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
     return ctx
 
 
+def use_planned_institutions(ctx: PlanContext, institutions: list[RowResult]) -> None:
+    """Dry run only: resolve inst_ids against the institutions another file would load (accepted or unconfirmed), as if
+    that file were imported first. Never used by an import, which reads the registry."""
+    loaded = [r for r in institutions
+              if r.sheet == "Institutions" and r.bucket in ("accepted", "unconfirmed") and "entry" in r.payload]
+    ids = {r.row_id: r.payload["entry"].entity_id for r in loaded}
+    region = {r.payload["entry"].entity_id: r.payload["entry"].region for r in loaded}
+    info = {r.payload["entry"].entity_id: {"kind": r.payload["kind"], "calendar_type": r.payload.get("calendar_type"),
+                                           "timezone": r.payload.get("timezone"),
+                                           "parent_id": r.payload["entry"].parent_id} for r in loaded}
+    before_inst, before_region, before_info = ctx.existing_institutions, ctx.existing_region, ctx.registry_info
+    ctx.existing_institutions = lambda i: ids.get(i) or before_inst(i)
+    ctx.existing_region = lambda rid: region.get(rid) or before_region(rid)
+    ctx.registry_info = lambda rid: info.get(rid) or before_info(rid)
+
+
 def plan_hook(plans, kernel):
     """The `on_fact_change` hook for the plan service: completes the waiting confirm tasks of a confirmed fact and revises
     the plans that use it (knowledge.changes.after_fact_change)."""

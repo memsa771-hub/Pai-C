@@ -2,13 +2,15 @@
 
     python -m scripts.os_import_batch template OUT.xlsx
     python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--report OUT.csv] [--aliases A.yaml]
+                                               [--institutions-from OTHER.xlsx]...
     python -m scripts.os_import_batch import FILE --country PK --owner-accepted <decision ref> --actor NAME [--refetch]
     python -m scripts.os_import_batch import FILE --country PK --reviewers --batch-ref REF --actor NAME [--refetch]
     python -m scripts.os_import_batch undo IMPORT_ID --actor NAME
     python -m scripts.os_import_batch list
 
 `validate` reads the file and plans every row; it touches no database (dry run). `--lists DIR` reads official-list
-files (the H3 shape) to know the list URLs. `import --owner-accepted` is the separate mode for batches 1-5 (P2-D16a):
+files (the H3 shape) to know the list URLs. `--institutions-from OTHER` (dry run only, repeatable) plans OTHER the same
+way and lets FILE's rows use the institutions OTHER would load, as if it were imported first. `import --owner-accepted` is the separate mode for batches 1-5 (P2-D16a):
 both checkers must be the two AI checks the owner accepted. `--reviewers` accepts only checkers that attested the batch.
 `--refetch` re-fetches model- and OCR-read rows through the page gateway (R-68). Every import is logged; the report CSV
 lists every row beside the file. `--aliases FILE` (may repeat) gives alias files made for FILE (bound by its sha256): an
@@ -30,6 +32,7 @@ from app.os.knowledge.sheets.importer import (
     plan_file,
     plan_hook,
     run_import,
+    use_planned_institutions,
     wire_other_tasks,
     write_report,
 )
@@ -75,6 +78,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                                          help="what if every official list were loaded (dry run only)")
     sub.choices["validate"].add_argument("--assume-aliases-attested", action="store_true",
                                          help="what if both checkers of every alias had attested it (dry run only)")
+    sub.choices["validate"].add_argument("--institutions-from", action="append", default=[], metavar="OTHER",
+                                         help="resolve inst_ids against the institutions OTHER would load (dry run only)")
     imp = sub.choices["import"]
     mode = imp.add_mutually_exclusive_group(required=True)
     mode.add_argument("--owner-accepted", metavar="DECISION_REF")
@@ -92,10 +97,19 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             out(f"wrote {write_template(Path(args.out))}")
             return 0
         if args.cmd == "validate":
-            ctx = build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
-                                family=args.family, decision_ref=args.decision_ref, list_urls=_list_urls(Path(args.lists) if args.lists else None,
-                                                                         args.country),
-                                require_list=not args.no_list_needed)
+            urls = _list_urls(Path(args.lists) if args.lists else None, args.country)
+
+            def context():
+                return build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
+                                     family=args.family, decision_ref=args.decision_ref, list_urls=urls,
+                                     require_list=not args.no_list_needed)
+
+            ctx = context()
+            for other in args.institutions_from:
+                _, planned = plan_file(Path(other), context())
+                use_planned_institutions(ctx, planned)
+                out(f"institutions from {Path(other).name}: "
+                    f"{sum(1 for r in planned if r.sheet == 'Institutions' and r.bucket in ('accepted', 'unconfirmed'))}")
             ctx.aliases = tuple(load_aliases(Path(a)) for a in args.aliases)
             if args.assume_aliases_attested:  # the dry run has no review queue; only alias refs are assumed
                 ctx.attested = lambda name, ref: ref.startswith("aliases-")
