@@ -1,0 +1,420 @@
+file: PAI-Research-Batch5-Universities-BS-v4.xlsx
+sha256: e629b9c3287469dae61b3b02a100f5a0326ca7ccc549e088270c6a9dc533d4af
+aliases:
+- from: UNI-FAST
+  to: PK-UNI-039
+  batch5:
+    name: FAST National University of Computer & Emerging Sciences (FAST-NUCES)
+    city: Islamabad
+    official_url: null
+    source_url: https://nu.edu.pk/Admissions/EligibilityCriteria
+  batch1:
+    name: National University of Computer & Emerging Sciences
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="National University of Computer & Emerging Sciences" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Private" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx
+    quote: <a href="http://www.nu.edu.pk/">http://www.nu.edu.pk/</a>
+    address_quote: A.K Brohi Road
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host nu.edu.pk, same as batch 5 host nu.edu.pk. HEC list name 'National University of Computer & Emerging Sciences' (FAST-NUCES); website nu.edu.pk matches batch 5 host.
+- from: UNI-PIEAS
+  to: PK-UNI-044
+  batch5:
+    name: Pakistan Institute of Engineering and Applied Sciences (PIEAS)
+    city: Islamabad
+    official_url: null
+    source_url: https://admissions.pieas.edu.pk/Admissions/Contents/Information%20leaflet%20BS-Programs-Updated_02012026.pdf
+  batch1:
+    name: Pakistan Institute of Engineering & Applied Sciences
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Pakistan Institute of Engineering & Applied Sciences" … charteredby="Government of Pakistan" city="Islamabad" discipline="Engineering & Technology" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx
+    quote: <a href="http://www.pieas.edu.pk/">http://www.pieas.edu.pk/</a>
+    address_quote: Nilore, Islamabad, Pakistan.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host pieas.edu.pk, same as batch 5 host admissions.pieas.edu.pk. HEC profile website pieas.edu.pk, address Nilore, Islamabad; batch 5 host admissions.pieas.edu.pk.
+- from: UNI-PU
+  to: PK-UNI-200
+  batch5:
+    name: University of the Punjab
+    city: Lahore
+    official_url: null
+    source_url: https://pu.edu.pk/home/section/exam/17189
+  batch1:
+    name: University of the Punjab
+    city: Lahore
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="University of the Punjab" … charteredby="Government of Punjab" city="Lahore" discipline="General" sector="Public" province="Punjab"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx
+    quote: <a href="http://www.pu.edu.pk/">http://www.pu.edu.pk/</a>
+    address_quote: Quaid-e-Azam Campus, Lahore.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host pu.edu.pk, same as batch 5 host pu.edu.pk.
+- from: UNI-LUMS
+  to: PK-UNI-136
+  batch5:
+    name: Lahore University of Management Sciences (LUMS)
+    city: Lahore
+    official_url: null
+    source_url: https://admission.lums.edu.pk/critical-dates-all-programmes
+  batch1:
+    name: Lahore University of Management Sciences
+    city: Lahore
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Lahore University of Management Sciences" … charteredby="Government of Pakistan" city="Lahore" discipline="General" sector="Private" province="Punjab"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx
+    quote: <a href="http://www.lums.edu.pk/">http://www.lums.edu.pk/</a>
+    address_quote: D.H.A, Lahore Cantt. 54792
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host lums.edu.pk, same as batch 5 host admission.lums.edu.pk.
+- from: UNI-IBAK
+  to: PK-UNI-229
+  batch5:
+    name: Institute of Business Administration (IBA), Karachi
+    city: Karachi
+    official_url: null
+    source_url: https://admissions.iba.edu.pk/admission-schedule-fall2027.php
+  batch1:
+    name: Institute of Business Administration
+    city: Karachi
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Institute of Business Administration" … charteredby="Government of Sindh" city="Karachi" discipline="General" sector="Public" province="Sindh"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx
+    quote: <a href="http://www.iba.edu.pk/">http://www.iba.edu.pk/</a>
+    address_quote: Main Campus University Road, Karachi.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host iba.edu.pk, same as batch 5 host admissions.iba.edu.pk. IBA Karachi (iba.edu.pk), not Sukkur IBA; Sukkur IBA University is PK-UNI-271 (iba-suk.edu.pk) and maps from UNI-SIBA.
+- from: UNI-MUET
+  to: PK-UNI-242
+  batch5:
+    name: Mehran University of Engineering & Technology, Jamshoro
+    city: Jamshoro
+    official_url: null
+    source_url: https://admissions.muet.edu.pk/admission-policy/
+  batch1:
+    name: Mehran University of Engineering & Technology
+    city: Khairpur
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Mehran University of Engineering & Technology" … charteredby="Government of Sindh" city="Khairpur" discipline="General" sector="Public" province="Sindh"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx
+    quote: <a href="http://www.muet.edu.pk">http://www.muet.edu.pk</a>
+    address_quote: Indus Highway, Jamshoro 76062, Pakistan.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host muet.edu.pk, same as batch 5 host admissions.muet.edu.pk. Batch 1 city 'Khairpur' comes from the HEC list attribute; the HEC profile page gives the address 'Indus Highway, Jamshoro 76062' and the website muet.edu.pk, matching batch 5 (Jamshoro). Only one Mehran UET row in batch 1. Batch 1 city value should be reviewed.
+- from: UNI-QAU
+  to: PK-UNI-045
+  batch5:
+    name: Quaid-i-Azam University, Islamabad
+    city: Islamabad
+    official_url: null
+    source_url: http://ugadmissions.qau.edu.pk/
+  batch1:
+    name: Quaid-i-Azam University
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Quaid-i-Azam University" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx
+    quote: <a href="https://www.qau.edu.pk/">https://www.qau.edu.pk/</a>
+    address_quote: Quaid-i-Azam University Islamabad, 45320, Pakistan.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host qau.edu.pk, same as batch 5 host ugadmissions.qau.edu.pk.
+- from: UNI-CUI
+  to: PK-UNI-026
+  batch5:
+    name: COMSATS University Islamabad (CUI)
+    city: Islamabad
+    official_url: null
+    source_url: https://ww2.comsats.edu.pk/ro/Prospectus/UG_Prospectus/Undergraduate-Guide-2025-26.pdf
+  batch1:
+    name: COMSATS University, Islamabad
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="COMSATS University, Islamabad" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx
+    quote: <a href="https://www.comsats.edu.pk/">https://www.comsats.edu.pk/</a>
+    address_quote: Park Road, Tarlai Kalan,
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host comsats.edu.pk, same as batch 5 host ww2.comsats.edu.pk. HEC profile website comsats.edu.pk; batch 5 host ww2.comsats.edu.pk.
+- from: UNI-GCU
+  to: PK-UNI-114
+  batch5:
+    name: Government College University, Lahore
+    city: Lahore
+    official_url: null
+    source_url: https://gcu.edu.pk/admissions.php?pg=bs-program
+  batch1:
+    name: Government College University, Lahore
+    city: Lahore
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Government College University, Lahore" … charteredby="Government of Punjab" city="Lahore" discipline="General" sector="Public" province="Punjab"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx
+    quote: <a href="http://www.gcu.edu.pk/">http://www.gcu.edu.pk/</a>
+    address_quote: Near Nasir Bagh, Katchery Rd, Lahore 54000, Pakistan.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host gcu.edu.pk, same as batch 5 host gcu.edu.pk.
+- from: UNI-BUITEMS
+  to: PK-UNI-011
+  batch5:
+    name: Balochistan University of IT, Engineering & Management Sciences (BUITEMS)
+    city: Quetta
+    official_url: null
+    source_url: https://www.buitms.edu.pk/News/2026/AdmissionSpring2026/EligibilityAdmission%20Spring-2026.pdf
+  batch1:
+    name: Balochistan University of Information Technology, Engineering & Management Sciences (BUITEMS)
+    city: Quetta
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Balochistan/Balochistan-University-of-Information-Technology--Management-Sciences.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Balochistan University of Information Technology, Engineering & Management Sciences (BUITEMS)" … charteredby="Government of Balochistan" city="Quetta" discipline="Engineering & Technology" sector="Public" province="Balochistan"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Balochistan/Balochistan-University-of-Information-Technology--Management-Sciences.aspx
+    quote: <a href="http://www.buitms.edu.pk">http://www.buitms.edu.pk</a>
+    address_quote: Airport Road, Baleli, Quetta
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host buitms.edu.pk, same as batch 5 host www.buitms.edu.pk. HEC profile website buitms.edu.pk (sic), address Quetta; batch 5 host www.buitms.edu.pk.
+- from: UNI-UAF
+  to: PK-UNI-172
+  batch5:
+    name: University of Agriculture, Faisalabad
+    city: Faisalabad
+    official_url: null
+    source_url: https://web.uaf.edu.pk/Downloads/MeritListsView
+  batch1:
+    name: University of Agriculture
+    city: Faisalabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="University of Agriculture" … charteredby="Government of Punjab" city="Faisalabad" discipline="General" sector="Public" province="Punjab"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx
+    quote: <a href="http://www.uaf.edu.pk/">http://www.uaf.edu.pk/</a>
+    address_quote: University of Agriculture University Main Rd، Faisalabad, Pakistan.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host uaf.edu.pk, same as batch 5 host web.uaf.edu.pk.
+- from: UNI-UETP
+  to: PK-UNI-083
+  batch5:
+    name: University of Engineering & Technology, Peshawar
+    city: Peshawar
+    official_url: null
+    source_url: https://admission.uetpeshawar.edu.pk/
+  batch1:
+    name: University of Engineering & Technology
+    city: Peshawar
+    official_url: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="University of Engineering & Technology" … charteredby="Government of Pakistan" city="Peshawar" discipline="General" sector="Public" province="Khyber Pakhtunkhwa"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
+    quote: <a href="http://www.uetpeshawar.edu.pk/">http://www.uetpeshawar.edu.pk/</a>
+    address_quote: Post Box No. 814, Peshawar.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: 'Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host uetpeshawar.edu.pk, same as batch 5 host admission.uetpeshawar.edu.pk. Batch 1 has two rows named ''University of Engineering & Technology'': PK-UNI-083 (Peshawar, KP, website uetpeshawar.edu.pk) and PK-UNI-178 (Lahore). Batch 5 host admission.uetpeshawar.edu.pk and city Peshawar settle it as PK-UNI-083.'
+- from: UNI-KU
+  to: PK-UNI-280
+  batch5:
+    name: University of Karachi
+    city: Karachi
+    official_url: null
+    source_url: https://www.uok.edu.pk/admissions/2026/prosiikvi.pdf
+  batch1:
+    name: University of Karachi
+    city: Karachi
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="University of Karachi" … charteredby="Government of Sindh" city="Karachi" discipline="General" sector="Public" province="Sindh"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx
+    quote: <a href="http://www.uok.edu.pk">http://www.uok.edu.pk</a>
+    address_quote: University Road, Karachi 75270.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host uok.edu.pk, same as batch 5 host www.uok.edu.pk.
+- from: TST-USAT
+  to: PK-TST-003
+  batch5:
+    name: HEC Undergraduate Studies Admission Test (USAT), Education Testing Council
+    city: Islamabad
+    official_url: null
+    source_url: https://www.hec.gov.pk/english/news/news/Pages/USAT-HEC.aspx
+  batch1:
+    name: Education Testing Council, HEC (USAT, HAT, LAT, LAW-GAT)
+    city: null
+    official_url: https://etc.hec.gov.pk/
+    source_url: https://www.hec.gov.pk/english/services/students/etc/Pages/FAQ's.aspx
+    source_quote: 'Education Testing Council conducts the following standardized test:'
+  evidence:
+    url: https://www.hec.gov.pk/english/services/students/etc/Pages/FAQ's.aspx
+    quote: 'USAT (Undergraduate Studies Admission Test):'
+  basis: official list line
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: 'Batch 1 has no separate USAT test row; PK-TST-003 is the HEC Education Testing Council, whose batch 1 name lists USAT and whose FAQ page (fetched 2026-11-13) lists ''Undergraduate Studies Admission Test (USAT)'' under ''Education Testing Council conducts the following standardized test:''. Batch 5 source host www.hec.gov.pk is the parent of the batch 1 official host etc.hec.gov.pk. Batch 5 type is admission_test, batch 1 type is entry_test_body: the alias maps the test to its conducting body.'
+- from: UNI-GIKI
+  to: PK-UNI-058
+  batch5:
+    name: Ghulam Ishaq Khan Institute of Engineering Sciences and Technology (GIKI)
+    city: Topi
+    official_url: https://giki.edu.pk/
+    source_url: https://giki.edu.pk/admissions/admissions-undergraduates/
+  batch1:
+    name: Ghulam Ishaq Khan Institute of Engineering Sciences & Technology
+    city: Abbottabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Ghulam Ishaq Khan Institute of Engineering Sciences & Technology" … charteredby="Government of Khyber Pakhtunkhwa" city="Abbottabad" discipline="General" sector="Private" province="Khyber Pakhtunkhwa"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx
+    quote: <a href="http://www.giki.edu.pk">http://www.giki.edu.pk</a>
+    address_quote: Topi-23640, District Swabi
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host giki.edu.pk, same as batch 5 host giki.edu.pk. Batch 1 city 'Abbottabad' comes from the HEC list attribute; the HEC profile page gives the address 'Topi-23640, District Swabi' and the website giki.edu.pk, matching batch 5 (Topi). Batch 1 city value should be reviewed.
+- from: UNI-BAHRIA
+  to: PK-UNI-025
+  batch5:
+    name: Bahria University
+    city: Islamabad
+    official_url: https://www.bahria.edu.pk/
+    source_url: https://www.bahria.edu.pk/page/RedirectToPageTemplate?pageContentId=8895&websiteId=1
+  batch1:
+    name: Bahria University
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Bahria University" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx
+    quote: <a href="http://www.bahria.edu.pk/">http://www.bahria.edu.pk/</a>
+    address_quote: Shangrilla Road, Sector E-8 Islamabad
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host bahria.edu.pk, same as batch 5 host www.bahria.edu.pk.
+- from: UNI-NUML
+  to: PK-UNI-040
+  batch5:
+    name: National University of Modern Languages (NUML)
+    city: Islamabad
+    official_url: https://www.numl.edu.pk/
+    source_url: https://www.numl.edu.pk/admission
+  batch1:
+    name: National University of Modern Languages
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="National University of Modern Languages" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx
+    quote: <a href="http://www.numl.edu.pk/">http://www.numl.edu.pk/</a>
+    address_quote: National University of Modern Languages
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host numl.edu.pk, same as batch 5 host www.numl.edu.pk.
+- from: UNI-AIR
+  to: PK-UNI-023
+  batch5:
+    name: Air University
+    city: Islamabad
+    official_url: https://au.edu.pk/
+    source_url: https://au.edu.pk/Pages/Admission/FAQS.aspx
+  batch1:
+    name: Air University
+    city: Islamabad
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Air University" … charteredby="Government of Pakistan" city="Islamabad" discipline="General" sector="Public" province="Islamabad Capital Territory"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx
+    quote: <a href="http://www.au.edu.pk/">http://www.au.edu.pk/</a>
+    address_quote: Main Campus, Sector E-9, Islamabad.
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host au.edu.pk, same as batch 5 host au.edu.pk.
+- from: UNI-SIBA
+  to: PK-UNI-271
+  batch5:
+    name: Sukkur IBA University
+    city: Sukkur
+    official_url: https://iba-suk.edu.pk/
+    source_url: https://iba-suk.edu.pk/admissions/announcements?page=1
+  batch1:
+    name: Sukkur IBA University
+    city: Sukkur
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur%20IBA%20University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Sukkur IBA University" … charteredby="Government of Sindh" city="Sukkur" discipline="General" sector="Public" province="Sindh"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur%20IBA%20University.aspx
+    quote: <a href="http://www.iba-suk.edu.pk">http://www.iba-suk.edu.pk</a>
+    address_quote: Main Campus, Airport Road, Sukkur
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: '2026-11-13'
+  note: Website on the batch 1 official_url (HEC profile, fetched 2026-11-13) is host iba-suk.edu.pk, same as batch 5 host iba-suk.edu.pk.

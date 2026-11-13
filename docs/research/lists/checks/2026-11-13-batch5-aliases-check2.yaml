@@ -1,0 +1,152 @@
+aliases:
+  - from: UNI-FAST
+    to: PK-UNI-039
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx", quote: "Sector H-11/4, Islamabad."}
+    hec_visit_website_link: "http://www.nu.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Batch 5 source host nu.edu.pk matches. Batch 5 official_url empty. Batch 5 claude_note campus list is not supported by its own source (row already says so)."
+  - from: UNI-PIEAS
+    to: PK-UNI-044
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx", quote: "Nilore, Islamabad, Pakistan."}
+    hec_visit_website_link: "http://www.pieas.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host admissions.pieas.edu.pk matches pieas.edu.pk. Batch 5 official_url empty."
+  - from: UNI-PU
+    to: PK-UNI-200
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx", quote: "Quaid-e-Azam Campus, Lahore."}
+    hec_visit_website_link: "http://www.pu.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host pu.edu.pk matches. Not PK-UNI-122 (Information Technology University of the Punjab). Batch 5 official_url empty."
+  - from: UNI-LUMS
+    to: PK-UNI-136
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx", quote: "D.H.A, Lahore Cantt. 54792"}
+    hec_visit_website_link: "http://www.lums.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host admission.lums.edu.pk matches lums.edu.pk. Batch 5 official_url empty."
+  - from: UNI-IBAK
+    to: PK-UNI-229
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx", quote: "Main Campus University Road, Karachi."}
+    hec_visit_website_link: "http://www.iba.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host admissions.iba.edu.pk matches iba.edu.pk; Karachi. Not Sukkur IBA (PK-UNI-271, iba-suk.edu.pk). Batch 5 official_url empty."
+  - from: UNI-MUET
+    to: PK-UNI-242
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx", quote: "Indus Highway, Jamshoro 76062, Pakistan."}
+    hec_visit_website_link: "http://www.muet.edu.pk"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host admissions.muet.edu.pk matches muet.edu.pk. DATA PROBLEM: batch 1 city = Khairpur (copied from HEC list attribute), but the HEC profile address is Jamshoro; batch 5 Jamshoro is right. Batch 5 official_url empty."
+  - from: UNI-QAU
+    to: PK-UNI-045
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx", quote: "Quaid-i-Azam University Islamabad, 45320, Pakistan."}
+    hec_visit_website_link: "https://www.qau.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host ugadmissions.qau.edu.pk matches qau.edu.pk. Batch 5 source_url is http not https. Batch 5 official_url empty."
+  - from: UNI-CUI
+    to: PK-UNI-026
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx", quote: "Park Road, Tarlai Kalan, Islamabad 45550, Pakistan"}
+    hec_visit_website_link: "https://www.comsats.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host ww2.comsats.edu.pk matches comsats.edu.pk. Batch 1 name \"COMSATS University, Islamabad\". Batch 5 official_url empty."
+  - from: UNI-GCU
+    to: PK-UNI-114
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx", quote: "Near Nasir Bagh, Katchery Rd, Lahore 54000, Pakistan."}
+    hec_visit_website_link: "http://www.gcu.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host gcu.edu.pk matches; Lahore. Not GCU Faisalabad (PK-UNI-113) or GCU Hyderabad (PK-UNI-219). Batch 5 official_url empty."
+  - from: UNI-BUITEMS
+    to: PK-UNI-011
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Balochistan/Balochistan-University-of-Information-Technology--Management-Sciences.aspx", quote: "Airport Road, Baleli, Quetta"}
+    hec_visit_website_link: "http://www.buitms.edu.pk"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host buitms.edu.pk matches. Not BUET Khuzdar (PK-UNI-010). Batch 5 official_url empty."
+  - from: UNI-UAF
+    to: PK-UNI-172
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx", quote: "University of Agriculture University Main Rd، Faisalabad, Pakistan."}
+    hec_visit_website_link: "http://www.uaf.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host web.uaf.edu.pk matches uaf.edu.pk; Faisalabad. Not the Peshawar/Swat/D.I. Khan agriculture universities. Batch 5 official_url empty."
+  - from: UNI-UETP
+    to: PK-UNI-083
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx", quote: "Post Box No. 814, Peshawar."}
+    hec_visit_website_link: "http://www.uetpeshawar.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host admission.uetpeshawar.edu.pk matches. Batch 1 name is bare \"University of Engineering & Technology\" (same as Lahore PK-UNI-178); only city/domain tell them apart. Not UET Mardan (PK-UNI-084). Batch 5 official_url empty."
+  - from: UNI-KU
+    to: PK-UNI-280
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx", quote: "University Road, Karachi 75270."}
+    hec_visit_website_link: "http://www.uok.edu.pk"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Host uok.edu.pk matches. Batch 5 official_url empty."
+  - from: TST-USAT
+    to: PK-TST-003
+    evidence: {url: "https://www.hec.gov.pk/english/services/students/etc/Pages/FAQ's.aspx", quote: "Education Testing Council conducts the following standardized test: • Undergraduate Studies Admission Test ( USAT )"}
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Granularity mismatch: batch 1 row is the testing body (type entry_test_body, ETC covering USAT, HAT, LAT, LAW-GAT); batch 5 row is the single test USAT. It is the only batch 1 home for USAT. etc.hec.gov.pk (batch 1 official_url) returned almost no content via curl. Batch 5 official_url empty."
+  - from: UNI-GIKI
+    to: PK-UNI-058
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx", quote: "Topi-23640, District Swabi"}
+    hec_visit_website_link: "http://www.giki.edu.pk"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Domain giki.edu.pk matches. DATA PROBLEM: batch 1 city = Abbottabad (from HEC list attribute), but HEC profile address is Topi, District Swabi; batch 5 Topi is right. Batch 5 region \"KP\" vs batch 1 \"Khyber Pakhtunkhwa\" (naming inconsistency); batch 5 chartered_by empty."
+  - from: UNI-BAHRIA
+    to: PK-UNI-025
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx", quote: "Shangrilla Road, Sector E-8 Islamabad"}
+    hec_visit_website_link: "http://www.bahria.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Domain bahria.edu.pk matches. Batch 5 chartered_by empty."
+  - from: UNI-NUML
+    to: PK-UNI-040
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx", quote: "H-9 Islamabad ,Pakistan."}
+    hec_visit_website_link: "http://www.numl.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Domain numl.edu.pk matches. Batch 5 chartered_by empty."
+  - from: UNI-AIR
+    to: PK-UNI-023
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx", quote: "Main Campus, Sector E-9, Islamabad."}
+    hec_visit_website_link: "http://www.au.edu.pk/"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Domain au.edu.pk matches. Batch 5 chartered_by empty."
+  - from: UNI-SIBA
+    to: PK-UNI-271
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur%20IBA%20University.aspx", quote: "Main Campus, Airport Road, Sukkur"}
+    hec_visit_website_link: "http://www.iba-suk.edu.pk"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: "Domain iba-suk.edu.pk matches. Not IBA Karachi (PK-UNI-229). Batch 5 chartered_by empty."

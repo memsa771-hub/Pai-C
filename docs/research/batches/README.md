@@ -88,3 +88,14 @@ aliases:
 - **Report reasons.** The import report has an `Aliases` sheet with one row per alias: `alias_applied` (accepted) or `alias_not_accepted` (skipped, with the reason). An aliased Institutions row is skipped with reason `aliased`, and its detail is the target. A row whose alias target is not loaded is rejected with reason `alias_target_not_loaded`.
 - **Record.** Each row loaded through an alias records the alias in its provenance: from, to, the evidence, both checkers, and the alias file's name and sha256. The import log (`os_imports.aliases`, migration os_0034) keeps every alias file used and the aliases it applied. Undo by import id works unchanged. The §11.3 re-fetch waiver still applies, because the returned file's sha256 does not change.
 - **Use.** Pass alias files with `--aliases FILE` (repeatable) on `scripts/os_import_batch.py validate` or `import`. `validate` has no review queue, so `--assume-aliases-attested` shows the plan as if the alias checkers had attested. Aliases are command-line only: the admin upload in the API does not take alias files. The API's import record does show the `aliases` it used.
+
+## v6 seat re-entry (local research, 2026-11-13)
+
+`PAI-Research-Batch3-Sindh-v6-seats-reentry.csv` re-enters 34 of the 37 v5 seat rows that had no value. Their quotes
+hold more than one number because each table splits one programme by seat category (Merit vs UEAP, CEAP,
+self-finance, overseas); the value entered is the open/general merit figure, with `seat_category: open_merit` written
+explicitly (not empty), so a category subset is never shown as a total. Check 1 and an independent check 2 (own
+download, page images where the text layer shifts cells) agree on all 34 values and column headers
+(`-check1.csv`, `-check2.csv`; the full check records are in `docs/research/lists/checks/`). Held for review:
+SD-PRG-142 and SD-PRG-146 (the quote does not hold the row's figure; re-quote or re-scope), SD-PRG-144 (237 Karachi
+District inside the 238 open-merit cell that adds one reserved seat). UEAP/CEAP/self-finance seats are not entered.

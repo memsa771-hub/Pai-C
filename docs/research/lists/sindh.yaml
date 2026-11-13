@@ -51,6 +51,24 @@ lists:
     count_method: markup_count - counted list items with Province='Sindh' in the HTML (unconfirmed on import)
     read_method: curl + HTML markup count
     check2: correct
+  # Added 2026-11-13 (local P2 completion): official lists cited by batch rows that had no list entry.
+  # Check 1: .local-ci research, check 2: independent re-download; counts and rows agree.
+  - id: smbbmu-prospectus-2026-27-mbbs-bds
+    body: SMBBMU Larkana
+    name: MBBS & BDS Admissions Prospectus, Academic Session 2026-27 (public sector, Sindh)
+    url: https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf
+    institution_type: medical_dental_college
+    family: bachelor
+    date: 2026-10-07   # PDF metadata creation date; no date printed (both checks)
+    row_count: 9
+    count_quote: null
+    count_method: 'Table of contents "Code University / College": institution lines coded 01-09, no gaps (code 10
+      is "Admission Procedure", not an institution). Universities/colleges only; constituent colleges inside each
+      section are not counted'
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+    note: 'Local research 2026-11-13: check 1 and an independent check 2 (own download) agree on the decision, the
+      row count and every cited row.'
 not_found:
   - what: College affiliation lists of BISE Hyderabad, Sukkur, Larkana, Mirpurkhas, Shaheed Benazirabad
     note: not read in this pass

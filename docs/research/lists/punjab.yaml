@@ -136,6 +136,49 @@ lists:
     count_method: counted list items with Province='Punjab' in the HTML
     read_method: curl + HTML markup count
     check2: correct
+  # Added 2026-11-13 (local P2 completion): official lists cited by batch rows that had no list entry.
+  # Check 1: .local-ci research, check 2: independent re-download; counts and rows agree.
+  - id: uhs-prospectus-2025-26-medical-dental
+    body: UHS Lahore
+    name: Prospectus Session 2025-2026, MBBS & BDS Programme, Public Sector Medical and Dental Colleges in Punjab
+      (with annexed Admission Policy 2025-26)
+    url: https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf
+    institution_type: medical_dental_college
+    family: bachelor
+    date: '2025-10-22'   # printed: 'dated 22nd October 2025' (Government of Punjab notification in the prospectus)
+    row_count: 71
+    count_quote: null
+    count_method: '21 public institutions: clause 3 list "applicable to following Medical and Dental Institutions",
+      serials i-xxi, no gaps, same 21 as the seat table on p.37 (17 MBBS + 4 BDS rows); 32 private MBBS colleges:
+      Annex-C (PRIVATE SECTOR MBBS SEATS) serials 1-32, no gaps; 18 private BDS colleges: (PRIAVTE BDS SEATS) table
+      serials 1-18, no gaps. 21+32+18 = 71. Annex totals 4250 and 1100 are seat totals, not institution counts'
+    read_method: 'curl + pdftotext (PDF text layer) for the public list; private annexes are scanned images (PDF pages
+      76-77): pdftoppm + tesseract OCR; the MBBS annex page also read by eye from the rendered image'
+    check2: correct
+    note: 'Local research 2026-11-13: check 1 and an independent check 2 (own download) agree on the decision, the
+      row count and every cited row. Part of the list was read from images (scanned pages or a JPEG) by a model, so
+      a person should confirm those lines (R-72).'
+  - id: uhs-prospectus-2026-27-medical-dental
+    body: UHS Lahore
+    name: Prospectus Session 2026-2027, MBBS & BDS Programme, Public Sector Medical and Dental Colleges in Punjab
+      (with annexed Admission Policy 2026-27)
+    url: https://www.uhs.edu.pk/images/Prospectus26.pdf
+    institution_type: medical_dental_college
+    family: bachelor
+    date: '2026-10-14'   # printed: 'dated 14th October, 2026' (Government of Punjab notification in the prospectus)
+    row_count: 75
+    count_quote: null
+    count_method: '24 public institutions: clause 3 list "applicable to following Medical and Dental Institutions",
+      serials i-xxiv, no gaps (4 starred "Subject to the approval by PM&DC"), same as the seat table pp.38-39 (19
+      MBBS + 5 BDS rows); 33 private MBBS colleges: Annex-III (PRIVATE SECTOR MBBS SEATS) serials 1-33, no gaps; 18
+      private BDS colleges: Annex-IV (PRIAVTE BDS SEATS) serials 1-18, no gaps. 24+33+18 = 75. Annex totals 4400 and
+      1100 are seat totals, not institution counts'
+    read_method: 'curl + pdftotext (PDF text layer) for the public list; Annex-III/IV are scanned images (PDF pages
+      77-78): pdftoppm + tesseract OCR, and both pages read by eye from the rendered images (model image read)'
+    check2: correct
+    note: 'Local research 2026-11-13: check 1 and an independent check 2 (own download) agree on the decision, the
+      row count and every cited row. Part of the list was read from images (scanned pages or a JPEG) by a model, so
+      a person should confirm those lines (R-72).'
 not_found:
   - what: Private colleges and A-level schools in Punjab (board affiliation lists; P2 §11 Q4)
     note: no official list found in this pass
