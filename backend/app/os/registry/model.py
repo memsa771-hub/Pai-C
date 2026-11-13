@@ -39,6 +39,8 @@ ALLOWED_SUCCESSORS: dict[str, tuple[str, ...]] = {kind: (kind,) for kind in KIND
 # Causes an institution or a campus may be recorded with: they come from lists, review, research, monitoring and the
 # yearly rollover, never from a guess, a seed or a hand edit (R-32).
 CAUSES_OF_INSTITUTIONS = ("import", "review", "research", "monitor", "rollover")
+# The kinds a programme may be placed under (`link_programme`); the import plan rejects a row under any other kind.
+PROGRAMME_PARENTS = ("institution",)
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _DOMAIN = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")

@@ -35,7 +35,7 @@ from app.os.knowledge.sheets.reader import Batch, read_batch
 from app.os.knowledge.sheets.safe import safe_cell
 from app.os.knowledge.store import SqlKnowledge
 from app.os.registry.calendars import record_calendar, record_calendar_date
-from app.os.registry.model import KIND_PREFIX, slug
+from app.os.registry.model import KIND_PREFIX, PROGRAMME_PARENTS, slug
 from app.os.registry.store import RegistryError, RegistryStore, kept_lists
 
 __all__ = ["AlreadyImported", "ImportDeps", "ImportRefused", "ImportResult", "build_context", "plan_file", "plan_hook", "run_import",
@@ -325,6 +325,7 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
         cref = cause_ref(import_id)
         refused: set[str] = set()  # registry ids whose row the registry refused at load time
         refused_programmes: set[str] = set()  # programme refs rejected at load time (their institution was refused)
+        unlinked: set[str] = set()  # programmes this import created whose place in the registry was then refused
 
         def not_loaded(registry_id: str | None) -> bool:
             return registry_id in refused and deps.registry.get(registry_id) is None
@@ -344,15 +345,25 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                     _reject(r, "institution_not_loaded", r.payload["inst_registry_id"])
                     refused_programmes.add(r.row_id)
                     continue
-                elif (r.sheet == "Facts" and r.payload.get("scope") == "programme"
-                      and r.payload.get("ref") in refused_programmes and deps.programmes.get(r.payload["ref"]) is None):
+                elif r.sheet == "Facts" and r.payload.get("scope") == "programme" and (
+                        (r.payload.get("ref") in refused_programmes and deps.programmes.get(r.payload["ref"]) is None)
+                        or r.payload.get("ref") in unlinked):
                     _reject(r, "programme_not_loaded", r.payload["ref"])
                     continue
                 elif r.sheet == "Facts" and r.payload.get("scope") == "registry" and not_loaded(r.payload.get("ref")):
                     _reject(r, "entity_unknown", r.payload["ref"])
                     continue
                 elif r.sheet == "Programmes":
-                    _load_programme(deps, r, import_id, mode, decision_ref, actor, cref, route_key, created)
+                    n_created = len(created)
+                    try:
+                        _load_programme(deps, r, import_id, mode, decision_ref, actor, cref, route_key, created)
+                    except RegistryError as e:  # a backstop: the plan should have rejected it; the row, not the import
+                        _reject(r, "registry_refused", str(e)[:500])
+                        refused_programmes.add(r.row_id)
+                        if len(created) > n_created:
+                            unlinked.add(r.row_id)  # no fact goes on a programme left without its institution
+                        continue
+                    unlinked.discard(r.row_id)  # a later row of the programme placed it
                 else:
                     r.payload["fid"] = _write_fact(deps, r, r.payload, import_id, mode, decision_ref, actor)
                 if r.queue_kind == "conflict" and deps.disputes is not None and r.payload.get("fid"):
@@ -405,6 +416,8 @@ def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, d
     p, row = r.payload, r.payload["row"]
     ref = r.row_id
     inst = deps.registry.get(p["inst_registry_id"])
+    if inst is None or inst.kind not in PROGRAMME_PARENTS:  # refused before the programme is created, never after
+        raise RegistryError(f"{p['inst_registry_id']} is not an institution of the registry")
     if deps.programmes.get(ref) is None:
         https = tuple(u for u in (p.get("url"),) if u and u.startswith("https://"))
         deps.programmes.upsert(Programme(ref=ref, route_key=route_key, university=inst.name if inst else "",

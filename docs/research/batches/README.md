@@ -67,6 +67,15 @@ Rows that cite a non-official copy (news, Google Drive, Facebook, Instagram, Wik
 
 v4 is the version to import. v2 and v3 are kept as history.
 
+## Programmes under an entity that is not an institution
+
+A programme is placed only under an entity of registry kind `institution`. A Programmes row whose `inst_id` names an
+entity (in the file, or already in the registry) of another kind (an `admission_system`, a board, a body; see `type_kinds` in format.yaml) is
+rejected with reason `parent_not_institution`. The detail names the id and its kind. `validate` and `import` reject the
+row alike, and the rest of the file loads. Facts rows on that programme are rejected `programme_not_loaded`, as for any
+programme that is not loaded. A programme row whose institution the registry still refuses at load time is rejected
+`registry_refused`, and the import goes on (the same backstop as for Institutions rows).
+
 ## Alias files
 
 A returned file is kept unchanged as the source record. When a file uses its own id for an entity that another batch already lists under a different id, the link between the two ids goes in an **alias file**. The returned file is never edited. An alias file is YAML that is supplied with the batch:

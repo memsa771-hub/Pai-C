@@ -30,7 +30,7 @@ from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
 from app.os.registry.calendars import calendar_types
-from app.os.registry.model import KIND_PREFIX, NATIONAL, REGION_REQUIRED, RegistryEntry, slug
+from app.os.registry.model import KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED, RegistryEntry, slug
 
 BUCKETS = ("accepted", "unconfirmed", "queued", "rejected", "skipped")
 OWNER_ACCEPTED, REVIEWERS = "owner_accepted", "reviewers"
@@ -478,6 +478,9 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
     reg_id = inst_registry_id(inst_id or "")
     if reg_id is None:
         return ("alias_target_not_loaded" if r.get("_alias") else "institution_not_loaded"), str(inst_id)
+    parent = ctx.meta(reg_id)  # file first, then database; with no meta the kind is unknown and the registry decides
+    if parent and parent.get("kind") not in PROGRAMME_PARENTS:
+        return "parent_not_institution", f"{inst_id} ({reg_id}) is of kind {parent.get('kind')}"
     url, quote = _text(r.get("source_url")), _text(r.get("quote_verbatim"))
     rm_text = _text(r.get("read_method"))
     rm = fmt.read_method(rm_text) if rm_text else None  # a missing read method is not assumed to be fetch

@@ -13,7 +13,8 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.os import models
 from app.os.registry.model import (
-    ALLOWED_PARENTS, ALLOWED_SUCCESSORS, CAUSES_OF_INSTITUTIONS, NAMES_A_LIST, NATIONAL, RegistryEntry, known_region)
+    ALLOWED_PARENTS, ALLOWED_SUCCESSORS, CAUSES_OF_INSTITUTIONS, NAMES_A_LIST, NATIONAL, PROGRAMME_PARENTS,
+    RegistryEntry, known_region)
 
 T = models.registry
 RV = models.registry_revisions
@@ -280,7 +281,7 @@ class RegistryStore:
                 PG.c.tenant_id == self.tenant_id, PG.c.ref == ref).with_for_update()).first()
             if old is None:
                 raise RegistryError(f"programme {ref} does not exist")
-            if self._kind_of(conn, institution_id) != "institution":
+            if self._kind_of(conn, institution_id) not in PROGRAMME_PARENTS:
                 raise RegistryError(f"{institution_id} is not an institution of the registry")
             new = {"institution_id": institution_id,
                    **{k: (getattr(old, k) if v is _UNSET else v) for k, v in given.items()}}
