@@ -354,6 +354,7 @@ imports = Table(
     Column("finished_at", DateTime(timezone=True)),
     Column("undone_at", DateTime(timezone=True)),
     Column("undone_by", Text),
+    Column("aliases", JSONB, nullable=False, server_default=text("'[]'::jsonb")),  # alias files used (P2-T13, os_0034)
     _in("mode", ("owner_accepted", "reviewers"), "ck_os_imports_mode"),
     _in("status", ("running", "done", "failed", "undone"), "ck_os_imports_status"),
     CheckConstraint("mode <> 'owner_accepted' OR decision_ref IS NOT NULL", name="ck_os_imports_decision"),

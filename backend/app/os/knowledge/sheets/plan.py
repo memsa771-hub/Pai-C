@@ -7,7 +7,12 @@ then loads, so the two never differ. Buckets:
 - `unconfirmed`   loaded as `unconfirmed`, shown as "not confirmed yet";
 - `queued`        not loaded; a review item is opened (`import_dispute`, `collect`);
 - `rejected`      not loaded; listed in the import report with the reason;
-- `skipped`       nothing to load by design (lead, history, searched-and-not-found, out of scope).
+- `skipped`       nothing to load by design (lead, history, searched-and-not-found, out of scope, aliased).
+
+Alias files (aliases.py, P2-T13) are planned first, as rows of an `Aliases` sheet in the report: an accepted alias makes
+the file's id name the entity already loaded under another id (in `Programmes.inst_id`, `Facts.entity_id` and
+`Institutions.parent_id`). Aliases are new checks, so they are judged only by reviewer attestation, whatever the mode of
+the rows.
 """
 
 import re
@@ -21,6 +26,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.os.knowledge.fact_classes import fact_class as class_of_field
 from app.os.knowledge.fact_classes import is_high_stakes
 from app.os.knowledge.regions import UnknownRegion, normalise_region
+from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
 from app.os.registry.calendars import calendar_types
@@ -59,6 +65,8 @@ class PlanContext:
     cap_without_allow_list: bool = False  # real imports: with no allow-list connected nothing is above `unconfirmed`
     decision_ref: str | None = None  # the owner's decision reference (owner-accepted mode)
     batch_sha: str = ""  # sha256 of the file being planned; set by plan_batch
+    aliases: tuple[AliasFile, ...] = ()  # alias files for this file (P2-T13); bound to it by sha256 in plan_batch
+    applied_aliases: dict[str, dict] = field(default_factory=dict)  # set by plan_batch: file id -> the applied alias
     fmt: Format = field(default_factory=load_format)
 
 
@@ -110,8 +118,10 @@ class Checks:
         self.c1, self.c2, self.notes, self.provenance = c1, c2, notes, provenance
 
 
-def read_checks(row: dict, ctx: PlanContext) -> Checks:
-    fmt = ctx.fmt
+def read_checks(row: dict, ctx: PlanContext, *, mode: str | None = None, batch_ref: str | None = None) -> Checks:
+    """`mode` and `batch_ref` override the context's (an alias is judged in reviewers mode against its own ref)."""
+    fmt, mode = ctx.fmt, mode or ctx.mode
+    batch_ref = ctx.batch_ref if batch_ref is None else batch_ref
     c1 = (_text(row.get("checker1_result")) or "").lower() or None
     c2 = fmt.check2_values.get((_text(row.get("checker2_approved")) or "").lower())
     n1, n2 = _text(row.get("checker1_name")), _text(row.get("checker2_name"))
@@ -119,7 +129,7 @@ def read_checks(row: dict, ctx: PlanContext) -> Checks:
     if c1 is not None and c1 not in fmt.check1_results:
         notes.append(f"checker1_result '{c1}' is not allowed")
         c1 = None
-    if ctx.mode == OWNER_ACCEPTED:
+    if mode == OWNER_ACCEPTED:
         r1, r2 = fmt.owner_accepted_ref(1, n1), fmt.owner_accepted_ref(2, n2)
         if c1 is not None and r1 is None:
             notes.append("checker 1 is not a check the owner accepted")
@@ -129,9 +139,9 @@ def read_checks(row: dict, ctx: PlanContext) -> Checks:
             c2 = None
         prov = {"checker1": r1, "checker2": r2, "checker1_name": n1, "checker2_name": n2}
     else:
-        ok = lambda n: bool(n) and ctx.attested is not None and ctx.attested(n, ctx.batch_ref)
+        ok = lambda n: bool(n) and ctx.attested is not None and ctx.attested(n, batch_ref)  # noqa: E731
         if c1 is not None and not ok(n1):
-            notes.append(f"checker 1 '{n1}' has not attested batch {ctx.batch_ref}")
+            notes.append(f"checker 1 '{n1}' has not attested batch {batch_ref}")
             c1 = None
         if c2 is not None and (not ok(n2) or n2 == n1):
             notes.append("checker 2 is unknown, has not attested, or is checker 1 (two different people)")
@@ -216,13 +226,58 @@ def _region(text: str | None, kind: str | None, ctx: PlanContext) -> tuple[str |
         return None, "unknown_region"
 
 
-def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
+def resolve_aliases(ctx: PlanContext) -> tuple[list[RowResult], dict[str, dict]]:
+    """(report rows, applied aliases: file id -> what provenance keeps). An alias is applied only when both checks accept
+    it (check 1 correct, check 2 yes), the rule for rows, judged always in reviewers mode: both checkers attested the alias
+    file's own ref (`AliasFile.attest_ref`, from its sha256) and checker 2 is not checker 1. The owner-accepted checker
+    names never accept an alias: the owner's acceptance covers the batch rows checked on its date, not later checks.
+    Any other alias is ignored and reported."""
+    rows: list[RowResult] = []
+    applied: dict[str, dict] = {}
+    for af in ctx.aliases:
+        for a in af.aliases:
+            chk = read_checks(a.checks, ctx, mode=REVIEWERS, batch_ref=af.attest_ref)
+            res = RowResult("Aliases", a.from_id, a.index, "skipped")
+            rows.append(res)
+            if chk.c1 == "correct" and chk.c2 == "yes":
+                res.bucket, res.reason, res.detail = "accepted", "alias_applied", f"{a.from_id} -> {a.to}"
+                applied[a.from_id] = {"from": a.from_id, "to": a.to, "alias_file": af.path.name,
+                                      "alias_sha256": af.sha256, "attest_ref": af.attest_ref,
+                                      "evidence": {"url": a.evidence_url, "quote": a.evidence_quote},
+                                      "checker1": chk.provenance.get("checker1"),
+                                      "checker2": chk.provenance.get("checker2")}
+            else:
+                res.reason = "alias_not_accepted"
+                res.detail = "; ".join(chk.notes) or f"check 1 {chk.c1 or 'missing'}, check 2 {chk.c2 or 'missing'}"
+    return rows, applied
+
+
+def _aliased(r: dict, column: str, applied: dict[str, dict]) -> tuple[dict, dict | None]:
+    """The row as planned: its id rewritten to an applied alias's target (a copy; the file's row is kept as read)."""
+    used = applied.get(_text(r.get(column)) or "")
+    return ({**r, column: used["to"], "_alias": used}, used) if used else (r, None)
+
+
+def _note_alias(res: RowResult, original: dict, used: dict | None) -> None:
+    """A row planned through an alias keeps the file's own row and records the alias in its provenance (R-76)."""
+    if used is None:
+        return
+    if "row" in res.payload:
+        res.payload["row"] = original
+    if "provenance" in res.payload:
+        res.payload["provenance"]["alias"] = dict(used)
+
+
+def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] | None = None) -> list[RowResult]:
     fmt, out, seen = ctx.fmt, [], set()
     planned: dict[str, str] = {}  # inst_id -> registry id of the rows planned so far (a parent comes before its child)
-    for r in batch.sheets["Institutions"]:
+    via_alias: list[tuple[RowResult, dict, dict | None]] = []
+    for original in batch.sheets["Institutions"]:
+        r, used = _aliased(original, "parent_id", applied or {})  # before every other check
         rid = _text(r.get("inst_id")) or ""
         res = RowResult("Institutions", rid, r["_row"], "rejected")
         out.append(res)
+        via_alias.append((res, original, used))
         if not rid:
             res.reason = "missing_id"
             continue
@@ -230,6 +285,9 @@ def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
             res.reason = "duplicate_id"
             continue
         seen.add(rid)
+        if applied and rid in applied:  # the entity is loaded under another id; this row loads nothing
+            res.bucket, res.reason, res.detail = "skipped", "aliased", applied[rid]["to"]
+            continue
         status = _text(r.get("claude_status"))
         if status not in fmt.claude_statuses:
             res.reason, res.detail = "bad_status", str(status)
@@ -250,6 +308,8 @@ def plan_institutions(batch: Batch, ctx: PlanContext) -> list[RowResult]:
         problem, detail = _institution_entry(r, rid, res, ctx, planned)
         if problem:
             res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
+    for res, original, used in via_alias:
+        _note_alias(res, original, used)
     return out
 
 
@@ -287,7 +347,7 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
     if _text(r.get("parent_id")):
         parent = planned.get(_text(r.get("parent_id"))) or ctx.existing_institutions(_text(r.get("parent_id")))
         if parent is None:
-            return "parent_not_loaded", str(r.get("parent_id"))
+            return ("alias_target_not_loaded" if r.get("_alias") else "parent_not_loaded"), str(r.get("parent_id"))
     tz = _text(r.get("timezone"))
     if tz is not None:
         try:
@@ -315,8 +375,9 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
     return None, ""
 
 
-def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list[RowResult]) -> list[RowResult]:
-    fmt = ctx.fmt
+def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list[RowResult],
+                              applied: dict[str, dict] | None = None) -> list[RowResult]:
+    fmt, applied = ctx.fmt, applied or {}
     abroad = {res.row_id for res in institutions if res.reason in ("out_of_scope", "out_of_scope_region")}
     skipped_programmes: set[str] = set()
     registry_ids = {res.row_id: res.payload["entry"].entity_id for res in institutions
@@ -338,10 +399,13 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
     programme_refs: set[str] = set()
     seen_keys: set = set()
     seen_programmes: set = set()
-    for r in batch.sheets.get("Programmes", []):
+    via_alias: list[tuple[RowResult, dict, dict | None]] = []
+    for original in batch.sheets.get("Programmes", []):
+        r, used = _aliased(original, "inst_id", applied)  # before every other check
         rid = _text(r.get("programme_id")) or ""
         res = RowResult("Programmes", rid, r["_row"], "rejected")
         out.append(res)
+        via_alias.append((res, original, used))
         if not rid:
             res.reason = "missing_id"
             continue
@@ -365,9 +429,13 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         elif res.bucket in ("accepted", "unconfirmed"):
             programme_refs.add(rid)  # only a programme that is actually loaded can carry facts
     in_file = _all_programme_ids(batch)
-    for r in batch.sheets.get("Facts", []):
+    for original in batch.sheets.get("Facts", []):
+        r, used = _aliased(original, "entity_id", applied)  # before every other check
         out.append(_fact_row(r, ctx, inst_registry_id, (programme_refs, in_file), seen_keys,
                              abroad | skipped_programmes))
+        via_alias.append((out[-1], original, used))
+    for res, original, used in via_alias:
+        _note_alias(res, original, used)
     return out
 
 
@@ -381,7 +449,7 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
     inst_id = _text(r.get("inst_id"))
     reg_id = inst_registry_id(inst_id or "")
     if reg_id is None:
-        return "institution_not_loaded", str(inst_id)
+        return ("alias_target_not_loaded" if r.get("_alias") else "institution_not_loaded"), str(inst_id)
     url, quote = _text(r.get("source_url")), _text(r.get("quote_verbatim"))
     rm_text = _text(r.get("read_method"))
     rm = fmt.read_method(rm_text) if rm_text else None  # a missing read method is not assumed to be fetch
@@ -486,14 +554,19 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
     if value is None:
         return "no_value", ""
     loaded, in_file = programme_ids
-    if entity in loaded or (entity not in in_file and ctx.existing_programmes(entity)):
+    if r.get("_alias"):  # an alias names an entity of the Institutions sheet, never a programme
+        ref = inst_registry_id(entity)
+        if ref is None:
+            return "alias_target_not_loaded", entity
+        scope = "registry"
+    elif entity in loaded or (entity not in in_file and ctx.existing_programmes(entity)):
         scope, ref = "programme", entity
     elif entity in in_file:
         return "programme_not_loaded", entity  # a fact is never attached to a programme that was not loaded
     else:
         ref = inst_registry_id(entity)
         if ref is None:
-            return "entity_unknown", entity
+            return ("alias_target_not_loaded" if r.get("_alias") else "entity_unknown"), entity
         scope = "registry"
     url, quote = _text(r.get("source_url")), _text(r.get("quote_verbatim"))
     rm_text = _text(r.get("read_method"))
@@ -558,8 +631,11 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
 def plan_batch(batch: Batch, ctx: PlanContext) -> list[RowResult]:
     """Every row of every sheet with its decision, institutions first (programmes and facts need them)."""
     ctx.batch_sha = batch.sha256
-    inst = plan_institutions(batch, ctx)
-    return inst + plan_programmes_and_facts(batch, ctx, inst)
+    bind(ctx.aliases, batch.sha256, batch.path.name)  # an alias file for another file is refused, whole
+    alias_rows, applied = resolve_aliases(ctx)
+    ctx.applied_aliases = applied
+    inst = plan_institutions(batch, ctx, applied)
+    return alias_rows + inst + plan_programmes_and_facts(batch, ctx, inst, applied)
 
 
 def summarise(results: list[RowResult]) -> dict[str, dict[str, int]]:

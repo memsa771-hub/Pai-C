@@ -1,7 +1,7 @@
 """Validate, import and undo a returned research spreadsheet (P2 spec §4.6; master R-68). No SQL by hand.
 
     python -m scripts.os_import_batch template OUT.xlsx
-    python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--report OUT.csv]
+    python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--report OUT.csv] [--aliases A.yaml]
     python -m scripts.os_import_batch import FILE --country PK --owner-accepted <decision ref> --actor NAME [--refetch]
     python -m scripts.os_import_batch import FILE --country PK --reviewers --batch-ref REF --actor NAME [--refetch]
     python -m scripts.os_import_batch undo IMPORT_ID --actor NAME
@@ -11,13 +11,18 @@
 files (the H3 shape) to know the list URLs. `import --owner-accepted` is the separate mode for batches 1-5 (P2-D16a):
 both checkers must be the two AI checks the owner accepted. `--reviewers` accepts only checkers that attested the batch.
 `--refetch` re-fetches model- and OCR-read rows through the page gateway (R-68). Every import is logged; the report CSV
-lists every row beside the file. Exit code 2 when refused.
+lists every row beside the file. `--aliases FILE` (may repeat) gives alias files made for FILE (bound by its sha256): an
+accepted alias makes an id of the file name an entity loaded under another id; the file itself stays unchanged. An
+alias counts only when both its checkers attested the alias file's ref (`aliases-<sha256 of the alias file>`) in the
+review queue; `validate --assume-aliases-attested` shows the plan as if they had.
+Exit code 2 when refused.
 """
 
 import argparse
 import sys
 from pathlib import Path
 
+from app.os.knowledge.sheets.aliases import load_aliases
 from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
@@ -61,11 +66,15 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
         p.add_argument("--family", default="", help="the batch's family (allow-list scope)")
         p.add_argument("--batch-ref", default=None)
         p.add_argument("--report", default=None)
+        p.add_argument("--aliases", action="append", default=[], metavar="FILE",
+                       help="an alias file for this file (YAML; may repeat)")
     sub.choices["validate"].add_argument("--lists", default=None)
     sub.choices["validate"].add_argument("--decision-ref", default=None,
                                          help="the owner's decision reference: shows the plan with the spec §11.3 waiver")
     sub.choices["validate"].add_argument("--no-list-needed", action="store_true",
                                          help="what if every official list were loaded (dry run only)")
+    sub.choices["validate"].add_argument("--assume-aliases-attested", action="store_true",
+                                         help="what if both checkers of every alias had attested it (dry run only)")
     imp = sub.choices["import"]
     mode = imp.add_mutually_exclusive_group(required=True)
     mode.add_argument("--owner-accepted", metavar="DECISION_REF")
@@ -87,6 +96,9 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                                 family=args.family, decision_ref=args.decision_ref, list_urls=_list_urls(Path(args.lists) if args.lists else None,
                                                                          args.country),
                                 require_list=not args.no_list_needed)
+            ctx.aliases = tuple(load_aliases(Path(a)) for a in args.aliases)
+            if args.assume_aliases_attested:  # the dry run has no review queue; only alias refs are assumed
+                ctx.attested = lambda name, ref: ref.startswith("aliases-")
             _, results = plan_file(Path(args.file), ctx)
             if args.report:
                 write_report(results, Path(args.report))
@@ -115,7 +127,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             res = run_import(Path(args.file), deps, mode=OWNER_ACCEPTED if args.owner_accepted else REVIEWERS,
                              actor=args.actor, country=args.country, decision_ref=args.owner_accepted,
                              batch_ref=args.batch_ref, family=args.family, route_key=args.route_key,
-                             report_path=Path(args.report) if args.report else None)
+                             report_path=Path(args.report) if args.report else None,
+                             aliases=[Path(a) for a in args.aliases])
             out(f"import {res.import_id} done; report {res.report_path}")
             _print_counts(res.counts, out)
         elif args.cmd == "undo":
@@ -128,7 +141,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             from app.os.knowledge.sheets.importlog import ImportLog
 
             for rec in ImportLog(deps.engine, deps.tenant_id).list():
-                out(f"{rec.id}\t{rec.status}\t{rec.mode}\t{rec.file_name}\t{rec.actor}\t{rec.started_at:%Y-%m-%d %H:%M}")
+                out(f"{rec.id}\t{rec.status}\t{rec.mode}\t{rec.file_name}\t{rec.actor}\t{rec.started_at:%Y-%m-%d %H:%M}"
+                    + (f"\taliases: {', '.join(a['alias_file'] for a in rec.aliases)}" if rec.aliases else ""))
         return 0
     except (ValueError, SheetError, AlreadyImported, RuntimeError, KeyError) as e:
         out(f"refused: {e}")

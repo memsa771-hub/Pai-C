@@ -37,7 +37,8 @@ def record_out(r) -> dict:
             "batch_ref": r.batch_ref, "actor": r.actor, "note_actor": r.note_actor, "status": r.status, "counts": r.counts,
             "programmes_created": r.programmes_created, "error": r.error, "started_at": r.started_at.isoformat(),
             "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-            "undone_at": r.undone_at.isoformat() if r.undone_at else None, "undone_by": r.undone_by}
+            "undone_at": r.undone_at.isoformat() if r.undone_at else None, "undone_by": r.undone_by,
+            "aliases": r.aliases}
 
 
 def row_out(r) -> dict:

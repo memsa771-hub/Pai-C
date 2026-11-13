@@ -66,3 +66,25 @@ The v4 files fill both checker columns on every row. The names in the files are 
 Rows that cite a non-official copy (news, Google Drive, Facebook, Instagram, Wikipedia, a compromised board site) are never loaded as fact, whatever the checks say (R-72). These include the AJK Joint Admission Committee rows copied from educationinkarachi.net and ajkbise.net.
 
 v4 is the version to import. v2 and v3 are kept as history.
+
+## Alias files
+
+A returned file is kept unchanged as the source record. When a file uses its own id for an entity that another batch already lists under a different id, the link between the two ids goes in an **alias file**. The returned file is never edited. An alias file is YAML that is supplied with the batch:
+
+```yaml
+file: <the returned file's name>
+sha256: <sha256 of that returned file>
+aliases:
+  - from: <the id used inside the returned file>
+    to: <the inst_id the entity was loaded under, as its own file writes it>
+    evidence: {url: <official page>, quote: <text showing the two are the same entity>}
+    check1: {result: correct, name: <reviewer ref>, date: <YYYY-MM-DD>}
+    check2: {approved: yes, name: <another reviewer ref>, date: <YYYY-MM-DD>}
+```
+
+- **Bound to one file.** The import refuses an alias file whose `sha256` is not the sha256 of the file it is used with, and then nothing is imported. It also refuses a malformed alias file, and an id aliased twice.
+- **Acceptance.** An alias is applied only when check 1 is `correct` and check 2 is `yes`, and both checkers have attested the alias file's own ref in the review queue. Checker 2 must not be checker 1. The ref is `aliases-<sha256 of the alias file>`, so it covers that exact file. This holds whatever mode the batch rows import in. The owner-accepted AI check names do not accept an alias: those names cover the rows checked on 2026-11-07, not later checks. An alias that is not accepted is ignored. The rows then behave exactly as they would without the alias file.
+- **What it does.** An Institutions row whose `inst_id` is an applied alias loads nothing. Where `Programmes.inst_id`, `Facts.entity_id` or `Institutions.parent_id` equals an applied alias, it is replaced by the target before any other check. The target must be an Institutions-sheet entity that is planned in the same file or already in the registry. A Facts alias never resolves to a programme.
+- **Report reasons.** The import report has an `Aliases` sheet with one row per alias: `alias_applied` (accepted) or `alias_not_accepted` (skipped, with the reason). An aliased Institutions row is skipped with reason `aliased`, and its detail is the target. A row whose alias target is not loaded is rejected with reason `alias_target_not_loaded`.
+- **Record.** Each row loaded through an alias records the alias in its provenance: from, to, the evidence, both checkers, and the alias file's name and sha256. The import log (`os_imports.aliases`, migration os_0034) keeps every alias file used and the aliases it applied. Undo by import id works unchanged. The §11.3 re-fetch waiver still applies, because the returned file's sha256 does not change.
+- **Use.** Pass alias files with `--aliases FILE` (repeatable) on `scripts/os_import_batch.py validate` or `import`. `validate` has no review queue, so `--assume-aliases-attested` shows the plan as if the alias checkers had attested. Aliases are command-line only: the admin upload in the API does not take alias files. The API's import record does show the `aliases` it used.

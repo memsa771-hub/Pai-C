@@ -1,6 +1,6 @@
 """The import log (`os_imports`, P2 spec §4.6 step 5): who imported which file, in which mode, with what result."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -36,12 +36,13 @@ class ImportRecord:
     finished_at: datetime | None
     undone_at: datetime | None
     undone_by: str | None
+    aliases: list = field(default_factory=list)  # the alias files used, with their sha256 (P2-T13)
 
 
 def _rec(r) -> ImportRecord:
     return ImportRecord(r.id, r.file_name, r.sha256, r.mode, r.decision_ref, r.batch_ref, r.actor, r.note_actor,
                         r.status, r.counts, r.programmes_created, r.report_path, r.report_csv, r.error, r.started_at, r.finished_at, r.undone_at,
-                        r.undone_by)
+                        r.undone_by, r.aliases)
 
 
 def cause_ref(import_id: int) -> str:
@@ -54,12 +55,13 @@ class ImportLog:
         self.engine, self.tenant_id = engine, tenant_id
 
     def start(self, *, file_name: str, sha256: str, mode: str, decision_ref: str | None, batch_ref: str,
-              actor: str, note_actor: str | None = None) -> int:
+              actor: str, note_actor: str | None = None, aliases: list[dict] | None = None) -> int:
         try:
             with self.engine.begin() as conn:
                 return conn.execute(T.insert().values(
                     tenant_id=self.tenant_id, file_name=file_name, sha256=sha256, mode=mode, decision_ref=decision_ref,
-                    batch_ref=batch_ref, actor=actor, note_actor=note_actor).returning(T.c.id)).scalar_one()
+                    batch_ref=batch_ref, actor=actor, note_actor=note_actor,
+                    aliases=aliases or []).returning(T.c.id)).scalar_one()
         except IntegrityError as e:
             if "uq_os_imports_live" in str(e.orig):
                 raise AlreadyImported(f"{file_name} (sha256 {sha256[:12]}) is already imported; undo it first") from e

@@ -18,6 +18,7 @@ from sqlalchemy import Engine
 
 from app.os.knowledge.port import Fact
 from app.os.knowledge.programmes import Programme, ProgrammeStore
+from app.os.knowledge.sheets.aliases import load_aliases
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.importlog import AlreadyImported, ImportLog, cause_ref
 from app.os.knowledge.sheets.plan import (
@@ -253,10 +254,11 @@ def _write_fact(deps: ImportDeps, res: RowResult, spec: dict, import_id: int, mo
 def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: str, decision_ref: str | None = None,
                batch_ref: str | None = None, family: str = "", route_key: str = "registry",
                report_path: Path | None = None, note_actor: str | None = None,
-               fmt: Format | None = None) -> ImportResult:
+               fmt: Format | None = None, aliases: tuple[Path, ...] | list[Path] = ()) -> ImportResult:
     """The real import. Refuses: an owner-accepted import without its decision reference; a file already imported
     (done, or failed and not undone); rows that need a review item when no review queue is connected. With no allow-list
-    connected, no row goes above `unconfirmed`. `actor` is the identity that runs it, `note_actor` a typed name."""
+    connected, no row goes above `unconfirmed`. `actor` is the identity that runs it, `note_actor` a typed name.
+    `aliases` are alias files for this file (aliases.py); one made for another file is refused before anything is logged."""
     if mode not in (OWNER_ACCEPTED, REVIEWERS):
         raise ValueError(f"unknown import mode '{mode}'")
     if mode == OWNER_ACCEPTED and not (decision_ref or "").strip():
@@ -265,6 +267,7 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
     batch_ref = batch_ref or path.stem
     ctx = build_context(deps, country=country, mode=mode, batch_ref=batch_ref, family=family,
                         decision_ref=decision_ref, fmt=fmt)
+    ctx.aliases = tuple(load_aliases(Path(a)) for a in aliases)
     batch, results = plan_file(path, ctx, fmt)
     n_queued = sum(1 for r in results if r.bucket == "queued")
     if n_queued and deps.disputes is None:
@@ -272,7 +275,11 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                             "nothing was imported")
     log = ImportLog(deps.engine, deps.tenant_id)
     import_id = log.start(file_name=path.name, sha256=batch.sha256, mode=mode, decision_ref=decision_ref,
-                          batch_ref=batch_ref, actor=actor, note_actor=note_actor)
+                          batch_ref=batch_ref, actor=actor, note_actor=note_actor,
+                          aliases=[{**af.record(), "applied": [
+                              {k: v for k, v in a.items() if k not in ("alias_file", "alias_sha256", "attest_ref")}
+                              for a in ctx.applied_aliases.values() if a["alias_sha256"] == af.sha256]}
+                              for af in ctx.aliases])
     created: list[str] = []
     queued = 0
     deps.hook_errors = []
