@@ -10,113 +10,113 @@ aliases:
     to: PK-UNI-039
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx", quote: "<a href=\"http://www.nu.edu.pk/\">http://www.nu.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx", quote: "Sector H-11/4, Islamabad."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-PIEAS
     to: PK-UNI-044
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx", quote: "<a href=\"http://www.pieas.edu.pk/\">http://www.pieas.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx", quote: "Nilore, Islamabad, Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-PU
     to: PK-UNI-200
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx", quote: "<a href=\"http://www.pu.edu.pk/\">http://www.pu.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx", quote: "Quaid-e-Azam Campus, Lahore."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-LUMS
     to: PK-UNI-136
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx", quote: "<a href=\"http://www.lums.edu.pk/\">http://www.lums.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx", quote: "D.H.A, Lahore Cantt. 54792"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-IBAK
     to: PK-UNI-229
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx", quote: "<a href=\"http://www.iba.edu.pk/\">http://www.iba.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx", quote: "Main Campus University Road, Karachi."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-MUET
     to: PK-UNI-242
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx", quote: "<a href=\"http://www.muet.edu.pk\">http://www.muet.edu.pk</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx", quote: "Indus Highway, Jamshoro 76062, Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-QAU
     to: PK-UNI-045
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx", quote: "<a href=\"https://www.qau.edu.pk/\">https://www.qau.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx", quote: "Quaid-i-Azam University Islamabad, 45320, Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-CUI
     to: PK-UNI-026
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx", quote: "<a href=\"https://www.comsats.edu.pk/\">https://www.comsats.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx", quote: "Park Road, Tarlai Kalan, Islamabad 45550, Pakistan"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-GCU
     to: PK-UNI-114
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx", quote: "<a href=\"http://www.gcu.edu.pk/\">http://www.gcu.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx", quote: "Near Nasir Bagh, Katchery Rd, Lahore 54000, Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-BUITEMS
     to: PK-UNI-011
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Balochistan/Balochistan-University-of-Information-Technology--Management-Sciences.aspx", quote: "<a href=\"http://www.buitms.edu.pk\">http://www.buitms.edu.pk</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Balochistan/Balochistan-University-of-Information-Technology--Management-Sciences.aspx", quote: "Airport Road, Baleli, Quetta"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-UAF
     to: PK-UNI-172
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx", quote: "<a href=\"http://www.uaf.edu.pk/\">http://www.uaf.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx", quote: "University of Agriculture University Main Rd، Faisalabad, Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-UETP
     to: PK-UNI-083
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx", quote: "<a href=\"http://www.uetpeshawar.edu.pk/\">http://www.uetpeshawar.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx", quote: "Post Box No. 814, Peshawar."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-KU
     to: PK-UNI-280
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx", quote: "<a href=\"http://www.uok.edu.pk\">http://www.uok.edu.pk</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx", quote: "University Road, Karachi 75270."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: TST-USAT
     to: PK-TST-003
     evidence: {url: "https://www.hec.gov.pk/english/services/students/etc/Pages/FAQ's.aspx", quote: "USAT (Undergraduate Studies Admission Test):"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/services/students/etc/Pages/FAQ's.aspx", quote: "Education Testing Council conducts the following standardized test: • Undergraduate Studies Admission Test ( USAT )"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-GIKI
     to: PK-UNI-058
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx", quote: "<a href=\"http://www.giki.edu.pk\">http://www.giki.edu.pk</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx", quote: "Topi-23640, District Swabi"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-BAHRIA
     to: PK-UNI-025
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx", quote: "<a href=\"http://www.bahria.edu.pk/\">http://www.bahria.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx", quote: "Shangrilla Road, Sector E-8 Islamabad"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-NUML
     to: PK-UNI-040
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx", quote: "<a href=\"http://www.numl.edu.pk/\">http://www.numl.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx", quote: "H-9 Islamabad ,Pakistan."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-AIR
     to: PK-UNI-023
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx", quote: "<a href=\"http://www.au.edu.pk/\">http://www.au.edu.pk/</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx", quote: "Main Campus, Sector E-9, Islamabad."}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
   - from: UNI-SIBA
     to: PK-UNI-271
     evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur%20IBA%20University.aspx", quote: "<a href=\"http://www.iba-suk.edu.pk\">http://www.iba-suk.edu.pk</a>"}
     check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur%20IBA%20University.aspx", quote: "Main Campus, Airport Road, Sukkur"}
-    check1: {result: correct, name: "Claude local - check 1", date: "2026-11-13"}
-    check2: {approved: "yes", name: "Claude local - check 2 (independent)", date: "2026-11-13"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}

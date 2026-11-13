@@ -99,3 +99,18 @@ download, page images where the text layer shifts cells) agree on all 34 values 
 (`-check1.csv`, `-check2.csv`; the full check records are in `docs/research/lists/checks/`). Held for review:
 SD-PRG-142 and SD-PRG-146 (the quote does not hold the row's figure; re-quote or re-scope), SD-PRG-144 (237 Karachi
 District inside the 238 open-merit cell that adds one reserved seat). UEAP/CEAP/self-finance seats are not entered.
+
+`PAI-Research-Batch3-Sindh-v6-seats.xlsx` is built from these files with `scripts/os_values_sheet.py` (mapping
+`-v6-seats.mapping.yaml`; command and input sha256 in its "Derived from" sheet): 34 rows, check 1 `correct` and
+check 2 `yes` on each.
+
+### Checker names are reviewer refs (2026-11-14)
+
+In the reviewers mode a checker name must be the `--ref` of a reviewer registered with `scripts/os_reviewers.py` who
+attested the batch (or alias file) ref; a ref is lower-case letters, digits, `_`, `.`, `-`. The alias files and the
+two seats workbooks first carried display names ("Claude local - check 1", "Claude research – seats check 1", ...),
+which can never be refs, so those checks could not count in a real import. They now carry refs, with no other
+change: `claude-local-check-1` / `claude-local-check-2` (alias files; check records in `docs/research/lists/checks/`
+keep the display names "Claude local - check 1" / "Claude local - check 2 (independent)"),
+`claude-research-seats-check-1` / `-2` (v5 seats) and `claude-research-v6-seats-check-1` / `-2` (v6 seats). Editing an
+alias file changes its sha256 and so its attest ref.
