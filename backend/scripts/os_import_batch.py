@@ -9,7 +9,9 @@
     python -m scripts.os_import_batch list
 
 `validate` reads the file and plans every row; it touches no database (dry run). `--lists DIR` reads official-list
-files (the H3 shape) to know the list URLs. `--institutions-from OTHER` (dry run only, repeatable) plans OTHER the same
+files (the H3 shape) to know the list URLs and regions: a row whose list serves another region is rejected as the import
+would. Without the database `validate` cannot see the lists an entity already names (the import checks those too).
+`--institutions-from OTHER` (dry run only, repeatable) plans OTHER the same
 way and lets FILE's rows use the institutions OTHER would load, as if it were imported first. `import --owner-accepted` is the separate mode for batches 1-5 (P2-D16a):
 both checkers must be the two AI checks the owner accepted. `--reviewers` accepts only checkers that attested the batch.
 `--refetch` re-fetches model- and OCR-read rows through the page gateway (R-68). Every import is logged; the report CSV
@@ -41,16 +43,20 @@ from app.os.knowledge.sheets.reader import SheetError
 from app.os.knowledge.sheets.template import write_template
 
 
-def _list_urls(directory: Path | None, country: str) -> dict[str, str]:
+def _lists(directory: Path | None, country: str) -> tuple[dict[str, tuple[str, ...]], dict[str, str | None]]:
+    """({list URL: the ids of every list at it}, {list id: region}) of the official-list files in `directory`."""
     import yaml
 
     from app.os.registry.lists import parse_official_lists
 
-    urls: dict[str, str] = {}
+    urls: dict[str, tuple[str, ...]] = {}
+    regions: dict[str, str | None] = {}
     for f in sorted(directory.glob("*.yaml")) if directory else []:
         for e in parse_official_lists(yaml.safe_load(f.read_text(encoding="utf-8")), country=country):
-            urls[norm_url(e.source_url)] = e.entity_id
-    return urls
+            u = norm_url(e.source_url)
+            urls[u] = tuple(dict.fromkeys((*urls.get(u, ()), e.entity_id)))
+            regions[e.entity_id] = e.region
+    return urls, regions
 
 
 def _print_counts(counts: dict, out) -> None:
@@ -97,11 +103,12 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             out(f"wrote {write_template(Path(args.out))}")
             return 0
         if args.cmd == "validate":
-            urls = _list_urls(Path(args.lists) if args.lists else None, args.country)
+            urls, regions = _lists(Path(args.lists) if args.lists else None, args.country)
 
             def context():
                 return build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
                                      family=args.family, decision_ref=args.decision_ref, list_urls=urls,
+                                     list_regions=regions,
                                      require_list=not args.no_list_needed)
 
             ctx = context()

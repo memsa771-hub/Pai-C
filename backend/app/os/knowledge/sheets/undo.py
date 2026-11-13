@@ -24,6 +24,7 @@ from sqlalchemy import Engine, delete, func, select, update
 from app.os import models
 from app.os.knowledge.sheets.importlog import ImportLog, cause_ref
 from app.os.knowledge.store import _snapshot as fact_snapshot
+from app.os.registry.store import WITHDRAWN
 from app.os.registry.store import _snapshot as registry_snapshot
 
 F, FR = models.knowledge_facts, models.fact_revisions
@@ -192,7 +193,7 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str,
             before = conn.execute(select(R).where(R.c.id == rid).with_for_update()).one()
             first = chain[0].before
             if first is None:
-                values = {"status": "closed", "attrs": {**before.attrs, "withdrawn_by_import": import_id}}
+                values = {"status": "closed", "attrs": {**before.attrs, WITHDRAWN: import_id}}
             else:
                 values = {k: (_when(first[k]) if k == "checked_at" else first[k]) for k in _REGISTRY_FIELDS}
             conn.execute(update(R).where(R.c.id == rid).values(**values, updated_at=func.now()))

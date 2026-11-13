@@ -36,7 +36,7 @@ from app.os.knowledge.sheets.safe import safe_cell
 from app.os.knowledge.store import SqlKnowledge
 from app.os.registry.calendars import record_calendar, record_calendar_date
 from app.os.registry.model import KIND_PREFIX, slug
-from app.os.registry.store import RegistryStore
+from app.os.registry.store import RegistryError, RegistryStore, kept_lists
 
 __all__ = ["AlreadyImported", "ImportDeps", "ImportRefused", "ImportResult", "build_context", "plan_file", "plan_hook", "run_import",
            "wire_other_tasks", "write_report"]
@@ -96,7 +96,9 @@ class ImportRefused(ValueError):
 
 
 def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref: str, family: str,
-                  list_urls: dict[str, str] | None = None, require_list: bool = True,
+                  list_urls: dict[str, str | tuple[str, ...]] | None = None,
+                  list_regions: dict[str, str | None] | None = None,
+                  require_list: bool = True,
                   decision_ref: str | None = None, fmt: Format | None = None) -> PlanContext:
     from app.os.knowledge.regions import countries
 
@@ -104,18 +106,28 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
         raise ValueError(f"no region vocabulary for country '{country}' (known: {countries()})")
     ctx = PlanContext(country=country, mode=mode, batch_ref=batch_ref, family=family, require_list=require_list,
                       decision_ref=decision_ref, fmt=fmt or load_format())
-    urls: dict[str, str] = dict(list_urls or {})
+    urls: dict[str, tuple[str, ...]] = {u: ((v,) if isinstance(v, str) else tuple(v))
+                                        for u, v in (list_urls or {}).items()}
+    ctx.list_regions.update(list_regions or {})  # list id -> region, for a dry run that reads list files
     if deps is not None:
-        for e in deps.registry.list(kind="official_list", limit=100_000):
-            urls.setdefault(norm_url(e.source_url), e.entity_id)
+        for e in deps.registry.list(kind="official_list", limit=100_000):  # every list of a URL, not only the first
+            u = norm_url(e.source_url)
+            urls[u] = tuple(dict.fromkeys((*urls.get(u, ()), e.entity_id)))
+            ctx.list_regions[e.entity_id] = e.region
         ctx.attested, ctx.official = deps.attested, deps.official
         ctx.cap_without_allow_list = deps.official is None  # no allow-list connected: nothing above `unconfirmed`
         ctx.existing_institutions = _registry_lookup(deps.registry)
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
         ctx.existing_region = lambda rid: getattr(deps.registry.get(rid), "region", None)
+        ctx.existing_lists = lambda rid: _kept(deps.registry, rid)
         ctx.registry_info = lambda rid: _info(deps.registry.get(rid))
     ctx.list_urls = urls
     return ctx
+
+
+def _kept(registry: RegistryStore, registry_id: str) -> tuple[str, ...]:
+    e = registry.get(registry_id)
+    return kept_lists(e) if e is not None else ()
 
 
 def use_planned_institutions(ctx: PlanContext, institutions: list[RowResult]) -> None:
@@ -128,8 +140,11 @@ def use_planned_institutions(ctx: PlanContext, institutions: list[RowResult]) ->
     info = {r.payload["entry"].entity_id: {"kind": r.payload["kind"], "calendar_type": r.payload.get("calendar_type"),
                                            "timezone": r.payload.get("timezone"),
                                            "parent_id": r.payload["entry"].parent_id} for r in loaded}
+    lists = {r.payload["entry"].entity_id: r.payload["entry"].list_ids for r in loaded}
     before_inst, before_region, before_info = ctx.existing_institutions, ctx.existing_region, ctx.registry_info
+    before_lists = ctx.existing_lists
     ctx.existing_institutions = lambda i: ids.get(i) or before_inst(i)
+    ctx.existing_lists = lambda rid: lists.get(rid) or before_lists(rid)
     ctx.existing_region = lambda rid: region.get(rid) or before_region(rid)
     ctx.registry_info = lambda rid: info.get(rid) or before_info(rid)
 
@@ -308,12 +323,34 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                 r.bucket, r.level, r.reason = "unconfirmed", "unconfirmed", "refetch_not_run"
                 r.needs_refetch = False
         cref = cause_ref(import_id)
+        refused: set[str] = set()  # registry ids whose row the registry refused at load time
+        refused_programmes: set[str] = set()  # programme refs rejected at load time (their institution was refused)
+
+        def not_loaded(registry_id: str | None) -> bool:
+            return registry_id in refused and deps.registry.get(registry_id) is None
+
         for r in results:
             if r.bucket == "queued":
                 queued += _queue(deps, r, batch.sha256, batch_ref)
             elif r.bucket in ("accepted", "unconfirmed") and r.payload:
                 if r.sheet == "Institutions":
-                    _load_institution(deps, r, import_id, mode, decision_ref, actor, cref)
+                    try:
+                        _load_institution(deps, r, import_id, mode, decision_ref, actor, cref)
+                    except RegistryError as e:  # a backstop: the plan should have rejected it; the row, not the import
+                        refused.add(r.payload["entry"].entity_id)
+                        _reject(r, "registry_refused", str(e)[:500])
+                        continue
+                elif r.sheet == "Programmes" and not_loaded(r.payload.get("inst_registry_id")):
+                    _reject(r, "institution_not_loaded", r.payload["inst_registry_id"])
+                    refused_programmes.add(r.row_id)
+                    continue
+                elif (r.sheet == "Facts" and r.payload.get("scope") == "programme"
+                      and r.payload.get("ref") in refused_programmes and deps.programmes.get(r.payload["ref"]) is None):
+                    _reject(r, "programme_not_loaded", r.payload["ref"])
+                    continue
+                elif r.sheet == "Facts" and r.payload.get("scope") == "registry" and not_loaded(r.payload.get("ref")):
+                    _reject(r, "entity_unknown", r.payload["ref"])
+                    continue
                 elif r.sheet == "Programmes":
                     _load_programme(deps, r, import_id, mode, decision_ref, actor, cref, route_key, created)
                 else:
@@ -341,6 +378,11 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                         list(deps.hook_errors))
 
 
+def _reject(r: RowResult, reason: str, detail: str) -> None:
+    """A row refused at load time: rejected in the report with its reason; the import goes on."""
+    r.bucket, r.level, r.reason, r.detail, r.queue_kind = "rejected", None, reason, detail, None
+
+
 def _load_institution(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None,
                       actor: str, cref: str) -> None:
     row, entry = r.payload["row"], r.payload["entry"]
@@ -354,7 +396,8 @@ def _load_institution(deps: ImportDeps, r: RowResult, import_id: int, mode: str,
         record_calendar(deps.registry, replace(entry, attrs=attrs), r.payload["calendar_type"], cause="import",
                         cause_ref=cref, actor=actor)
         return
-    deps.registry.record(replace(entry, attrs=attrs), cause="import", cause_ref=cref, actor=actor)
+    # an entity already on another official list keeps it: its lists are the union, existing first (R-32, R-35a)
+    deps.registry.record(replace(entry, attrs=attrs), cause="import", cause_ref=cref, actor=actor, keep_lists=True)
 
 
 def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None, actor: str,

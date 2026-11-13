@@ -30,7 +30,7 @@ from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
 from app.os.registry.calendars import calendar_types
-from app.os.registry.model import KIND_PREFIX, REGION_REQUIRED, RegistryEntry, slug
+from app.os.registry.model import KIND_PREFIX, NATIONAL, REGION_REQUIRED, RegistryEntry, slug
 
 BUCKETS = ("accepted", "unconfirmed", "queued", "rejected", "skipped")
 OWNER_ACCEPTED, REVIEWERS = "owner_accepted", "reviewers"
@@ -54,10 +54,13 @@ class PlanContext:
     family: str = ""  # the batch's family, for the allow-list scope (data of the batch, never guessed)
     attested: Callable[[str, str], bool] | None = None  # (reviewer ref, batch ref) -> bool; reviewer mode (T5)
     official: Callable[[str, Scope], bool] | None = None  # allow-list lookup (T3); None = not checked
-    list_urls: dict[str, str] = field(default_factory=dict)  # official list URL -> list entity id
+    # official list URL -> its list id, or the ids of every list published at that URL (one page, several lists)
+    list_urls: dict[str, str | tuple[str, ...]] = field(default_factory=dict)
     existing_institutions: Callable[[str], str | None] = lambda inst_id: None  # inst_id -> registry id already loaded
     existing_programmes: Callable[[str], bool] = lambda ref: False
     existing_region: Callable[[str], str | None] = lambda registry_id: None  # registry id -> region code
+    existing_lists: Callable[[str], tuple[str, ...]] = lambda registry_id: ()  # registry id -> lists an import keeps
+    list_regions: dict[str, str | None] = field(default_factory=dict)  # official list id -> its region code
     region_lookup: Callable[[str], str | None] = lambda registry_id: None  # set by the plan: file first, then database
     registry_info: Callable[[str], dict | None] = lambda registry_id: None  # a stored entity: kind, calendar_type, timezone, parent_id
     meta: Callable[[str], dict | None] = lambda registry_id: None  # set by the plan: file first, then database
@@ -86,6 +89,17 @@ class RowResult:
 
 def norm_url(u: str) -> str:
     return u.strip().rstrip("/").lower()
+
+
+def lists_at(ctx: PlanContext, url: str | None, region: str | None) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(the lists a row from `url` is on, every list at `url`). A URL of one list: that list, as it is (its region is
+    checked by the caller). A URL of several lists (one page, with regional views of it): the national ones among them
+    and the ones of the row's region; none of them is a region conflict, for the caller to reject."""
+    found = ctx.list_urls.get(norm_url(url or ""))
+    every = (found,) if isinstance(found, str) else tuple(found or ())
+    if len(every) <= 1:
+        return every, every
+    return tuple(x for x in every if ctx.list_regions.get(x, NATIONAL) in (NATIONAL, region)), every
 
 
 def _date(v: Any) -> datetime | None:
@@ -271,6 +285,7 @@ def _note_alias(res: RowResult, original: dict, used: dict | None) -> None:
 def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] | None = None) -> list[RowResult]:
     fmt, out, seen = ctx.fmt, [], set()
     planned: dict[str, str] = {}  # inst_id -> registry id of the rows planned so far (a parent comes before its child)
+    first: dict[str, tuple[str, str | None]] = {}  # inst_id -> (kind, region) of its first row with an entry
     via_alias: list[tuple[RowResult, dict, dict | None]] = []
     for original in batch.sheets["Institutions"]:
         r, used = _aliased(original, "parent_id", applied or {})  # before every other check
@@ -281,10 +296,13 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
         if not rid:
             res.reason = "missing_id"
             continue
-        if rid in seen:
+        url = norm_url(_text(r.get("source_url")) or "")
+        on, _ = lists_at(ctx, url, _region(_text(r.get("region")), None, ctx)[0])
+        key = (rid, on or url)  # one row per id and list(s) (its URL while no list of it is loaded)
+        if key in seen:
             res.reason = "duplicate_id"
             continue
-        seen.add(rid)
+        seen.add(key)
         if applied and rid in applied:  # the entity is loaded under another id; this row loads nothing
             res.bucket, res.reason, res.detail = "skipped", "aliased", applied[rid]["to"]
             continue
@@ -305,7 +323,7 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
         if res.bucket in ("skipped", "queued"):
             res.level = None
             continue
-        problem, detail = _institution_entry(r, rid, res, ctx, planned)
+        problem, detail = _institution_entry(r, rid, res, ctx, planned, first)
         if problem:
             res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
     for res, original, used in via_alias:
@@ -313,8 +331,8 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
     return out
 
 
-def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
-                       planned: dict[str, str]) -> tuple[str | None, str]:
+def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, planned: dict[str, str],
+                       first: dict[str, tuple[str, str | None]]) -> tuple[str | None, str]:
     fmt = ctx.fmt
     kind = fmt.kind_of_type(_text(r.get("type")))
     if kind is None:
@@ -337,12 +355,21 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
         return "bad_date", str(r.get("retrieved"))
     if not quote:
         return "no_quote", ""
+    if rid in first and first[rid] != (kind, region):  # a second row of the id (on another list) names the same entity
+        return "duplicate_id_conflict", f"{kind}/{region}; an earlier row of the id is {first[rid][0]}/{first[rid][1]}"
     lists: tuple[str, ...] = ()
     if kind in ("institution", "campus"):
-        lid = ctx.list_urls.get(norm_url(url or ""))
-        if lid is None and ctx.require_list:
+        on, every = lists_at(ctx, url, region)
+        if not every and ctx.require_list:
             return "no_official_list", str(url)
-        lists = (lid or "list:not-loaded",)
+        if every and not on:
+            return "region_conflicts_with_list", f"{url} is the page of {', '.join(every)}; none is of {region}"
+        lists = on or ("list:not-loaded",)
+        # the import keeps the lists the entity already names (R-32): each must serve the row's region, as must its own
+        for kept in dict.fromkeys((*ctx.existing_lists(f"{KIND_PREFIX[kind]}:{slug(rid)}"), *lists)):
+            served = ctx.list_regions.get(kept, NATIONAL)
+            if served not in (NATIONAL, region):
+                return "region_conflicts_with_list", f"{kept} is a list of {served}; the row's region is {region}"
     parent = None
     if _text(r.get("parent_id")):
         parent = planned.get(_text(r.get("parent_id"))) or ctx.existing_institutions(_text(r.get("parent_id")))
@@ -367,6 +394,7 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext,
             attrs={})
     except ValueError as e:
         return "invalid_entry", str(e)
+    first.setdefault(rid, (kind, region))
     res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote, timezone=tz,
                        calendar_type=ctype)
     _cap(res, url, region, quote, ctx, rm)

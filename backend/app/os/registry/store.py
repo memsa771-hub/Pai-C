@@ -4,7 +4,7 @@ revision. There is no delete: a closed or merged entity keeps its row (R-60)."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -21,6 +21,7 @@ LK = models.registry_links
 PG = models.programmes
 _PROGRAMME_COLUMNS = ("institution_id", "campus_id", "level", "field", "family", "region")
 _UNSET: Any = object()  # a column the caller left out of link_programme: it keeps its value
+WITHDRAWN = "withdrawn_by_import"  # attrs key of a row closed by the undo of the import that created it
 _TRACKED = ("kind", "parent_id", "region", "institution_type", "name", "aliases", "official_domains", "status",
             "successor_id", "list_ids", "source_url", "quote", "checked_at", "attrs")
 # which kinds each link may join (the link's `to_kind` "programme" is checked against os_programmes instead)
@@ -110,6 +111,14 @@ def _snapshot(row) -> dict[str, Any]:
     return out
 
 
+def kept_lists(row) -> tuple[str, ...]:
+    """The lists a `record(keep_lists=True)` keeps of a stored row (or entry): all of them, except for a row closed by
+    the undo of the import that created it, whose lists came only from that import."""
+    if row.status == "closed" and WITHDRAWN in row.attrs:
+        return ()
+    return tuple(row.list_ids)
+
+
 class RegistryStore:
     def __init__(self, engine: Engine, tenant_id: str) -> None:
         self.engine = engine
@@ -163,16 +172,20 @@ class RegistryStore:
                                     f"{row.region}, so it cannot be where it came from")
 
     def record(self, entry: RegistryEntry, *, cause: str, cause_ref: str | None = None,
-               actor: str | None = None) -> Recorded:
+               actor: str | None = None, keep_lists: bool = False) -> Recorded:
         """Adds or updates a registry row with its cause (research run, import id, reviewer, ...). One revision per
-        change; recording the same entry again writes nothing."""
+        change; recording the same entry again writes nothing. An update replaces every column with the entry's;
+        `keep_lists=True` keeps the lists the row already names and adds the entry's after them (an entity found on a
+        second official list stays on the first, R-32, R-35a), read under the entity's lock (see `kept_lists`)."""
         self._check_cause(cause, entry.kind)
-        values = _values(entry)
         with self.engine.begin() as conn:
             self._lock(conn, entry.entity_id)
-            self._check_refs(conn, entry)
             before = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id, T.c.entity_id == entry.entity_id)
                                   .with_for_update()).first()
+            if keep_lists and before is not None:
+                entry = replace(entry, list_ids=tuple(dict.fromkeys((*kept_lists(before), *entry.list_ids))))
+            values = _values(entry)
+            self._check_refs(conn, entry)
             stmt = insert(T).values(tenant_id=self.tenant_id, entity_id=entry.entity_id, **values)
             stmt = stmt.on_conflict_do_update(constraint="uq_os_registry_entity",
                                               set_={**values, "updated_at": func.now()}).returning(T.c.id)
