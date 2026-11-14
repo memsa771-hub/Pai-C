@@ -5,7 +5,13 @@ A returned file is kept unchanged as the source record, so a second id for an en
 edited out of it: an alias file, supplied with the batch as data, says which id is which. It is bound to one returned
 file by that file's sha256, and every alias carries its evidence and the same two checks as a row. Only an alias both
 checks accepted is applied (`plan.resolve_aliases`), and those checks are reviewer attestations of `attest_ref`. The
-import records each alias it used, with its evidence and checkers, in the import log and in each row's provenance."""
+import records each alias it used, with its evidence and checkers, in the import log and in each row's provenance.
+
+Optional keys (P2-T28; old files stay valid, so the format has no version to bump):
+- `required: true`, per alias or for the whole file (an alias's own value wins): the file's id must not load as an entity
+  of its own. If the alias is not accepted, every row naming the id is rejected (`alias_required_not_accepted`) instead
+  of loading a new, duplicate entity.
+- `target_evidence: {url, quote}`: where the target itself is shown (its own page). Kept in provenance with the alias."""
 
 import hashlib
 from dataclasses import dataclass
@@ -30,6 +36,8 @@ class Alias:
     evidence_quote: str
     checks: dict  # in the batch checker columns' names, so `plan.read_checks` judges it like a row
     index: int  # 1-based position in the file, for the report
+    required: bool = False  # not accepted: the rows naming `from_id` are rejected, never loaded as a new entity (T28)
+    target_evidence: dict | None = None  # {url, quote} of the target's own page, if given (T28)
 
 
 @dataclass(frozen=True)
@@ -76,6 +84,9 @@ def load_aliases(path: Path) -> AliasFile:
     items = doc.get("aliases")
     if not isinstance(items, list) or not items:
         raise AliasError(f"alias file {path.name}: needs a non-empty `aliases` list")
+    file_required = doc.get("required", False)
+    if not isinstance(file_required, bool):
+        raise AliasError(f"alias file {path.name}: `required` is true or false")
     out: list[Alias] = []
     seen: set[str] = set()
     for i, a in enumerate(items, 1):
@@ -94,10 +105,21 @@ def load_aliases(path: Path) -> AliasFile:
         if frm in seen:
             raise AliasError(f"{where}: `{frm}` is aliased twice")
         seen.add(frm)
+        required = a.get("required", file_required)
+        if not isinstance(required, bool):
+            raise AliasError(f"{where}: `required` is true or false")
+        target_ev = a.get("target_evidence")
+        if target_ev is not None:
+            if not isinstance(target_ev, dict):
+                raise AliasError(f"{where}: `target_evidence` is a mapping with a url and a quote")
+            t_url, t_quote = _s(target_ev.get("url")), _s(target_ev.get("quote"))
+            if not t_url.startswith(("https://", "http://")) or not t_quote:
+                raise AliasError(f"{where}: `target_evidence` needs a url and a quote")
+            target_ev = {"url": t_url, "quote": t_quote}
         checks = {"checker1_result": _s(c1.get("result")) or None, "checker1_name": _s(c1.get("name")) or None,
                   "checker1_date": _s(c1.get("date")) or None, "checker2_approved": _s(c2.get("approved")) or None,
                   "checker2_name": _s(c2.get("name")) or None, "checker2_date": _s(c2.get("date")) or None}
-        out.append(Alias(frm, to, url, quote, checks, i))
+        out.append(Alias(frm, to, url, quote, checks, i, required, target_ev))
     return AliasFile(path, _s(doc["file"]), _s(doc["sha256"]).lower(), hashlib.sha256(data).hexdigest(), tuple(out))
 
 

@@ -9,6 +9,9 @@ then loads, so the two never differ. Buckets:
 - `rejected`      not loaded; listed in the import report with the reason;
 - `skipped`       nothing to load by design (lead, history, searched-and-not-found, out of scope, aliased).
 
+A row of an aliased id whose source is an official list is a list line naming an entity loaded under another id
+(P2-T28): it loads no entity but adds that list to the target (reason `alias_membership`, `RegistryStore.add_lists`).
+
 Alias files (aliases.py, P2-T13) are planned first, as rows of an `Aliases` sheet in the report: an accepted alias makes
 the file's id name the entity already loaded under another id (in `Programmes.inst_id`, `Facts.entity_id` and
 `Institutions.parent_id`). Aliases are new checks, so they are judged only by reviewer attestation, whatever the mode of
@@ -74,6 +77,7 @@ class PlanContext:
     batch_sha: str = ""  # sha256 of the file being planned; set by plan_batch
     aliases: tuple[AliasFile, ...] = ()  # alias files for this file (P2-T13); bound to it by sha256 in plan_batch
     applied_aliases: dict[str, dict] = field(default_factory=dict)  # set by plan_batch: file id -> the applied alias
+    refused_required: dict[str, str] = field(default_factory=dict)  # set by plan_batch: required alias not accepted (T28)
     fmt: Format = field(default_factory=load_format)
 
 
@@ -289,6 +293,7 @@ def resolve_aliases(ctx: PlanContext) -> tuple[list[RowResult], dict[str, dict]]
     Any other alias is ignored and reported."""
     rows: list[RowResult] = []
     applied: dict[str, dict] = {}
+    ctx.refused_required = {}
     for af in ctx.aliases:
         for a in af.aliases:
             chk = read_checks(a.checks, ctx, mode=REVIEWERS, batch_ref=af.attest_ref)
@@ -301,9 +306,16 @@ def resolve_aliases(ctx: PlanContext) -> tuple[list[RowResult], dict[str, dict]]
                                       "evidence": {"url": a.evidence_url, "quote": a.evidence_quote},
                                       "checker1": chk.provenance.get("checker1"),
                                       "checker2": chk.provenance.get("checker2")}
+                if a.required:
+                    applied[a.from_id]["required"] = True
+                if a.target_evidence:
+                    applied[a.from_id]["target_evidence"] = dict(a.target_evidence)
             else:
                 res.reason = "alias_not_accepted"
                 res.detail = "; ".join(chk.notes) or f"check 1 {chk.c1 or 'missing'}, check 2 {chk.c2 or 'missing'}"
+                if a.required:  # its id must not load as an entity of its own: every row naming it is rejected (T28)
+                    res.bucket, res.reason = "rejected", "alias_required_not_accepted"
+                    ctx.refused_required[a.from_id] = f"{a.from_id} -> {a.to} (required alias not accepted)"
     return rows, applied
 
 
@@ -328,6 +340,7 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
     planned: dict[str, str] = {}  # inst_id -> registry id of the rows planned so far (a parent comes before its child)
     first: dict[str, tuple[str, str | None]] = {}  # inst_id -> (kind, region) of its first row with an entry
     via_alias: list[tuple[RowResult, dict, dict | None]] = []
+    memberships: list[tuple[RowResult, dict]] = []  # rows of an aliased id on an official list (P2-T28), planned last
     for original in batch.sheets["Institutions"]:
         r, used = _aliased(original, "parent_id", applied or {})  # before every other check
         rid = _text(r.get("inst_id")) or ""
@@ -337,6 +350,10 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
         if not rid:
             res.reason = "missing_id"
             continue
+        refused = ctx.refused_required.get(rid) or ctx.refused_required.get(_text(original.get("parent_id")) or "")
+        if refused:  # a required alias was not accepted: the id never loads as a new (duplicate) entity
+            res.reason, res.detail = "alias_required_not_accepted", refused
+            continue
         url = norm_url(_text(r.get("source_url")) or "")
         on, _ = lists_at(ctx, url, _region(_text(r.get("region")), None, ctx)[0])
         key = (rid, on or url)  # one row per id and list(s) (its URL while no list of it is loaded)
@@ -344,7 +361,8 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
             res.reason = "duplicate_id"
             continue
         seen.add(key)
-        if applied and rid in applied:  # the entity is loaded under another id; this row loads nothing
+        member = bool(applied and rid in applied and lists_at(ctx, url, None)[1])  # a list line of the target (T28)
+        if applied and rid in applied and not member:  # the entity is loaded under another id; this row loads nothing
             res.bucket, res.reason, res.detail = "skipped", "aliased", applied[rid]["to"]
             continue
         status = _text(r.get("claude_status"))
@@ -364,12 +382,126 @@ def plan_institutions(batch: Batch, ctx: PlanContext, applied: dict[str, dict] |
         if res.bucket in ("skipped", "queued"):
             res.level = None
             continue
+        if member:
+            memberships.append((res, r))
+            continue
         problem, detail = _institution_entry(r, rid, res, ctx, planned, first)
         if problem:
             res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
+    _plan_memberships(memberships, out, ctx, applied or {})
     for res, original, used in via_alias:
         _note_alias(res, original, used)
     return out
+
+
+def _plan_memberships(memberships: list[tuple[RowResult, dict]], out: list[RowResult], ctx: PlanContext,
+                      applied: dict[str, dict]) -> None:
+    """P2-T28 (W12 "T28 rules"): a row of an applied alias whose source is an official list adds that list to the
+    target instead of loading an entity (FU-3). Planned after every other row of the sheet, so the target may come
+    anywhere in the file. A list the target already names (stored, or from its own rows in the file) adds nothing: the
+    row stays `aliased`. A second row adding the same list to the same target is `duplicate_membership`."""
+    file_targets: dict[str, dict] = {}  # inst_id -> what its loaded rows in this file give the entity
+    for res in out:
+        if "entry" in res.payload and res.bucket in ("accepted", "unconfirmed"):
+            t = file_targets.setdefault(res.row_id, {"eid": res.payload["entry"].entity_id, "kind": res.payload["kind"],
+                                                     "region": res.payload["entry"].region, "lists": ()})
+            t["lists"] = tuple(dict.fromkeys((*t["lists"], *res.payload.get("lists", ()))))
+    added: dict[str, tuple[str, ...]] = {}  # target -> lists the memberships of this file add or upgrade, in order
+    for res, r in memberships:
+        problem, detail = _membership(r, res, ctx, applied[res.row_id], file_targets, added)
+        if problem:
+            res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
+
+
+def _membership(r: dict, res: RowResult, ctx: PlanContext, used: dict, file_targets: dict[str, dict],
+                added: dict[str, tuple[str, ...]]) -> tuple[str | None, str]:
+    fmt, to = ctx.fmt, used["to"]
+    target = file_targets.get(to)
+    if target is None:
+        eid = ctx.existing_institutions(to)
+        info = ctx.registry_info(eid) if eid else None
+        if eid is None or not info or info.get("kind") not in ("institution", "campus") \
+                or (info.get("status") or "active") != "active":  # closed, merged or renamed: never a list's target
+            why = f"{info.get('kind')}, {info.get('status') or 'active'}" if info else "not loaded"
+            return "alias_target_not_loaded", f"{to} ({why}); a list line adds a list only to a loaded institution"
+        target = {"eid": eid, "kind": info["kind"], "region": ctx.existing_region(eid),
+                  "lists": tuple(ctx.existing_lists(eid))}
+    eid, tkind, tregion = target["eid"], target["kind"], target["region"]
+    if tkind not in ("institution", "campus"):
+        return "alias_target_not_loaded", f"{to} is a {tkind}; only an institution or campus is on a list"
+    on, every = lists_at(ctx, r.get("source_url"), tregion)
+    # the stored evidence of each list the target names (fix round 1): a weaker one may be upgraded by this line
+    trust = (ctx.registry_info(eid) or {}).get("list_trust") or {}
+    weaker = tuple(x for x in on if x in target["lists"] and x in trust
+                   and TRUST_RANK.get(trust[x] or "", -1) < TRUST_RANK.get(res.level or "", -1))
+    if on and all(x in target["lists"] for x in on) and not weaker:  # nothing to add or upgrade: as before T28
+        res.bucket, res.level, res.reason, res.detail = "skipped", None, "aliased", to
+        res.payload = {"row": r, "provenance": res.payload.get("provenance", {})}
+        return None, ""
+    kind = fmt.kind_of_type(_text(r.get("type")))
+    if kind is None:
+        return "unknown_type", str(r.get("type"))
+    if kind != tkind:
+        return "alias_kind_conflict", f"the row is a {kind}; the target {eid} is a {tkind}"
+    url, quote = _text(r.get("source_url")), _text(r.get("source_quote"))
+    rm_text = _text(r.get("read_method"))
+    rm = fmt.read_method(rm_text)
+    if rm is None:
+        return "unknown_read_method", str(rm_text)
+    if fmt.is_lead_read(rm_text):
+        return "non_official_source", "read as a lead"
+    prob = _source_problem(url, None, rm, ctx)
+    if prob:
+        return prob, str(url)
+    region, rprob = _region(_text(r.get("region")), None, ctx)
+    if rprob:
+        return rprob, str(r.get("region"))
+    if region is not None and region != tregion:  # an empty region takes the target's (rule 4)
+        return "region_conflicts_with_alias", f"the row's region is {region}; the target {eid} is in {tregion}"
+    checked = _date(r.get("retrieved"))
+    if checked is None:
+        return "bad_date", str(r.get("retrieved"))
+    if not quote:
+        return "no_quote", ""
+    if not on:
+        return "region_conflicts_with_list", f"{url} is the page of {', '.join(every)}; none is of {tregion}"
+    for x in on:  # the list must serve the target's region (rule 5)
+        served = ctx.list_regions.get(x, NATIONAL)
+        if served not in (NATIONAL, tregion):
+            return "region_conflicts_with_list", f"{x} is a list of {served}; the target {eid} is in {tregion}"
+    mine = added.get(eid, ())
+    if all(x in mine or (x in target["lists"] and x not in weaker) for x in on):
+        return "duplicate_membership", f"another row of this file already adds {', '.join(on)} to {eid}"
+    new = tuple(x for x in on if x not in target["lists"] and x not in mine)
+    upgrade = tuple(x for x in weaker if x not in mine)
+    added[eid] = (*mine, *new, *upgrade)
+    res.payload.setdefault("provenance", {})["alias"] = dict(used)  # the alias that made it a list line of the target
+    res.payload.update(membership={"target": eid, "target_inst_id": to, "lists": new, "upgrade": upgrade},
+                       kind=tkind, read_method=rm, region=tregion, url=url, quote=quote, checked_at=checked)
+    all_lists = tuple(dict.fromkeys((*target["lists"], *added[eid])))  # the target's lists after the import (rule 6)
+    _cap(res, url, tregion, quote, ctx, rm, all_lists, tkind)
+    if not new and TRUST_RANK.get(res.level or "", -1) <= min(TRUST_RANK.get(trust[x] or "", -1) for x in upgrade):
+        res.bucket, res.level, res.reason, res.detail = "skipped", None, "aliased", to  # capped: no upgrade after all
+        res.needs_refetch = False
+        res.payload = {"row": r, "provenance": res.payload.get("provenance", {})}
+        return None, ""
+    res.payload["level_reason"], res.payload["detail_rest"] = res.reason, res.detail
+    res.reason = "alias_membership"
+    res.detail = membership_detail(res.payload)
+    return None, ""
+
+
+TRUST_RANK = {"unconfirmed": 0, "confirmed": 1, "verified": 2}  # the levels of a loaded row, lowest first
+
+
+def membership_detail(payload: dict) -> str:
+    """The report detail of a list line of an alias (P2-T28): the target and what it adds or upgrades, then the reason
+    of its level (kept in `payload["level_reason"]`, so a re-fetch changes it without touching `alias_membership`)."""
+    m = payload["membership"]
+    what = f"{m['target']} + {', '.join(m['lists'])}" if m["lists"] else m["target"]
+    if m.get("upgrade"):
+        what += f" (evidence upgraded: {', '.join(m['upgrade'])})"
+    return "; ".join(x for x in (what, payload.get("level_reason"), payload.get("detail_rest")) if x)
 
 
 def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, planned: dict[str, str],
@@ -468,6 +600,11 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         if "entry" in res.payload:
             eid = res.payload["entry"].entity_id
             file_lists[eid] = tuple(dict.fromkeys((*file_lists.get(eid, ()), *res.payload.get("lists", ()))))
+    for res in institutions:  # a list line of an aliased id adds its list to the target (P2-T28)
+        m = res.payload.get("membership")
+        if m and res.bucket in ("accepted", "unconfirmed"):
+            base = file_lists.get(m["target"]) or tuple(ctx.existing_lists(m["target"]))
+            file_lists[m["target"]] = tuple(dict.fromkeys((*base, *m["lists"])))
     ctx.lists_lookup = lambda rid: file_lists.get(rid) or ctx.existing_lists(rid)
 
     def inst_registry_id(inst_id: str) -> str | None:
@@ -486,6 +623,10 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         via_alias.append((res, original, used))
         if not rid:
             res.reason = "missing_id"
+            continue
+        refused = ctx.refused_required.get(_text(original.get("inst_id")) or "")
+        if refused:  # a required alias not accepted: never loaded against the id itself (P2-T28)
+            res.reason, res.detail = "alias_required_not_accepted", refused
             continue
         status = _text(r.get("claude_status"))
         if status not in fmt.claude_statuses:
@@ -515,8 +656,13 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
 
     for original in batch.sheets.get("Facts", []):
         r, used = _aliased(original, "entity_id", applied)  # before every other check
-        out.append(_fact_row(r, ctx, inst_registry_id, (programme_refs, in_file), seen_keys,
-                             abroad | skipped_programmes, parent_of))
+        refused = ctx.refused_required.get(_text(original.get("entity_id")) or "")
+        if refused and _text(original.get("fact_id")):  # a required alias not accepted (P2-T28)
+            out.append(RowResult("Facts", _text(original.get("fact_id")) or "", r["_row"], "rejected",
+                                 reason="alias_required_not_accepted", detail=refused))
+        else:
+            out.append(_fact_row(r, ctx, inst_registry_id, (programme_refs, in_file), seen_keys,
+                                 abroad | skipped_programmes, parent_of))
         via_alias.append((out[-1], original, used))
     for res, original, used in via_alias:
         _note_alias(res, original, used)

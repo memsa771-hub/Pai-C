@@ -206,6 +206,51 @@ class RegistryStore:
                                             before=old, after=new, cause=cause, cause_ref=cause_ref, actor=actor))
             return Recorded(row_id, action)
 
+    def add_lists(self, entity_id: str, list_ids: tuple[str, ...] | list[str], evidence: dict, *, cause: str,
+                  cause_ref: str | None = None, actor: str | None = None,
+                  upgrade: tuple[str, ...] | list[str] = ()) -> Recorded:
+        """Puts a stored institution or campus on more official lists (P2-T28, alias membership; R-32, R-35a): the
+        lists are appended after the ones it names, and `attrs.list_evidence[list_id]` keeps `evidence` (the list line
+        that showed it: url, quote, checks, alias). Every other column is left as it is (FU-2: a list line never
+        rewrites the name, type, source or domains). One `change` revision, under the entity's lock; undo of the import
+        restores the row from that revision's `before`. A list the entity already names keeps its evidence, except a list
+        in `upgrade` (fix round 1): its evidence is replaced when the new `trust` ranks above the stored one (unconfirmed <
+        confirmed < verified), with the same one revision. A list with no stored evidence is not in `upgrade`."""
+        with self.engine.begin() as conn:
+            self._lock(conn, entity_id)
+            before = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id, T.c.entity_id == entity_id)
+                                  .with_for_update()).first()
+            if before is None:
+                raise RegistryError(f"{entity_id} is not in the registry; a list line cannot add a list to it")
+            if before.kind not in ("institution", "campus"):  # the kinds an official list names (P2-T16)
+                raise RegistryError(f"only an institution or campus is on an official list; {entity_id} is a "
+                                    f"{before.kind}")
+            if before.status != "active":  # closed, merged or renamed: the list belongs on the successor, if any
+                raise RegistryError(f"{entity_id} is {before.status}; a list line cannot add a list to it")
+            self._check_cause(cause, before.kind)
+            new_lists = tuple(dict.fromkeys((*before.list_ids, *list_ids)))
+            self._check_refs(conn, replace(_entry(before), list_ids=new_lists))
+            attrs = dict(before.attrs)
+            ev = dict(attrs.get("list_evidence") or {})
+            for list_id in dict.fromkeys(list_ids):
+                ev.setdefault(list_id, dict(evidence))
+            rank = {"unconfirmed": 0, "confirmed": 1, "verified": 2}
+            for list_id in dict.fromkeys(upgrade):
+                old = ev.get(list_id)
+                if list_id in new_lists and old is not None and \
+                        rank.get(old.get("trust") or "", -1) < rank.get(evidence.get("trust") or "", -1):
+                    ev[list_id] = dict(evidence)
+            attrs["list_evidence"] = ev
+            if new_lists == tuple(before.list_ids) and attrs == dict(before.attrs):
+                return Recorded(before.id, "unchanged")
+            conn.execute(update(T).where(T.c.id == before.id).values(list_ids=list(new_lists), attrs=attrs,
+                                                                     updated_at=func.now()))
+            after = conn.execute(select(T).where(T.c.id == before.id)).one()
+            conn.execute(RV.insert().values(tenant_id=self.tenant_id, registry_id=before.id, action="change",
+                                            before=_snapshot(before), after=_snapshot(after), cause=cause,
+                                            cause_ref=cause_ref, actor=actor))
+            return Recorded(before.id, "change")
+
     def _revise(self, conn, registry_id: int, *, kind: str, subject: str, before: dict, after: dict, cause: str,
                 cause_ref: str | None, actor: str | None) -> None:
         conn.execute(RV.insert().values(tenant_id=self.tenant_id, registry_id=registry_id, kind=kind, subject=subject,

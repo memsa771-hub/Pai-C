@@ -145,13 +145,17 @@ def test_alias_and_union_together(engine, clean, tmp_path):
     assert s.get(E).list_ids == (A,) and s.get(E).status == "active"
 
 
-def test_an_aliased_row_alone_on_another_list_adds_nothing_to_the_target(engine, clean, tmp_path):
+def test_an_aliased_row_alone_on_another_list_adds_that_list_to_the_target(engine, clean, tmp_path):
+    # P2-T28 (FU-3, controller decision under the owner's delegation of 2026-11-14) changed this on purpose: it was
+    # test_an_aliased_row_alone_on_another_list_adds_nothing_to_the_target, which asserted ("skipped", "aliased") and
+    # list_ids == (A,). An aliased row on no list still adds nothing (test_alias_membership.py, rule 11).
     s = two_lists(engine)
     do_import(engine, tmp_path, [inst(1)], "a.xlsx")
     before = s.revisions(E)
     res = _alias_import(engine, tmp_path, [inst(9, inst_id="T-UNI-X", source_url=BETA_URL)])
-    assert [(r.bucket, r.reason) for r in res.rows if r.sheet == "Institutions"] == [("skipped", "aliased")]
-    assert s.get(E).list_ids == (A,) and loaded(s) == {A: 1, B: 0} and s.revisions(E) == before
+    assert [(r.bucket, r.reason) for r in res.rows if r.sheet == "Institutions"] == [("accepted", "alias_membership")]
+    assert s.get(E).list_ids == (A, B) and loaded(s) == {A: 1, B: 1}
+    assert s.revisions(E)[:-1] == before and s.revisions(E)[-1].action == "change"
 
 
 # --- fix round 1 (review F1-F4) ---------------------------------------------------------------------------------------

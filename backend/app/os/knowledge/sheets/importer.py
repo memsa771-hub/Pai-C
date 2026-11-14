@@ -27,6 +27,7 @@ from app.os.knowledge.sheets.plan import (
     PlanContext,
     RowResult,
     Scope,
+    membership_detail,
     norm_url,
     plan_batch,
     summarise,
@@ -75,11 +76,13 @@ class ImportResult:
 
 
 def _info(e) -> dict | None:
-    """What the plan needs of a stored entity for a calendar date: its kind, calendar type, zone and parent."""
+    """What the plan needs of a stored entity: its kind, calendar type, zone and parent (a calendar date), and its status
+    (a list line of an alias adds no list to a closed entity, P2-T28)."""
     if e is None:
         return None
     return {"kind": e.kind, "calendar_type": e.attrs.get("calendar_type"), "timezone": e.attrs.get("timezone"),
-            "parent_id": e.parent_id}
+            "parent_id": e.parent_id, "status": e.status,
+            "list_trust": {k: (v or {}).get("trust") for k, v in (e.attrs.get("list_evidence") or {}).items()}}
 
 
 def _registry_lookup(registry: RegistryStore):
@@ -257,7 +260,9 @@ def _apply_refetch(results: list[RowResult], refetcher, official=None) -> None:
         p = r.payload
         if r.bucket not in ("accepted", "unconfirmed") or not p.get("url") or not p.get("quote"):
             continue
-        promotable = r.bucket == "unconfirmed" and r.reason == "check_unclear_or_missing"
+        member = "membership" in p  # a list line of an alias keeps `alias_membership`; its level reason is separate
+        reason = p.get("level_reason") if member else r.reason
+        promotable = r.bucket == "unconfirmed" and reason == "check_unclear_or_missing"
         if not (r.needs_refetch or promotable):
             continue
         fams = refetch_families(p) or (refetcher.family,)
@@ -269,8 +274,14 @@ def _apply_refetch(results: list[RowResult], refetcher, official=None) -> None:
             out = Outcome(False, "refetch_blocked:not_official")
         if r.needs_refetch:
             r.needs_refetch = False
-            if not out.matched:
+            if not out.matched and member:
+                r.bucket, r.level, p["level_reason"] = "unconfirmed", "unconfirmed", out.reason
+                r.detail = membership_detail(p)
+            elif not out.matched:
                 r.bucket, r.level, r.reason, r.detail = "unconfirmed", "unconfirmed", out.reason, p["url"]
+        elif out.matched and member:
+            r.bucket, r.level, p["level_reason"] = "accepted", "confirmed", "quote_matched_on_refetch"
+            r.detail = membership_detail(p)
         elif out.matched:
             r.bucket, r.level, r.reason = "accepted", "confirmed", "quote_matched_on_refetch"
 
@@ -358,7 +369,12 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
         _apply_refetch(results, Refetcher(deps.fetcher, family), ctx.official)
         for r in results:  # a model/OCR row nobody could re-fetch stays unconfirmed (R-68)
             if r.needs_refetch and r.bucket == "accepted":
-                r.bucket, r.level, r.reason = "unconfirmed", "unconfirmed", "refetch_not_run"
+                r.bucket, r.level = "unconfirmed", "unconfirmed"
+                if "membership" in r.payload:
+                    r.payload["level_reason"] = "refetch_not_run"
+                    r.detail = membership_detail(r.payload)
+                else:
+                    r.reason = "refetch_not_run"
                 r.needs_refetch = False
         cref = cause_ref(import_id)
         refused: set[str] = set()  # registry ids whose row the registry refused at load time
@@ -368,10 +384,14 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
         def not_loaded(registry_id: str | None) -> bool:
             return registry_id in refused and deps.registry.get(registry_id) is None
 
+        memberships: list[RowResult] = []  # list lines of an alias (P2-T28): after every entity row, so the target exists
         for r in results:
             if r.bucket == "queued":
                 queued += _queue(deps, r, batch.sha256, batch_ref)
             elif r.bucket in ("accepted", "unconfirmed") and r.payload:
+                if r.sheet == "Institutions" and "membership" in r.payload:
+                    memberships.append(r)
+                    continue
                 if r.sheet == "Institutions":
                     try:
                         _load_institution(deps, r, import_id, mode, decision_ref, actor, cref)
@@ -409,6 +429,11 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                                             fact_id=r.payload["fid"], summary=f"{r.row_id}: sources disagree",
                                             batch_ref=batch_ref, opened_by="import")
                     queued += 1
+        for r in memberships:
+            try:
+                _load_membership(deps, r, import_id, mode, decision_ref, actor, cref)
+            except RegistryError as e:  # a backstop: the target's own row was refused, or the registry moved
+                _reject(r, "registry_refused", str(e)[:500])
         counts = summarise(results)
         text = report_text(results)
         default_report = path / "import-report.csv" if path.is_dir() else path.with_name(path.stem + ".import-report.csv")
@@ -447,6 +472,18 @@ def _load_institution(deps: ImportDeps, r: RowResult, import_id: int, mode: str,
         return
     # an entity already on another official list keeps it: its lists are the union, existing first (R-32, R-35a)
     deps.registry.record(replace(entry, attrs=attrs), cause="import", cause_ref=cref, actor=actor, keep_lists=True)
+
+
+def _load_membership(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None, actor: str,
+                     cref: str) -> None:
+    """A list line naming, through an applied alias, an entity loaded under another id (P2-T28): only its lists and
+    `attrs.list_evidence` change (`RegistryStore.add_lists`); its name, type, source and domains stay as they were."""
+    p = r.payload
+    ev = {**_evidence(r, mode, decision_ref, import_id, actor)[0], "inst_id": r.row_id, "url": p["url"],
+          "quote": p["quote"], "checked_at": p["checked_at"], "read_method": p["read_method"], "trust": r.level}
+    ev = json.loads(json.dumps(ev, default=_jsonable))
+    deps.registry.add_lists(p["membership"]["target"], p["membership"]["lists"], ev, cause="import", cause_ref=cref,
+                            actor=actor, upgrade=p["membership"].get("upgrade", ()))
 
 
 def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None, actor: str,
