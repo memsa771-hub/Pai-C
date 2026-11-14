@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.os import models
 from app.os.kernel import Kernel
-from app.os.knowledge.sheets.importer import plan_hook, run_import
+from app.os.knowledge.sheets.importer import build_context, plan_file, plan_hook, run_import
 from app.os.knowledge.sheets.undo import undo_import
 from app.os.knowledge.store import SqlKnowledge
 from app.os.playbooks import load_playbook_dir
@@ -79,6 +79,32 @@ def test_the_calendar_row_and_its_date_arrive_through_the_calendar_paths(engine,
     f = d.knowledge.registry_facts([CAL], ["result_date"], 2027, intake_term="winter")[(CAL, "result_date")]
     assert f.value == {"date": "2031-05-20", "tz": "Asia/Karachi"} and f.status == "verified"
     assert f.fact_class == "schedule_date" and f.intake_term == "winter"  # the class comes from the calendar's type
+
+
+def board_rows():
+    board = inst(4, ctype="examination_board", source_url="https://board.beta.test/about", timezone="Asia/Karachi")
+    board.update(inst_id="BETA-BOARD", name="Beta board")
+    cal = inst(5, ctype="exam_calendar", source_url="https://board.beta.test/datesheet", parent_id="BETA-BOARD")
+    cal.update(inst_id="BETA-EXAMS", name="Beta board exam calendar")
+    return [board, cal]
+
+
+def test_a_calendar_under_a_board_is_planned_and_loaded_with_the_board_as_parent(engine, world):
+    # exam and result date sheets come from boards (W10 decision 4): the board is imported as kind board, not a body
+    _, d, tmp = world
+    path = workbook(tmp, board_rows(), [], name="plan.xlsx")
+    ctx = build_context(d, country=COUNTRY, mode="owner_accepted", batch_ref="plan", family="", decision_ref="ref-1")
+    _, planned = plan_file(path, ctx)
+    by_id = {r.row_id: r for r in planned if r.sheet == "Institutions"}
+    assert by_id["BETA-BOARD"].payload["kind"] == "board"
+    assert by_id["BETA-EXAMS"].bucket == "accepted"
+    assert by_id["BETA-EXAMS"].payload["entry"].parent_id == "board:beta-board"
+    res = do_import(d, tmp, "a.xlsx", board_rows(), [])
+    assert [(r.row_id, r.reason) for r in res.rows if r.sheet == "Institutions" and r.bucket != "accepted"] == []
+    cal = RegistryStore(engine, "pai").get("cal:beta-exams")
+    assert cal is not None and (cal.kind, cal.parent_id, cal.attrs["calendar_type"]) == (
+        "calendar", "board:beta-board", "exam")
+    assert RegistryStore(engine, "pai").get("board:beta-board").kind == "board"
 
 
 def test_a_wrong_field_for_the_calendars_type_is_rejected_not_loaded(engine, world):

@@ -19,8 +19,8 @@ sheets:
   Institutions:
     key: inst_id
     required: [inst_id, type, name, region, source_url, source_quote, read_method, retrieved, claude_status]
-    # `parent_id` (the inst_id of the body, system or institution a calendar belongs to) and `timezone` (the zone of its
-    # dates) are optional: the v4 batches have neither. A calendar row uses both (P2-T11).
+    # `parent_id` (the inst_id of the body, board, system or institution a calendar belongs to) and `timezone` (the zone
+    # of its dates) are optional: the v4 batches have neither. A calendar row uses both (P2-T11).
     columns: [inst_id, type, name, region, city, sector, discipline, chartered_by, official_url, in_scope, source_url,
               source_quote, read_method, retrieved, claude_status, claude_note, parent_id, timezone]
   Programmes:

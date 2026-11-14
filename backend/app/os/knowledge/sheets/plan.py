@@ -616,7 +616,7 @@ def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: tuple[set[st
 
 
 def _timezone_of(registry_id: str, ctx: PlanContext) -> str | None:
-    """The zone of a calendar's dates: its own, else its parent's (a body or institution), a few levels up."""
+    """The zone of a calendar's dates: its own, else its parent's (a body, board or institution), a few levels up."""
     rid: str | None = registry_id
     for _ in range(4):
         meta = ctx.meta(rid) if rid else None

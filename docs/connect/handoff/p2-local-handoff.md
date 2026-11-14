@@ -124,7 +124,9 @@ CI's `os` job has a 60-minute limit. If CI fails, reproduce the failure locally 
   compared.
 - **R-46** stays `built: false` as recorded in the P1 handoff.
 - **R-48** is `built: false` until freeze exception 1 lands (the OS side is built).
-- The T2 parent-kind table was chosen by the agent; the final review should confirm it.
+- The T2 parent-kind table was chosen by the agent; the final review should confirm it. Decided 2026-11-14 (controller
+  decision, for the owner to confirm at sign-off): approved, with `board` added as a parent of `calendar`; see
+  `p2-handoff.md` §4.
 
 ## 7. Known limits to remember (details in the T12 draft handoff §4)
 

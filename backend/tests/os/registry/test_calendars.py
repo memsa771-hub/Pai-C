@@ -17,6 +17,7 @@ from app.os.registry.calendars import (
     record_calendar_date,
 )
 from app.os.registry.model import RegistryEntry
+from app.os.registry.store import RegistryError
 
 from .helpers import AT, child, inst, olist, store
 
@@ -65,6 +66,20 @@ def test_a_calendar_may_belong_to_an_institution(world):
     s, _ = world
     record_calendar(s, calendar_entry("inst-cal", parent="inst:one"), "admission", cause="import")
     assert s.get("cal:inst-cal").parent_id == "inst:one"
+
+
+def test_a_boards_calendar_is_stored_with_the_board_as_parent(world):
+    # exam and result date sheets come from boards (W10 decision 4): a calendar may sit under a board, a campus may not
+    s, _ = world
+    s.record(child("board", "board", "beta-board", None, region="national"), cause="import")
+    record_calendar(s, calendar_entry("beta-exams", parent="board:beta-board"), "exam", cause="import")
+    e = s.get("cal:beta-exams")
+    assert (e.kind, e.parent_id, e.attrs["calendar_type"]) == ("calendar", "board:beta-board", "exam")
+    assert s.get(e.parent_id).kind == "board"
+    with pytest.raises(RegistryError, match="parent of a campus is institution, not a board"):
+        s.record(child("campus", "campus", "north", "board:beta-board", list_ids=("list:alpha-list",),
+                       region="punjab"), cause="import")
+    assert s.get("campus:north") is None
 
 
 def test_record_a_date_fact_per_intake(world):

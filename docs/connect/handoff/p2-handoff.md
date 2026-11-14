@@ -169,6 +169,10 @@ Code limits and known gaps:
 - **Coverage (T9):** a source on an unlisted domain fails check (c) of the launch-gate reading; a follow-up is noted in the T9 review.
 - **Monitoring (T7):** programme-scope facts only; the day's run is one per day; a sanity failure delays a change but never hides it (two failures in a row take the facts back); notices to students are the existing "plan updated" notice and bell, no new event kind.
 - **Registry (T2):** which kind a parent may have is chosen per kind table by the agent; the final review is to check it.
+  **Decided 2026-11-14** (controller decision under the owner's delegation, for the owner to confirm at sign-off): the
+  table is approved as built, with one change: `board` may be the parent of a `calendar` (exam and result date
+  sheets come from boards; walkthrough rows PI-09 and GI-02). No other loosening; a campus still needs an
+  institution (`backend/app/os/registry/model.py` `ALLOWED_PARENTS`, task T26).
 - **Intakes (T8):** the Counsellor adapter maps an intake error to `route_not_supported` (an approximation); the upgrade route has no handler for the new value error (no current path reaches it).
 - **Consistency job:** rules 9 to 12 read PAI OS alone, per student with an open plan, and run inside the connection's job (they are off when the connection is off); rule 13 is P4 (R-70).
   - **They cover only the programmes in open plans.** A fact a student could see elsewhere (a browse screen, a programme list of a route they have not planned) is not read.

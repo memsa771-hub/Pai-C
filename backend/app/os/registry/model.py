@@ -36,7 +36,8 @@ ALLOWED_PARENTS: dict[str, tuple[str, ...]] = {
     "admission_system": ("admission_body", "board", "regulator"),
     "entry_test": ("admission_body", "admission_system", "board"),
     "institution": ("institution",), "campus": ("institution",), "seat_category": ("admission_system",),
-    "calendar": ("admission_system", "admission_body", "institution"), "official_list": (),
+    # a board publishes exam and result date sheets, so its calendar sits under it (W10 decision 4, 2026-11-14)
+    "calendar": ("admission_system", "admission_body", "board", "institution"), "official_list": (),
 }
 # Which kind may replace an entity of a kind when it is merged or renamed (`successor_id`): the same kind.
 ALLOWED_SUCCESSORS: dict[str, tuple[str, ...]] = {kind: (kind,) for kind in KIND_PREFIX}
