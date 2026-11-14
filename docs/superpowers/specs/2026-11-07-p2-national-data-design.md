@@ -149,6 +149,8 @@ None yet. The questions are in §11. Until the owner answers, each one uses its 
 - **Lookup.** `PageGateway.fetch` asks `os_source_domains` whether the domain is `active` for the region and family
   (or for the route, for Germany). Any other domain is refused with `not_official`; a `suspect` one with
   `suspect_domain`.
+  - *Note (2026-11-14, P2-T22):* the scope is checked before the `os_pages` cache, and a `not_official` refusal is not
+    stored (it depends on the scope; `os_pages` is keyed by URL only).
 - **Integrity checks** run on every page fetched (thresholds and patterns in `knowledge/sources/integrity.yaml`):
   - spam patterns: gambling and link-farm words, in every language the data lists;
   - a link flood: the share of links to off-list domains against the domain's own last snapshot;
