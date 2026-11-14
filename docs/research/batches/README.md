@@ -123,3 +123,22 @@ change: `claude-local-check-1` / `claude-local-check-2` (alias files; check reco
 keep the display names "Claude local - check 1" / "Claude local - check 2 (independent)"),
 `claude-research-seats-check-1` / `-2` (v5 seats) and `claude-research-v6-seats-check-1` / `-2` (v6 seats). Editing an
 alias file changes its sha256 and so its attest ref.
+
+## Allow-list family per row, and the dry run with an allow-list (P2-T19, 2026-11-14)
+
+- **How the family is chosen.** An allow-list file is per region and family, so the import judges a row's source
+  against (row region, family). The families tried are the `family` of every official list the row's entity is on
+  (`docs/research/lists/*.yaml`; the registry keeps it as the list's `attrs.family`). An Institutions row uses the lists
+  the import gives it: the lists the entity already names, then its own. A Programmes row, and a Facts row on an
+  entity or on a programme, uses the lists (and region) of the entity it hangs on, planned in the same file or stored;
+  a programme's facts use its institution. Aliases are resolved first. The source passes when its host is listed for
+  the row's region and any of those families; the row's provenance records the scope that accepted it
+  (`allow_list_scope: {region, family}`). When the entity is on no list with a family (a body, a board, a test, a
+  calendar), `--family` is used; with no `--family` the family is `''`, which no region file matches. The detail of a
+  `source_not_on_allow_list` row names the scopes tried.
+- **Dry run with an allow-list.** `validate FILE --country PK --lists ../docs/research/lists --allow-list DIR` loads the
+  allow-list YAML files in DIR (`load_allowlist`, no database) and judges every source as the import does against the
+  same entries, including the one-body-one-domain rule (R-71) of those files. `--lists` is needed for the families.
+  The files carry no database state: a domain marked suspect in the database (monitoring, a person) is refused by
+  the import but not by the dry run, and the output says so. Without `--allow-list` the output says that the
+  allow-list was not checked.

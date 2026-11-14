@@ -150,6 +150,27 @@ def load_allowlist(directory: Path = LISTS_DIR) -> AllowList:
     return AllowList(tuple(entries), preferred, frozenset(multiple))
 
 
+def applies(entry, scope: Scope) -> bool:
+    """An entry (a list entry or a stored row) serves the scope: its route, or its region and family."""
+    return bool((scope.route_key and entry.route_key == scope.route_key)
+                or (scope.region and entry.region == scope.region and entry.family == scope.family))
+
+
+def file_lookup(allow: AllowList) -> Callable[[str, Scope], bool]:
+    """`SourceDomains.is_listed` as it answers right after `sync(allow)` into an empty table, from the files alone (a
+    dry run, no database): every entry is active, except the domains the one-body-one-domain rule (R-71) sets suspect.
+    A domain marked suspect at run time (monitoring, a person) is database state and is not known here."""
+    suspect = frozenset(resolve_claims(allow))
+
+    def is_listed(host: str, scope: Scope) -> bool:
+        entries = [e for e in allow.entries if host_matches(host, e.domain)]
+        if any(e.domain in suspect for e in entries):  # as in the table: one suspect row of the domain refuses
+            return False
+        return any(e.tier is not None and applies(e, scope) for e in entries)
+
+    return is_listed
+
+
 def resolve_claims(allow: AllowList) -> dict[str, str]:
     """R-71: when two domains claim one body, the one with a preferred suffix stays; the rest are suspect until a
     person confirms them. With no single preferred domain, all of them are suspect. Returns domain -> reason."""
@@ -256,9 +277,7 @@ class SourceDomains:
             rows = self._rows(conn, host)
         if any(r.state == "suspect" for r in rows):  # one suspect row (any scope, or a parent) refuses (review I1)
             return False
-        return any(r.state == "active" and r.tier is not None and (
-            (scope.route_key and r.route_key == scope.route_key)
-            or (scope.region and r.region == scope.region and r.family == scope.family)) for r in rows)
+        return any(r.state == "active" and r.tier is not None and applies(r, scope) for r in rows)
 
     def domain_for(self, host: str, fallback: str) -> str:
         """The listed domain a host belongs to (the most specific), or `fallback`."""

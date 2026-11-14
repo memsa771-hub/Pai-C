@@ -26,6 +26,7 @@ from app.os.knowledge.sheets.plan import (
     REVIEWERS,
     PlanContext,
     RowResult,
+    Scope,
     norm_url,
     plan_batch,
     summarise,
@@ -38,8 +39,8 @@ from app.os.registry.calendars import record_calendar, record_calendar_date
 from app.os.registry.model import KIND_PREFIX, PROGRAMME_PARENTS, slug
 from app.os.registry.store import RegistryError, RegistryStore, kept_lists
 
-__all__ = ["AlreadyImported", "ImportDeps", "ImportRefused", "ImportResult", "build_context", "plan_file", "plan_hook", "run_import",
-           "wire_other_tasks", "write_report"]
+__all__ = ["AlreadyImported", "ImportDeps", "ImportRefused", "ImportResult", "build_context", "official_by_host",
+           "plan_file", "plan_hook", "run_import", "wire_other_tasks", "write_report"]
 REPORT_COLUMNS = ("sheet", "row_id", "source_row", "bucket", "level", "reason", "detail")
 
 
@@ -98,6 +99,7 @@ class ImportRefused(ValueError):
 def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref: str, family: str,
                   list_urls: dict[str, str | tuple[str, ...]] | None = None,
                   list_regions: dict[str, str | None] | None = None,
+                  list_families: dict[str, str] | None = None,
                   require_list: bool = True,
                   decision_ref: str | None = None, fmt: Format | None = None) -> PlanContext:
     from app.os.knowledge.regions import countries
@@ -109,15 +111,19 @@ def build_context(deps: ImportDeps | None, *, country: str, mode: str, batch_ref
     urls: dict[str, tuple[str, ...]] = {u: ((v,) if isinstance(v, str) else tuple(v))
                                         for u, v in (list_urls or {}).items()}
     ctx.list_regions.update(list_regions or {})  # list id -> region, for a dry run that reads list files
+    ctx.list_families.update({k: v for k, v in (list_families or {}).items() if v})  # list id -> family, the same
     if deps is not None:
         for e in deps.registry.list(kind="official_list", limit=100_000):  # every list of a URL, not only the first
             u = norm_url(e.source_url)
             urls[u] = tuple(dict.fromkeys((*urls.get(u, ()), e.entity_id)))
             ctx.list_regions[e.entity_id] = e.region
+            if e.attrs.get("family"):  # the list's family (H3 data): the allow-list scope of what is on it (P2-T19)
+                ctx.list_families[e.entity_id] = str(e.attrs["family"])
         ctx.attested, ctx.official = deps.attested, deps.official
         ctx.cap_without_allow_list = deps.official is None  # no allow-list connected: nothing above `unconfirmed`
         ctx.existing_institutions = _registry_lookup(deps.registry)
         ctx.existing_programmes = lambda ref: deps.programmes.get(ref) is not None
+        ctx.existing_programme_institution = lambda ref: getattr(deps.programmes.get(ref), "institution_id", None)
         ctx.existing_region = lambda rid: getattr(deps.registry.get(rid), "region", None)
         ctx.existing_lists = lambda rid: _kept(deps.registry, rid)
         ctx.registry_info = lambda rid: _info(deps.registry.get(rid))
@@ -140,7 +146,10 @@ def use_planned_institutions(ctx: PlanContext, institutions: list[RowResult]) ->
     info = {r.payload["entry"].entity_id: {"kind": r.payload["kind"], "calendar_type": r.payload.get("calendar_type"),
                                            "timezone": r.payload.get("timezone"),
                                            "parent_id": r.payload["entry"].parent_id} for r in loaded}
-    lists = {r.payload["entry"].entity_id: r.payload["entry"].list_ids for r in loaded}
+    lists: dict[str, tuple[str, ...]] = {}  # every list the other file puts an entity on (as the registry would keep)
+    for r in loaded:
+        eid = r.payload["entry"].entity_id
+        lists[eid] = tuple(dict.fromkeys((*lists.get(eid, ()), *r.payload.get("lists", r.payload["entry"].list_ids))))
     before_inst, before_region, before_info = ctx.existing_institutions, ctx.existing_region, ctx.registry_info
     before_lists = ctx.existing_lists
     ctx.existing_institutions = lambda i: ids.get(i) or before_inst(i)
@@ -173,11 +182,16 @@ def wire_other_tasks(deps: ImportDeps) -> ImportDeps:
     try:
         from app.os.knowledge.sources.allowlist import SourceDomains
 
-        domains = SourceDomains(deps.engine, deps.tenant_id)
-        deps.official = lambda url, scope: domains.is_listed(urlsplit(url).hostname or "", scope)
+        deps.official = official_by_host(SourceDomains(deps.engine, deps.tenant_id).is_listed)
     except ImportError:
         pass
     return deps
+
+
+def official_by_host(is_listed):
+    """The plan's `official(url, scope)` from an allow-list lookup by host: the table's (`SourceDomains.is_listed`)
+    for an import, or the files' (`allowlist.file_lookup`) for a dry run, so both judge a row the same way."""
+    return lambda url, scope: is_listed(urlsplit(url).hostname or "", scope)
 
 
 def plan_file(path: Path, ctx: PlanContext, fmt: Format | None = None) -> tuple[Batch, list[RowResult]]:
@@ -218,9 +232,27 @@ def _evidence(res: RowResult, mode: str, decision_ref: str | None, import_id: in
     return [ev]
 
 
-def _apply_refetch(results: list[RowResult], refetcher) -> None:
+def refetch_families(payload: dict) -> tuple[str, ...] | None:
+    """The families a row is re-fetched for (P2-T19): the one whose allow-list scope accepted it in the plan, else the
+    families of its entity's lists (an unconfirmed row the plan did not judge); None: the run's `--family`."""
+    scope = (payload.get("provenance") or {}).get("allow_list_scope")
+    if scope:
+        return (scope["family"],)
+    return tuple(payload.get("allow_list_families") or ()) or None
+
+
+def _listed_families(url: str, region: str | None, fams: tuple[str, ...], official) -> tuple[str, ...]:
+    """The families whose scope the allow-list lists the URL's host for, asked before any fetch (P2-T19, re-review
+    R1-S1): the gateway caches a refusal by URL, so a fetch under an unlisted scope would refuse the listed one too."""
+    return tuple(f for f in fams if official(url, Scope(region=region or "", family=f)))
+
+
+def _apply_refetch(results: list[RowResult], refetcher, official=None) -> None:
     """R-68: model- and OCR-read rows are confirmed only if the quote matches on the re-fetched page; an unconfirmed
-    row with a quote is promoted when it matches. A mismatch never raises a level."""
+    row with a quote is promoted when it matches. A mismatch never raises a level. With an allow-list (`official`), a
+    row is fetched only under the scopes it is listed for; with none listed it is refused without a fetch."""
+    from app.os.knowledge.sheets.refetch import Outcome
+
     for r in results:
         p = r.payload
         if r.bucket not in ("accepted", "unconfirmed") or not p.get("url") or not p.get("quote"):
@@ -228,7 +260,13 @@ def _apply_refetch(results: list[RowResult], refetcher) -> None:
         promotable = r.bucket == "unconfirmed" and r.reason == "check_unclear_or_missing"
         if not (r.needs_refetch or promotable):
             continue
-        out = refetcher.check(p["url"], p["quote"], p.get("region"))
+        fams = refetch_families(p) or (refetcher.family,)
+        if official is not None and refetcher.fetcher is not None:
+            fams = _listed_families(p["url"], p.get("region"), fams, official)
+        if fams:
+            out = refetcher.check(p["url"], p["quote"], p.get("region"), fams)
+        else:  # listed for none of the row's scopes: as the gateway would answer, but nothing is fetched or cached
+            out = Outcome(False, "refetch_blocked:not_official")
         if r.needs_refetch:
             r.needs_refetch = False
             if not out.matched:
@@ -317,7 +355,7 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
     try:
         from app.os.knowledge.sheets.refetch import Refetcher
 
-        _apply_refetch(results, Refetcher(deps.fetcher, family))
+        _apply_refetch(results, Refetcher(deps.fetcher, family), ctx.official)
         for r in results:  # a model/OCR row nobody could re-fetch stays unconfirmed (R-68)
             if r.needs_refetch and r.bucket == "accepted":
                 r.bucket, r.level, r.reason = "unconfirmed", "unconfirmed", "refetch_not_run"

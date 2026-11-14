@@ -16,23 +16,33 @@ class Outcome:
 
 
 class Refetcher:
-    """One fetch per URL per import. `fetch` is `PageGateway.fetch(url, own, shared, scope)`: the page is read only
-    when the domain is official for the scope (the allow-list, T3), otherwise it comes back blocked."""
+    """One fetch per URL and scope per import. `fetch` is `PageGateway.fetch(url, own, shared, scope)`: the page is read
+    only when the domain is official for the scope (the allow-list, T3), otherwise it comes back blocked."""
 
     def __init__(self, fetcher: Fetcher | None, family: str = "") -> None:
         self.fetcher, self.family = fetcher, family
-        self._pages: dict[str, tuple[str, str | None]] = {}
+        self._pages: dict[tuple[str, str, str], tuple[str, str | None]] = {}
 
-    def check(self, url: str, quote: str, region: str | None) -> Outcome:
+    def _page(self, url: str, region: str, family: str) -> tuple[str, str | None]:
+        key = (url, region, family)
+        if key not in self._pages:
+            try:
+                page = self.fetcher.fetch(url, (), (), Scope(region=region, family=family))
+                self._pages[key] = (normalise(page.text or ""), page.blocked)
+            except Exception as e:  # noqa: BLE001  (a transient failure is not a mismatch)
+                self._pages[key] = ("", f"error:{type(e).__name__}")
+        return self._pages[key]
+
+    def check(self, url: str, quote: str, region: str | None, families: tuple[str, ...] | None = None) -> Outcome:
+        """`families`: the allow-list families the row may be read for (the plan's, P2-T19), tried in order until the
+        page is not blocked; None: the run's `--family`."""
         if self.fetcher is None:
             return Outcome(False, "refetch_not_run")
-        if url not in self._pages:
-            try:
-                page = self.fetcher.fetch(url, (), (), Scope(region=region or "", family=self.family))
-                self._pages[url] = (normalise(page.text or ""), page.blocked)
-            except Exception as e:  # noqa: BLE001  (a transient failure is not a mismatch)
-                self._pages[url] = ("", f"error:{type(e).__name__}")
-        text, blocked = self._pages[url]
+        text, blocked = "", None
+        for family in families or (self.family,):
+            text, blocked = self._page(url, region or "", family)
+            if not blocked:
+                break
         if blocked:
             return Outcome(False, f"refetch_blocked:{blocked}")
         return Outcome(quote_on_page(quote, text), "quote_matched" if quote_on_page(quote, text) else "quote_not_found")

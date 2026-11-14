@@ -51,7 +51,7 @@ class PlanContext:
     country: str
     mode: str = OWNER_ACCEPTED
     batch_ref: str = ""
-    family: str = ""  # the batch's family, for the allow-list scope (data of the batch, never guessed)
+    family: str = ""  # the --family given: the allow-list family of a row whose entity is on no list with a family
     attested: Callable[[str, str], bool] | None = None  # (reviewer ref, batch ref) -> bool; reviewer mode (T5)
     official: Callable[[str, Scope], bool] | None = None  # allow-list lookup (T3); None = not checked
     # official list URL -> its list id, or the ids of every list published at that URL (one page, several lists)
@@ -61,6 +61,9 @@ class PlanContext:
     existing_region: Callable[[str], str | None] = lambda registry_id: None  # registry id -> region code
     existing_lists: Callable[[str], tuple[str, ...]] = lambda registry_id: ()  # registry id -> lists an import keeps
     list_regions: dict[str, str | None] = field(default_factory=dict)  # official list id -> its region code
+    list_families: dict[str, str] = field(default_factory=dict)  # official list id -> its family (H3 data, P2-T19)
+    existing_programme_institution: Callable[[str], str | None] = lambda ref: None  # a stored programme's institution
+    lists_lookup: Callable[[str], tuple[str, ...]] = lambda registry_id: ()  # set by the plan: file, then database
     region_lookup: Callable[[str], str | None] = lambda registry_id: None  # set by the plan: file first, then database
     registry_info: Callable[[str], dict | None] = lambda registry_id: None  # a stored entity: kind, calendar_type, timezone, parent_id
     meta: Callable[[str], dict | None] = lambda registry_id: None  # set by the plan: file first, then database
@@ -196,22 +199,39 @@ def _source_problem(url: str | None, source_type: str | None, read_method: str |
     return None
 
 
-def _scope(region: str | None, ctx: PlanContext) -> Scope:
-    return Scope(region=region or "", family=ctx.family)
+def families(lists: tuple[str, ...] | list[str], ctx: PlanContext) -> tuple[str, ...]:
+    """The allow-list families to try for a row (P2-T19): the family of every official list its entity is on (H3 data,
+    `family` of each list), in a fixed order. When none of them has a family: the `--family` given, which may be ''."""
+    found = sorted({ctx.list_families[x] for x in lists if ctx.list_families.get(x)})
+    return tuple(found) or (ctx.family,)
 
 
 def _cap(result: RowResult, url: str, region: str | None, quote: str | None, ctx: PlanContext,
-         read_method: str | None) -> None:
-    """Things that stop a row above `unconfirmed`: no quote, off the allow-list, a model or OCR reading."""
+         read_method: str | None, lists: tuple[str, ...] = ()) -> None:
+    """Things that stop a row above `unconfirmed`: no quote, off the allow-list, a model or OCR reading. The source
+    passes the allow-list when its host is listed for the row's region and any family of the entity's lists; the scope
+    that accepted it is kept in the row's provenance. Every row that gets here keeps the families it may be read for
+    (`allow_list_families`), for the re-fetch of a row whose check did not reach this (P2-T19)."""
+    result.payload["allow_list_families"] = families(lists, ctx)
     if result.bucket not in ("accepted",):
         return
     if not quote:
         _lower(result, "no_quote")
-    elif ctx.official is None and ctx.cap_without_allow_list:
+        return
+    if ctx.official is None and ctx.cap_without_allow_list:
         _lower(result, "allow_list_not_connected")  # no allow-list to check the source against: never above this
-    elif ctx.official is not None and not ctx.official(url, _scope(region, ctx)):
-        _lower(result, "source_not_on_allow_list")
-    elif read_method is None or read_method in ctx.fmt.needs_refetch:  # a missing read method is never assumed fetch
+        return
+    if ctx.official is not None:
+        tried = [Scope(region=region or "", family=f) for f in families(lists, ctx)]
+        accepted = next((sc for sc in tried if ctx.official(url, sc)), None)
+        if accepted is None:
+            _lower(result, "source_not_on_allow_list")
+            where = "scopes tried: " + ", ".join(f"{sc.region or '-'}/{sc.family or '-'}" for sc in tried)
+            result.detail = "; ".join(x for x in (result.detail, where) if x)
+            return
+        result.payload.setdefault("provenance", {})["allow_list_scope"] = {"region": accepted.region,
+                                                                            "family": accepted.family}
+    if read_method is None or read_method in ctx.fmt.needs_refetch:  # a missing read method is never assumed fetch
         if waiver_applies(ctx) and result.level == "verified":
             # owner ruling P2 spec §11.3: both AI checks accepted it, so no re-fetch; the waiver is on the record
             prov = result.payload.setdefault("provenance", {})
@@ -358,6 +378,7 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
     if rid in first and first[rid] != (kind, region):  # a second row of the id (on another list) names the same entity
         return "duplicate_id_conflict", f"{kind}/{region}; an earlier row of the id is {first[rid][0]}/{first[rid][1]}"
     lists: tuple[str, ...] = ()
+    eid = f"{KIND_PREFIX[kind]}:{slug(rid)}"
     if kind in ("institution", "campus"):
         on, every = lists_at(ctx, url, region)
         if not every and ctx.require_list:
@@ -366,7 +387,7 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
             return "region_conflicts_with_list", f"{url} is the page of {', '.join(every)}; none is of {region}"
         lists = on or ("list:not-loaded",)
         # the import keeps the lists the entity already names (R-32): each must serve the row's region, as must its own
-        for kept in dict.fromkeys((*ctx.existing_lists(f"{KIND_PREFIX[kind]}:{slug(rid)}"), *lists)):
+        for kept in dict.fromkeys((*ctx.existing_lists(eid), *lists)):
             served = ctx.list_regions.get(kept, NATIONAL)
             if served not in (NATIONAL, region):
                 return "region_conflicts_with_list", f"{kept} is a list of {served}; the row's region is {region}"
@@ -388,16 +409,18 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
         domains.append(urlsplit(ou).hostname.lower())
     try:
         entry = RegistryEntry(
-            entity_id=f"{KIND_PREFIX[kind]}:{slug(rid)}", kind=kind, name=str(r.get("name") or ""), source_url=url,
+            entity_id=eid, kind=kind, name=str(r.get("name") or ""), source_url=url,
             checked_at=checked, quote=quote, region=region, institution_type=_text(r.get("type")), parent_id=parent,
             official_domains=tuple(d for d in domains if re.match(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$", d)), list_ids=lists,
             attrs={})
     except ValueError as e:
         return "invalid_entry", str(e)
     first.setdefault(rid, (kind, region))
+    # the lists the registry names for the entity after the import (R-32): the stored ones, then the row's own
+    on_lists = tuple(x for x in dict.fromkeys((*ctx.existing_lists(eid), *lists)) if x != "list:not-loaded")
     res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote, timezone=tz,
-                       calendar_type=ctype)
-    _cap(res, url, region, quote, ctx, rm)
+                       calendar_type=ctype, lists=on_lists)
+    _cap(res, url, region, quote, ctx, rm, on_lists)
     if res.bucket in ("accepted", "unconfirmed"):
         planned[rid] = entry.entity_id
     return None, ""
@@ -419,6 +442,12 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         "timezone": res.payload.get("timezone"), "parent_id": res.payload["entry"].parent_id}
         for res in institutions if "entry" in res.payload}
     ctx.meta = lambda rid: file_meta.get(rid) or ctx.registry_info(rid)
+    file_lists: dict[str, tuple[str, ...]] = {}  # every list the file's rows put an entity on, with its stored ones
+    for res in institutions:
+        if "entry" in res.payload:
+            eid = res.payload["entry"].entity_id
+            file_lists[eid] = tuple(dict.fromkeys((*file_lists.get(eid, ()), *res.payload.get("lists", ()))))
+    ctx.lists_lookup = lambda rid: file_lists.get(rid) or ctx.existing_lists(rid)
 
     def inst_registry_id(inst_id: str) -> str | None:
         return registry_ids.get(inst_id) or ctx.existing_institutions(inst_id)
@@ -457,10 +486,16 @@ def plan_programmes_and_facts(batch: Batch, ctx: PlanContext, institutions: list
         elif res.bucket in ("accepted", "unconfirmed"):
             programme_refs.add(rid)  # only a programme that is actually loaded can carry facts
     in_file = _all_programme_ids(batch)
+    planned_parent = {res.row_id: res.payload["inst_registry_id"] for res in out if res.sheet == "Programmes"
+                      and res.row_id in programme_refs and "inst_registry_id" in res.payload}
+
+    def parent_of(ref: str) -> str | None:  # the institution a programme hangs on: planned in the file, else stored
+        return planned_parent.get(ref) or ctx.existing_programme_institution(ref)
+
     for original in batch.sheets.get("Facts", []):
         r, used = _aliased(original, "entity_id", applied)  # before every other check
         out.append(_fact_row(r, ctx, inst_registry_id, (programme_refs, in_file), seen_keys,
-                             abroad | skipped_programmes))
+                             abroad | skipped_programmes, parent_of))
         via_alias.append((out[-1], original, used))
     for res, original, used in via_alias:
         _note_alias(res, original, used)
@@ -522,13 +557,13 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
                    "facts": facts, "read_method": rm, "checked_at": checked, "url": url, "quote": quote,
                    "programme_new": rid not in seen_programmes, "region": ctx.region_lookup(reg_id)}
     seen_programmes.add(rid)
-    _cap(res, url, res.payload["region"], quote, ctx, rm)
+    _cap(res, url, res.payload["region"], quote, ctx, rm, ctx.lists_lookup(reg_id))
     seen_keys.update(keys)  # registered only once the row has passed every check
     return None, ""
 
 
 def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: tuple[set[str], set[str]], seen_keys,
-              out_of_scope: set[str]) -> RowResult:
+              out_of_scope: set[str], parent_of: Callable[[str], str | None] = lambda ref: None) -> RowResult:
     fmt = ctx.fmt
     rid = _text(r.get("fact_id")) or ""
     res = RowResult("Facts", rid, r["_row"], "rejected")
@@ -552,7 +587,8 @@ def _fact_row(r, ctx: PlanContext, inst_registry_id, programme_ids: tuple[set[st
     if res.bucket in ("skipped", "queued"):
         res.level = None
         return res
-    problem, detail = _fact_checks(r, rid, field_name, high, res, chk, ctx, inst_registry_id, programme_ids, seen_keys)
+    problem, detail = _fact_checks(r, rid, field_name, high, res, chk, ctx, inst_registry_id, programme_ids, seen_keys,
+                                   parent_of)
     if problem:
         res.bucket, res.level, res.reason, res.detail, res.queue_kind = "rejected", None, problem, detail, None
     return res
@@ -572,7 +608,7 @@ def _timezone_of(registry_id: str, ctx: PlanContext) -> str | None:
 
 
 def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: PlanContext, inst_registry_id,
-                 programme_ids, seen_keys) -> tuple[str | None, str]:
+                 programme_ids, seen_keys, parent_of) -> tuple[str | None, str]:
     fmt = ctx.fmt
     entity = _text(r.get("entity_id")) or ""
     if not entity:
@@ -652,9 +688,11 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
                    "value": fact_value, "quote": quote or "", "url": url, "term": term, "calendar": calendar_class,
                    "year": year, "read_method": rm, "language": lang, "checked_at": checked, "high_stakes": high,
                    "source_type": _text(r.get("source_type"))}
-    region = ctx.region_lookup(ref) if scope == "registry" else None
+    # the entity whose region and lists judge the source: the fact's own, or the institution its programme hangs on
+    owner = ref if scope == "registry" else parent_of(ref)
+    region = ctx.region_lookup(owner) if owner else None
     res.payload["region"] = region
-    _cap(res, url, region, quote, ctx, rm)
+    _cap(res, url, region, quote, ctx, rm, ctx.lists_lookup(owner) if owner else ())
     seen_keys.add(key)  # registered only once the row has passed every check
     return None, ""
 

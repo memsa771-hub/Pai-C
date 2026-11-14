@@ -1,8 +1,8 @@
 """Validate, import and undo a returned research spreadsheet (P2 spec §4.6; master R-68). No SQL by hand.
 
     python -m scripts.os_import_batch template OUT.xlsx
-    python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--report OUT.csv] [--aliases A.yaml]
-                                               [--institutions-from OTHER.xlsx]...
+    python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--allow-list DIR] [--report OUT.csv]
+                                               [--aliases A.yaml] [--institutions-from OTHER.xlsx]...
     python -m scripts.os_import_batch import FILE --country PK --owner-accepted <decision ref> --actor NAME [--refetch]
     python -m scripts.os_import_batch import FILE --country PK --reviewers --batch-ref REF --actor NAME [--refetch]
     python -m scripts.os_import_batch undo IMPORT_ID --actor NAME
@@ -19,6 +19,11 @@ lists every row beside the file. `--aliases FILE` (may repeat) gives alias files
 accepted alias makes an id of the file name an entity loaded under another id; the file itself stays unchanged. An
 alias counts only when both its checkers attested the alias file's ref (`aliases-<sha256 of the alias file>`) in the
 review queue; `validate --assume-aliases-attested` shows the plan as if they had.
+The allow-list family of a row is the `family` of every official list its entity is on (`--lists` files for a dry run,
+the registry for an import); `--family` is used only when none of them has one (P2-T19). `validate --allow-list DIR`
+judges every source against the allow-list files in DIR as the import judges it against the same entries; without it the
+dry run does not check the allow-list and says so. The files carry no database state: a domain marked suspect in the
+database is refused by the import but not by the dry run.
 Exit code 2 when refused.
 """
 
@@ -31,6 +36,7 @@ from app.os.knowledge.sheets.importer import (
     AlreadyImported,
     ImportDeps,
     build_context,
+    official_by_host,
     plan_file,
     plan_hook,
     run_import,
@@ -43,20 +49,25 @@ from app.os.knowledge.sheets.reader import SheetError
 from app.os.knowledge.sheets.template import write_template
 
 
-def _lists(directory: Path | None, country: str) -> tuple[dict[str, tuple[str, ...]], dict[str, str | None]]:
-    """({list URL: the ids of every list at it}, {list id: region}) of the official-list files in `directory`."""
+def _lists(directory: Path | None, country: str) -> tuple[dict[str, tuple[str, ...]], dict[str, str | None],
+                                                          dict[str, str]]:
+    """({list URL: the ids of every list at it}, {list id: region}, {list id: family}) of the official-list files in
+    `directory`."""
     import yaml
 
     from app.os.registry.lists import parse_official_lists
 
     urls: dict[str, tuple[str, ...]] = {}
     regions: dict[str, str | None] = {}
+    fams: dict[str, str] = {}
     for f in sorted(directory.glob("*.yaml")) if directory else []:
         for e in parse_official_lists(yaml.safe_load(f.read_text(encoding="utf-8")), country=country):
             u = norm_url(e.source_url)
             urls[u] = tuple(dict.fromkeys((*urls.get(u, ()), e.entity_id)))
             regions[e.entity_id] = e.region
-    return urls, regions
+            if e.attrs.get("family"):
+                fams[e.entity_id] = str(e.attrs["family"])
+    return urls, regions, fams
 
 
 def _print_counts(counts: dict, out) -> None:
@@ -72,12 +83,15 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
         p = sub.add_parser(name)
         p.add_argument("file")
         p.add_argument("--country", required=True, help="the key of regions.yaml, e.g. the ISO code of the country")
-        p.add_argument("--family", default="", help="the batch's family (allow-list scope)")
+        p.add_argument("--family", default="",
+                       help="the allow-list family of a row whose entity is on no official list with a family")
         p.add_argument("--batch-ref", default=None)
         p.add_argument("--report", default=None)
         p.add_argument("--aliases", action="append", default=[], metavar="FILE",
                        help="an alias file for this file (YAML; may repeat)")
     sub.choices["validate"].add_argument("--lists", default=None)
+    sub.choices["validate"].add_argument("--allow-list", default=None, metavar="DIR",
+                                         help="judge sources against the allow-list YAML files in DIR (no database)")
     sub.choices["validate"].add_argument("--decision-ref", default=None,
                                          help="the owner's decision reference: shows the plan with the spec §11.3 waiver")
     sub.choices["validate"].add_argument("--no-list-needed", action="store_true",
@@ -103,13 +117,30 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             out(f"wrote {write_template(Path(args.out))}")
             return 0
         if args.cmd == "validate":
-            urls, regions = _lists(Path(args.lists) if args.lists else None, args.country)
+            urls, regions, fams = _lists(Path(args.lists) if args.lists else None, args.country)
+            official, notes = None, []
+            if args.allow_list:
+                from app.os.knowledge.sources.allowlist import file_lookup, load_allowlist
+
+                allow = load_allowlist(Path(args.allow_list))
+                official = official_by_host(file_lookup(allow))
+                notes.append(f"allow-list: checked against {len(allow.entries)} entries of {args.allow_list}, from "
+                             "the files only: a domain marked suspect in the database is refused by the import but "
+                             "not here")
+                if not fams:
+                    notes.append("allow-list: no list families (give --lists): every row is judged with --family "
+                                 f"'{args.family}'")
+            else:
+                notes.append("allow-list: NOT checked (give --allow-list DIR); the import caps a row whose source is "
+                             "not on the allow-list at unconfirmed (source_not_on_allow_list)")
 
             def context():
-                return build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
-                                     family=args.family, decision_ref=args.decision_ref, list_urls=urls,
-                                     list_regions=regions,
-                                     require_list=not args.no_list_needed)
+                c = build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
+                                  family=args.family, decision_ref=args.decision_ref, list_urls=urls,
+                                  list_regions=regions, list_families=fams,
+                                  require_list=not args.no_list_needed)
+                c.official = official
+                return c
 
             ctx = context()
             for other in args.institutions_from:
@@ -123,6 +154,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             _, results = plan_file(Path(args.file), ctx)
             if args.report:
                 write_report(results, Path(args.report))
+            for note in notes:  # after the plan: a refused file still starts its output with "refused:"
+                out(note)
             _print_counts(summarise(results), out)
             return 0
         if deps is None:
