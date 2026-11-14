@@ -206,3 +206,73 @@ alias file changes its sha256 and so its attest ref.
     2026-11-14 (R-71). It stays out until a person confirms it is clean.
   - Never listable: educationinkarachi.net, unioncouncil.com.pk, drive.google.com, en.wikipedia.org, facebook.com,
     instagram.com.
+
+## Making a list workbook from two extractions (P2-T29, 2026-11-15)
+
+A list batch (all the rows of one official list) is built with `backend/scripts/os_list_sheet.py`, not typed by hand.
+
+- **The two-extraction rule.** Every row comes from two independent extractions of the same downloaded document: E1
+  and E2, made with two different methods (for example two different parsers). A row is written only when both
+  extractions have it and agree on it. Nothing is parsed from the web by the tool and nothing is invented: it only
+  combines the two CSVs and the list's own data.
+- **What the tool enforces, and what it does not.** It refuses:
+  - one file given twice;
+  - two files with the same sha256 (a copy is not a second extraction), unless `--identical-extractions REASON` is
+    given, and the reason is recorded;
+  - the same method label twice (`--e1-method`, `--e2-method`, both recorded).
+
+  It cannot see who made a file. That the two extractions were run by two agents that shared no files (W12) is the
+  process rule; the method labels and the sha256s in "Derived from" are what an auditor checks it against.
+- **Inputs.**
+  - `--lists ../docs/research/lists --list <list id> --country PK`: the list's url, region, family, institution_type,
+    row_count and count_confirmed come from the H3 list file.
+  - `--e1 E1.csv --e2 E2.csv`: columns `key`, `name`, `quote`, `doc_sha256` (the sha256 of the document read, 64 hex
+    characters), and optionally `city` and `page`. `--e1-method TEXT --e2-method TEXT`: how each was made.
+  - `--mapping MAP.yaml` (data):
+    - `id_prefix`: inst_id = prefix + key. It is a new, stable id, never a batch 1-5 id.
+    - `type`, which must be the list's `institution_type` and a type of kind institution or campus in format.yaml;
+      or `type_column`, for a per-section type. Its values must be spelled exactly as format.yaml spells them, and
+      the rows per type are recorded.
+    - `region: list` (the list file's region), or `region: column` with `region_column`.
+    - optional `city_column`.
+    - `read_method`: it must map to `fetch` in format.yaml, for example "curl + pdftotext (PDF text layer)".
+    - `retrieved`: the day the document was downloaded, not after a checker date.
+  - `--checker1 REF DATE --checker2 REF DATE`: two different reviewer refs. `--out OUT.xlsx`, and `--force` to
+    overwrite an existing output.
+- **Refused (exit 2), with nothing written:**
+  - the two extractions name different documents (doc_sha256);
+  - either extraction's row count is not the list's row_count. `--allow-count-mismatch` is accepted only when the
+    list's count is not confirmed, and its use is recorded in the "Derived from" sheet;
+  - a read_method that does not map to `fetch`;
+  - a mapping type that is not the list's;
+  - an existing OUT or held file without `--force`.
+
+  With `--force`, old outputs are removed first, so a refused run leaves none behind.
+- **Matching.** Rows are matched by key. Name and quote (and the mapped type, region and city columns) are compared
+  after normalising: casefold, whitespace collapsed, quotes and dashes unified. The normalising is for the comparison
+  only: the cells written are E1's verbatim text.
+- **Written rows.**
+  - `source_url` is exactly the list URL, so the import puts the row on the list.
+  - `retrieved` and `read_method` come from the mapping. `claude_status` is `found`.
+  - check 1 is `correct` and check 2 is `yes`, with the two refs and dates.
+  - `checker_note` holds both documents' sha256.
+- **Held rows.** These go to `OUT.held.csv` (next to OUT, with the reason and both readings) and are not written:
+  - a row the two extractions disagree on, including a row read from different documents;
+  - a row in one extraction only;
+  - a key twice in one extraction;
+  - a row with no key;
+  - a row with an empty name or quote.
+
+  A held row is settled with two checks and a new run, never guessed.
+- **Provenance.** The "Derived from" sheet records:
+  - the sha256 of the list file, E1, E2 and the mapping;
+  - the two methods;
+  - the list's type, and with `type_column` the rows per type;
+  - the checkers, any override and the command.
+
+  Formula-like cells are neutralised in the workbook and in the held CSV.
+- **Validate.** `python -m scripts.os_import_batch validate OUT.xlsx --country PK --lists ../docs/research/lists`
+  plans every written row onto the list. The dry run plans in the owner-accepted mode, where reviewer refs are not
+  checks, so the rows show as `unconfirmed`. In a reviewers-mode import, with both refs attested, they are verified.
+- **Types.** `public_college` and `private_college` (the H3 list types of college lists) are institution types in
+  format.yaml.

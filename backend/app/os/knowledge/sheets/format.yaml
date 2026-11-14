@@ -83,7 +83,8 @@ intake_patterns:
 type_kinds:
   institution: [hec_recognised_university_or_dai, private_medical_college, public_medical_college,
                 private_dental_college, public_dental_college, government_college,
-                public_medical_university_or_college, admitting_university, university]
+                public_medical_university_or_college, admitting_university, university, public_college,
+                private_college]
   board: [examination_board, exam_board, ibcc_member_not_student_board, technical_board_out_of_scope,
           foreign_qualification_awarding_body]
   regulator: [professional_regulator, hec_accreditation_council]
