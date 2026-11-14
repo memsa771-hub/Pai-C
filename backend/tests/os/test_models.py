@@ -100,7 +100,8 @@ def test_task_state_check_rejects_unknown_state(engine, clean):
             ))
 
 
-def test_downgrade_then_upgrade_slice2(os_db):
+def test_downgrade_then_upgrade_slice2(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     """os_0003 can be taken back and re-applied; the models still match afterwards."""
     from sqlalchemy import create_engine, inspect
 

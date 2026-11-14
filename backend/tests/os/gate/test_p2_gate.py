@@ -498,6 +498,9 @@ def test_the_allow_lists_are_loaded_whether_or_not_the_source_guard_is_on(engine
 
     settings = load_settings({"DATABASE_URL": "x"})
     assert settings.source_guard is False
+    empty, real = tmp_path / "no-lists", allowlist.load_allowlist
+    empty.mkdir()  # the committed lists/ folder holds reviewed lists now (P2-T20): an empty folder stands in for none
+    monkeypatch.setattr(allowlist, "load_allowlist", lambda *a, **k: real(empty))
     assert load_allow_lists(settings, engine) == 0  # no list files: nothing to load, and no error
     assert SourceDomains(engine, "pai").domains() == []
     monkeypatch.setattr(allowlist, "load_allowlist", lambda *a, **k: _lists(tmp_path, "punjab", "university", "a.test"))

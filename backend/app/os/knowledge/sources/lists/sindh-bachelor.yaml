@@ -1,0 +1,138 @@
+# Reviewed allow-list, region sindh, family bachelor (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: sindh
+family: bachelor
+bodies:
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hec.gov.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Commission (HEC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Higher Education Commission: https://hec.gov.pk/english/pages/home.aspx'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
+      "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - iba-suk.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur IBA University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-SIBA
+  name: Sukkur IBA University
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur IBA University.aspx
+    quote: Visit Website http://www.iba-suk.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Sukkur IBA University.aspx
+    quote: HEC profile "Sukkur IBA University"; Visit Website href "http://www.iba-suk.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - iba.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-IBAK
+  name: Institute of Business Administration (IBA), Karachi
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx
+    quote: Visit Website http://www.iba.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Institute-of-Business-Administration.aspx
+    quote: HEC profile "Institute of Business Administration (IBA)" (Karachi); Visit Website href "http://www.iba.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - lumhs.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/Liaquat-University-of-Medical-and-Health-Sciences.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: SD-MED-03
+  name: Liaquat University of Medical & Health Sciences, Jamshoro
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Liaquat-University-of-Medical-and-Health-Sciences.aspx
+    quote: Visit Website http://www.lumhs.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Liaquat-University-of-Medical-and-Health-Sciences.aspx
+    quote: HEC profile "Liaquat University of Medical & Health Sciences" (Jamshoro); Visit Website href "http://www.lumhs.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - muet.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-MUET
+  name: Mehran University of Engineering & Technology, Jamshoro
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx
+    quote: Visit Website http://www.muet.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Mehran-University-of-Engineering--Technology.aspx
+    quote: HEC profile "Mehran University of Engineering & Technology"; Visit Website href "http://www.muet.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - neduet.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/NED-University-of-Engineering--Technology.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: SD-ADM-003
+  name: NED University of Engineering & Technology
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/NED-University-of-Engineering--Technology.aspx
+    quote: Visit Website http://www.neduet.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/NED-University-of-Engineering--Technology.aspx
+    quote: HEC profile "NED University of Engineering & Technology" (Karachi); Visit Website href "http://www.neduet.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - smbbmu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/Shaheed-Mohtarma-Benazir-Bhutto-Medical-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: SD-ADM-001
+  name: Shaheed Mohtarma Benazir Bhutto Medical University (SMBBMU), Larkana
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Shaheed-Mohtarma-Benazir-Bhutto-Medical-University.aspx
+    quote: Visit Website http://www.smbbmu.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/Shaheed-Mohtarma-Benazir-Bhutto-Medical-University.aspx
+    quote: HEC profile "Shaheed Mohtarma Benazir Bhutto Medical University" (Larkana); Visit Website href "http://www.smbbmu.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - uok.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-KU
+  name: University of Karachi
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx
+    quote: Visit Website http://www.uok.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Sindh/University-of-Karachi.aspx
+    quote: HEC profile "University of Karachi"; Visit Website href "http://www.uok.edu.pk"
+    retrieved: '2026-11-14'

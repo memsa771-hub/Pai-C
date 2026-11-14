@@ -72,6 +72,37 @@ def test_sync_lookup_and_subdomains(engine, clean):
     assert host_matches("a.b.test", "b.test") and not host_matches("ab.test", "b.test")
 
 
+def test_a_sync_racing_another_sync_does_not_fail(engine, clean):
+    """Workers that start together each sync the lists (P2-T20): a row another sync inserted at the same moment is a
+    row to update, not a unique-key error that stops the worker."""
+    import threading
+
+    allow = load_allowlist(FIX)
+    e = next(x for x in allow.entries if x.domain == "alpha-university.test")
+    other = engine.connect()
+    tx = other.begin()  # a second worker's sync: it has inserted the row and not committed yet
+    other.execute(models.source_domains.insert().values(
+        tenant_id="pai", domain=e.domain, region=e.region, family=e.family, route_key=e.route_key, tier=e.tier,
+        list_ref=e.list_ref, reviewed_by=e.reviewed_by, state="active"))
+    out: dict = {}
+
+    def run():
+        try:
+            out["result"] = SourceDomains(engine, "pai").sync(allow)
+        except Exception as exc:  # noqa: BLE001 - the test reports it
+            out["error"] = exc
+
+    t = threading.Thread(target=run)
+    t.start()
+    t.join(2)  # our insert now waits on the other worker's row
+    tx.commit()
+    other.close()
+    t.join(30)
+    assert "error" not in out, out.get("error")
+    assert out["result"].added == len(allow.entries) - 1
+    assert sorted(SourceDomains(engine, "pai").domains()) == sorted({x.domain for x in allow.entries})
+
+
 def test_suspect_survives_resync_and_needs_two_approvers(engine, clean):
     store = SourceDomains(engine, "pai")
     store.sync(load_allowlist(FIX))

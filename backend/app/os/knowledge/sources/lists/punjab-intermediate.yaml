@@ -1,0 +1,75 @@
+# Reviewed allow-list, region punjab, family intermediate (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: punjab
+family: intermediate
+bodies:
+- body_ref: ''
+  tier: board
+  domains:
+  - biselahore.com
+  list_ref: https://hed.punjab.gov.pk/boards
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PK-BRD-005
+  name: BISE Lahore
+  evidence:
+    url: https://hed.punjab.gov.pk/boards
+    quote: 'Lahore: http://www.biselahore.com'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://hed.punjab.gov.pk/boards
+    quote: 'hed.punjab.gov.pk/boards (HED Punjab): "[Lahore](http://www.biselahore.com)"; also ibcc.edu.pk/ibcc-forum-members:
+      "BISE Lahore: https://www.biselahore.com/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - cis.punjab.gov.pk
+  list_ref: https://hed.punjab.gov.pk/colleges
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: HED Punjab list of colleges (cis.punjab.gov.pk)
+  evidence:
+    url: https://hed.punjab.gov.pk/colleges
+    quote: List of Colleges https://cis.punjab.gov.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://hed.punjab.gov.pk/colleges
+    quote: 'hed.punjab.gov.pk/colleges: "Please click bellow link to view Public Colleges." link "List of Colleges" href "https://cis.punjab.gov.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hed.punjab.gov.pk
+  list_ref: https://www.punjab.gov.pk/administrative-departments
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Department, Government of the Punjab
+  evidence:
+    url: https://www.punjab.gov.pk/administrative-departments
+    quote: Higher Education Department ... https://hed.punjab.gov.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.punjab.gov.pk/administrative-departments
+    quote: 'punjab.gov.pk "Administrative Departments | Punjab Portal": entry "Higher Education Department", "Old DPI Building,
+      Opposite to Museum, New Anar Kali Road, Shahrah-e-Quaid-e-Azam, Lahore", website href "https://hed.punjab.gov.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - ocas.punjab.gov.pk
+  list_ref: https://hed.punjab.gov.pk/ocas
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PB-ADM-003
+  name: OCAS - Online College Admission System (Punjab public colleges)
+  evidence:
+    url: https://hed.punjab.gov.pk/ocas
+    quote: Online College Admissions System (OCAS) https://ocas.punjab.gov.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://hed.punjab.gov.pk/ocas
+    quote: 'hed.punjab.gov.pk/ocas: link "Online College Admissions System (OCAS)" href "https://ocas.punjab.gov.pk/"'
+    retrieved: '2026-11-14'

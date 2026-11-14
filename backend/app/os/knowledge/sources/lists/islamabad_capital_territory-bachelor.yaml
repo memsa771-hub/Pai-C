@@ -1,0 +1,154 @@
+# Reviewed allow-list, region islamabad_capital_territory, family bachelor (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: islamabad_capital_territory
+family: bachelor
+bodies:
+- body_ref: ''
+  tier: institution
+  domains:
+  - au.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-AIR
+  name: Air University
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx
+    quote: Visit Website http://www.au.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Air-University.aspx
+    quote: HEC profile "Air University, Islamabad"; Visit Website href "http://www.au.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - bahria.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-BAHRIA
+  name: Bahria University
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx
+    quote: Visit Website http://www.bahria.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Bahria-University.aspx
+    quote: HEC profile "Bahria University"; Visit Website href "http://www.bahria.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - comsats.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-CUI
+  name: COMSATS University Islamabad (CUI)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx
+    quote: Visit Website https://www.comsats.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/COMSATS.aspx
+    quote: HEC profile "COMSATS University, Islamabad"; Visit Website href "https://www.comsats.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hec.gov.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Commission (HEC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Higher Education Commission: https://hec.gov.pk/english/pages/home.aspx'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
+      "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - nu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-FAST
+  name: FAST National University of Computer & Emerging Sciences (FAST-NUCES)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx
+    quote: Visit Website http://www.nu.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Computer-and-Emerging-Sciences.aspx
+    quote: HEC profile "National University of Computer & Emerging Sciences"; Visit Website href "http://www.nu.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - numl.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-NUML
+  name: National University of Modern Languages (NUML)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx
+    quote: Visit Website http://www.numl.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/National-University-of-Modern-Languages.aspx
+    quote: HEC profile "National University of Modern Languages"; Visit Website href "http://www.numl.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - pieas.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-PIEAS
+  name: Pakistan Institute of Engineering and Applied Sciences (PIEAS)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx
+    quote: Visit Website http://www.pieas.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Pakistan-Institute-of-Engineering-And-Applied-Sciences.aspx
+    quote: HEC profile "Pakistan Institute of Engineering & Applied Sciences"; Visit Website href "http://www.pieas.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - qau.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-QAU
+  name: Quaid-i-Azam University, Islamabad
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx
+    quote: Visit Website https://www.qau.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Quaid-i-Azam-University.aspx
+    quote: HEC profile "Quaid-i-Azam University"; Visit Website href "https://www.qau.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - szabmu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: IC-ADM-001
+  name: Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+    quote: Visit Website http://www.szabmu.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+    quote: HEC profile "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU)"; Visit Website href "http://www.szabmu.edu.pk/"
+    retrieved: '2026-11-14'

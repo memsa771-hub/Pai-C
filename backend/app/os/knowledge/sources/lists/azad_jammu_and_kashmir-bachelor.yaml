@@ -1,0 +1,26 @@
+# Reviewed allow-list, region azad_jammu_and_kashmir, family bachelor (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: azad_jammu_and_kashmir
+family: bachelor
+bodies:
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hec.gov.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Commission (HEC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Higher Education Commission: https://hec.gov.pk/english/pages/home.aspx'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
+      "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
+    retrieved: '2026-11-14'

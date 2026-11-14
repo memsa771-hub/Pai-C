@@ -1,0 +1,172 @@
+# Reviewed allow-list, region punjab, family bachelor (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: punjab
+family: bachelor
+bodies:
+- body_ref: ''
+  tier: institution
+  domains:
+  - gcu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-GCU
+  name: Government College University, Lahore
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx
+    quote: Visit Website http://www.gcu.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Government-College-University,-Lahore.aspx
+    quote: HEC profile "Government College University, Lahore"; Visit Website href "http://www.gcu.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hec.gov.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Commission (HEC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Higher Education Commission: https://hec.gov.pk/english/pages/home.aspx'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
+      "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hed.punjab.gov.pk
+  list_ref: https://www.punjab.gov.pk/administrative-departments
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Department, Government of the Punjab
+  evidence:
+    url: https://www.punjab.gov.pk/administrative-departments
+    quote: Higher Education Department ... https://hed.punjab.gov.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.punjab.gov.pk/administrative-departments
+    quote: 'punjab.gov.pk "Administrative Departments | Punjab Portal": entry "Higher Education Department", "Old DPI Building,
+      Opposite to Museum, New Anar Kali Road, Shahrah-e-Quaid-e-Azam, Lahore", website href "https://hed.punjab.gov.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - lums.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-LUMS
+  name: Lahore University of Management Sciences (LUMS)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx
+    quote: Visit Website http://www.lums.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/Lahore-University-of-Management-Sciences.aspx
+    quote: HEC profile "Lahore University of Management Sciences"; Visit Website href "http://www.lums.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - pmdc.pk
+  list_ref: https://www.nhsrc.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PK-REG-003
+  name: Pakistan Medical & Dental Council (PMDC)
+  evidence:
+    url: https://www.nhsrc.gov.pk/
+    quote: 'Quick Links: [Pakistan Medical and Dental Council](https://pmdc.pk/)'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.nhsrc.gov.pk/
+    quote: 'nhsrc.gov.pk (header "MINISTRY OF NATIONAL HEALTH SERVICES REGULATIONS AND COORDINATION", "Government of Pakistan"):
+      Quick Links "[Pakistan Medical and Dental Council](https://pmdc.pk/)"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - pu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-PU
+  name: University of the Punjab
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx
+    quote: Visit Website http://www.pu.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-the-Punjab.aspx
+    quote: HEC profile "University of the Punjab"; Visit Website href "http://www.pu.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - szabmu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: IC-ADM-001
+  name: Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+    quote: Visit Website http://www.szabmu.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Islamabad/Shaheed-Zulfiqar-Ali-Bhutto-Medical-University.aspx
+    quote: HEC profile "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU)"; Visit Website href "http://www.szabmu.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - uaf.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-UAF
+  name: University of Agriculture, Faisalabad
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx
+    quote: Visit Website http://www.uaf.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Agriculture.aspx
+    quote: HEC profile "University of Agriculture" (Faisalabad); Visit Website href "http://www.uaf.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - uet.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Engineering-and-Technology.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PB-ADM-002
+  name: University of Engineering & Technology, Lahore (UET; ECAT)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Engineering-and-Technology.aspx
+    quote: Visit Website http://www.uet.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Engineering-and-Technology.aspx
+    quote: HEC profile "University of Engineering & Technology" (Lahore); Visit Website href "http://www.uet.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - uhs.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Health-Sciences.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PB-ADM-001
+  name: University of Health Sciences (UHS), Lahore
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Health-Sciences.aspx
+    quote: Visit Website http://www.uhs.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Punjab/University-of-Health-Sciences.aspx
+    quote: HEC profile "University of Health Sciences" (Lahore); Visit Website href "http://www.uhs.edu.pk/"
+    retrieved: '2026-11-14'

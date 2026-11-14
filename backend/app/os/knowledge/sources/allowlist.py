@@ -216,15 +216,19 @@ class SourceDomains:
                 where = (D.c.tenant_id == self.tenant_id, D.c.domain == e.domain, D.c.region == e.region,
                          D.c.family == e.family, D.c.route_key == e.route_key)
                 fields = {"body_ref": e.body_ref, "tier": e.tier, "list_ref": e.list_ref, "reviewed_by": e.reviewed_by}
+                inserted = False
                 if conn.execute(select(D.c.id).where(*where)).first() is None:
                     bad = conn.execute(select(D.c.state_reason).where(
                         D.c.tenant_id == self.tenant_id, D.c.domain == e.domain, D.c.state == "suspect")).first()
-                    conn.execute(insert(D).values(
+                    # workers that start together each sync: a row another sync inserted meanwhile is updated below
+                    inserted = conn.execute(insert(D).values(
                         tenant_id=self.tenant_id, domain=e.domain, region=e.region, family=e.family,
                         route_key=e.route_key, **fields, state="suspect" if bad else "active",
-                        state_reason=bad.state_reason if bad else None, state_since=now))
-                    added += 1
-                else:
+                        state_reason=bad.state_reason if bad else None, state_since=now)
+                        .on_conflict_do_nothing(constraint="uq_os_source_domains_entry")
+                        .returning(D.c.id)).first() is not None
+                    added += inserted
+                if not inserted:
                     differs = or_(*(D.c[k].is_distinct_from(v) for k, v in fields.items()))
                     r = conn.execute(update(D).where(*where, differs).values(**fields, updated_at=func.now()))
                     updated += r.rowcount

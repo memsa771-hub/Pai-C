@@ -15,7 +15,8 @@ def new_doc(store, student="stu-1", data=PNG, doc_type="passport"):
     return store.create(student, doc_type, 1, "scan.png", "image/png", data)
 
 
-def test_migration_up_down_up(os_db):
+def test_migration_up_down_up(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     from tests.os.conftest import run_alembic
 
     run_alembic(["downgrade", "os_0003"], os_db)

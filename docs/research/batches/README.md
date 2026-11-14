@@ -142,3 +142,24 @@ alias file changes its sha256 and so its attest ref.
   The files carry no database state: a domain marked suspect in the database (monitoring, a person) is refused by
   the import but not by the dry run, and the output says so. Without `--allow-list` the output says that the
   allow-list was not checked.
+
+## Allow-lists in the repo (P2-T20, 2026-11-14)
+
+- **Where they are.** `backend/app/os/knowledge/sources/lists/<region>-<family>.yaml`: 16 files (7 regions and
+  `national`, each `bachelor` and `intermediate`), 56 entries. The worker loads them into `os_source_domains` at start.
+- **Where they came from.** The W13 allow-list review of 2026-11-14. Check 1 (`claude-allowlist-check-1`) drafted one
+  entry per proven host, each with the official page that names the domain (HEC recognised-university profile pages,
+  the federal and provincial government and department pages, the IBCC forum-members page). Check 2
+  (`claude-allowlist-check-2`) fetched every proof page again on its own and approved 56 of the 57 entries. Owner
+  ruling 2026-11-14: for allow-list files, both AI checks are enough review. Each entry's `reviewed_by` names both
+  checks; `evidence` is check 1's link text and href, `check2_evidence` is check 2's. Check 2 changed no domain, tier
+  or `list_ref`. `body_ref` is `''` until the bodies are in the registry.
+- **Left out.**
+  - `hed.ajk.gov.pk` (AJK, intermediate): check 2 marked it unclear. Its only proof page, ajk.gov.pk, carried
+    injected spam on 2026-11-14. Owner question open.
+  - The hosts check 1 could not prove: admission.hed.gkp.pk, etea.edu.pk, jac.ajk.gov.pk, www.imcgf72.edu.pk and
+    gcwg.punjab.gov.pk (no independent official page names them; check 2's retry found none either).
+  - ajkbise.net: named by the IBCC forum-members page, but its homepage still carried injected gambling links on
+    2026-11-14 (R-71). It stays out until a person confirms it is clean.
+  - Never listable: educationinkarachi.net, unioncouncil.com.pk, drive.google.com, en.wikipedia.org, facebook.com,
+    instagram.com.
