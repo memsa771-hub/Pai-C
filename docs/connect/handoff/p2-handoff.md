@@ -25,6 +25,23 @@ Phase spec: `docs/superpowers/specs/2026-11-07-p2-national-data-design.md` (with
 
 Integration: `pc/p2-integration` merges T1 to T11 on one migration chain `os_0025` to `os_0032` (`os_0033` is T12's). Each task branch keeps its own migration number; the chain was renumbered on the integration branch and again when the tasks reach `pai-connect`.
 
+**Local completion run, 2026-11-13 and 2026-11-14 (LOCAL, not on GitHub).** T13 to T22 were built on the owner's PC. Each code task (T13, T14, T16, T18 to T22) and the data task T17 were built by an implementer and checked by an independent reviewer. T15 was checked by a controller script (its entries against both checks), and its squash was then covered by the independent merge review of T13 to T15 (`briefs/MERGE-T13-15-review.md`). **T13 to T22 are squash-merged into the local branch `pai-connect`** (from `1614f24`, the GitHub head after #222; T21 at `37e061d0`, T22 at `bde1c4c5`). Its hashes below are branch commits and will change when it is squashed; the controller puts in the final hash at merge time. Nothing is pushed; these are local commits, not PRs. Source: `.local-ci/LEDGER.md` and the briefs, reports and reviews in `.local-ci/work/briefs/` (local, not in the repo). The R-IDs are those the task briefs name (R-58, the no-country-names rule, is named by every code brief and is left out below).
+
+| Task | Result | R-IDs | Where (local commit) |
+|---|---|---|---|
+| T13 | **Import aliases**: an alias file (YAML, bound to the returned file's sha256) maps an id used inside one returned file to an Institutions-sheet entity that is planned in the same file or already in the registry, so a returned file stays byte-identical. An alias applies only when check 1 is `correct`, check 2 is `yes` and both checkers have attested the alias file's ref `aliases-<sha256 of the alias file>` in the review queue, whatever the batch's row mode; any edit needs new attestations. A Facts alias never resolves to a programme. Report reasons: `alias_applied` and `alias_not_accepted` (the `Aliases` sheet), `aliased` (the aliased Institutions row is skipped), `alias_target_not_loaded` (`docs/research/batches/README.md`, "Alias files") | R-67, R-68, R-76 | `8a764588`; `os_0034` |
+| T14 | **A T6-format sheet from re-entered values**: a generic command builds a new workbook from a base sheet, a values CSV and check CSVs, with a YAML mapping (no file names in code). Built the Sindh v5 seats workbook: 74 rows (10 check-2 `unclear` rows held, 37 rows without a value not written; `briefs/T14-rereview.md`; the first implementer commit had 121) | R-67, R-68, R-76 | `771bd295`; no migration |
+| T15 | Data: five official-list entries (UHS x2 Punjab, SMBBMU Sindh, BMC Balochistan, SZABMU ICT), the FDE HSSC list (ICT), alias files for batch 5 (19) and batch 4 (2), the v6 Sindh seat re-entry, check records in `docs/research/lists/checks/` | data task (no brief file) | `19e0f559` |
+| T16 | **List union**: an institution on several official lists keeps every list on import; undo restores the entity that was there before. A row whose own regional list does not match its region is a plan rejection (`region_conflicts_with_list`), and a registry refusal is a rejected row (`registry_refused`), not a failed import. A URL shared by several list entries (HEC `recognised.aspx`) puts the row on the national list(s) and the regional list matching its region. `validate --lists` reads list regions | R-32, R-35 (a), R-60, R-68, R-69 (undo), R-76 | `668d1bf8`; no migration |
+| T17 | Data: the Sindh v6 seats workbook (34 rows, both checks agree). **Reviewer refs**: checker names in alias files and seats workbooks are reviewer refs (`claude-local-check-1/2`, `claude-research-seats-check-1/2`, `claude-research-v6-seats-check-1/2`), since reviewers mode matches names against refs (`[a-z0-9_.-]{2,64}`) | data task (no brief file) | `b4ac61ec` |
+| T18 | **The parent kind**: a programme under a non-institution is a rejected row (`parent_not_institution`) in the plan, and the importer turns a programme `RegistryError` into a rejected row (`registry_refused`). Batch 4 now imports; P4-034..036 are rejected | none besides R-58 | `84972b73`; no migration |
+| T19 | **Per-row family**: a row's allow-list family is the `family` of every official list its entity is on (files for a dry run, the registry for an import; aliases resolved; programme facts take the institution's region), else `--family`; the scope that accepted it is kept in `provenance.allow_list_scope`. **`validate --allow-list DIR`**: the dry run judges sources against the allow-list files as the import does. **Re-fetch scope**: `--refetch` uses the row's accepting scope, else its list families, else `--family`, and fetches only for families the host is listed for (none: `refetch_blocked:not_official` without a gateway call) | none besides R-58 | `68010d0b`; no migration |
+| T20 | **The allow-lists**: 16 files in `backend/app/os/knowledge/sources/lists/`, 56 entries, from W13 check 1 drafts and check 2 `yes` only (`hed.ajk.gov.pk` out), `reviewed_by` both check refs. **Sync race fix**: `SourceDomains.sync` skips a row another worker's sync has just inserted (it raised `UniqueViolation` when several workers start). Downgrade tests take the `clean` fixture | R-71 | `321cc3fd`; no migration |
+| T21 | **The body family**: a body of a kind in `SERVES_A_REGION` (`regulator`, `board`, `admission_body`, `admission_system`, `entry_test`; `backend/app/os/registry/model.py`) on no list with a family is judged against every family of the loaded official lists, `--family` first (`family_choice`, basis `body_any`; `provenance.family_basis`). Data: `admission.hed.gkp.pk` (KP intermediate) and `etea.edu.pk` (KP bachelor), from checks 1b and 2b. **Allow-list total: 58 entries** (W13 checks 1, 2, 1b and 2b; the bare `hed.gkp.pk` entries were removed in the fix round) | R-71 | `37e061d0`; no migration |
+| T22 | **Page cache scope (FU-9)**: with the source guard on, the allow-list is checked for the asked scope before any cache lookup, a `not_official` refusal is no longer stored in `os_pages`, and a cached redirect to an unlisted target is refused. No-guard path unchanged. Spec notes in the Slice 2 spec §6 and the P2 spec §4.2 | R-71 | branch commits `2d92c4fa`, `8d732d6d` (squash-merged as `bde1c4c5`); no migration |
+
+**Migration added after T12: `os_0034_import_aliases`** (T13; `backend/alembic/versions_os/os_0034_import_aliases.py`, down `os_0033`). It adds `os.os_imports.aliases` (JSONB, default `[]`): the alias files an import used, with their sha256. Its downgrade is refused while any import has logged an alias file (no silent loss). There is no `os_0035`; the OS head is `os_0034`. This closes the remainder of T13 review item 6 (ledger ruling: "T13 #6 remainder ... is done in W11").
+
 T12 in detail:
 
 | Part | Result | Where |
@@ -40,12 +57,12 @@ T12 in detail:
 
 | # | Gate item | Status |
 |---|---|---|
-| 1 | Every task merged into `pai-connect` with all CI jobs green | **Yes.** All twelve tasks are in `pai-connect` with every CI job green: #203 to #207, #210, #211, and #221, which landed the approved stacked PRs #212, #213, #215, #216, #217, #219 and #220 (they had been squash-merged into the task branch beneath them). Spec rulings #214, research batches #218. Migrations `os_0025` to `os_0033`, one head |
+| 1 | Every task merged into `pai-connect` with all CI jobs green | **Yes.** All twelve tasks are in `pai-connect` with every CI job green: #203 to #207, #210, #211, and #221, which landed the approved stacked PRs #212, #213, #215, #216, #217, #219 and #220 (they had been squash-merged into the task branch beneath them). Spec rulings #214, research batches #218. Migrations `os_0025` to `os_0033`, one head. (On GitHub. T13 to T22 are local only; see "Local evidence" below) |
 | 2 | `check_traceability.py --gate P2` passes | **Exit 0.** Every P2 R-ID has a tagged test. **R-48 is `built: true`** since freeze exception 1 (#219, `CONNECT_MERIT_ANSWERS`) landed in #221; the Counsellor lead was asked to confirm in #219 whether admission answers from ProgrammeFacts also count, else it goes back to `false`. R-15 (a P1 requirement) is still unbuilt (§4) |
 | 3 | Walkthroughs for every region and family checked by checker 1 and approved by checker 2 | **Not proved by code.** The H2 walkthroughs and H3 lists are drafted on `pc/p2-research-batches`; the sign-off rows are the owner's to confirm. By ruling §11.2 two independent AI checks count as the two checks |
 | 4 | Spam page: refused, domain `suspect`, facts unconfirmed, review item open | **Yes.** `tests/os/gate/test_p2_gate.py::test_gate_4_spam_page_is_refused_the_domain_suspect_facts_unconfirmed_item_open` (with the real queue); also T3's `test_spam_fixture_is_refused_and_its_domain_becomes_suspect` |
 | 5 | A `not_readable` source collected with evidence, approved by a second person | **Mechanism proved** (`test_gate_5_...`: not-readable row, collect item, evidence file, collected value, comparing check, approval, verified; audit). **The real one (H7) is a people step still to do** |
-| 6 | Registry built from official lists: 100% of each named list | **Reading built, figure not measured here.** The coverage dashboard (T9) and the launch-gate reading (a) to (d) are tested; the real percentage needs the registry batches imported (H4) |
+| 6 | Registry built from official lists: 100% of each named list | **Reading built, figure not measured here.** The coverage dashboard (T9) and the launch-gate reading (a) to (d) are tested; the real percentage needs the registry batches imported (H4). **Measured locally on 2026-11-14: 686 / 2435 = 28.2%, NOT met** (see "Local evidence" below) |
 | 7 | Spike 1 rerun on a sample from every region: 100% on verified, at least 95% on confirmed | **Harness built and tested; live run not done.** The harness is strict: every key entry must be held at `confirmed` or above, the sample is 5 distinct institutions, NaN and infinity match nothing. **No answer key exists yet (H6)**: the dry run of batches 1 to 5 (#218, `docs/research/batches/VALIDATION-2026-11-12.md`) accepts only admission-body and system facts (1 to 4 per region), no institution facts, so no region can reach 5 institutions. `os_spike1_rerun regions` lists 0 of 9 regions with a key and `plan` refuses, so there is no cost estimate yet. The billed run is the controller's, inside the US$20 cap (ruling Q5) |
 | 8 | Monitoring and a student report proven on a scripted page change (rows 6.23, 6.24) | **Yes.** T7's `test_a_page_change_in_season_resets_the_fact_pauses_the_step_and_queues_the_item` and `test_a_report_shows_not_confirmed_to_everyone_but_only_the_reporters_steps_wait`, with the owner-ruled scope (§3) |
 | 9 | A scripted rollover (rows 6.10, R-61 to R-63) | **Yes.** T8's `test_rollover_proof_2026_to_2027`; the next-intake plan proof |
@@ -55,6 +72,31 @@ T12 in detail:
 | 13 | This handoff written; the owner signs off | Written (draft). **Awaiting the owner's sign-off** |
 
 Test counts on the T12 branch: `tests/os` 2955 (2 skipped, 1 xfailed) passed; the legacy suite 2560 passed, 13 skipped; vitest 602 passed; `next build --webpack` ok; `tach check`, `check_freeze.py`, `check_traceability.py --gate P2` ok; one OS Alembic head (`os_0033`).
+
+### Local evidence, 2026-11-14 (LOCAL, not GitHub CI)
+
+Everything in this subsection was run on the owner's PC. The W4 import ran on the local branch `pai-connect` at `37e061d0` (T13 to T21) with a fresh local database; the test counts come from the commits named with each count. It is **not** GitHub CI and does not change the table above. It changes no gate to "met".
+
+**W4 local import** (all 7 imports exit 0; Batch 4 now imports). Sources: the ledger entry "W4 re-run 2026-11-14 on 37e061d0" and the report CSVs `.local-ci/work/W4/out/i-*.csv` (counts below recounted from the CSVs).
+
+| Batch | `verified` (both checks) | Still `unconfirmed`, by reason |
+|---|---|---|
+| B1 (national) | 361 | conflict 1 |
+| B2 (Punjab) | 186 | `no_quote` 116, conflict 3, `check_unclear_or_missing` 3 |
+| B3 (Sindh) | 111 | `check_unclear_or_missing` 2, conflict 1 |
+| B4 (KP, Bal, ICT, AJK, GB) | 94 | `source_not_on_allow_list` 10 (`www.imcgf72.edu.pk`), conflict 2, `check_unclear_or_missing` 2 |
+| B5 (universities BS) | 55 | `check_unclear_or_missing` 1, `no_quote` 1 |
+| Seats v5 (Sindh) | 0 | `refetch_not_run` 74 |
+| Seats v6 (Sindh) | 0 | `refetch_not_run` 34 |
+| **Total** | **807** | |
+
+Before this run nothing was above `unconfirmed` (no allow-list file existed). The ledger line lists the unconfirmed rows without B1's conflict 1 and B4's conflict 2 and unclear 2; the CSVs of the same run hold them, so the CSV counts are used here. Rows that are queued, rejected or skipped are in the same CSVs (for example B3's 110 `no_value` programmes). **Seats v5 and v6 stay `refetch_not_run`**: their workbooks import in reviewers mode, which needs `--refetch`, a live page fetch through the app; it was not run because an outbound call needs the owner's approval (CLAUDE.md).
+
+**Gate 6 (registry from official lists): NOT met.** List memberships loaded / published, over the lists that have a published count: **686 / 2435 = 28.2%** (ledger; recounted from `.local-ci/work/W4/out/progress.csv`). By region: AJK 8/186, Balochistan 16/16, Gilgit-Baltistan 29/29, ICT 30/112, KP 47/47, national 284/541, Punjab 180/1057, Sindh 92/447. No published count yet: `kp-hed-participating-colleges` (0 loaded), `hec-recognised-campuses` (0 loaded), `seccap-participating-colleges` (60 loaded). The research batches name only the institutions they researched; the gate needs every line of each official list. That needs **registry batches built from the official lists** (W12: one T6 workbook per region, rows = list lines, source = the list URL, two independent extractions as check 1 and 2). The allow-list work does not move this number. These figures replace the earlier gate-6 list numbers, which the shared-URL defect fixed in T16 had distorted (FU-7).
+
+**Test counts (local).** Full `tests/os` at the T21 review, on `ccc90417` (T21 before its fix round `e20aaef9`; the fix round was checked with a targeted set): 3023 passed, 24 skipped, 1 xfailed, 0 failed (`briefs/T21-review.md`). Earlier local full runs: merge trial `668d1bf8` (T13 to T16) os 3001 passed, 24 skipped, 1 xfailed; standalone 51 passed; legacy 3953 passed, 1662 skipped; frontend 602/602 (ledger). T22 was checked on its branch commit `2d92c4fa` with a targeted set (623 passed, 22 skipped; `briefs/T22-review.md`), not a full run. No full local run on `37e061d0` is recorded yet.
+
+LOCAL full CI on <commit>: <to fill>
 
 ## 3. Owner decisions and rulings
 
@@ -71,6 +113,18 @@ Phase decisions P2-D1 to P2-D30 are in the phase spec §2.2 (approved with the s
 | 2026-11-08 (§11.3, refines P2-D22 and R-28) | **A student's report shows the fact as "not confirmed" to everyone at once, but only the reporting students' steps wait.** Other students' steps keep running (on a provisional date) until a reviewer agrees, or until 3 different students report the same fact in the same open round; then every plan waits. A report the reviewer dismisses puts the fact back to the status it had (from the revision log) |
 | Standing | Student sentences are added directly in data files with `approved: true`, under the owner's standing approval ("you dont need to open PRs for such silly student sentences just update it directly"). P2 added twelve, listed in §6 |
 | Research (progress ledger) | Sindh seats: 74 rows accepted by both checks. PMDC: 59 matches accepted; the 045 rule and the 048 city accepted, the 043 disagreement held back |
+| 2026-11-14 (W13, local ledger) | **For the allow-list files, an AI check 1 plus an independent AI check 2 is enough review** ("ai ke review kafi hai"). `reviewed_by` names the two AI check refs. Applied in T20 and T21 |
+| 2026-11-14 (local ledger) | **Delegation:** with the owner away, he delegated the open decisions to the controller: "build the best of it ... do it by yourself". The controller decisions below were made under it. **Each is for the owner to confirm at sign-off.** |
+
+Controller decisions under the delegation of 2026-11-14 (source: the local ledger; **all for the owner to confirm at sign-off**):
+
+| Decision | What and why |
+|---|---|
+| Body family rule | A body row (a regulator, board, admission body, admission system or entry test) on no official list with a family is judged against every family of the loaded official lists, `--family` first; institutions are unchanged; the region is never widened. Built in T21 (`SERVES_A_REGION`, a positive tuple after the T21 review) |
+| `hed.ajk.gov.pk` kept out | Its only proof page (`ajk.gov.pk`) carries live spam (replica watches), seen in checks 1, 2 and 1b; check 2 gave `unclear`. It stays off the allow-list |
+| `hed.gkp.pk` proven, not listed on its own | Checks 1b and 2b proved it (via `kpese.gov.pk`), and it proves `admission.hed.gkp.pk` and `etea.edu.pk`, which are listed. The bare `hed.gkp.pk` entries were removed in the T21 fix round: they rested on one check's family, and listed `admission.hed.gkp.pk` under bachelor through the subdomain |
+| No-region rows and P4-034..036 held | The 40 rows without a usable region (34 foreign-board IBCC rows, 6 with an empty region; the ledger calls them wildcard) and P4-034..036 stay rejected or held. No region, institution id or other data was guessed |
+| Seats re-fetch not run | Seats v5 and v6 stay `refetch_not_run`: the re-fetch is a live outbound page fetch, which needs the owner's approval (CLAUDE.md) |
 
 ## 4. Open gaps and deviations
 
@@ -84,6 +138,29 @@ People and process (not code):
 - **R-48 is `built: true`** with freeze exception 1 (#219). Open question for the Counsellor lead (in #219): the R-48 title also names admission answers from ProgrammeFacts, which no Counsellor reply reads yet; and the merit items are added in code after the model runs, not given to the model as input.
 - **R-15's OS side** (an excluded field disappears from the OS programme list) was moved from P1 to P2 by the P1 handoff (Q4) but is not in the P2 spec's scope; it is still not built (`built: false`, phase P1). The owner decides where it goes.
 - R-46 stays `built: false` as recorded in the P1 handoff.
+
+Data gaps found in the local run of 2026-11-14 (source: the local ledger and `.local-ci/work/W4/out/*.csv`):
+
+- **10 `www.imcgf72.edu.pk` rows** (IC-ADM-002 and B4-F-043..051) stay `unconfirmed`, `source_not_on_allow_list`: the host is not proven (check 1b: the `fde.gov.pk` prospectus link was unreachable).
+- **4 hosts researched again in check 1b and not proven**, so not on the allow-list: `jac.ajk.gov.pk`, `gcwg.punjab.gov.pk`, `www.imcgf72.edu.pk`, `hed.ajk.gov.pk` (its proof page is compromised). This is not the full list of hosts left out (W13 check 1 lists the others).
+- **`ajkbise.net` is kept out on purpose**: `docs/research/lists/ajk.yaml` marks it suspect (gambling spam, 2026-11-07); W13 check 2 found it compromised again (ledger).
+- **PK-TST-005 is `checker2_rejected`**: a data finding, not an allow-list one; the row never reaches the allow-list check.
+- **40 no-region rows** (34 foreign-board IBCC, 6 with an empty region; W13 check 1 summary) are held; no region is guessed.
+- **P4-034..036** (Balochistan divisional-merit MBBS seats in other provinces) are filed under BL-ADM-001, an admission system; they are rejected `parent_not_institution` until research gives a real institution id or another model.
+- **Batch 3's 110 `no_value` programmes** (v4 MBBS/BDS seat rows with the number only in the quote) are rejected; their re-entered values are the v5 (74) and v6 (34) seats workbooks, which wait for the re-fetch.
+
+Follow-ups from the local reviews (FU-1 to FU-10, as the ledger records them):
+
+- **FU-1**: list progress must not count withdrawn rows (gate (a) could go green from undone imports); whether genuinely closed rows count is the owner's decision (W10).
+- **FU-2**: per-list evidence (`source_url` and quote per list) for R-76; the first list's URL and quote are replaced on the row and kept only in revisions. Own task.
+- **FU-3**: an aliased row on another list could add that list to its target; later decision.
+- **FU-4**: merge review F1/F2: a `validate --institutions-from` dry run plans OTHER files without their own alias files; alias files load after the OTHER loop.
+- **FU-5**: a `--institutions-from` dry run checks only the last row's list when OTHER has one entity on two lists (dry run only).
+- **FU-6**: hand-built plan contexts without list regions treat shared-URL lists as national (affects `test_real_batches_dry_run` only).
+- **FU-7**: a database that already holds a pre-T16 HEC import may have universities on a wrong regional list, so a re-import gives `region_conflicts_with_list`; the local W4 run used a fresh database. Whether a production import ever happened is to check.
+- **FU-8**: a theoretical orphan after a late link refusal (T18 review minor).
+- **FU-9**: a cached page served to a scope it is not listed for. **Done in T22.**
+- **FU-10**: cached render sub-request hosts, and `not_readable:render` per URL (both need a schema change; low risk); the T22 review also notes that an integrity check is judged with the first caller's domains.
 
 Code limits and known gaps:
 
@@ -110,6 +187,16 @@ Code limits and known gaps:
 | render / scan settings (`OS_RENDER_*`, scan limits) | Headless rendering and OCR limits (T4) | see `settings.py` |
 | `CONNECT_MERIT_ANSWERS`, `CONNECT_CALENDAR_FROM_KNOWLEDGE` | The Counsellor's merit answers and calendar read, after their freeze exceptions | not built into the Counsellor yet |
 
+Import and dry-run options changed or added in the local run (T16, T19; `backend/scripts/os_import_batch.py`):
+
+| Option | Meaning | Default |
+|---|---|---|
+| `validate --lists DIR` | The dry run reads the official-list files: their regions are used since T16, their families since T19 | none |
+| `validate --allow-list DIR` | The dry run judges every source against the allow-list YAML files in DIR as the import does; it carries no database state, so a domain marked `suspect` in a database is not seen (T19) | not checked; the report says "allow-list: NOT checked" |
+| `--family` | The allow-list family used only for a row that gets no family from its lists (see below) | `''` |
+
+**How the allow-list family of a row is chosen** (`family_choice` in `backend/app/os/knowledge/sheets/plan.py`): (1) the `family` of every official list the row's entity is on (the `--lists` files in a dry run, the registry in an import), basis `lists`; else (2) for a body of a kind in `SERVES_A_REGION`, every family of the loaded official lists, `--family` first, basis `body_any` (T21); else (3) `--family`, basis `run`. The region is never widened. The scope that accepted the source is stored in `provenance.allow_list_scope`, the basis in `provenance.family_basis`.
+
 With every flag off the application behaves as before P2 (tested per task).
 
 ## 6. Student sentences added in P2 (`approved: true`, for the owner to read)
@@ -133,6 +220,9 @@ All twelve are in `backend/app/os/monitor/texts.yaml`:
 
 - Reviewers: `python -m scripts.os_reviewers add|list|disable|enable|rotate` (AI reviewers need `--identity`).
 - Import: the spreadsheet CLI of T6 (`--owner-accepted <decision ref>` for batches 1 to 5 v4); undo by import id.
+  - Alias files: `--aliases FILE.aliases.yaml` (T13); the alias applies only after two reviewers attest `aliases-<sha256>`.
+  - Dry run with the allow-list: `python -m scripts.os_import_batch validate FILE --country PK --lists DIR --allow-list DIR [--report OUT.csv]`. The allow-list files are in `backend/app/os/knowledge/sources/lists/`. The family of each row is chosen as in §5; give `--family` only for rows that get none.
+  - Re-fetch (`--refetch`): model- and OCR-read rows are fetched again through the page gateway, only for the families the host is listed for (T19). It is an outbound call: run it only with the owner's approval.
 - Spike 1: `python -m scripts.os_spike1_rerun regions|plan|score` (no model call). A key is `tests/os/quality/<region>_answer_key.yaml`; the shape is in `app/os/gate/spike1.py`.
 - Gate: `python scripts/check_traceability.py --gate P2`; the proofs: `pytest tests/os/gate`.
 - Consistency: the nightly job runs rules 1 to 12; `scripts/connect_consistency.py run|status` as in P1.
