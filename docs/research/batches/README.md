@@ -135,7 +135,8 @@ alias file changes its sha256 and so its attest ref.
   the row's region and any of those families; the row's provenance records the scope that accepted it
   (`allow_list_scope: {region, family}`). When the entity is on no list with a family (a body, a board, a test, a
   calendar), `--family` is used; with no `--family` the family is `''`, which no region file matches. The detail of a
-  `source_not_on_allow_list` row names the scopes tried.
+  `source_not_on_allow_list` row names the scopes tried. Since P2-T21 a body is judged against every family of the run
+  (next section); an institution keeps this rule.
 - **Dry run with an allow-list.** `validate FILE --country PK --lists ../docs/research/lists --allow-list DIR` loads the
   allow-list YAML files in DIR (`load_allowlist`, no database) and judges every source as the import does against the
   same entries, including the one-body-one-domain rule (R-71) of those files. `--lists` is needed for the families.
@@ -143,10 +144,35 @@ alias file changes its sha256 and so its attest ref.
   the import but not by the dry run, and the output says so. Without `--allow-list` the output says that the
   allow-list was not checked.
 
+## The allow-list family of a body (P2-T21, 2026-11-14)
+
+- **Decision.** A controller decision under the owner's delegation of 2026-11-14, after the T19 and T20 real-data runs
+  left 211 rows `source_not_on_allow_list`, almost all of them rows of bodies or facts on bodies.
+- **The rule.** A body is an entity of one of the kinds that serve a whole region: regulator, board, admission_body,
+  admission_system and entry_test (the registry's `SERVES_A_REGION`, a positive list, so a kind added later is not a
+  body by default). When a body is on no list with a family, its source is judged against every family the
+  run knows from its official lists: the families of the loaded lists (`--lists` for `validate`, the registry lists'
+  `attrs.family` for the import), the `--family` given first, then the others sorted. The source passes when its host
+  is listed for (row region, f) for any of them. This holds for the body's Institutions row, for Facts on the body
+  (planned in the file or stored; the kind comes from the file, else the registry), and for the families a row is
+  re-fetched under (`allow_list_families`). Aliases are resolved first.
+- **Why.** The allow-list entries were researched and checked per region and family for the domains these bodies cite.
+  A body serves the whole region, not one programme family. The family split keeps institutions' programme facts
+  scoped, and that does not change.
+- **What does not change.** Every other kind keeps the P2-T19 rule: the families of its lists, else `--family`. That
+  is an institution, a campus, a calendar (an institution's own admission calendar and its dates stay scoped to the
+  run's family), a seat category and an official list, and so is an entity of unknown kind. The region must still match exactly, the host must be on an
+  active entry, the R-71 suspect rule still holds, and the re-fetch still asks the allow-list before any fetch.
+- **Provenance.** `allow_list_scope` records the accepting scope, as before. `family_basis` says why those families
+  were tried: `lists` (the entity's lists), `body_any` (a body, every family of the run) or `run` (`--family`).
+- **Validate and import.** Both read the run's families from the official lists: `validate` from the `--lists`
+  files, the import from every official list in the registry. They agree while the registry holds the same lists.
+
 ## Allow-lists in the repo (P2-T20, 2026-11-14)
 
 - **Where they are.** `backend/app/os/knowledge/sources/lists/<region>-<family>.yaml`: 16 files (7 regions and
-  `national`, each `bachelor` and `intermediate`), 56 entries. The worker loads them into `os_source_domains` at start.
+  `national`, each `bachelor` and `intermediate`), 58 entries (56 from round a, 2 from round b, below). The worker
+  loads them into `os_source_domains` at start.
 - **Where they came from.** The W13 allow-list review of 2026-11-14. Check 1 (`claude-allowlist-check-1`) drafted one
   entry per proven host, each with the official page that names the domain (HEC recognised-university profile pages,
   the federal and provincial government and department pages, the IBCC forum-members page). Check 2
@@ -154,11 +180,28 @@ alias file changes its sha256 and so its attest ref.
   ruling 2026-11-14: for allow-list files, both AI checks are enough review. Each entry's `reviewed_by` names both
   checks; `evidence` is check 1's link text and href, `check2_evidence` is check 2's. Check 2 changed no domain, tier
   or `list_ref`. `body_ref` is `''` until the bodies are in the registry.
+- **Round b (P2-T21, 2026-11-14).** Check 1b (`claude-allowlist-check-1b`) proved 3 of the 7 hosts left out above;
+  check 2b (`claude-allowlist-check-2b`) re-fetched every proof page on its own and approved all 3. Both checks give the
+  same host and tier for each, and the same region where check 2b names one (it lists regions and families only from
+  the citing rows); `evidence` is check 1b's quote and `check2_evidence` check 2b's. Two of the three are listed:
+  - `admission.hed.gkp.pk`, admission_body, khyber_pakhtunkhwa intermediate (placed as ocas.punjab.gov.pk). Proof:
+    hed.gkp.pk links it ("OCAS KP Colleges"); hed.gkp.pk is its `list_ref`.
+  - `etea.edu.pk`, admission_body, khyber_pakhtunkhwa bachelor. Proof: a KP-TEVTA PDF on kptevta.gov.pk names it; check
+    2b also found hed.gkp.pk linking it. B5-F-035's entity (UNI-UETP, aliased to PK-UNI-083) is on hec-recognised-kp
+    (bachelor).
+  - `hed.gkp.pk` is proven by both checks as the domain of the KP Higher Education Department (regulator; proof:
+    kpese.gov.pk, the KP Elementary & Secondary Education Department, links it), but it is **not listed on its own**
+    (controller, T21 fix round 1): its families rest on check 1b alone (check 2b gave none, since no row cites the bare
+    host and the department is on no official list), no row needs it, and a listed domain covers its subdomains, so an
+    entry for it under bachelor would also list admission.hed.gkp.pk under bachelor. It stays the proof page
+    (`list_ref`) of admission.hed.gkp.pk. Add it when a row cites it and both checks give its families.
+  - Still left out: hed.ajk.gov.pk, jac.ajk.gov.pk, www.imcgf72.edu.pk, gcwg.punjab.gov.pk.
 - **Left out.**
   - `hed.ajk.gov.pk` (AJK, intermediate): check 2 marked it unclear. Its only proof page, ajk.gov.pk, carried
     injected spam on 2026-11-14. Owner question open.
   - The hosts check 1 could not prove: admission.hed.gkp.pk, etea.edu.pk, jac.ajk.gov.pk, www.imcgf72.edu.pk and
-    gcwg.punjab.gov.pk (no independent official page names them; check 2's retry found none either).
+    gcwg.punjab.gov.pk (no independent official page names them; check 2's retry found none either). Round b (above)
+    later proved admission.hed.gkp.pk and etea.edu.pk.
   - ajkbise.net: named by the IBCC forum-members page, but its homepage still carried injected gambling links on
     2026-11-14 (R-71). It stays out until a person confirms it is clean.
   - Never listable: educationinkarachi.net, unioncouncil.com.pk, drive.google.com, en.wikipedia.org, facebook.com,

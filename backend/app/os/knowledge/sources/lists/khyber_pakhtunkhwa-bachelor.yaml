@@ -4,6 +4,8 @@
 # both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
 # inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
 # ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+# Entries reviewed by claude-allowlist-check-1b and claude-allowlist-check-2b (W13 round b, 2026-11-14) say so in
+# reviewed_by; the same owner ruling covers them.
 region: khyber_pakhtunkhwa
 family: bachelor
 bodies:
@@ -71,4 +73,23 @@ bodies:
   check2_evidence:
     url: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
     quote: HEC profile "University of Engineering & Technology" (Peshawar); Visit Website href "http://www.uetpeshawar.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - etea.edu.pk
+  list_ref: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+  reviewed_by: claude-allowlist-check-1b, claude-allowlist-check-2b
+  inst_id: PK-TST-005
+  name: Educational Testing and Evaluation Agency (ETEA), Khyber Pakhtunkhwa
+  evidence:
+    url: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+    quote: '"Interested candidates may first visit ETEA website, www.etea.edu.pk and apply for the posts online." and "Online
+      Application Form will be available on www.etea.edu.pk on 11th February 2022." (pdftotext of the PDF)'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+    quote: 'pdftotext of the live PDF: header "...TECHNICAL EDUCATION & VOCATIONAL ... Web: www.kptevta.gov.pk"; "1. Interested
+      candidates may first visit ETEA website, www.etea.edu.pk and apply for the posts online."; "6. Online Application
+      Form will be available on www.etea.edu.pk on 11th February 2022."'
     retrieved: '2026-11-14'

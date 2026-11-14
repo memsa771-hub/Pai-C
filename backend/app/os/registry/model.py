@@ -21,6 +21,10 @@ assert tuple(KIND_PREFIX) == models.REGISTRY_KINDS
 KINDS = models.REGISTRY_KINDS
 STATUSES = models.REGISTRY_STATUSES
 NAMES_A_LIST = ("institution", "campus")  # R-32: built only from official lists, so each names the lists it came from
+# The bodies that serve a whole region, not one programme family: on no list with a family, their sources are judged
+# against every family of the run's official lists (P2-T21). A positive list: a kind added later keeps the narrow rule.
+SERVES_A_REGION = ("regulator", "board", "admission_body", "admission_system", "entry_test")
+assert set(SERVES_A_REGION) <= set(KIND_PREFIX)
 REGION_REQUIRED = ("regulator", "board", "admission_body", "institution", "campus", "official_list")
 NEEDS_PARENT = ("campus",)
 NO_QUOTE_NEEDED = ("official_list",)  # a list is the source itself; its count may come with no quote (R-35a)

@@ -30,7 +30,8 @@ from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
 from app.os.registry.calendars import calendar_types
-from app.os.registry.model import KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED, RegistryEntry, slug
+from app.os.registry.model import (KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED, SERVES_A_REGION,
+                                   RegistryEntry, slug)
 
 BUCKETS = ("accepted", "unconfirmed", "queued", "rejected", "skipped")
 OWNER_ACCEPTED, REVIEWERS = "owner_accepted", "reviewers"
@@ -199,20 +200,39 @@ def _source_problem(url: str | None, source_type: str | None, read_method: str |
     return None
 
 
-def families(lists: tuple[str, ...] | list[str], ctx: PlanContext) -> tuple[str, ...]:
+def families(lists: tuple[str, ...] | list[str], ctx: PlanContext, kind: str | None = None) -> tuple[str, ...]:
     """The allow-list families to try for a row (P2-T19): the family of every official list its entity is on (H3 data,
-    `family` of each list), in a fixed order. When none of them has a family: the `--family` given, which may be ''."""
+    `family` of each list), in a fixed order. When none of them has a family: for a body (P2-T21, below) every family
+    the run knows, else the `--family` given, which may be ''."""
+    return family_choice(lists, ctx, kind)[0]
+
+
+def family_choice(lists: tuple[str, ...] | list[str], ctx: PlanContext,
+                  kind: str | None = None) -> tuple[tuple[str, ...], str]:
+    """(families, basis). basis `lists`: the families of the entity's lists. basis `body_any` (P2-T21, controller
+    decision under the owner's delegation of 2026-11-14): a body of a kind in `SERVES_A_REGION` (a regulator, board,
+    admission body or system, entry test) on no list with a family serves its whole region, so it is tried under every
+    family of the loaded official lists (`list_families`), the `--family` given first, then the others sorted. basis
+    `run`: the `--family` given (every other kind, such as an institution, campus, calendar, seat category or list on no
+    list with a family; an unknown kind; or no list family loaded at all). The region is never widened."""
     found = sorted({ctx.list_families[x] for x in lists if ctx.list_families.get(x)})
-    return tuple(found) or (ctx.family,)
+    if found:
+        return tuple(found), "lists"
+    known = sorted({f for f in ctx.list_families.values() if f})
+    if kind in SERVES_A_REGION and known:
+        return tuple(dict.fromkeys((*((ctx.family,) if ctx.family else ()), *known))), "body_any"
+    return (ctx.family,), "run"
 
 
 def _cap(result: RowResult, url: str, region: str | None, quote: str | None, ctx: PlanContext,
-         read_method: str | None, lists: tuple[str, ...] = ()) -> None:
+         read_method: str | None, lists: tuple[str, ...] = (), kind: str | None = None) -> None:
     """Things that stop a row above `unconfirmed`: no quote, off the allow-list, a model or OCR reading. The source
     passes the allow-list when its host is listed for the row's region and any family of the entity's lists; the scope
     that accepted it is kept in the row's provenance. Every row that gets here keeps the families it may be read for
-    (`allow_list_families`), for the re-fetch of a row whose check did not reach this (P2-T19)."""
-    result.payload["allow_list_families"] = families(lists, ctx)
+    (`allow_list_families`), for the re-fetch of a row whose check did not reach this (P2-T19). `kind` is the kind of
+    the entity whose lists these are (None: unknown); it decides the families of a body (P2-T21, `family_choice`)."""
+    fams, basis = family_choice(lists, ctx, kind)
+    result.payload["allow_list_families"] = fams
     if result.bucket not in ("accepted",):
         return
     if not quote:
@@ -222,15 +242,16 @@ def _cap(result: RowResult, url: str, region: str | None, quote: str | None, ctx
         _lower(result, "allow_list_not_connected")  # no allow-list to check the source against: never above this
         return
     if ctx.official is not None:
-        tried = [Scope(region=region or "", family=f) for f in families(lists, ctx)]
+        tried = [Scope(region=region or "", family=f) for f in fams]
         accepted = next((sc for sc in tried if ctx.official(url, sc)), None)
         if accepted is None:
             _lower(result, "source_not_on_allow_list")
             where = "scopes tried: " + ", ".join(f"{sc.region or '-'}/{sc.family or '-'}" for sc in tried)
             result.detail = "; ".join(x for x in (result.detail, where) if x)
             return
-        result.payload.setdefault("provenance", {})["allow_list_scope"] = {"region": accepted.region,
-                                                                            "family": accepted.family}
+        prov = result.payload.setdefault("provenance", {})
+        prov["allow_list_scope"] = {"region": accepted.region, "family": accepted.family}
+        prov["family_basis"] = basis  # lists | body_any | run: why these families were tried (P2-T21)
     if read_method is None or read_method in ctx.fmt.needs_refetch:  # a missing read method is never assumed fetch
         if waiver_applies(ctx) and result.level == "verified":
             # owner ruling P2 spec §11.3: both AI checks accepted it, so no re-fetch; the waiver is on the record
@@ -420,7 +441,7 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
     on_lists = tuple(x for x in dict.fromkeys((*ctx.existing_lists(eid), *lists)) if x != "list:not-loaded")
     res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote, timezone=tz,
                        calendar_type=ctype, lists=on_lists)
-    _cap(res, url, region, quote, ctx, rm, on_lists)
+    _cap(res, url, region, quote, ctx, rm, on_lists, kind)
     if res.bucket in ("accepted", "unconfirmed"):
         planned[rid] = entry.entity_id
     return None, ""
@@ -557,7 +578,7 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
                    "facts": facts, "read_method": rm, "checked_at": checked, "url": url, "quote": quote,
                    "programme_new": rid not in seen_programmes, "region": ctx.region_lookup(reg_id)}
     seen_programmes.add(rid)
-    _cap(res, url, res.payload["region"], quote, ctx, rm, ctx.lists_lookup(reg_id))
+    _cap(res, url, res.payload["region"], quote, ctx, rm, ctx.lists_lookup(reg_id), (parent or {}).get("kind"))
     seen_keys.update(keys)  # registered only once the row has passed every check
     return None, ""
 
@@ -692,7 +713,8 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
     owner = ref if scope == "registry" else parent_of(ref)
     region = ctx.region_lookup(owner) if owner else None
     res.payload["region"] = region
-    _cap(res, url, region, quote, ctx, rm, ctx.lists_lookup(owner) if owner else ())
+    owner_kind = (ctx.meta(owner) or {}).get("kind") if owner else None  # file first, then database; None: unknown
+    _cap(res, url, region, quote, ctx, rm, ctx.lists_lookup(owner) if owner else (), owner_kind)
     seen_keys.add(key)  # registered only once the row has passed every check
     return None, ""
 
