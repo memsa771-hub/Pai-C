@@ -11,6 +11,8 @@ key (doc_scoring.py) and prints **only rates and counts, never a value**. The --
 
     # offline (free): a test model that answers each file from the key; checks the wiring, scoring and cross-checks
     python -m tests.os.quality.run_document_quality --model test --set sample --mode whole --runs 1 --out /tmp/s.json
+    # P3-T8: the intermediate set (the R-40 types), offline; a billed run on it waits for the owner (ADR-001 Q6)
+    python -m tests.os.quality.run_document_quality --model test --set intermediate --mode whole --runs 1 --out /tmp/i.json
 
 The real set never enters the repo: it defaults to ~/spike2-docs/docs and ~/spike2-docs/answer_key.yaml, and a
 billed run on it needs `verified: true` in the key (the owner checked it). Do not change the key or the bar to pass.
@@ -38,6 +40,8 @@ from app.os.documents.validators import validate
 from app.os.knowledge.research.readings import cost, model_for
 from app.os.settings import load_settings
 from tests.os.quality.doc_scoring import PASS_CORRECT, load_doc_key, score
+from tests.os.quality.make_intermediate_docs import INTERMEDIATE
+from tests.os.quality.make_intermediate_docs import KEY_NAME as INTERMEDIATE_KEY
 from tests.os.quality.make_sample_docs import KEY_NAME, SAMPLES
 
 REAL_DOCS = Path.home() / "spike2-docs" / "docs"
@@ -137,7 +141,7 @@ def run_once(docs_dir: Path, key: dict, readers, spec, types, variants, settings
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", choices=["openai", "test"], required=True)
-    ap.add_argument("--set", choices=["real", "sample"], required=True, dest="which")
+    ap.add_argument("--set", choices=["real", "sample", "intermediate"], required=True, dest="which")
     ap.add_argument("--docs", type=Path, help="the folder of files (default: by --set)")
     ap.add_argument("--key", type=Path, help="the answer key (default: by --set)")
     ap.add_argument("--mode", choices=["whole", "tiles"], required=True)
@@ -147,8 +151,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
 
-    docs_dir = args.docs or (REAL_DOCS if args.which == "real" else SAMPLES)
-    key_path = args.key or (REAL_KEY if args.which == "real" else SAMPLES / KEY_NAME)
+    sets = {"real": (REAL_DOCS, REAL_KEY), "sample": (SAMPLES, SAMPLES / KEY_NAME),
+            "intermediate": (INTERMEDIATE, INTERMEDIATE / INTERMEDIATE_KEY)}  # P3-T8: the R-40 types
+    docs_dir = args.docs or sets[args.which][0]
+    key_path = args.key or sets[args.which][1]
     if not docs_dir.is_dir() or not key_path.is_file():
         print(f"the {args.which} set is not here (files: {docs_dir}, key: {key_path})", file=sys.stderr)
         return 2
