@@ -118,6 +118,8 @@ CI's `os` job has a 60-minute limit. If CI fails, reproduce the failure locally 
 
 - **R-15**, OS side (an excluded field disappears from the OS programme list): moved from P1 to P2 but not in the P2
   scope; not built. Where does it go?
+  - Update (P2-T24, local): built in P2 under the controller's decision of W10 §1 (owner's delegation of 2026-11-14);
+    the owner confirms at sign-off. See `p2-handoff.md` §1 (T24) and §4.
 - **Germany CGPA:** Germany v2 asks only for the SSC and HSSC certificates. A CGPA ask needs an official source and the
   owner's wording.
 - **OCR engine:** Tesseract scored 6/10 on the bake-off (below the bar); Docling could not be installed and was not

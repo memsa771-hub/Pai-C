@@ -7,7 +7,7 @@ student (S4-D11).
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit, urlunsplit
 
@@ -15,6 +15,7 @@ from sqlalchemy import Engine, exists, func, insert, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
+from app.os.knowledge.fields import is_excluded
 from app.os.knowledge.programmes import Programme, _programme
 
 REQUESTS_PER_DAY = 3
@@ -104,15 +105,17 @@ def _has_facts(tenant_id: str, intake_year: int | None = None, intake_term: str 
 
 
 def visible_programmes(engine: Engine, tenant_id: str, route_key: str, intake_year: int,
-                       intake_term: str | None = None) -> list[Programme]:
+                       intake_term: str | None = None, excluded: Iterable[str] = ()) -> list[Programme]:
     """The route's programmes a student can choose: active ones, and requested ones with facts for the year (and the
-    term, when given)."""
+    term, when given). `excluded`: the student's excluded field codes (R-15, read through StudentFacts by the caller);
+    a programme in one is left out, one with an empty field stays."""
+    excluded = frozenset(excluded)
     with engine.connect() as conn:
         rows = conn.execute(select(P).where(
             P.c.tenant_id == tenant_id, P.c.route_key == route_key,
             (P.c.status == "active") | ((P.c.status == "requested") & _has_facts(tenant_id, intake_year, intake_term)),
         ).order_by(P.c.ref)).all()
-    return [_programme(r) for r in rows]
+    return [_programme(r) for r in rows if not is_excluded(r.field, excluded)]
 
 
 def requested_without_facts(engine: Engine, tenant_id: str) -> list[Programme]:

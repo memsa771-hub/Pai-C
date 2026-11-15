@@ -40,9 +40,13 @@ requirements:
   R-12: {title: "A crash anywhere loses nothing and duplicates nothing", phases: [P1], built: true}
   R-13: {title: "OS reads student facts from the Vault with evidence levels", phases: [P1], built: true}
   R-14: {title: "OS derives applicable levels and routes from the Vault", phases: [P1], built: true}
-  # R-15 stays false: every Counsellor reader is done in P1 (rule 8 of the consistency check covers them); the OS side moves to
-  # P2 (owner ruling Q4, 2026-11-07, recorded in docs/connect/handoff/p1-handoff.md). Rule 8 opens a case, so it is never silent.
-  R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: false}
+  # R-15: every Counsellor reader is done in P1 (rule 8 of the consistency check covers them); the OS side moved to P2 (owner
+  # ruling Q4, 2026-11-07, docs/connect/handoff/p1-handoff.md) and is built in P2-T24 (controller decision under the owner's
+  # delegation of 2026-11-14, for the owner to confirm at sign-off; docs/connect/handoff/p2-handoff.md §4). Its phases stay
+  # [P1]: tests/test_connect_traceability.py ties them to master spec §12, which lists R-15 under P1 only; adding P2 here
+  # needs the master §12 P2 row changed too (the owner's call). Condition: FU-13 (pai_c/connect/places.py passes the
+  # student to the bridge) must land before P2 sign-off; otherwise R-15 goes back to built: false.
+  R-15: {title: "An excluded field disappears everywhere at once", phases: [P1], built: true}
   R-16: {title: "Vault owns marks; Intermediate marks stored per part", phases: [P1], built: true}
   R-17: {title: "Plan built despite missing data; missing items become provide steps", phases: [P1], built: true}
   R-18: {title: "Each playbook step declares the evidence level it needs", phases: [P1], built: true}

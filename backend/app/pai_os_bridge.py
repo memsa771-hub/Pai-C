@@ -906,14 +906,14 @@ def merit_check(student_ref: str, programme_ref: str, term: str, year: int) -> d
         return None
 
 
-def programmes_for(route_key: str, term: str, year: int) -> list[dict]:
-    """The places for a route and intake, `{ref, name, university}`. `[]` when PAI OS is not mounted, and on any
-    failure (logged)."""
+def programmes_for(route_key: str, term: str, year: int, student_ref: str | None = None) -> list[dict]:
+    """The places for a route and intake, `{ref, name, university}`. With `student_ref`, places in a field the student
+    excluded are left out (R-15). `[]` when PAI OS is not mounted, and on any failure (logged)."""
     try:
         from app.os.contracts.route_contract import IntakeRef
         from app.os.ports import plan_query
 
-        listing = plan_query.programme_list(route_key, IntakeRef(term=term, year=year))
+        listing = plan_query.programme_list(route_key, IntakeRef(term=term, year=year), student_ref)
         return [{"ref": p.programme_ref, "name": p.name, "university": p.university} for p in listing.programmes]
     except ports.OsUnavailable:
         return []

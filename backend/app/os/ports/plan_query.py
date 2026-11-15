@@ -1,6 +1,7 @@
 """The PlanQuery port (Slice 8 spec §2.2, S8-D13, S8-D14): read-only answers for the Counsellor, in process, no
 HTTP endpoint. They answer even while the `counsellor` module is off (for tests)."""
 
+import logging
 
 from sqlalchemy import select
 
@@ -23,6 +24,8 @@ from app.os.programme_facts import build as build_programme_facts
 from app.os.programme_list_v2 import build as build_list_v2
 from app.os.summary import build_summary
 
+log = logging.getLogger("app.os.ports.plan_query")
+
 
 def plan_summary(student_ref: str) -> PlanSummaryV1 | None:
     svc = ports.services()
@@ -35,15 +38,33 @@ def plan_view(student_ref: str) -> PlanViewV1:
     return build_plan_view(ports.services(), student_ref)
 
 
-def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
+def _excluded(svc, student_ref: str | None) -> frozenset[str]:
+    """The student's excluded field codes, read now through StudentFacts (R-15); none without a student."""
+    if student_ref is None:
+        return frozenset()
+    from app.os.knowledge.fields import excluded_for
+
+    try:
+        return excluded_for(student_ref, engine=svc.engine, tenant_id=svc.settings.tenant_id)
+    except Exception as e:  # noqa: BLE001  (logged by type: the unfiltered list, rule 8 opens a case if needed)
+        log.error("excluded fields could not be read (%s); the programme list is not filtered", type(e).__name__)
+        return frozenset()
+
+
+def programme_list(route_key: str, intake: IntakeRef, student_ref: str | None = None) -> ProgrammeListV1:
     """The route's active programmes. `facts_confirmed`: every programme fact the route's newest playbook needs is
-    confirmed for that intake year. An unknown route has no programmes."""
+    confirmed for that intake year. An unknown route has no programmes. With `student_ref`, a programme in a field the
+    student excluded is left out (R-15, P2-T24); one with an empty field stays."""
+    from app.os.knowledge.fields import is_excluded
+
     svc = ports.services()
     book = newest_plain(svc.plans.playbooks.values()).get(route_key)
     if book is None:
         return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[])
     _, fields = needed_fields(book)
-    programmes = ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
+    excluded = _excluded(svc, student_ref)
+    programmes = [p for p in ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
+                  if not is_excluded(p.field, excluded)]
     facts = svc.knowledge.programme_facts([p.ref for p in programmes], sorted(fields), intake.year)
     return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[
         ProgrammeEntry(programme_ref=p.ref, university=p.university, name=p.name,
@@ -71,10 +92,12 @@ def merit_check(student_ref: str, programme_ref: str, intake: IntakeRef, categor
     return build_merit(svc.knowledge, facts, programme_ref, intake, category, scale_pairs(current_types()))
 
 
-def programme_list_v2(route_key: str, intake: IntakeRef) -> ProgrammeListV2:
-    """`programme_list` plus each place's coverage level, region and whether PAI can run it yet (P2-D27, R-34)."""
+def programme_list_v2(route_key: str, intake: IntakeRef, student_ref: str | None = None) -> ProgrammeListV2:
+    """`programme_list` plus each place's coverage level, region and whether PAI can run it yet (P2-D27, R-34). With
+    `student_ref`, a programme in a field the student excluded is left out (R-15); the contract is unchanged."""
     svc = ports.services()
-    return build_list_v2(svc.engine, svc.settings.tenant_id, svc.plans.playbooks, route_key, intake)
+    return build_list_v2(svc.engine, svc.settings.tenant_id, svc.plans.playbooks, route_key, intake,
+                         excluded=_excluded(svc, student_ref))
 
 
 def routes() -> list[dict]:

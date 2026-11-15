@@ -98,27 +98,47 @@ class Replanner:
         """Re-checks the plan's programmes against the student's facts as they are now (the eligibility note is
         refreshed on the way) and returns those that read `likely_below`, unless a pending proposal already removes
         them (D-o)."""
-        from app.os.eligibility.notes import refresh
+        return self._breaks(plan_id)[0]
 
-        _, cards = refresh(self.plans, self.student_of(plan_id), plan_id)
+    def excluded(self, plan_id: int) -> tuple[str, ...]:
+        """The plan's programmes in a field the student excluded (R-15, P2-T24), unless a pending proposal already
+        removes them. The excluded fields are read now through StudentFacts, never stored."""
+        return self._breaks(plan_id)[1]
+
+    def _breaks(self, plan_id: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """(below, excluded): see `below` and `excluded`. Stale removals expire first."""
+        from app.os.eligibility.notes import refresh
+        from app.os.knowledge.fields import excluded_for, excluded_refs
+
+        student = self.student_of(plan_id)
+        _, cards = refresh(self.plans, student, plan_id)
         # Firm only: a line that stands on the route's default minimum pass (provisional) keeps its note, but is
         # not a ground to propose a removal (evidence rule; final review I3).
         firm = {ref for ref, card in cards.items()
                 if any(ln.status == "likely_below" and not ln.provisional for ln in card.lines)}
-        self._expire_stale_removals(plan_id, firm)
+        contract, _ = self.plans._contract(plan_id)
+        taken = self.overrides.cancelled(plan_id)  # an accepted removal already took it: nothing to propose again
+        planned = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)
+                   if p.programme_ref not in taken]
+        out = excluded_refs(self.engine, self.tenant, planned,
+                            excluded_for(student, engine=self.engine, tenant_id=self.tenant))
+        self._expire_stale_removals(plan_id, firm, out)
         held = {op.get("programme_ref") for p in self.proposals.for_plan(plan_id)
                 if p.status in ("pending", "requested")  # a removal asked of the Counsellor still holds its programme
                 for op in p.ops if op.get("op") == "cancel_programme"}
-        return tuple(ref for ref in cards if ref in firm and ref not in held)
+        return (tuple(ref for ref in cards if ref in firm and ref not in held),
+                tuple(ref for ref in planned if ref in out and ref not in held))
 
-    def _expire_stale_removals(self, plan_id: int, firm: set[str]) -> None:
+    def _expire_stale_removals(self, plan_id: int, firm: set[str], excluded: set[str] = frozenset()) -> None:
         """A pending removal made for a fact change goes stale when a programme it removes no longer reads firmly
-        below: it expires, so one tap cannot drop a programme the student now meets (final review I2)."""
+        below (final review I2), or is no longer in an excluded field (R-15): it expires, so one tap cannot drop a
+        programme the student now meets or wants again."""
+        grounds = {REASONS["fact_below"]: firm, REASONS["field_excluded"]: excluded}
         for p in self.proposals.for_plan(plan_id):
             if p.status != "pending" or not p.ops:
                 continue
-            if all(op.get("op") == "cancel_programme" and op.get("reason") == REASONS["fact_below"] for op in p.ops) \
-                    and any(op.get("programme_ref") not in firm for op in p.ops):
+            removals = all(op.get("op") == "cancel_programme" and op.get("reason") in grounds for op in p.ops)
+            if removals and any(op.get("programme_ref") not in grounds[op.get("reason")] for op in p.ops):
                 self.proposals.expire_if_pending(p.id)
 
     def state(self, plan_id: int, with_suggestions: bool = False, with_below: bool = False,
@@ -137,8 +157,9 @@ class Replanner:
             suggestions = {ref: [m for m in found if not self._needs_same(plan_id, contract, book, ref, m, without_need)]
                            for ref, found in suggestions.items()}
         held, held_in = self.held(plan_id) if with_held else ((), ())
-        return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version,
-                         self.below(plan_id) if with_below else (), held, held_in)
+        below, excluded = self._breaks(plan_id) if with_below else ((), ())
+        return PlanState(plan_id, book.key, programmes, tasks, suggestions, book.version, below, held, held_in,
+                         excluded)
 
     def _needs_same(self, plan_id: int, contract, book, out_ref: str, in_ref: str, key: str) -> bool:
         """Whether the plan, with `in_ref` in the place of `out_ref`, has a step of `in_ref` that hard-depends on the
@@ -177,7 +198,11 @@ class Replanner:
         from app.os.knowledge.requests import visible_programmes
 
         year, chosen = contract.target_intake.year, {p.programme_ref for p in contract.programmes}
-        others = [p.ref for p in visible_programmes(self.engine, self.tenant, book.key, year) if p.ref not in chosen]
+        from app.os.knowledge.fields import excluded_for  # R-15: a swap never brings in an excluded field
+
+        gone = excluded_for(contract.student_ref, engine=self.engine, tenant_id=self.tenant)
+        others = [p.ref for p in visible_programmes(self.engine, self.tenant, book.key, year, excluded=gone)
+                  if p.ref not in chosen]
         if not others or book.eligibility is None:
             return [r for r in others if self.confirmed(r, year)][:3]
         cards = programme_cards(self.plans, book.eligibility, others, year, profile_of(self.plans, contract.student_ref))

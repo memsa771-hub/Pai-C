@@ -27,6 +27,7 @@ REASONS = {
     "upgrade": "There is a newer version of your route's guide.",
     "review": "The file you approved changed: please approve it again.",
     "fact_below": "Your updated details no longer meet this programme's requirements.",
+    "field_excluded": "You ruled out this programme's field of study.",
     "fact_all_below": "The student's facts no longer meet any place on this plan; the Counsellor decides with the "
                       "student.",
 }
@@ -46,6 +47,7 @@ class PlanState:
     below: tuple[str, ...] = ()  # programmes whose eligibility now reads likely_below (set for student_fact_changed)
     held: tuple[str, ...] = ()  # programmes a pending or requested swap or removal already covers (P1-T8, R-22)
     held_in: tuple[str, ...] = ()  # the programmes those pending or requested swaps bring in
+    excluded: tuple[str, ...] = ()  # programmes in a field the student excluded (set for student_fact_changed, R-15)
 
 
 @dataclass(frozen=True)
@@ -172,10 +174,13 @@ def rules_for(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
         return [AddTask(template_key=p["template_key"], programme_ref=p.get("programme_ref"),
                         reason=REASONS["review"])]
     if event.type == "student_fact_changed":
-        # D-o: a programme that no longer fits is proposed for removal (big: the student accepts). Plan-level breaks
-        # (an excluded field, a place preference) only refresh the eligibility note; the choice request is T6.
-        gone = [ref for ref in state.programmes if ref in state.below]
+        # D-o: a programme that no longer fits is proposed for removal (big: the student accepts). R-15 (P2-T24): so is
+        # a programme in a field the student excluded, never removed silently. A place preference only refreshes the
+        # eligibility note.
+        gone = [ref for ref in state.programmes if ref in state.below or ref in state.excluded]
         if gone and len(state.programmes) - len(gone) < cfg.min_programmes:
             return [Escalate(reason=REASONS["fact_all_below"])]  # R-22: never leave fewer than the minimum
-        return [CancelProgramme(programme_ref=ref, reason=REASONS["fact_below"]) for ref in gone]
+        return [CancelProgramme(programme_ref=ref,
+                                reason=REASONS["fact_below" if ref in state.below else "field_excluded"])
+                for ref in gone]
     return Handover(f"no rule for '{event.type}'")

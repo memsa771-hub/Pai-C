@@ -369,9 +369,14 @@ def test_a_changed_constraint_is_one_event_one_sweep_and_never_a_silent_removal(
 
 
 def excluded_world(os_world, student, db):
-    """A student with one open path (Pharm-D) and a plan; returns (path row, plan id)."""
+    """A student with one open path (Pharm-D) and a plan whose second place (p-hard) is a Pharm-D programme in the OS
+    registry (its `field` is the Counsellor's code, P2-T24); returns (path row, plan id)."""
+    from sqlalchemy import update
+
     from tests.test_path_exclusions import add_path, setup
 
+    with os_world.engine.begin() as conn:
+        conn.execute(update(models.programmes).where(models.programmes.c.ref == "p-hard").values(field="pharm_d"))
     _, journey = setup(student, db)
     row = add_path(db, student, journey, "pharm_d")
     return row, start_pk_plan(os_world, db, student.workspace_id)
@@ -415,10 +420,9 @@ def test_an_excluded_field_leaves_every_counsellor_reader_at_once_and_reaches_th
 
 
 @pytest.mark.connect_row("6.9")
-@pytest.mark.xfail(strict=True, reason="Q4 (owner ruling 2026-11-07): the OS side of R-15 moves to P2. The OS programme "
-                   "list has no field tag, so an excluded field raises no proposal; the nightly job opens a case instead "
-                   "(rule 8). When P2 builds it, this test starts to pass and strict xfail makes that visible.")
+@pytest.mark.req("R-15")
 def test_an_excluded_chosen_field_raises_a_proposal_on_the_plan_P2(os_world):
+    """Q4 (owner ruling 2026-11-07) moved the OS side of R-15 to P2; built in P2-T24."""
     from app.config import config
     from scripts.counselor_eval_support import StudentSession
 

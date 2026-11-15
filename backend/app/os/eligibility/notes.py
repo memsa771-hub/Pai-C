@@ -114,7 +114,11 @@ def refresh(plans, student_ref: str, plan_id: int, only: str | None = None) -> t
         def make() -> list[str]:
             if card.verdict != "likely_below":
                 return []
-            others = [p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, book.key, year)]
+            from app.os.knowledge.fields import excluded_for  # R-15: no suggestion in an excluded field
+
+            gone = excluded_for(student_ref, engine=plans.engine, tenant_id=plans.kernel.tenant_id)
+            others = [p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, book.key, year,
+                                                        excluded=gone)]
             cands = programme_cards(plans, rules, others, year, profile)
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]
         return make

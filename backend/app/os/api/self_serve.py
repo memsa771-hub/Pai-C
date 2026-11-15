@@ -14,6 +14,7 @@ from app.os.eligibility.evaluate import Card
 from app.os.eligibility.notes import profile_of, programme_cards
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.programmes import _programme
+from app.os.knowledge.fields import excluded_for, is_excluded
 from app.os.knowledge.requests import requested_without_facts, visible_programmes
 
 G, F, RQ, P = models.programmes, models.knowledge_facts, models.programme_requests, models.plans
@@ -58,13 +59,19 @@ def _requested_by(plans, student_ref: str, route_key: str, year: int, term: str 
     return [_programme(r) for r in rows]
 
 
+def _excluded(plans, student_ref: str) -> frozenset[str]:
+    """The student's excluded field codes, read now through StudentFacts (R-15); never stored."""
+    return excluded_for(student_ref, engine=plans.engine, tenant_id=plans.kernel.tenant_id)
+
+
 def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list[dict] | None:
     """None if the route is unknown."""
     book = newest_books(plans).get(route_key)
     if book is None:
         return None
     term = _term(book)
-    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term)
+    excluded = _excluded(plans, student_ref)
+    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term, excluded)
     rules = book.eligibility
     cards = (programme_cards(plans, rules, [p.ref for p in visible], year, profile_of(plans, student_ref))
              if rules is not None else {})
@@ -80,6 +87,8 @@ def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list
                     "requested_by_student": p.status == "requested", "confirmed_facts": confirmed,
                     "card": card_out(card) if p.ref in researched else None})
     for p in _requested_by(plans, student_ref, route_key, year, term):
+        if is_excluded(p.field, excluded):
+            continue
         out.append({"ref": p.ref, "university": p.university, "name": p.name, "research_state": "being_researched",
                     "requested_by_student": True, "confirmed_facts": 0, "card": None})
     return out
@@ -110,7 +119,11 @@ def eligibility(plans, student_ref: str, programme_ref: str, route_key: str, yea
         return {"card": None, "suggestions": []}
     cards = programme_cards(plans, book.eligibility, list(visible), year, profile_of(plans, student_ref))
     card = cards[programme_ref][0]
-    picks = suggest(card, list(cards.values()), _chosen(plans, student_ref, route_key, year))
+    # R-15: the asked programme keeps its card, but a suggestion is never in a field the student excluded
+    allowed = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, _term(book),
+                                                 _excluded(plans, student_ref))}
+    picks = suggest(card, [c for c in cards.values() if c[0].programme_ref in allowed],
+                    _chosen(plans, student_ref, route_key, year))
     return {"card": card_out(card), "suggestions": [
         {"programme_ref": s.programme_ref, "university": visible[s.programme_ref].university,
          "name": visible[s.programme_ref].name, "confirmed_facts": s.confirmed_facts} for s in picks]}
