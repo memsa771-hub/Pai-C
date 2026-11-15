@@ -9,7 +9,10 @@ from app.os import clock, models
 from app.os.ports import os_events
 
 EVENT_TYPES = ("admission_rejected", "deadline_at_risk", "document_missing", "task_failed", "playbook_newer",
-               "escalate", "approved_changed", "route_invalid", "student_fact_changed")
+               "escalate", "approved_changed", "route_invalid", "student_fact_changed",
+               # master R-39 (ADR-001 D12), raised by replan/detectors.py
+               "merit_list.published", "merit_list.not_listed", "merit_list.next_round", "fee_deposit.due",
+               "test.result_published", "admission.schedule_changed")
 ADMISSION_TEMPLATE = "admission_result"  # its result {"choice": "rejected"} is a rejection (the Slice 6b inbox)
 REVIEW_TEMPLATES = {"review_pack": "pack", "review_visa_file": "visa"}  # review step -> the artifact kind it approves
 

@@ -1,0 +1,17 @@
+# What raises the R-39 replan events (master R-39, ADR-001 D12). Detectors match a Knowledge field or a fact class, never a
+# region, body or institution name. The field names and classes are the vocabulary of knowledge/fact_classes.yaml and
+# registry/calendars.yaml; nothing new is defined here. A date fact is {"date": "YYYY-MM-DD", "tz": ...} or "YYYY-MM-DD".
+version: 1
+facts:
+  # A merit-list date of a place. On or before today: the list is out (`merit_list.published`). Set to a later day after
+  # an earlier list day has passed: a further round (`merit_list.next_round`, where rounds are cited, SI-08).
+  merit_list_fields: [merit_list_date]
+  # A result date. On or before today: the result is out (`test.result_published`; mainly P4's entry tests).
+  result_fields: [result_date]
+  # A fact of these classes whose value is a date: the day a fee is to be paid (`fee_deposit.due`), when set or moved.
+  fee_classes: [fee]
+  # A date fact of these classes that moves to another day (`admission.schedule_changed`).
+  schedule_classes: [schedule_date, deadline, test_date]
+answers:
+  # The student's answer to any of their steps that carries these values gives the event (programme of the step).
+  merit_list.not_listed: {choice: not_listed}
