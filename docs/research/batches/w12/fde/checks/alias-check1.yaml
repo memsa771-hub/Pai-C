@@ -1,0 +1,1805 @@
+# W12 D-FDE alias check 1 (ref claude-w12-fde-alias-check-1), 2026-11-15
+# FDE list: .local-ci/work/W12/FDE/E1/fde-hssc-participating-colleges.csv (82 rows)
+# Batches read (Institutions sheets, openpyxl in docker pai-ci-py, repo read-only): PAI-Research-Batch1..5-*-v4.xlsx and all PAI-Research-W12-*.xlsx
+# Candidates generated mechanically: (a) shared sector token (F-7/2, G-10/4, ...) anywhere in batch name/quote; (b) any batch name
+#   containing 'Islamabad Model College'; (c) normalised name tokens (generic words removed, IMCB/IMCG expanded) shared with an
+#   ICT/Islamabad row, or 2+ shared anywhere; (d) distinctive FDE tokens found in name/city/quote of ICT/Islamabad/Rawat/Rawalpindi rows.
+# Judged from the printed text only. alias-check2.yaml not read. No web.
+check: claude-w12-fde-alias-check-1
+date: 2026-11-15
+summary:
+  fde_rows: 82
+  batch_institution_rows_read: 2075
+  candidate_pairs: 197
+  fde_rows_with_a_candidate: 82
+  same: 1
+  unclear: 0
+  different: 196
+  same_pairs: ["FDE 78 -> IC-COL-001"]
+  fde_rows_to_load_as_new: 81
+  note: "IC-ADM-002 (Batch 4: FDE as the admission body for all Islamabad Model Colleges) is a body, not a member college, so it is no alias target and is left out of the pairs. The only ICT college row in any batch is IC-COL-001."
+same:
+  - fde_key: 78
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD"
+    fde_quote: "78 | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD F7 MARKAZ"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    source_url: "https://www.imcgf72.edu.pk/Admissin_Policy.aspx"
+    source_quote: "The number of seats available in IMCG (PG) F-7/2, Islamabad in different faculties is given below:"
+    reason: "Both name the Islamabad Model College for Girls (postgraduate) in sector F-7/2, Islamabad. FDE line: 'ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD'; batch name 'Islamabad Model College for Girls (PG) F-7/2', quote 'IMCG (PG) F-7/2, Islamabad'. Only one batch row names an F-7/2 college (IC-ADM-002 is the FDE admission body, not a college), so the pair is not ambiguous."
+candidates:
+  - fde_key: 1
+    fde_name: "Govt. Polytechnic Institute for Women"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['h8/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 2
+    fde_name: "Islamabad College for Boys, G-6/3, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g6/3'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 3
+    fde_name: "Islamabad College for Girls F-6/2, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f6/2'], batch row is F-7/2"
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-043
+    batch_name: "Pakistan Institute of Development Economics"
+    region: "Islamabad Capital Territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Pakistan Institute of Development Economics); the FDE line is a college. Shared token(s) ['economics'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-182
+    batch_name: "University of Home Economics, Lahore"
+    region: "Punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a university (University of Home Economics, Lahore); the FDE line is a college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-206
+    batch_name: "Aror University of Art, Architecture, Design and Heritage, Sukkur"
+    region: "Sindh"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a university (Aror University of Art, Architecture, Design and Heritage, Sukkur); the FDE line is a college. Shared token(s) ['art', 'design'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f11/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-W12-biek-affiliated-government-colleges.xlsx"
+    inst_id: SD-BIEK-GOV-147
+    batch_name: "Raana Liaquat Ali Khan Govt. College of Home Economics"
+    region: "sindh"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region sindh, quote '147. Raana Liaquat Ali Khan Govt. College of Home Economics Stadium Road, Karachi.Ph # 992'; the FDE line is an Islamabad college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-fsd.xlsx"
+    inst_id: PB-HEDCOL-FSD-33
+    batch_name: "GOVT. HOME ECONOMICS COLLEGE, FAISALABAD"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '33 | GOVT. HOME ECONOMICS COLLEGE, FAISALABAD'; the FDE line is an Islamabad college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-grw.xlsx"
+    inst_id: PB-HEDCOL-GRW-63
+    batch_name: "GOVT MIAN REHMAT ALI MEMORIAL HOME ECONOMICS COLLEGE GUJRANWALA"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote 'GOVT MIAN REHMAT ALI MEMORIAL HOME ECONOMICS COLLEGE GUJRANWALA'; the FDE line is an Islamabad college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-lhr.xlsx"
+    inst_id: PB-HEDCOL-LHR-42
+    batch_name: "GOVT. COLLEGE OF HOME ECONOMICS GULBERG, LAHORE"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '42 | GOVT. COLLEGE OF HOME ECONOMICS GULBERG, LAHORE'; the FDE line is an Islamabad college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 4
+    fde_name: "Institute of Home Economics, Art & Design, F-11/1 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-mul.xlsx"
+    inst_id: PB-HEDCOL-MUL-36
+    batch_name: "GOVT. COLLEGE OF HOME ECONOMICS, MADNI CHOWK, NEW MULTAN"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote 'GOVT. COLLEGE OF HOME ECONOMICS, MADNI CHOWK, NEW MULTAN'; the FDE line is an Islamabad college. Shared token(s) ['economics', 'home'] only."
+  - fde_key: 5
+    fde_name: "IMCB BHARAKAHU"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB BHARAKAHU'); the FDE line is not a girls' college"
+  - fde_key: 5
+    fde_name: "IMCB BHARAKAHU"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-36
+    batch_name: "Islamabad Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Islamabad Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['bharakahu'] is an address/word overlap, not the same institution."
+  - fde_key: 6
+    fde_name: "IMCB Chak Shahzad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Chak Shahzad'); the FDE line is not a girls' college"
+  - fde_key: 6
+    fde_name: "IMCB Chak Shahzad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-99
+    batch_name: "GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '99 | GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['chak'] only."
+  - fde_key: 6
+    fde_name: "IMCB Chak Shahzad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-151
+    batch_name: "Rawalpindi Medical College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Rawalpindi Medical College New Teaching Block, Holy Family Hospital, Rawalpindi.'; the FDE line is an Islamabad college. Shared token(s) ['hospital'] only."
+  - fde_key: 7
+    fde_name: "Islamabad Model College for Boys F-10/3 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f10/3'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 8
+    fde_name: "Islamabad Model College for Boys F-10/4, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f10/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 9
+    fde_name: "Islamabad Model College for Boys, F-11/1, Islamabad."
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f11/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 10
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR BOYS F-7/3,ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f7/3'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 11
+    fde_name: "Islamabad Model College for Boys F-8/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f8/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 12
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR BOYS G-10/4, ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g10/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 13
+    fde_name: "Islamabad Model College for Boys, G-11/1, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g11/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 14
+    fde_name: "Islamabad Model College for Boys G-6/2, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g6/2'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 15
+    fde_name: "IMCB G-6/4 ISBD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g6/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 16
+    fde_name: "IMCB G-7/2"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g7/2'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 17
+    fde_name: "TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-047
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "Islamabad Capital Territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 17
+    fde_name: "TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-ADM-001
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges"
+    region: "ICT"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 17
+    fde_name: "TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g7/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 17
+    fde_name: "TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-103
+    batch_name: "Islamic International Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [sector_token]
+    verdict: different
+    reason: "batch row is a medical/dental college (Islamic International Dental College); the FDE line is an FDE college. Shared sector ['g7/4'] is an address/word overlap, not the same institution."
+  - fde_key: 17
+    fde_name: "TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-189
+    batch_name: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "islamabad_capital_territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 18
+    fde_name: "IMCB,G9/4, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g9/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 19
+    fde_name: "Islamabad Model College for Boys H-9, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['h9/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 19
+    fde_name: "Islamabad Model College for Boys H-9, Islamabad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-109
+    batch_name: "Shifa College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan,'; the FDE line is an Islamabad college. Shared token(s) ['service'] only."
+  - fde_key: 20
+    fde_name: "Islamabad Model College for Boys Humak"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Boys Humak'); the FDE line is not a girls' college"
+  - fde_key: 21
+    fde_name: "Islamabad Model College for Boys, I-10/1, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i10/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 22
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR BOYS ,Street#17,I-10/1,ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i10/1'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-013
+    batch_name: "Mir Chakar Khan Rind University, Sibi Balochistan"
+    region: "Balochistan"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a university (Mir Chakar Khan Rind University, Sibi Balochistan); the FDE line is a college. Shared token(s) ['chakar', 'khan', 'mir'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-138
+    batch_name: "Mir Chakar Khan Rind University of Technology, Dera Ghazi Khan"
+    region: "Punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a university (Mir Chakar Khan Rind University of Technology, Dera Ghazi Khan); the FDE line is a college. Shared token(s) ['chakar', 'khan', 'mir'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i8/3'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-109
+    batch_name: "GOVT. COLLEGE S.S (N.H) GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '109 | GOVT. COLLEGE S.S (N.H) GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-110
+    batch_name: "Govt. Institute of Commerce, Gujar Khan"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '110 | Govt. Institute of Commerce, Gujar Khan'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-71
+    batch_name: "GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '71 | GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-89
+    batch_name: "GOVT. COLEGE FOR WOMEN GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '89 | GOVT. COLEGE FOR WOMEN GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-90
+    batch_name: "GOVT. COLLEGE FOR WOMEN MANGHOT,THESIL GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '90 | GOVT. COLLEGE FOR WOMEN MANGHOT,THESIL GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-99
+    batch_name: "GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '99 | GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 23
+    fde_name: "Islamabad Model College for Boys I-8/3, Islamabad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-109
+    batch_name: "Shifa College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan,'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 24
+    fde_name: "IMCB JABA TAILI"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB JABA TAILI'); the FDE line is not a girls' college"
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB JHANG SYEDAN ISLAMABAD'); the FDE line is not a girls' college"
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-111
+    batch_name: "GOVT. DEGREE COLLEGE FOR BOYS KALLAR SYEDAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '111 | GOVT. DEGREE COLLEGE FOR BOYS KALLAR SYEDAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['syedan'] only."
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-91
+    batch_name: "GOVT. DEGREE COLLEGE FOR WOMEN KALLAR SYEDAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '91 | GOVT. DEGREE COLLEGE FOR WOMEN KALLAR SYEDAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['syedan'] only."
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-32
+    batch_name: "HBS Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-45
+    batch_name: "Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-93
+    batch_name: "Dental College, Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental College, Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 25
+    fde_name: "IMCB JHANG SYEDAN ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-99
+    batch_name: "HBS Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 26
+    fde_name: "IMCB Mughal (FA) Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Mughal (FA) Islamabad'); the FDE line is not a girls' college"
+  - fde_key: 27
+    fde_name: "IMCB Nilore Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Nilore Islamabad'); the FDE line is not a girls' college"
+  - fde_key: 27
+    fde_name: "IMCB Nilore Islamabad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-106
+    batch_name: "Watim Dental College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Dental College T Chowk, Rawat Rawalpindi.'; the FDE line is an Islamabad college. Shared token(s) ['chowk'] only."
+  - fde_key: 27
+    fde_name: "IMCB Nilore Islamabad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-55
+    batch_name: "Watim Medical College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad f'; the FDE line is an Islamabad college. Shared token(s) ['chowk'] only."
+  - fde_key: 28
+    fde_name: "IMCB Pahg Panwal"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Pahg Panwal'); the FDE line is not a girls' college"
+  - fde_key: 29
+    fde_name: "IMCB, PIND BEGWAL (F.A) ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB, PIND BEGWAL (F.A) ISLAMABAD'); the FDE line is not a girls' college"
+  - fde_key: 30
+    fde_name: "IMCB PAKISTAN TOWN, ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB PAKISTAN TOWN, ISLAMABAD'); the FDE line is not a girls' college"
+  - fde_key: 31
+    fde_name: "IMCB Rawat"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-155
+    batch_name: "Pakistan Global Institute, Rawat"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Pakistan Global Institute, Rawat); the FDE line is a college. Shared token(s) ['rawat'] only."
+  - fde_key: 31
+    fde_name: "IMCB Rawat"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Rawat'); the FDE line is not a girls' college"
+  - fde_key: 31
+    fde_name: "IMCB Rawat"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-106
+    batch_name: "Watim Dental College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Dental College T Chowk, Rawat Rawalpindi.'; the FDE line is an Islamabad college. Shared token(s) ['rawat'] only."
+  - fde_key: 31
+    fde_name: "IMCB Rawat"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-55
+    batch_name: "Watim Medical College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad f'; the FDE line is an Islamabad college. Shared token(s) ['rawat'] only."
+  - fde_key: 32
+    fde_name: "IMCB Shah Allah Ditta"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-157
+    batch_name: "Pir Mehr Ali Shah Arid Agriculture University"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Pir Mehr Ali Shah Arid Agriculture University); the FDE line is a college. Shared token(s) ['shah'] only."
+  - fde_key: 32
+    fde_name: "IMCB Shah Allah Ditta"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCB Shah Allah Ditta'); the FDE line is not a girls' college"
+  - fde_key: 33
+    fde_name: "Islamabad Model College for Boys"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Boys'); the FDE line is not a girls' college"
+  - fde_key: 34
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR BOYS TARNOL ISLAMABAD."
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL COLLEGE FOR BOYS TARNOL ISLAMABAD.'); the FDE line is not a girls' college"
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f10/3'], batch row is F-7/2"
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-101
+    batch_name: "Govt. College of Commerce, Rawalpindi"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '101 | Govt. College of Commerce, Rawalpindi'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-102
+    batch_name: "Govt. Institute of Commerce, Rawalpindi Cantt"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '102 | Govt. Institute of Commerce, Rawalpindi Cantt'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-110
+    batch_name: "Govt. Institute of Commerce, Gujar Khan"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '110 | Govt. Institute of Commerce, Gujar Khan'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-82
+    batch_name: "Govt. Institute of Commerce (W), Rawalpindi"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '82 | Govt. Institute of Commerce (W), Rawalpindi'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-92
+    batch_name: "GOVT. COMMERCE COLLEGE, KAHUTA, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '92 | GOVT. COMMERCE COLLEGE, KAHUTA, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 35
+    fde_name: "ISLAMABAD MODEL COLLEGE OF COMMERCE FOR GIRLS F-10/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-94
+    batch_name: "GOVT. COLLEGE OF COMMERCE, MURREE"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '94 | GOVT. COLLEGE OF COMMERCE, MURREE'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 36
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-047
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "Islamabad Capital Territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 36
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-ADM-001
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges"
+    region: "ICT"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 36
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD')"
+  - fde_key: 36
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-189
+    batch_name: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "islamabad_capital_territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['shaheed'] is an address/word overlap, not the same institution."
+  - fde_key: 36
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-36
+    batch_name: "Islamabad Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Islamabad Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['bharakahu'] is an address/word overlap, not the same institution."
+  - fde_key: 37
+    fde_name: "Islamabad Model College for Girls (I-XII) Bhadana Kalan, F. A Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls (I-XII) Bhadana Kalan, F. A Islamabad')"
+  - fde_key: 38
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS( VI-XII) CHIRAH F.A ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL COLLEGE FOR GIRLS( VI-XII) CHIRAH F.A ISLAMABAD')"
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls Dhoke Gangal')"
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-105
+    batch_name: "GOVT. DEGREE COLLEGE FOR BOYS DHOKE SYEDIN"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '105 | GOVT. DEGREE COLLEGE FOR BOYS DHOKE SYEDIN'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-71
+    batch_name: "GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '71 | GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-72
+    batch_name: "GOVT. DEGREE COLLEGE FOR WOMEN DHOKE HASSU RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '72 | GOVT. DEGREE COLLEGE FOR WOMEN DHOKE HASSU RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-74
+    batch_name: "GOVT. DEGREE COLLEGE (W) DHOKE RATTA RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '74 | GOVT. DEGREE COLLEGE (W) DHOKE RATTA RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-79
+    batch_name: "GOVT. DEGREE COLLEGE FOR WOMEN, DHOKE MANGTAL, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '79 | GOVT. DEGREE COLLEGE FOR WOMEN, DHOKE MANGTAL, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-84
+    batch_name: "GOVT. DEGREE COLLEGE FOR WOMEN, DHOKE SYEDAIN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '84 | GOVT. DEGREE COLLEGE FOR WOMEN, DHOKE SYEDAIN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-109
+    batch_name: "Shifa College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan,'; the FDE line is an Islamabad college. Shared token(s) ['dhoke'] only."
+  - fde_key: 39
+    fde_name: "Islamabad Model College for Girls Dhoke Gangal"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-70
+    batch_name: "Fazaia Ruth Pfao Medical College"
+    region: ""
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Fazaia Ruth Pfao Medical College Shahrah-e-Faisal, PAF Faisal Base, Karachi (Letter sent t'; the FDE line is an Islamabad college. Shared token(s) ['fazaia'] only."
+  - fde_key: 40
+    fde_name: "IMCG.F.10/2"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f10/2'], batch row is F-7/2"
+  - fde_key: 41
+    fde_name: "Islamabad model college for girls F-11/3, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f11/3'], batch row is F-7/2"
+  - fde_key: 42
+    fde_name: "Islamabad Model College for Girls, St#25 F-6/2 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f6/2'], batch row is F-7/2"
+  - fde_key: 43
+    fde_name: "Islamabad Model College for Girls,F-7/4, Islamabad St.52"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f7/4'], batch row is F-7/2"
+  - fde_key: 44
+    fde_name: "Islamabad Model College for Girls F-8/1, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f8/1'], batch row is F-7/2"
+  - fde_key: 45
+    fde_name: "Islamabad Model College for Girls G-10/2 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g10/2'], batch row is F-7/2"
+  - fde_key: 46
+    fde_name: "Islamabad Model College for Girls Street#10 G-11/1, islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g11/1'], batch row is F-7/2"
+  - fde_key: 47
+    fde_name: "Islamabad Model College for Girls G-13/1, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g13/1'], batch row is F-7/2"
+  - fde_key: 48
+    fde_name: "Islamabad Model College for Girls G-14/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g14/4'], batch row is F-7/2"
+  - fde_key: 49
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS G-6/1-4. ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g6/1'], batch row is F-7/2"
+  - fde_key: 50
+    fde_name: "Islamabad Model College For Girls G-8/4,IBD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g8/4'], batch row is F-7/2"
+  - fde_key: 50
+    fde_name: "Islamabad Model College For Girls G-8/4,IBD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-142
+    batch_name: "Federal Medical College"
+    region: "islamabad_capital_territory"
+    matched_by: [sector_token]
+    verdict: different
+    reason: "batch row is a medical/dental college (Federal Medical College); the FDE line is an FDE college. Shared sector ['g8/4'] is an address/word overlap, not the same institution."
+  - fde_key: 51
+    fde_name: "Islamabad Model College for Girls,G-9/2,Isb"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g9/2'], batch row is F-7/2"
+  - fde_key: 52
+    fde_name: "Islamabad Model College for Girls Golra"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls Golra')"
+  - fde_key: 53
+    fde_name: "IMCG HERDOGHER"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG HERDOGHER')"
+  - fde_key: 54
+    fde_name: "Islamabad Model College for Girls (F.A) Humak"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls (F.A) Humak')"
+  - fde_key: 55
+    fde_name: "Islamabad Model College for Girls, St. 23, I-10/4, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i10/4'], batch row is F-7/2"
+  - fde_key: 56
+    fde_name: "Islamabad Model College for Girls I-14/3 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i14/3'], batch row is F-7/2"
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-047
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "Islamabad Capital Territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['ali'] is an address/word overlap, not the same institution."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-157
+    batch_name: "Pir Mehr Ali Shah Arid Agriculture University"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Pir Mehr Ali Shah Arid Agriculture University); the FDE line is a college. Shared token(s) ['ali'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-ADM-001
+    batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges"
+    region: "ICT"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges); the FDE line is an FDE college. Shared token(s) ['ali'] is an address/word overlap, not the same institution."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i8/3'], batch row is F-7/2"
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-biek-affiliated-government-colleges.xlsx"
+    inst_id: SD-BIEK-GOV-147
+    batch_name: "Raana Liaquat Ali Khan Govt. College of Home Economics"
+    region: "sindh"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region sindh, quote '147. Raana Liaquat Ali Khan Govt. College of Home Economics Stadium Road, Karachi.Ph # 992'; the FDE line is an Islamabad college. Shared token(s) ['ali', 'khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-grw.xlsx"
+    inst_id: PB-HEDCOL-GRW-11
+    batch_name: "GOVT. MAULANA ZAFAR ALI KHAN DEGREE COLLEGE WAZIRABAD, GUJRANWALA"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote 'GOVT. MAULANA ZAFAR ALI KHAN DEGREE COLLEGE WAZIRABAD, GUJRANWALA'; the FDE line is an Islamabad college. Shared token(s) ['ali', 'khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-grw.xlsx"
+    inst_id: PB-HEDCOL-GRW-22
+    batch_name: "Govt. Degree College (Boys), Kotla Arab Ali Khan, Gujrat"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote 'Govt. Degree College (Boys), Kotla Arab Ali Khan, Gujrat'; the FDE line is an Islamabad college. Shared token(s) ['ali', 'khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-grw.xlsx"
+    inst_id: PB-HEDCOL-GRW-90
+    batch_name: "GOVT.COLLEGE (W) KOTLA ARBAB ALI KHAN, GUJRAT"
+    region: "punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region punjab, quote 'GOVT.COLLEGE (W) KOTLA ARBAB ALI KHAN, GUJRAT'; the FDE line is an Islamabad college. Shared token(s) ['ali', 'khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-109
+    batch_name: "GOVT. COLLEGE S.S (N.H) GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '109 | GOVT. COLLEGE S.S (N.H) GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-110
+    batch_name: "Govt. Institute of Commerce, Gujar Khan"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '110 | Govt. Institute of Commerce, Gujar Khan'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-71
+    batch_name: "GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '71 | GOVT. DEGREE COLLEGE (W) DHOKE KALA KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-89
+    batch_name: "GOVT. COLEGE FOR WOMEN GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '89 | GOVT. COLEGE FOR WOMEN GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-90
+    batch_name: "GOVT. COLLEGE FOR WOMEN MANGHOT,THESIL GUJAR KHAN, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '90 | GOVT. COLLEGE FOR WOMEN MANGHOT,THESIL GUJAR KHAN, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-96
+    batch_name: "GOVT. HASHMAT ALI ISLAMIA DEGREE COLLEGE RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '96 | GOVT. HASHMAT ALI ISLAMIA DEGREE COLLEGE RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['ali'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-99
+    batch_name: "GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '99 | GOVT. DEGREE COLLEGE CHAK BELI KHAN RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-109
+    batch_name: "Shifa College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan,'; the FDE line is an Islamabad college. Shared token(s) ['khan'] only."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-189
+    batch_name: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University"
+    region: "islamabad_capital_territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University); the FDE line is an FDE college. Shared token(s) ['ali'] is an address/word overlap, not the same institution."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-45
+    batch_name: "Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['ali'] is an address/word overlap, not the same institution."
+  - fde_key: 57
+    fde_name: "Islamabad Model College For Girls I-8/3"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-93
+    batch_name: "Dental College, Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental College, Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['ali'] is an address/word overlap, not the same institution."
+  - fde_key: 58
+    fde_name: "IMCG I-8/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i8/4'], batch row is F-7/2"
+  - fde_key: 59
+    fde_name: "IMCG I-9/1, ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['i9/1'], batch row is F-7/2"
+  - fde_key: 60
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS (I-XII) JAGIOT (F.A) ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL COLLEGE FOR GIRLS (I-XII) JAGIOT (F.A) ISLAMABAD')"
+  - fde_key: 61
+    fde_name: "IMCG Kirpa IBD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Kirpa IBD')"
+  - fde_key: 62
+    fde_name: "Islamabad Model College for Girls, Korang Town, Islamabad."
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls, Korang Town, Islamabad.')"
+  - fde_key: 63
+    fde_name: "IMCG KOT HATHIAL"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG KOT HATHIAL')"
+  - fde_key: 64
+    fde_name: "IMCG LOHI BHEER"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG LOHI BHEER')"
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-130
+    batch_name: "Kohsar University, Murree"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Kohsar University, Murree); the FDE line is a college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL COLLEGE FOR MALPUR IBD'); the FDE line is not a girls' college"
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-60
+    batch_name: "GOVT. DEGREE COLLEGE FOR WOMEN MURREE, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '60 | GOVT. DEGREE COLLEGE FOR WOMEN MURREE, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-61
+    batch_name: "GOVT COLLEGE FOR WOMEN PHAGWARI MURREE"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '61 | GOVT COLLEGE FOR WOMEN PHAGWARI MURREE'; the FDE line is an Islamabad college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-70
+    batch_name: "GOVT. COLLEGE FOR WOMEN MURREE ROAD RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '70 | GOVT. COLLEGE FOR WOMEN MURREE ROAD RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-93
+    batch_name: "GOVT. COLLEGE MURREE (BOYS)"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '93 | GOVT. COLLEGE MURREE (BOYS)'; the FDE line is an Islamabad college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-94
+    batch_name: "GOVT. COLLEGE OF COMMERCE, MURREE"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '94 | GOVT. COLLEGE OF COMMERCE, MURREE'; the FDE line is an Islamabad college. Shared token(s) ['murree'] only."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-36
+    batch_name: "Islamabad Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Islamabad Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['murree'] is an address/word overlap, not the same institution."
+  - fde_key: 65
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR MALPUR IBD"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-90
+    batch_name: "Dental Section, Islamabad Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental Section, Islamabad Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['murree'] is an address/word overlap, not the same institution."
+  - fde_key: 66
+    fde_name: "IMCG (I-XII) MAIRA BEGWAL ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG (I-XII) MAIRA BEGWAL ISLAMABAD')"
+  - fde_key: 67
+    fde_name: "IMCG Mohra Nagial"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Mohra Nagial')"
+  - fde_key: 68
+    fde_name: "IMCG, NHC, Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG, NHC, Islamabad')"
+  - fde_key: 69
+    fde_name: "IMCG Nilore"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Nilore')"
+  - fde_key: 70
+    fde_name: "IMCG Pehount (FA) Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Pehount (FA) Islamabad')"
+  - fde_key: 71
+    fde_name: "IMCG PIND BEGWAL"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG PIND BEGWAL')"
+  - fde_key: 72
+    fde_name: "IMCG Punjgran"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Punjgran')"
+  - fde_key: 72
+    fde_name: "IMCG Punjgran"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-32
+    batch_name: "HBS Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 72
+    fde_name: "IMCG Punjgran"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-45
+    batch_name: "Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 72
+    fde_name: "IMCG Punjgran"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-93
+    batch_name: "Dental College, Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental College, Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 72
+    fde_name: "IMCG Punjgran"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-99
+    batch_name: "HBS Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-045
+    batch_name: "Quaid-i-Azam University"
+    region: "Islamabad Capital Territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Quaid-i-Azam University); the FDE line is a college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-160
+    batch_name: "Quaid e Azam Institute of Management Sciences Sargodha"
+    region: "Punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a university (Quaid e Azam Institute of Management Sciences Sargodha); the FDE line is a college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+    inst_id: PB-MED-008
+    batch_name: "Quaid-e-Azam Medical College, Bahawalpur"
+    region: "Punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region Punjab, quote '| 8 | Quaid-e-Azam Medical College, Bahawalpur | 297 |'; the FDE line is an Islamabad college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+    inst_id: PB-MED-024
+    batch_name: "Quaid-e-Azam Medical & Dental College Bahawalpur"
+    region: "Punjab"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region Punjab, quote '| 5 | *Quaid-e-Azam Medical &amp; Dental College Bahawalpur | 50 | - | - | - | - | - | - |'; the FDE line is an Islamabad college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Quaid.e.Azam university colony')"
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-Batch5-Universities-BS-v4.xlsx"
+    inst_id: UNI-QAU
+    batch_name: "Quaid-i-Azam University, Islamabad"
+    region: "ICT"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Quaid-i-Azam University, Islamabad); the FDE line is a college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-W12-biek-affiliated-private-colleges.xlsx"
+    inst_id: SD-BIEK-PVT-104
+    batch_name: "Quaid-e-Azam Rangers Public College, North Nazimabd"
+    region: "sindh"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region sindh, quote '104. Quaid-e-Azam Rangers Public College, North Nazimabd Rangers Complex, Block-A, North N'; the FDE line is an Islamabad college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-W12-biek-affiliated-private-colleges.xlsx"
+    inst_id: SD-BIEK-PVT-107
+    batch_name: "S.M.B Quaid-e-Azam Public Higher Secondary School"
+    region: "sindh"
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "different place: batch row region sindh, quote '107. S.M.B Quaid-e-Azam Public Higher Secondary School SMB-QAPS Camppus(Education City),Da'; the FDE line is an Islamabad college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-104
+    batch_name: "Margalla College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Margalla College of Dentistry Quaid-e-Azam Avenue, Gulrez Phase-III, Near High Court, Rawa'; the FDE line is an Islamabad college. Shared token(s) ['azam', 'quaid'] only."
+  - fde_key: 73
+    fde_name: "IMCG Quaid.e.Azam university colony"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-150
+    batch_name: "Quaid-e-Azam Medical College"
+    region: ""
+    matched_by: [two_name_tokens]
+    verdict: different
+    reason: "batch row is a medical/dental college (Quaid-e-Azam Medical College); the FDE line is an FDE college. Shared token(s) ['azam', 'quaid'] is an address/word overlap, not the same institution."
+  - fde_key: 74
+    fde_name: "IMCG Rawal Town"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Rawal Town')"
+  - fde_key: 74
+    fde_name: "IMCG Rawal Town"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-45
+    batch_name: "Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['rawal'] is an address/word overlap, not the same institution."
+  - fde_key: 74
+    fde_name: "IMCG Rawal Town"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-93
+    batch_name: "Dental College, Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [name_or_place_token_islamabad_row, token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental College, Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['rawal'] is an address/word overlap, not the same institution."
+  - fde_key: 75
+    fde_name: "Islamabad Model College for Girls, Rawat (F.A Islamabad)"
+    batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+    inst_id: PK-UNI-155
+    batch_name: "Pakistan Global Institute, Rawat"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a university (Pakistan Global Institute, Rawat); the FDE line is a college. Shared token(s) ['rawat'] only."
+  - fde_key: 75
+    fde_name: "Islamabad Model College for Girls, Rawat (F.A Islamabad)"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls, Rawat (F.A Islamabad)')"
+  - fde_key: 75
+    fde_name: "Islamabad Model College for Girls, Rawat (F.A Islamabad)"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-106
+    batch_name: "Watim Dental College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Dental College T Chowk, Rawat Rawalpindi.'; the FDE line is an Islamabad college. Shared token(s) ['rawat'] only."
+  - fde_key: 75
+    fde_name: "Islamabad Model College for Girls, Rawat (F.A Islamabad)"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-55
+    batch_name: "Watim Medical College"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad f'; the FDE line is an Islamabad college. Shared token(s) ['rawat'] only."
+  - fde_key: 76
+    fde_name: "IMCG Tarlai"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('IMCG Tarlai')"
+  - fde_key: 76
+    fde_name: "IMCG Tarlai"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-32
+    batch_name: "HBS Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['tarlai'] is an address/word overlap, not the same institution."
+  - fde_key: 76
+    fde_name: "IMCG Tarlai"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-99
+    batch_name: "HBS Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Dental College); the FDE line is an FDE college. Shared token(s) ['tarlai'] is an address/word overlap, not the same institution."
+  - fde_key: 77
+    fde_name: "Islamabad Model College for Girls Thanda Pani"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('Islamabad Model College for Girls Thanda Pani')"
+  - fde_key: 77
+    fde_name: "Islamabad Model College for Girls Thanda Pani"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-32
+    batch_name: "HBS Medical & Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Medical & Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 77
+    fde_name: "Islamabad Model College for Girls Thanda Pani"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-45
+    batch_name: "Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 77
+    fde_name: "Islamabad Model College for Girls Thanda Pani"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-93
+    batch_name: "Dental College, Rawal Institute of Health Sciences"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (Dental College, Rawal Institute of Health Sciences); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 77
+    fde_name: "Islamabad Model College for Girls Thanda Pani"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-99
+    batch_name: "HBS Dental College"
+    region: "islamabad_capital_territory"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "batch row is a medical/dental college (HBS Dental College); the FDE line is an FDE college. Shared token(s) ['lehtrar'] is an address/word overlap, not the same institution."
+  - fde_key: 78
+    fde_name: "ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family, sector_token]
+    verdict: same
+    reason: "Both name the Islamabad Model College for Girls (postgraduate) in sector F-7/2, Islamabad. FDE line: 'ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD'; batch name 'Islamabad Model College for Girls (PG) F-7/2', quote 'IMCG (PG) F-7/2, Islamabad'. Only one batch row names an F-7/2 college (IC-ADM-002 is the FDE admission body, not a college), so the pair is not ambiguous."
+  - fde_key: 79
+    fde_name: "Islamabad Model College for Girls ( Post-Graduate Margalla) F-7/4"
+    batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+    inst_id: PB-MED-071
+    batch_name: "Margalla Institute of Health Sciences, Rawalpindi"
+    region: "Punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region Punjab, quote '| 14 | Margalla Institute of Health Sciences, Rawalpindi | 75 |'; the FDE line is an Islamabad college. Shared token(s) ['margalla'] only."
+  - fde_key: 79
+    fde_name: "Islamabad Model College for Girls ( Post-Graduate Margalla) F-7/4"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['f7/4'], batch row is F-7/2"
+  - fde_key: 79
+    fde_name: "Islamabad Model College for Girls ( Post-Graduate Margalla) F-7/4"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-104
+    batch_name: "Margalla College of Dentistry"
+    region: ""
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region none, quote 'Margalla College of Dentistry Quaid-e-Azam Avenue, Gulrez Phase-III, Near High Court, Rawa'; the FDE line is an Islamabad college. Shared token(s) ['margalla'] only."
+  - fde_key: 80
+    fde_name: "IMCG(PG) G 10/4, ISLAMABAD"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['g10/4'], batch row is F-7/2"
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "different sector: FDE line is in ['h8/4'], batch row is F-7/2; the FDE line is not a girls' college"
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-101
+    batch_name: "Govt. College of Commerce, Rawalpindi"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '101 | Govt. College of Commerce, Rawalpindi'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-102
+    batch_name: "Govt. Institute of Commerce, Rawalpindi Cantt"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '102 | Govt. Institute of Commerce, Rawalpindi Cantt'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-110
+    batch_name: "Govt. Institute of Commerce, Gujar Khan"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '110 | Govt. Institute of Commerce, Gujar Khan'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-82
+    batch_name: "Govt. Institute of Commerce (W), Rawalpindi"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '82 | Govt. Institute of Commerce (W), Rawalpindi'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-92
+    batch_name: "GOVT. COMMERCE COLLEGE, KAHUTA, RAWALPINDI"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '92 | GOVT. COMMERCE COLLEGE, KAHUTA, RAWALPINDI'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx"
+    inst_id: PB-HEDCOL-RWP-94
+    batch_name: "GOVT. COLLEGE OF COMMERCE, MURREE"
+    region: "punjab"
+    matched_by: [token_in_batch_quote_islamabad_area]
+    verdict: different
+    reason: "different place: batch row region punjab, quote '94 | GOVT. COLLEGE OF COMMERCE, MURREE'; the FDE line is an Islamabad college. Shared token(s) ['commerce'] only."
+  - fde_key: 81
+    fde_name: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    batch_file: "PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx"
+    inst_id: PK-PMDC-50
+    batch_name: "Shifa College of Medicine"
+    region: "islamabad_capital_territory"
+    matched_by: [sector_token]
+    verdict: different
+    reason: "batch row is a medical/dental college (Shifa College of Medicine); the FDE line is an FDE college. Shared sector ['h8/4'] is an address/word overlap, not the same institution."
+  - fde_key: 82
+    fde_name: "ISLAMABAD MODEL POSTGRADUATE COLLEGE H-8"
+    batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+    inst_id: IC-COL-001
+    batch_name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: "ICT"
+    matched_by: [same_name_family]
+    verdict: different
+    reason: "FDE line names a different place and no F-7/2 address ('ISLAMABAD MODEL POSTGRADUATE COLLEGE H-8'); the FDE line is not a girls' college"

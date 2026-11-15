@@ -1,0 +1,137 @@
+ref: claude-w12-fde-alias-check-2
+task: W12 D-FDE alias check (independent; alias-check1.yaml not read)
+date: 2026-11-15
+inputs:
+  fde_csv: .local-ci/work/W12/FDE/E2/fde-hssc-participating-colleges.csv   # 82 rows, doc_sha256 20331e1e0dfd9e17e48b68224d0318f5626ee1186a652b7e2c0d243b6e418f81
+  batch_sheets: Institutions sheet of PAI-Research-Batch1..5-*-v4.xlsx and all 14 PAI-Research-W12-*.xlsx (2075 non-empty rows)
+  read_with: docker run --rm pai-ci-py python -I, openpyxl, repo mounted :ro
+method:
+  - step: region pass. Listed every batch row whose region is ICT in any spelling ("Islamabad Capital Territory", "islamabad_capital_territory", "ICT", "ICT (multi-campus)", "Islamabad / federal"). That is 54 rows. I read each one by hand against all 82 FDE lines.
+  - step: keyword pass over all 2075 rows (name, city, source_quote, claude_note, urls). Keywords were islamabad, isb, ibd, IMCB, IMCG, "model college", polytechnic, "home economics", "federal directorate", FDE, tanveer, margalla, bharakahu, tarlai, nilore, rawat, golra, humak, sihala, tarnol, chak shahzad, and sector codes such as F-7/2. This catches region=None rows (159, all PMDC).
+  - step: token pass. For each FDE line I took its distinctive tokens (normalized sector code like f7/2, and locality words, with generic words removed) and searched rows that are ICT or mention Islamabad. Every overlap, apart from generic words (road, sector, pakistan, women), is listed below as a candidate.
+  - rule: a university is not a college, a campus is not its parent body, and an admission body or board is not a college.
+
+candidates:
+  - fde_key: "78"
+    fde_quote: "78 | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD F7 MARKAZ"
+    batch_file: PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    inst_id: IC-COL-001
+    name: "Islamabad Model College for Girls (PG) F-7/2"
+    region: ICT
+    type: government_college
+    source_url: https://www.imcgf72.edu.pk/Admissin_Policy.aspx
+    source_quote: "The number of seats available in IMCG (PG) F-7/2, Islamabad in different faculties is given below:"
+    verdict: same
+    reason: >-
+      Same name ("Islamabad Model College for Girls", "(PG)" = "(POSTGRADUATE)"), same sector code F-7/2, both Islamabad, both FDE-run public colleges.
+      The batch row's official_url, imcgf72.edu.pk, encodes F-7/2. The F-7/2 sector has only one IMCG (PG) in the FDE list. Key 79 is the Margalla PG college at F-7/4 and key 43 is the F-7/4 college.
+      Key 78 must become an alias of IC-COL-001 and must not be loaded again.
+  - fde_key: "79"
+    fde_quote: "79 | Islamabad Model College for Girls ( Post-Graduate Margalla) F-7/4 | Main Bazar Sohan Niazi Book Center"
+    inst_id: IC-COL-001
+    verdict: different
+    reason: The sector is F-7/4, not F-7/2, and the name has the extra word "Margalla". The FDE list itself lists it separately from key 78.
+  - fde_key: "43"
+    fde_quote: "43 | Islamabad Model College for Girls,F-7/4, Islamabad St.52"
+    inst_id: IC-COL-001
+    verdict: different
+    reason: F-7/4 is a different sector, and this college is not postgraduate.
+  - fde_key: "80"
+    fde_quote: "IMCG(PG) G 10/4, ISLAMABAD"
+    inst_id: IC-COL-001
+    verdict: different
+    reason: It is also an IMCG (PG), but at G-10/4, a different sector.
+  - fde_key: all (1-82)
+    inst_id: IC-ADM-002
+    name: "Federal Directorate of Education (FDE) — HSSC-I admissions in Islamabad Model Colleges"
+    verdict: different
+    reason: This row is the admission body (the parent directorate), not a college. None of the 82 lines is the directorate itself.
+  - fde_key: all (1-82)
+    inst_id: PK-BRD-029
+    name: "Federal Board of Intermediate & Secondary Education (FBISE)"
+    verdict: different
+    reason: This row is an examination board, not a college.
+  - fde_key: "73"
+    fde_quote: "73 | IMCG Quaid.e.Azam university colony"
+    inst_id: [PK-UNI-045 (Batch1), UNI-QAU (Batch5)]
+    name: Quaid-i-Azam University
+    verdict: different
+    reason: The line is a girls' college located in the QAU staff colony. The batch rows are the university, and a university is not a college.
+  - fde_key: "76"
+    fde_quote: "76 | IMCG Tarlai | Nilore Islamabad"
+    inst_id: [PK-PMDC-32, PK-PMDC-99]
+    name: HBS Medical & Dental College / HBS Dental College
+    verdict: different
+    reason: The only shared token is the locality Tarlai. The batch rows are a private medical and a dental college.
+  - fde_key: "81"
+    fde_quote: "Islamabad Model Post Graduate College of Commerce H-8/4 Islamabad"
+    inst_id: PK-PMDC-50
+    name: Shifa College of Medicine
+    verdict: different
+    reason: The only shared token is the sector H-8/4. The batch row is a private medical college.
+  - fde_key: "50"
+    fde_quote: "Islamabad Model College For Girls G-8/4,IBD"
+    inst_id: [PK-PMDC-142, IC-MED-01]
+    name: Federal Medical College
+    verdict: different
+    reason: The only shared token is the sector G-8/4. The batch rows are a public medical college.
+  - fde_key: "17"
+    fde_quote: "17 | TANVEER HUSSAIN SHAHEED MODEL COLLEGE FOR BOYS (VI-XII) G-7/4"
+    inst_id: PK-PMDC-103
+    name: Islamic International Dental College
+    verdict: different
+    reason: The only shared token is the sector G-7/4. The batch row is a dental college. The "Shaheed" overlap with the SZABMU rows (PK-UNI-047, IC-ADM-001, PK-PMDC-189) is a generic word.
+  - fde_key: ["31", "75"]
+    fde_quote: ["31 | IMCB Rawat", "Islamabad Model College for Girls, Rawat (F.A Islamabad)"]
+    inst_id: [PK-PMDC-55, PK-UNI-155]
+    name: Watim Medical College / Pakistan Global Institute, Rawat
+    verdict: different
+    reason: The only shared token is the locality Rawat. The batch rows are a medical college and a university (region Punjab).
+  - fde_key: ["5", "36"]
+    fde_quote: ["5 | IMCB BHARAKAHU | Bharakahu Islamabad", "ISLAMABAD MODEL COLLEGE FOR GIRLS BHARAKAHU ISLAMABAD"]
+    inst_id: PK-PMDC-36
+    name: Islamabad Medical & Dental College
+    verdict: different
+    reason: The only shared token is the locality Bharakahu. The batch row is a medical college.
+  - fde_key: "74"
+    fde_quote: "74 | IMCG Rawal Town"
+    inst_id: [PK-PMDC-45, PK-PMDC-93]
+    name: Rawal Institute of Health Sciences / its Dental College
+    verdict: different
+    reason: The only shared word is "Rawal". The batch rows are medical and dental institutes.
+  - fde_key: "39"
+    fde_quote: "39 | Islamabad Model College for Girls Dhoke Gangal | Near Fazaia Colony Islamabad"
+    inst_id: PK-PMDC-70
+    name: Fazaia Ruth Pfao Medical College
+    verdict: different
+    reason: The only shared word is "Fazaia", which appears in the FDE line's address landmark. The batch row is a medical college.
+  - fde_key: "4"
+    fde_quote: "4 | Institute of Home Economics, Art & Design, F-11/1 Islamabad | F-11/1, Hilal Road, Islamabad"
+    inst_id: [PK-UNI-182, PK-UNI-043]
+    name: University of Home Economics, Lahore / Pakistan Institute of Development Economics
+    verdict: different
+    reason: The first is a university in Lahore. The second is a university, and its only overlap is the word "economics".
+  - fde_key: ["25", "65", "72", "77"]
+    inst_id: [PK-PMDC-32, PK-PMDC-36, PK-PMDC-45, PK-PMDC-90, PK-PMDC-93, PK-PMDC-99]
+    verdict: different
+    reason: The only overlap is road names in addresses (Lehtrar Road, Murree Road). The batch rows are medical and dental colleges.
+  - fde_key: "1"
+    fde_quote: "1 | Govt. Polytechnic Institute for Women | H-8/1, Islamabad"
+    inst_id: none
+    verdict: different
+    reason: No batch row is a polytechnic in ICT. The only overlap is the word "women", which hits women's universities in other regions.
+
+unclear: []
+
+summary:
+  fde_rows: 82
+  batch_rows_scanned: 2075
+  ict_batch_rows_read_manually: 54
+  same: 1   # FDE key 78 -> IC-COL-001 (Batch4 v4), Islamabad Model College for Girls (PG) F-7/2
+  different: all other candidates
+  unclear: 0
+  load_as_new_rows: 81   # keys 1-77 and 79-82
+  alias_rows: 1          # key 78
+  note: >-
+    No other FDE college (IMCB/IMCG/commerce/polytechnic/home-economics) exists as a row in any Batch v4 or W12 Institutions sheet.
+    IC-COL-001's claude_note says "Other FDE colleges: not collected", which matches this result.
