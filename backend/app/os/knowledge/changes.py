@@ -2,7 +2,8 @@
 
 Used by the admin API (knowledge.manual), research and the freshness sweeper. Plans change only through the
 kernel (invariant 1): `complete_review` and `service.recompile` (which calls `kernel.revise`). Only plans for
-the fact's intake year are touched (handoff M17). A programme fact also re-checks its students'
+the fact's intake year are touched (handoff M17). The R-39 events of the change are recorded on those plans first
+(replan.detectors). A programme fact also re-checks its students'
 eligibility, which writes a note when a verdict changes (Slice 4 S4-D7).
 """
 
@@ -38,6 +39,13 @@ def after_fact_change(service, kernel, scope: str, ref: str, field: str, fact_id
     if complete:  # a check cancelled since it was listed (its programme left the plan) is not completed
         for task_id in waiting:
             kernel.complete_review(task_id, {"fact_id": fact_id, "status": status}, only_if_waiting=True)
+    from app.os.replan import detectors  # imported here: replan imports knowledge
+
+    try:  # R-39 (ADR-001 D12): an event is extra, like a note: it must never stop a fact from being stored
+        detectors.on_fact_change(service.engine, kernel.tenant_id, plan_ids, scope, ref, field, fact_id, intake_year,
+                                 service.today())
+    except Exception:
+        log.exception("R-39 event detection failed after a fact change: %s %s", ref, field)
     revised = [p for p in plan_ids if service.recompile(p, "fact_changed") is not None]
     if scope == "programme":
         from app.os.eligibility import notes  # imported here: notes imports knowledge

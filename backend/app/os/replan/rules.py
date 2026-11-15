@@ -31,6 +31,12 @@ REASONS = {
     "fact_all_below": "The student's facts no longer meet any place on this plan; the Counsellor decides with the "
                       "student.",
 }
+# R-39 (ADR-001 D12). The master spec names these events but gives none of them a plan change of its own, so each is only
+# recorded (closed by an empty applied proposal, never handed to the Supervisor). A changed date's revision is row 6.10's:
+# `after_fact_change` recompiles the plans that use the fact, under the compiler's trust rules (an unconfirmed date
+# leaves its steps provisional). `merit_list.not_listed` removes nothing: rounds carry an application forward (SI-08).
+RECORD_ONLY = ("merit_list.published", "merit_list.not_listed", "merit_list.next_round", "fee_deposit.due",
+               "test.result_published", "admission.schedule_changed")
 MESSAGE = "Please do this soon so your plan stays on time."
 CLOSED = ("done", "cancelled", "skipped")
 _NEVER = datetime(1970, 1, 1, tzinfo=timezone.utc)  # a step with no date sorts first
@@ -183,4 +189,6 @@ def rules_for(event: Event, state: PlanState, cfg: ReplanConfig) -> list[Op] | H
         return [CancelProgramme(programme_ref=ref,
                                 reason=REASONS["fact_below" if ref in state.below else "field_excluded"])
                 for ref in gone]
+    if event.type in RECORD_ONLY:
+        return []  # R-39: the event is recorded and closed; no plan change of its own (see RECORD_ONLY)
     return Handover(f"no rule for '{event.type}'")

@@ -371,6 +371,10 @@ class Kernel:
                 replan_events.record(conn, self.tenant_id, row.plan_id, "admission_rejected",
                                      {"programme_ref": row.programme_ref, "instance_key": row.instance_key},
                                      f"task:{task_id}", task_id)
+            from app.os.replan import detectors  # R-39: the student's answer may give an event (data, never a name)
+
+            detectors.on_answer(conn, self.tenant_id, row.plan_id, task_id, row.instance_key, row.programme_ref,
+                                payload)
             conn.info[_QUIET] = True  # the student's own tick: the next student step is not announced as "needed"
             try:
                 self._promote(conn, row.plan_id)

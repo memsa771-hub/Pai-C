@@ -12,6 +12,7 @@ from sqlalchemy import Engine, func, select
 
 from app.os import models
 from app.os.knowledge.research.readings import AgentRuns, cost
+from app.os.replan import detectors
 from app.os.replan import events as ev
 from app.os.replan.apply import Replanner, ops_of
 from app.os.replan.rules import Handover, Retry, is_request_step, rules_for
@@ -147,7 +148,8 @@ def register_replan(engine: Engine, settings: OsSettings, replanner: Replanner, 
 
 
 def run_replan_job(replanner: Replanner, client: DBOSClient, now) -> int:
-    """Every 5 minutes (the worker's job): sweep for newer playbooks and changed approved files, expire answered-late
+    """Every 5 minutes (the worker's job): sweep for newer playbooks, changed approved files and merit-list or result
+    days that came (R-39), expire answered-late
     proposals, then enqueue one replan per pending event of every plan whose changes are not paused."""
     engine, tenant = replanner.engine, replanner.tenant
     P = models.plans
@@ -158,6 +160,7 @@ def run_replan_job(replanner: Replanner, client: DBOSClient, now) -> int:
         try:
             replanner.plans.check_newer(plan_id)
             ev.detect_approved_changed(engine, tenant, plan_id)
+            detectors.detect_reached(engine, tenant, plan_id, replanner.plans.today())  # R-39: a list or result day came
         except Exception:  # noqa: BLE001  (logged; the plan is swept again in 5 minutes)
             log.exception("replan sweep failed for plan %s", plan_id)
     replanner.expire_due(now)

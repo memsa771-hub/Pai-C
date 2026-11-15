@@ -1,0 +1,11 @@
+# What a student may see on their plan screen, card or notification for each R-39 event (master R-39, R-45: never in
+# chat). Drafted for P3-T7 and stored `approved: false` until the owner approves the wording: until then
+# event_texts.note returns them only in rehearsal mode (null otherwise), like choice_texts.yaml.
+version: 1
+approved: false
+merit_list.published: A merit list for one of your places is out. Check whether your name is on it.
+merit_list.not_listed: You told us your name is not on this merit list. Your plan stays as it is.
+merit_list.next_round: A further merit list round has a new date. Your plan follows it.
+fee_deposit.due: A fee for one of your places has a date to pay by. Your plan shows it.
+test.result_published: A result you are waiting for is out.
+admission.schedule_changed: A date in your admission schedule changed. Your plan follows the new date.
