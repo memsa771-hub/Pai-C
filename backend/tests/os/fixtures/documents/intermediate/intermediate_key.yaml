@@ -1,0 +1,145 @@
+bundles:
+  i1:
+    expect: []
+  i2:
+    expect:
+    - field: full_name
+      kind: mismatch
+  i3:
+    expect:
+    - field: full_name
+      kind: variant
+documents:
+  i1_character_certificate.png:
+    fields:
+      holder_name: Sana Testwala
+      issuing_authority: Exampleton Model College (college-a.test)
+    person: i1
+    type: character_certificate
+  i1_domicile_certificate.png:
+    fields:
+      holder_name: Sana Testwala
+      issuing_authority: Sample District Office (district-a.test)
+    person: i1
+    type: domicile_certificate
+  i1_equivalence_certificate.png:
+    fields:
+      equivalent_level: Secondary School Certificate
+      holder_name: Sana Testwala
+      issuing_authority: Sample Equivalence Office (equivalence.test)
+    person: i1
+    type: equivalence_certificate
+  i1_fee_challan_receipt.png:
+    fields:
+      holder_name: Sana Testwala
+      issuing_authority: Sample Bank, Exampleton Branch (bank.test)
+    person: i1
+    type: fee_challan_receipt
+  i1_migration_certificate.png:
+    fields:
+      holder_name: Sana Testwala
+      issuing_authority: Sample Board of Education (board-a.test)
+    person: i1
+    type: migration_certificate
+  i1_national_identity_card.png:
+    fields:
+      holder_name: Sana Testwala
+      identity_number: 00000-0000001-1
+      issuing_authority: Sample Identity Office (identity.test)
+    person: i1
+    type: national_identity_card
+  i1_o_a_level_statement.png:
+    fields:
+      holder_name: Sana Testwala
+      issuing_authority: Sample Examinations Body (exams.test)
+    person: i1
+    type: o_a_level_statement
+  i2_character_certificate.png:
+    fields:
+      holder_name: Omar Fixture
+      issuing_authority: Exampleton Model College (college-a.test)
+    person: i2
+    type: character_certificate
+  i2_domicile_certificate.png:
+    fields:
+      holder_name: Omar Fixture
+      issuing_authority: Sample District Office (district-a.test)
+    person: i2
+    type: domicile_certificate
+  i2_equivalence_certificate.png:
+    fields:
+      equivalent_level: Higher Secondary School Certificate
+      holder_name: Omar Fixture
+      issuing_authority: Sample Equivalence Office (equivalence.test)
+    person: i2
+    type: equivalence_certificate
+  i2_fee_challan_receipt.png:
+    fields:
+      holder_name: Bilal Placeholder
+      issuing_authority: Sample Bank, Exampleton Branch (bank.test)
+    person: i2
+    type: fee_challan_receipt
+  i2_migration_certificate.png:
+    fields:
+      holder_name: Omar Fixture
+      issuing_authority: Sample Board of Education (board-a.test)
+    person: i2
+    type: migration_certificate
+  i2_national_identity_card.png:
+    fields:
+      holder_name: Omar Fixture
+      identity_number: 00000-0000002-2
+      issuing_authority: Sample Identity Office (identity.test)
+    person: i2
+    type: national_identity_card
+  i2_o_a_level_statement.png:
+    fields:
+      holder_name: Omar Fixture
+      issuing_authority: Sample Examinations Body (exams.test)
+    person: i2
+    type: o_a_level_statement
+  i3_character_certificate.png:
+    fields:
+      holder_name: Muhammad Danish Sample
+      issuing_authority: Exampleton Model College (college-a.test)
+    person: i3
+    type: character_certificate
+  i3_domicile_certificate.png:
+    fields:
+      holder_name: Muhammad Danish Sample
+      issuing_authority: Sample District Office (district-a.test)
+    person: i3
+    type: domicile_certificate
+  i3_equivalence_certificate.png:
+    fields:
+      equivalent_level: Secondary School Certificate
+      holder_name: Muhammad Danish Sample
+      issuing_authority: Sample Equivalence Office (equivalence.test)
+    person: i3
+    type: equivalence_certificate
+  i3_fee_challan_receipt.png:
+    fields:
+      holder_name: Muhammad Danish Sample
+      issuing_authority: Sample Bank, Exampleton Branch (bank.test)
+    person: i3
+    type: fee_challan_receipt
+  i3_migration_certificate.png:
+    fields:
+      holder_name: Mohammad Danish Sample
+      issuing_authority: Sample Board of Education (board-a.test)
+    person: i3
+    type: migration_certificate
+  i3_national_identity_card.png:
+    fields:
+      holder_name: Muhammad Danish Sample
+      identity_number: 00000-0000003-3
+      issuing_authority: Sample Identity Office (identity.test)
+    person: i3
+    type: national_identity_card
+  i3_o_a_level_statement.png:
+    fields:
+      holder_name: Muhammad Danish Sample
+      issuing_authority: Sample Examinations Body (exams.test)
+    person: i3
+    type: o_a_level_statement
+verified: true
