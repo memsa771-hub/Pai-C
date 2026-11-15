@@ -15,6 +15,7 @@ from app.os.adapters.counsellor.escalation import applied_version
 from app.os.adapters.counsellor.store import IntakeStore, SweepStore
 from app.os.kernel.states import PLAN_OPEN
 from app.os.playbooks import PlaybookError, select_playbook
+from app.os.settings import released_families
 
 _NEEDED = ("decision_id", "journey_id", "student_ref", "chosen_at")
 
@@ -55,9 +56,11 @@ def latest_version(student_ref: str) -> int | None:
 
 
 def supports(origin: str, destination: str, level: str) -> bool:
-    """Whether a playbook exists for the route (every level, intermediate too: D-u)."""
+    """Whether a playbook exists for the route (every level, intermediate too: D-u). A family playbook counts only
+    while its release flag is on (P3-T1, ADR-001 D14)."""
+    svc = ports.services()
     try:
-        select_playbook(ports.services().plans.playbooks, origin, destination, level)
+        select_playbook(svc.plans.playbooks, origin, destination, level, released=released_families(svc.settings))
     except PlaybookError:
         return False
     return True

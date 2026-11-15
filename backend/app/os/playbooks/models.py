@@ -38,9 +38,13 @@ class Dependency(_Model):
 
 
 class Condition(_Model):
+    """`of: system` (P3-T1, ADR-001 D5): the fact is read from the step's admission system (resolved from the registry
+    by the compiler, P3-T4), not from the route or the programme. Only in a family playbook, on a step that has a
+    system in scope."""
     fact: str
     in_: list[str] | None = Field(None, alias="in")
     present: bool | None = None
+    of: Literal["system"] | None = None
 
     @model_validator(mode="after")
     def _one_test(self) -> "Condition":
@@ -54,6 +58,12 @@ NOTE_FIELDS = frozenset({"date", "due", "days", "weeks", "days_left"})
 
 def placeholders(note: str) -> set[str]:
     return {name for _, name, _, _ in Formatter().parse(note) if name is not None}
+
+
+def formatted_placeholders(text: str) -> list[str]:
+    """Placeholders with a conversion or a format spec (`{system!r}`, `{body:>10}`): never allowed in a title."""
+    return [f"{{{name}{'!' + conv if conv else ''}{':' + spec if spec else ''}}}"
+            for _, name, spec, conv in Formatter().parse(text) if name is not None and (spec or conv)]
 
 
 class Anchor(_Model):
@@ -70,6 +80,9 @@ class Anchor(_Model):
     date); `note_passed_earliest`: the same when the date is the earliest of several programmes'."""
     fact: str
     programme: Literal["visa"] | None = None
+    # P3-T1 (ADR-001 D5): the date comes from the step's admission system, or from that system's calendar, both
+    # resolved from the registry (P3-T4). Only in a family playbook, on a step that has a system in scope.
+    of: Literal["system", "system_calendar"] | None = None
     note: str | None = None
     note_earliest: str | None = None  # the note when the date is the earliest of several programmes' (provisional)
     waiting: str | None = None
@@ -101,6 +114,16 @@ class LeadTime(_Model):
             raise ValueError("lead_time needs exactly one of 'days' or 'constant'")
         return self
 
+
+# P3-T1 (ADR-001 D5): names a step title may hold, filled from registry names at compile time (P3-T4), by the fan-out
+# that brings them into scope. A step per programme has one place, so its system, body and institution; a step per
+# system has its system and that system's body, but no single institution. A step that does not fan out has none.
+TITLE_FIELDS: dict[str, frozenset[str]] = {
+    "none": frozenset(),
+    "programme": frozenset({"system", "body", "institution"}),
+    "system": frozenset({"system", "body"}),
+}
+FAMILY_CODE = r"^[a-z][a-z0-9_]*$"  # a registry / allow-list family code; its release flag is derived from it (D14)
 
 REQUEST_TEMPLATES = ("provide", "which_is_right", "result_expected")  # template keys of the compiler's request steps
 Evidence = Literal["stated", "shown", "confirmed"]
@@ -159,7 +182,7 @@ class TaskTemplate(_Model):
     kind: Literal["work", "student"]
     inbox_kind: Literal["provide", "approve", "act", "choose"] | None = None
     depends_on: list[Dependency] = []
-    fan_out: Literal["none", "programme"] = "none"
+    fan_out: Literal["none", "programme", "system"] = "none"  # `system`: P3-T1, a family playbook only (D5)
     condition: Condition | None = None
     anchor: Anchor | None = None
     lead_time: LeadTime | None = None
@@ -183,7 +206,50 @@ class TaskTemplate(_Model):
         if self.anchor and (self.anchor.note_passed or self.anchor.note_passed_earliest) and not self.lead_time:
             raise ValueError(f"anchor.note_passed needs a lead_time: without one the date cannot pass early "
                              f"({self.template_key})")
+        self._check_system_scope()
         return self
+
+    @property
+    def title_placeholders(self) -> set[str]:
+        return placeholders(self.title)
+
+    @property
+    def uses_systems(self) -> bool:
+        """The step needs the registry's admission systems resolved (P3-T1, D5): it fans out per system, reads a fact
+        or a date `of` its system, or names a registry name in its title."""
+        return (self.fan_out == "system" or bool(self.condition and self.condition.of)
+                or bool(self.anchor and self.anchor.of) or bool(self.title_placeholders))
+
+    def _check_system_scope(self) -> None:
+        """A system is in scope only on a step that fans out per system, or per programme (a place resolves to the one
+        system that admits it). Without one, `of: system`, `of: system_calendar` and title names are misuse."""
+        key = self.template_key
+        in_scope = self.fan_out in ("system", "programme")
+        if self.anchor and self.anchor.of and self.anchor.programme:
+            raise ValueError(f"anchor.of and anchor.programme name two sources for one date; keep one ({key})")
+        if self.anchor and self.anchor.of and not in_scope:
+            raise ValueError(f"anchor.of: {self.anchor.of} needs a system in scope: fan the step out per system or "
+                             f"per programme ({key})")
+        if self.condition and self.condition.of and not in_scope:
+            raise ValueError(f"condition.of: {self.condition.of} needs a system in scope: fan the step out per system "
+                             f"or per programme ({key})")
+        try:
+            names = self.title_placeholders
+            formatted = formatted_placeholders(self.title)
+        except ValueError as e:
+            raise ValueError(f"title of {key} is not a valid template ({e})") from None
+        if formatted:
+            raise ValueError(f"title placeholder {formatted} of {key} has a conversion or format spec; write the plain "
+                             f"name only")
+        for name in sorted(names):
+            if name not in TITLE_FIELDS["programme"]:
+                raise ValueError(f"unknown title placeholder {{{name}}} in {key} (known: "
+                                 f"{sorted(TITLE_FIELDS['programme'])})")
+        allowed = TITLE_FIELDS[self.fan_out]
+        outside = sorted(names - allowed)
+        if outside:
+            raise ValueError(f"title placeholder {outside} of {key} is not in scope on a step with fan_out: "
+                             f"{self.fan_out} (in scope: {sorted(allowed) or 'none'})")
 
 
 class Constant(_Model):
@@ -241,6 +307,9 @@ class Playbook(_Model):
     key: str
     version: int = Field(ge=1)
     route: Route
+    # P3-T1 (ADR-001 D1): the registry and allow-list family code this playbook serves. Code maps a playbook to a family
+    # only through this field. A playbook with it is offered for new plans only while its release flag is on (D14).
+    family: str | None = Field(None, pattern=FAMILY_CODE)
     default_timezone: str
     require_citations: bool = False
     applies_to: AppliesTo | None = None  # P2-D25: the intakes this version is for; None = all
@@ -311,11 +380,27 @@ class Playbook(_Model):
                                          f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
+        self._check_family_units()
         self._durations_are_sourced_or_estimated()
         self._check_needs()
         self._check_pages()
         self._check_sources()
         return self
+
+    @property
+    def uses_systems(self) -> bool:
+        """Some step needs the registry's admission systems resolved (P3-T1, D5)."""
+        return any(t.uses_systems for t in self.tasks)
+
+    def _check_family_units(self) -> None:
+        """P3-T1 (D5): systems, their calendars and registry names in titles come from the registry by the playbook's
+        family; a playbook without `family` cannot use them."""
+        if self.family is not None:
+            return
+        misuse = sorted(t.template_key for t in self.tasks if t.uses_systems)
+        if misuse:
+            raise ValueError(f"{misuse} use fan_out: system, anchor.of, condition.of or a title placeholder: these "
+                             f"need the playbook's 'family' (the registry family whose systems they read)")
 
     def _durations_are_sourced_or_estimated(self) -> None:
         """R-30: a duration without an official figure is marked `estimate: true`. A constant a step uses as its

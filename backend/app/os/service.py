@@ -16,7 +16,7 @@ from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, pres
 from app.os.playbooks import Playbook, PlaybookError, select_playbook
 from app.os.requests import gate, state
 from app.os.runner import Registry, default_registry
-from app.os.settings import OsSettings
+from app.os.settings import OsSettings, released_families
 
 
 class NothingNewer(ValueError):
@@ -147,7 +147,8 @@ class PlanService:
             raise IntakeNotOpen(f"the {term} {year} intake is not open for planning yet")
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
             self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-            with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract)))
+            with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract),
+            released=released_families(self.settings)))  # D14: a family's new plans wait for its flag
         return self.kernel.create_plan(contract, self.compile(contract, playbook))
 
     def _contract(self, plan_id: int) -> tuple[RouteContract | RouteContractV2, str]:
@@ -196,7 +197,8 @@ class PlanService:
         contract, _ = self._contract(plan_id)
         pinned = self._pinned(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract))
+                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract),
+                                 released=self._released_for(plan_id, pinned))
         if newest.key != pinned.key or newest.version <= pinned.version:
             return False
         with self.engine.begin() as conn:
@@ -209,7 +211,8 @@ class PlanService:
         student accepted, Slice 7: never a newer one they did not see)."""
         contract, sha = self._contract(plan_id)
         newest = select_playbook(self.playbooks, contract.origin_country, contract.destination_country, contract.level,
-                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract))
+                                 with_needs=self.needs_gate(contract, with_needs), intake=_intake_of(contract),
+                                 released=self._released_for(plan_id))
         if version is not None:
             newest = self.playbooks[(newest.key, version)]
             applies = newest.applies_to  # R-65: a version for other intakes is never forced onto this plan
@@ -221,6 +224,19 @@ class PlanService:
             if newest.key == pinned.key and newest.version <= pinned.version:
                 raise NothingNewer(f"plan {plan_id} already uses {pinned.key}@{pinned.version}: nothing newer")
         return self.kernel.upgrade_playbook(plan_id, self.compile(contract, newest, plan_id), based_on=sha)
+
+    def _released_for(self, plan_id: int, pinned: Playbook | None = None) -> frozenset[str]:
+        """D14: the released families, plus the family a running plan is pinned to: that plan keeps its version line
+        (upgrades) with the flag off; only new plans wait for the flag. No family playbook loaded: no pin is read."""
+        released = released_families(self.settings)
+        if not any(b.family for b in self.playbooks.values()):
+            return released
+        if pinned is None:
+            try:
+                pinned = self._pinned(plan_id)
+            except KeyError:  # a plan without a pin (legacy): only the flags count, as for a new plan
+                return released
+        return released | {pinned.family} if pinned.family else released
 
     def anchor_fields(self) -> set[str]:
         return {t.anchor.fact for book in self.playbooks.values() for t in book.tasks if t.anchor}

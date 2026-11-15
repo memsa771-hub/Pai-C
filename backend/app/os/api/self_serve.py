@@ -24,9 +24,32 @@ def newest_books(plans) -> dict:
     return newest_plain(plans.playbooks.values())  # a needs playbook is not listed (P1-T8): the bytes stay the same
 
 
+def requestable(plans, student_ref: str, route_key: str) -> bool:
+    """A student may ask for a new programme on a route they can start a plan on (D14): any route without a family,
+    a family route while its flag is on, or a family route the student already has an open plan pinned to. A route
+    key nobody loaded is never requestable. No family playbook loaded: no query, exactly as before."""
+    from app.os.playbooks import offered
+    from app.os.settings import released_families
+
+    book = newest_books(plans).get(route_key)
+    if book is None:
+        return False
+    if offered(book, released_families(plans.settings)):
+        return True
+    pins = models.playbook_pins
+    with plans.engine.connect() as conn:
+        return conn.execute(select(P.c.id).join(pins, pins.c.plan_id == P.c.id).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN),
+            pins.c.playbook_key == route_key).limit(1)).first() is not None
+
+
 def routes_out(plans) -> list[dict]:
+    """The routes a student can start a plan on: a family playbook only while its release flag is on (D14)."""
+    from app.os.settings import released_families
+
+    offered = newest_plain(plans.playbooks.values(), released=released_families(plans.settings))
     return [{"key": b.key, "version": b.version, "origin": b.route.origin, "destination": b.route.destination,
-             "level": b.route.level} for _, b in sorted(newest_books(plans).items())]
+             "level": b.route.level} for _, b in sorted(offered.items())]
 
 
 def card_out(card: Card | None) -> dict | None:

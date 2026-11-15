@@ -20,11 +20,12 @@ from app.os.intakes import IntakeStore
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import PLAN_OPEN, is_started
 from app.os.knowledge.requests import visible_programmes
-from app.os.playbooks import newest_plain
+from app.os.playbooks import newest_plain, offered
 from app.os.ports import choice_requests, choice_sink
 from app.os.replan.ops import CancelProgramme, SwapProgramme
 from app.os.replan.lock import plan_lock
 from app.os.replan.store import OverrideStore, ProposalStore
+from app.os.settings import released_families
 
 log = logging.getLogger(__name__)
 CHANGES_PER_DAY = 3  # swaps and removals per plan (S4-D10); the kernel has no revision limit yet (Slice 7)
@@ -82,6 +83,15 @@ def _route(plans, route_key: str):
     return book
 
 
+def _has_plan(plans, student_ref: str, route_key: str, intake: IntakeRef) -> bool:
+    """The student already has a self-serve plan for this route and intake (it keeps running with the flag off)."""
+    with plans.engine.connect() as conn:
+        found = conn.execute(select(P.c.id).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.source == "self_serve",
+            P.c.external_ref == f"self:{student_ref}:{route_key}:{intake.term}:{intake.year}").limit(1)).first()
+    return found is not None
+
+
 def _check_programmes(plans, route_key: str, year: int, refs: list[str], term: str | None = None) -> None:
     visible = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term)}
     unknown = [r for r in refs if r not in visible]
@@ -114,6 +124,8 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
     service (ChoiceSink) and `Preparing(decision_version)` is returned; `ChoiceRefused` when the host refuses. A host
     answer of None (its part is off, or no host) leaves everything below as it always was."""
     book = _route(plans, route_key)
+    if not offered(book, released_families(plans.settings)) and not _has_plan(plans, student_ref, route_key, intake):
+        raise NotAllowed(f"unknown route '{route_key}'")  # D14: a family's new plans wait for its release flag
     if len(choices) > 10:
         raise NotAllowed("choose at most 10 programmes")
     _check_programmes(plans, route_key, intake.year, [c.programme_ref for c in choices], intake.term)

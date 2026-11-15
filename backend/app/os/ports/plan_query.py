@@ -102,8 +102,12 @@ def programme_list_v2(route_key: str, intake: IntakeRef, student_ref: str | None
 
 def routes() -> list[dict]:
     """The routes the loaded playbooks serve (the newest version of each key), for the Counsellor's choice screen:
-    `{key, origin, destination, level, intake_terms}`, ordered by key. Raises OsUnavailable when PAI OS is not mounted."""
-    newest = newest_plain(ports.services().plans.playbooks.values())
+    `{key, origin, destination, level, intake_terms}`, ordered by key. Raises OsUnavailable when PAI OS is not mounted.
+    A family playbook is listed only while its release flag is on (P3-T1, ADR-001 D14)."""
+    from app.os.settings import released_families
+
+    svc = ports.services()
+    newest = newest_plain(svc.plans.playbooks.values(), released=released_families(svc.settings))
     return [{"key": k, "origin": b.route.origin, "destination": b.route.destination, "level": b.route.level,
              "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
 

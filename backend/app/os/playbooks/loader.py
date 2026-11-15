@@ -1,6 +1,6 @@
 """Loads playbook YAML files. Any problem is a PlaybookError naming the file, so startup fails loudly."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from pathlib import Path
 
 import yaml
@@ -60,31 +60,43 @@ def load_playbook_dir(directory: Path = PLAYBOOK_DIR) -> dict[tuple[str, int], P
     return books
 
 
+def offered(book: Playbook, released: Collection[str] | None) -> bool:
+    """P3-T1 (ADR-001 D14): a family playbook is offered only while its family is released (its flag is on).
+    `released`: the released family codes; None for a reader of plans that already exist, which sees every playbook.
+    A playbook without `family` is always offered, so every route without one stays exactly as it was."""
+    return book.family is None or released is None or book.family in released
+
+
 def select_playbook(
     books: Mapping[tuple[str, int], Playbook], origin: str, destination: str, level: str, *, with_needs: bool = False,
-    intake: tuple[str, int] | None = None,
+    intake: tuple[str, int] | None = None, released: Collection[str] | None = (),
 ) -> Playbook:
     """The newest playbook for the route. A playbook that declares `needs` is chosen only when the caller asks
     (`with_needs`), and the caller asks only while the student's needs gate is on (P1-T8, D-w3).
     `intake` (term, year): a version whose `applies_to` does not cover it is left out (P2-D25, R-65); without it
-    `applies_to` is ignored and the newest wins, as before."""
+    `applies_to` is ignored and the newest wins, as before.
+    `released` (D14): the family codes whose release flag is on; a family playbook of another family is left out.
+    Left out, no family playbook is chosen (off by default); None: no release filter (a reader of an existing plan)."""
     matches = [
         b for b in books.values()
         if (b.route.origin, b.route.destination, b.route.level) == (origin, destination, level)
         and (with_needs or not b.declares_needs)
         and (intake is None or b.applies_to is None or b.applies_to.covers(*intake))
+        and offered(b, released)
     ]
     if not matches:
         raise PlaybookError(f"no playbook for {origin}->{destination} {level}")
     return max(matches, key=lambda b: (b.version, b.key))
 
 
-def newest_plain(books: Iterable[Playbook]) -> dict[str, Playbook]:
+def newest_plain(books: Iterable[Playbook], released: Collection[str] | None = None) -> dict[str, Playbook]:
     """The newest version of each playbook key, leaving out the ones that declare `needs`: the route listings and the
-    route builder read this, so they stay as they were in every state."""
+    route builder read this, so they stay as they were in every state.
+    `released` (D14): given, a family playbook whose family is not in it is left out too (the route listings offer
+    only released families). None (the default): every family playbook, for readers of plans that already exist."""
     out: dict[str, Playbook] = {}
     for book in books:
-        if book.declares_needs:
+        if book.declares_needs or not offered(book, released):
             continue
         if book.key not in out or book.version > out[book.key].version:
             out[book.key] = book

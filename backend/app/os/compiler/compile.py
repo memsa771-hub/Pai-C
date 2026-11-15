@@ -30,6 +30,12 @@ class CompileError(ValueError):
     pass
 
 
+class SystemsNotResolved(CompileError, NotImplementedError):
+    """P3-T1 (ADR-001 D5): the playbook has a step that fans out per admission system, reads a fact or date of its
+    system, or names a registry name in its title. Resolving a place to its system from the registry is P3-T4; until
+    then such a step is refused loudly, never compiled without its system and never dropped."""
+
+
 @dataclass(frozen=True)
 class DraftTask:
     instance_key: str
@@ -94,10 +100,11 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
     route, programme = set(), set()
     for t in playbook.tasks:
         target = programme if t.fan_out == "programme" else route
-        for name in (t.condition.fact if t.condition else None, t.citation_from_fact):
+        # a fact `of` the step's system (P3-T1, D5) is read from the registry, never as a route or programme fact
+        for name in (t.condition.fact if t.condition and not t.condition.of else None, t.citation_from_fact):
             if name:
                 target.add(name)
-        if t.anchor:  # an anchor on a chosen programme reads that programme's fact (Slice 9 Task 11, F1)
+        if t.anchor and not t.anchor.of:  # on a chosen programme: that programme's fact (Slice 9 Task 11, F1)
             (programme if t.anchor.programme else target).add(t.anchor.fact)
     for ask in playbook.asks.values():  # P1-T8: the calendar fact of a result still to come (R-20)
         if ask.expected and not ask.expected.calendar:  # an official calendar is read by its registry id instead
@@ -252,6 +259,10 @@ def compile_plan(
     draft is exactly what it was before.
     `calendar_facts`: the date facts of the registry calendars the playbook's asks name, by (calendar id, field)
     (P2-T11); read only by the result-expected step of an ask that names a calendar."""
+    if playbook.uses_systems:  # P3-T1: never compiled without its systems, never silently dropped
+        steps = sorted(t.template_key for t in playbook.tasks if t.uses_systems)
+        raise SystemsNotResolved(f"playbook {playbook.key} v{playbook.version}: step(s) {steps} need the registry's "
+                                 f"admission systems, which the compiler does not resolve yet (P3-T4)")
     chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     removed = {o.target for o in overrides if o.op == "cancel_programme"}

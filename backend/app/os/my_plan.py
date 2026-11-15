@@ -58,7 +58,7 @@ def _book(svc: Any, chosen: dict):
     if pin is not None:
         return books.get((pin.playbook_key, pin.version))
     try:  # no pin: the playbook this route runs on
-        return select_playbook(books, c["origin_country"], c["destination_country"], c["level"])
+        return select_playbook(books, c["origin_country"], c["destination_country"], c["level"], released=None)
     except PlaybookError:
         return None
 

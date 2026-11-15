@@ -22,6 +22,7 @@ from app.os.intakes import IntakeError
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.playbooks import PlaybookError, select_playbook
 from app.os.replan.store import OverrideStore, ProposalStore
+from app.os.settings import released_families
 
 REFUSALS = ("not_authorized", "invalid_export", "route_not_supported", "unknown_programme", "self_serve_plan_open",
             "plan_closed")
@@ -46,6 +47,29 @@ def _plans_of(svc, student_ref: str, source: str) -> list:
         return conn.execute(select(P.c.id, P.c.external_ref, P.c.status).where(
             P.c.tenant_id == svc.kernel.tenant_id, P.c.student_ref == student_ref, P.c.source == source)
             .order_by(P.c.id)).all()
+
+
+def _released(svc, decision, source: str, external_ref: bool = False) -> frozenset[str]:
+    """P3-T1 (ADR-001 D14): the families whose release flag is on, plus the family of a playbook that one of the
+    student's open `source` plans is already pinned to (with `external_ref`, only the plan this decision is for): a
+    running plan keeps running with the flag off, while a new plan waits for the flag. With no unreleased family
+    playbook on the decision's route nothing is read, so every other route is exactly as before."""
+    released = released_families(svc.plans.settings)
+    books = svc.plans.playbooks
+    route = (decision.origin_country, decision.destination_country, decision.level)
+    if not any(b.family and b.family not in released and (b.route.origin, b.route.destination, b.route.level) == route
+               for b in books.values()):
+        return released
+    PP = models.playbook_pins
+    query = select(PP.c.playbook_key, PP.c.version).join(P, P.c.id == PP.c.plan_id).where(
+        P.c.tenant_id == svc.kernel.tenant_id, P.c.student_ref == decision.student_ref, P.c.source == source,
+        P.c.status.in_(PLAN_OPEN))
+    if external_ref:
+        query = query.where(P.c.external_ref == decision.to_route_contract().external_ref)
+    with svc.engine.connect() as conn:
+        pins = conn.execute(query).all()
+    pinned = {books[(k, v)].family for k, v in pins if (k, v) in books}
+    return released | {f for f in pinned if f}
 
 
 def _superseded(svc, intake: Intake) -> bool:
@@ -230,7 +254,7 @@ def _adopt(svc, intake: Intake, decision: DecisionRecordV2) -> IntakeResult | No
     nothing applies (the normal path decides, as before)."""
     try:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
-                               decision.level)
+                               decision.level, released=_released(svc, decision, "self_serve"))
     except PlaybookError:
         return None
     known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
@@ -300,7 +324,7 @@ def process(svc, intake: Intake) -> IntakeResult:
         return _refuse(svc, intake, "not_authorized")
     try:
         book = select_playbook(svc.plans.playbooks, decision.origin_country, decision.destination_country,
-                               decision.level)
+                               decision.level, released=_released(svc, decision, SOURCE, external_ref=True))
     except PlaybookError:
         return _refuse_v2(svc, intake, decision, "route_not_supported")
     known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}

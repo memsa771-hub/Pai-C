@@ -421,7 +421,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
     @router.post("/programmes/requests", status_code=202, response_model=RequestOut)
     def request_new(body: RequestIn, student: str = Depends(current_student_ref_for_write),
                     svc: Services = Depends(services)) -> dict:
-        if body.route not in self_serve.newest_books(svc.plans):
+        if not self_serve.requestable(svc.plans, student, body.route):  # D14: an unreleased family is unknown
             raise HTTPException(status_code=422, detail=f"unknown route '{body.route}'")
         tenant = svc.settings.tenant_id
         try:

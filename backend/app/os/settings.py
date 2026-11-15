@@ -65,6 +65,28 @@ class OsSettings:
     # Offline mode only: agents that still use OpenAI (OS_LIVE_AGENTS, e.g. "documents" so a rehearsal can read a
     # real document). Each keeps its own monthly cap; every other agent stays canned.
     live_agents: frozenset[str] = frozenset()
+    # P3-T1 (ADR-001 D14): the release flags of route families that are on, by flag name (`CONNECT_FAMILY_<FAMILY>`).
+    # Off by default: a family playbook is offered for new plans only while its flag is on.
+    family_flags: frozenset[str] = frozenset()
+
+    @property
+    def released_families(self) -> frozenset[str]:
+        """The family codes whose release flag is on (D14)."""
+        return frozenset(name.removeprefix(FAMILY_FLAG_PREFIX).lower() for name in self.family_flags)
+
+
+FAMILY_FLAG_PREFIX = "CONNECT_FAMILY_"
+
+
+def family_flag(family: str) -> str:
+    """The release flag of a route family, derived from its code alone (D14): `CONNECT_FAMILY_` + the code upper-cased.
+    No family is named in code (R-58)."""
+    return FAMILY_FLAG_PREFIX + family.upper()
+
+
+def released_families(settings) -> frozenset[str]:
+    """The released family codes of `settings`; none for a settings object that has no release flags (D14)."""
+    return frozenset(getattr(settings, "released_families", frozenset()))
 
 
 TRUTHY = {"1", "true", "yes", "on"}
@@ -163,4 +185,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> OsSettings:
         model_mode=model_mode,
         offline_answers_dir=answers_dir,
         live_agents=live_agents,
+        family_flags=frozenset(name for name in env if name.startswith(FAMILY_FLAG_PREFIX)
+                               and name == name.upper() and flag(env, name)),
     )
