@@ -122,8 +122,8 @@ def check_mode_fact(field: str, value: object, entity_kind: str | None) -> tuple
     if field != v.field:
         return None
     if entity_kind != v.entity_kind:
-        return ("mode_on_wrong_kind",
-                f"'{field}' is a fact of an {v.entity_kind}, not of {'a ' + entity_kind if entity_kind else 'a programme or unknown entity'}")
+        what = f"a {entity_kind}" if entity_kind else "a programme or an entity of unknown kind"
+        return "mode_on_wrong_kind", f"'{field}' is a fact of an {v.entity_kind}, not of {what}"
     if not isinstance(value, str) or value not in v.modes:
         return "unknown_admission_mode", f"'{value}' is not an admission mode (use one of {sorted(v.modes)})"
     return None

@@ -2,6 +2,7 @@
 provisional until that fact is `verified`. Synthetic data only: no system, region or mode of any real place."""
 
 import copy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -89,7 +90,7 @@ def test_the_mode_rule_accepts_a_mode_on_a_system_only():
     assert check_mode_fact("admission_mode", "central_portal", None)[0] == "mode_on_wrong_kind"
 
 
-# --- provisional until verified (D3), on a programme-level condition: the system path is P3-T4 --------------------------
+# --- provisional until verified (D3), on a programme-level condition: the system path is P3-T4 ---------------------
 
 def gated_book() -> Playbook:
     data = IE.model_dump(mode="json", by_alias=True, exclude_none=True)
@@ -99,11 +100,7 @@ def gated_book() -> Playbook:
 
 def mode(value, status):
     f = fact(value, "confirmed" if status == "verified" else status)
-    if status == "verified":
-        from dataclasses import replace
-
-        f = replace(f, status="verified")
-    return f
+    return replace(f, status=status)
 
 
 @pytest.mark.parametrize("status, provisional", [("unconfirmed", True), ("confirmed", True), ("verified", False)])
