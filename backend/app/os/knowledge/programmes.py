@@ -45,6 +45,48 @@ class Programme:
     region: str | None = None
 
 
+@dataclass(frozen=True)
+class ProgrammeScope:
+    """Which programmes a route's playbook sees (P3-T2, ADR-001 D4). Made only by `programmes_of`.
+
+    Without `family` (Germany, the fakes, every route before P3): the programmes whose `route_key` is the playbook's
+    key, exactly as before. With `family`: the programmes the registry places in that family at the route's level (their
+    `family` and `level` columns, written by `RegistryStore.link_programme`), whatever their `route_key`. A student's
+    request on a family route (status `requested`) carries no registry place, only the route's key, so it is seen
+    through that key, as a request on any other route is."""
+
+    route_key: str
+    family: str | None = None
+    level: str | None = None
+
+    def holds(self, p) -> bool:
+        """Whether programme `p` (a `Programme` or a row with route_key, family, level, status) is the route's."""
+        if self.family is None:
+            return p.route_key == self.route_key
+        return (p.family == self.family and p.level == self.level) or (
+            p.status == "requested" and p.route_key == self.route_key)
+
+    def where(self, table=T):
+        """The same rule as a SQL condition on `table` (os_programmes)."""
+        if self.family is None:
+            return table.c.route_key == self.route_key
+        return ((table.c.family == self.family) & (table.c.level == self.level)) | (
+            (table.c.status == "requested") & (table.c.route_key == self.route_key))
+
+
+def programmes_of(playbook) -> ProgrammeScope:
+    """The one rule for which programmes a playbook sees (ADR-001 D4). Every reader of a route's programmes goes
+    through it: a family playbook (`family` set) sees the programmes of its family and level, any other playbook the
+    programmes of its key."""
+    family = getattr(playbook, "family", None)
+    return ProgrammeScope(playbook.key, family, playbook.route.level if family else None)
+
+
+def scope_of(route: "str | ProgrammeScope") -> ProgrammeScope:
+    """A route key given as a string is today's `route_key` match (callers that know only a key, and old tests)."""
+    return route if isinstance(route, ProgrammeScope) else ProgrammeScope(route)
+
+
 def with_own_pages(programmes: list[Programme]) -> list[Programme]:
     """Each programme with `own_pages`: its start URLs that appear in no other programme's start URLs."""
     from collections import Counter
@@ -122,8 +164,10 @@ class ProgrammeStore:
         """The programme with its own pages (start URLs no other programme of the tenant uses)."""
         return next((p for p in self._all() if p.ref == ref), None)
 
-    def active(self, route_key: str) -> list[Programme]:
-        return [p for p in self._all() if p.route_key == route_key and p.status == "active"]
+    def active(self, route: "str | ProgrammeScope") -> list[Programme]:
+        """The route's active programmes: pass `programmes_of(playbook)`; a bare key is the `route_key` match."""
+        scope = scope_of(route)
+        return [p for p in self._all() if scope.holds(p) and p.status == "active"]
 
 
 def load_programme_seed(path: Path, store: ProgrammeStore | None) -> int:
