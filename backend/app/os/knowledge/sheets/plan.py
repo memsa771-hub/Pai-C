@@ -204,6 +204,11 @@ def _source_problem(url: str | None, source_type: str | None, read_method: str |
     return None
 
 
+def list_families_of(lists: tuple[str, ...] | list[str], ctx: PlanContext) -> tuple[str, ...]:
+    """The families the official lists `lists` name (the `family` of each list that has one), sorted; () when none."""
+    return tuple(sorted({ctx.list_families[x] for x in lists if ctx.list_families.get(x)}))
+
+
 def families(lists: tuple[str, ...] | list[str], ctx: PlanContext, kind: str | None = None) -> tuple[str, ...]:
     """The allow-list families to try for a row (P2-T19): the family of every official list its entity is on (H3 data,
     `family` of each list), in a fixed order. When none of them has a family: for a body (P2-T21, below) every family
@@ -696,6 +701,11 @@ def _programme_row(r, rid, res: RowResult, chk: Checks, ctx: PlanContext, inst_r
     parent = ctx.meta(reg_id)  # file first, then database; with no meta the kind is unknown and the registry decides
     if parent and parent.get("kind") not in PROGRAMME_PARENTS:
         return "parent_not_institution", f"{inst_id} ({reg_id}) is of kind {parent.get('kind')}"
+    if ctx.family:  # P3-T2 (ADR-001 D4): the run's --family becomes the programme's family; its lists must agree
+        named = list_families_of(ctx.lists_lookup(reg_id), ctx)
+        if named and ctx.family not in named:
+            return "family_conflicts_with_list", (f"{inst_id} ({reg_id}) is on lists of family {', '.join(named)}, "
+                                                  f"not '{ctx.family}'")
     url, quote = _text(r.get("source_url")), _text(r.get("quote_verbatim"))
     rm_text = _text(r.get("read_method"))
     rm = fmt.read_method(rm_text) if rm_text else None  # a missing read method is not assumed to be fetch

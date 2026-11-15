@@ -28,6 +28,10 @@ the registry for an import); `--family` is used only when none of them has one (
 judges every source against the allow-list files in DIR as the import judges it against the same entries; without it the
 dry run does not check the allow-list and says so. The files carry no database state: a domain marked suspect in the
 database is refused by the import but not by the dry run.
+`--family` is also the family every programme of the run belongs to (P3-T2, ADR-001 D4): the import writes it on each
+programme it places, so that family's playbook sees the programme at its level. A Programmes row whose institution is on
+an official list of another family is rejected (`family_conflicts_with_list`). Without `--family` no family is written
+(as before) and both commands say so; `scripts/os_programme_family_backfill.py` sets it later.
 Exit code 2 when refused.
 """
 
@@ -88,7 +92,9 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
         p.add_argument("file")
         p.add_argument("--country", required=True, help="the key of regions.yaml, e.g. the ISO code of the country")
         p.add_argument("--family", default="",
-                       help="the allow-list family of a row whose entity is on no official list with a family")
+                       help="the family of the run's programmes (written on each one; a row whose lists name another "
+                            "family is rejected), and the allow-list family of a row whose entity is on no official "
+                            "list with a family")
         p.add_argument("--batch-ref", default=None)
         p.add_argument("--report", default=None)
         p.add_argument("--aliases", action="append", default=[], metavar="FILE",
@@ -121,6 +127,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
     undo.add_argument("--actor", required=True)
     sub.add_parser("list")
     args = parser.parse_args(argv)
+    no_family = (f"family: none given (--family): the {args.cmd} writes no programme family, as before; no family "
+                 "playbook sees these programmes until it is set") if getattr(args, "family", None) == "" else None
     try:
         if args.cmd == "template":
             out(f"wrote {write_template(Path(args.out))}")
@@ -178,8 +186,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             _, results = plan_file(Path(args.file), ctx)
             if args.report:
                 write_report(results, Path(args.report))
-            for note in notes:  # after the plan: a refused file still starts its output with "refused:"
-                out(note)
+            for note in notes + ([no_family] if no_family else []):  # after the plan: a refused file still starts
+                out(note)                                                 # its output with "refused:"
             _print_counts(summarise(results), out)
             return 0
         if deps is None:
@@ -208,6 +216,8 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                              report_path=Path(args.report) if args.report else None,
                              aliases=[Path(a) for a in args.aliases])
             out(f"import {res.import_id} done; report {res.report_path}")
+            if no_family:
+                out(no_family)
             _print_counts(res.counts, out)
         elif args.cmd == "undo":
             from app.os.knowledge.sheets.undo import undo_import

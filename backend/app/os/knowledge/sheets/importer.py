@@ -414,7 +414,8 @@ def run_import(path: Path, deps: ImportDeps, *, mode: str, actor: str, country: 
                 elif r.sheet == "Programmes":
                     n_created = len(created)
                     try:
-                        _load_programme(deps, r, import_id, mode, decision_ref, actor, cref, route_key, created)
+                        _load_programme(deps, r, import_id, mode, decision_ref, actor, cref, route_key, created,
+                                        family)
                     except RegistryError as e:  # a backstop: the plan should have rejected it; the row, not the import
                         _reject(r, "registry_refused", str(e)[:500])
                         refused_programmes.add(r.row_id)
@@ -487,7 +488,10 @@ def _load_membership(deps: ImportDeps, r: RowResult, import_id: int, mode: str, 
 
 
 def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, decision_ref: str | None, actor: str,
-                    cref: str, route_key: str, created: list[str]) -> None:
+                    cref: str, route_key: str, created: list[str], family: str = "") -> None:
+    """`family`: the run's --family. When given it is written as the programme's family (P3-T2, ADR-001 D4), so the
+    family's playbook sees the programme at its level; the plan has already refused a row whose institution's lists
+    name another family (`family_conflicts_with_list`). Without it the family column is left as it is, as before."""
     p, row = r.payload, r.payload["row"]
     ref = r.row_id
     inst = deps.registry.get(p["inst_registry_id"])
@@ -500,7 +504,8 @@ def _load_programme(deps: ImportDeps, r: RowResult, import_id: int, mode: str, d
                                          official_domains=(), notes=row.get("campus")))
         created.append(ref)
     place = {k: v for k, v in (("level", row.get("level")), ("field", row.get("field")),
-                               ("region", inst.region if inst else None)) if v is not None}
+                               ("region", inst.region if inst else None), ("family", family or None))
+             if v is not None}
     deps.registry.link_programme(ref, institution_id=p["inst_registry_id"], cause="import", cause_ref=cref,
                                  actor=actor, **place)
     for f in p["facts"]:
