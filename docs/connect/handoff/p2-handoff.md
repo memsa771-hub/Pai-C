@@ -126,6 +126,7 @@ Controller decisions under the delegation of 2026-11-14 (source: the local ledge
 | `hed.gkp.pk` proven, not listed on its own | Checks 1b and 2b proved it (via `kpese.gov.pk`), and it proves `admission.hed.gkp.pk` and `etea.edu.pk`, which are listed. The bare `hed.gkp.pk` entries were removed in the T21 fix round: they rested on one check's family, and listed `admission.hed.gkp.pk` under bachelor through the subdomain |
 | No-region rows and P4-034..036 held | The 40 rows without a usable region (34 foreign-board IBCC rows, 6 with an empty region; the ledger calls them wildcard) and P4-034..036 stay rejected or held. No region, institution id or other data was guessed |
 | Seats re-fetch not run | Seats v5 and v6 stay `refetch_not_run`: the re-fetch is a live outbound page fetch, which needs the owner's approval (CLAUDE.md) |
+| Germany CGPA: W10 option 3 (T25) | `backend/app/os/playbooks/germany_master.v3.yaml` = version 2 plus, on `uni_assist_apply` and `direct_apply`, a `transcript` document need at `shown` and the CGPA `education.bachelor.gpa` at `stated`. The transcript is cited to S2, master's section, accordion "University studies certificates": "Please upload all certificates in their entirety. Include the diploma certificate as well as the overview of all subjects and grades (transcript)." (check 1: curl 2026-11-14 22:34 UTC; W10 check 2: 2026-11-13; both sha256 `4ccf4a31...a49bf1`; spike 5 A11). S2 has no CGPA sentence: the CGPA is a student fact only, for the existing grade estimate (`transcript.cgpa`); no CGPA rule or minimum is added. Version 2 is unchanged; a plan pinned to it moves to 3 only through the accepted `playbook_newer` proposal. Row 6.21 now runs on the shipped v3 (the test-only copy is gone). The three sentences are in §6 |
 
 ## 4. Open gaps and deviations
 
@@ -141,6 +142,11 @@ People and process (not code):
   - What remains (**FU-13**, below): the Counsellor's place picker (`backend/app/pai_c/connect/places.py`, `places_for`) does not yet pass the student to `pai_os_bridge.programmes_for`, so the route builder still shows the route's full list. It is a one-line change in a Counsellor file (not frozen), left out because T24 was scoped to the OS side and the bridge; it needs the Counsellor lead's review. Rule 8 of the consistency job still opens a case for an excluded chosen field, so this is loud, not silent.
   - The match needs programmes whose `field` holds a Counsellor study-field code (for example `pharm_d`). No imported batch fills the `field` column yet, so on real data nothing is filtered until the research sheets carry it; `field_codes.yaml` maps any other value the sheets use, entered only from a checked sheet.
 - R-46 stays `built: false` as recorded in the P1 handoff.
+- **Germany v3 (T25), for the owner to confirm:** the CGPA ask cites S2 although S2 has no CGPA sentence (the playbook
+  requires a citation on every ask; it cites the transcript sentence the CGPA is read from, and S2's "In order to
+  calculate your grade ..."). New Germany plans with the needs gate on now start on version 3; existing version 2 plans
+  get a `playbook_newer` proposal and stay on 2 until the student accepts it. The P1 handoff's "Germany CGPA gap" (row
+  6.21 proven only on a test copy) is closed by T25 if the owner confirms.
 
 Data gaps found in the local run of 2026-11-14 (source: the local ledger and `.local-ci/work/W4/out/*.csv`):
 
@@ -220,7 +226,16 @@ With every flag off the application behaves as before P2 (tested per task).
 
 ## 6. Student sentences added in P2 (`approved: true`, for the owner to read)
 
-All twelve are in `backend/app/os/monitor/texts.yaml`:
+Twelve are in `backend/app/os/monitor/texts.yaml` (below). Three more (T25) are route data in
+`backend/app/os/playbooks/germany_master.v3.yaml` `asks`; playbook asks carry no `approved` flag (the playbook is route
+data, as version 2's SSC and HSSC titles), so they rest on the standing approval. The P1 handoff asked the owner to
+approve this wording; **for the owner to read**:
+
+- `transcript` (`shown`): "Upload your final transcript"
+- `education.bachelor.gpa` (`stated`): "Tell us your final CGPA"
+- `education.bachelor.gpa` (`which_is_right`): "Which CGPA is right?"
+
+The twelve in `backend/app/os/monitor/texts.yaml`:
 
 1. "PAI is checking this date again with the official site. This step waits until it is confirmed."
 2. "Report as wrong"

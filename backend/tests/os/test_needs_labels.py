@@ -31,7 +31,8 @@ def student_text(book) -> str:
 
 def test_there_are_needs_books_to_check():
     assert {(b.key, b.version) for b in needs_books()} == {
-        ("germany_master", 2), ("ireland_master", 2), ("pakistan_bs", 2), ("pakistan_inter", 2)}
+        ("germany_master", 2), ("germany_master", 3), ("ireland_master", 2), ("pakistan_bs", 2),
+        ("pakistan_inter", 2)}
 
 
 @pytest.mark.parametrize("book", needs_books(), ids=lambda b: f"{b.key}.v{b.version}")

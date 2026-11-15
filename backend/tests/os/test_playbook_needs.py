@@ -192,9 +192,11 @@ def test_select_skips_needs_books_by_default():
     assert select_playbook(books, "PK", "IE", "master").version == 1
 
 
-def test_select_with_needs_picks_v2():
+def test_select_with_needs_picks_the_newest_needs_book():
     books = _all_books()
-    assert select_playbook(books, "PK", "DE", "master", with_needs=True).version == 2
+    assert select_playbook(books, "PK", "DE", "master", with_needs=True).version == 3  # P2-T25 ships v3 beside v2
+    before_v3 = {k: b for k, b in books.items() if k != ("germany_master", 3)}
+    assert select_playbook(before_v3, "PK", "DE", "master", with_needs=True).version == 2
     assert select_playbook(books, "PK", "PK", "intermediate", with_needs=True).version == 2
 
 
@@ -286,7 +288,7 @@ def test_same_need_twice_in_one_step_is_refused(tmp_path):
 
 # ---- upgrade never goes back --------------------------------------------------------------------
 
-def test_upgrade_with_the_gate_off_keeps_a_v2_plan_on_v2(engine, clean):
+def test_upgrade_with_the_gate_off_keeps_a_needs_plan_on_its_version(engine, clean):
     from sqlalchemy import func, select
 
     from app.os import models
@@ -301,9 +303,9 @@ def test_upgrade_with_the_gate_off_keeps_a_v2_plan_on_v2(engine, clean):
 
     svc = service(engine)
     plan_id = svc.start_plan(TEST_STUDENT, with_needs=True).plan_id
-    assert svc._pinned(plan_id).version == 2
+    assert svc._pinned(plan_id).version == 3  # the newest needs book (v3 since P2-T25)
     before = revisions(plan_id)
     with pytest.raises(NothingNewer, match="nothing newer"):
         svc.upgrade(plan_id)  # the default gate (off) selects v1, which is older than the pin
-    assert svc._pinned(plan_id).version == 2
+    assert svc._pinned(plan_id).version == 3
     assert revisions(plan_id) == before

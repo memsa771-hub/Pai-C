@@ -134,6 +134,22 @@ require one for non-EHEA degrees. Each such requirement is a per-programme fact.
   requirement for applying to a German university." (S3). **confirmed**: Pakistan is not listed.
   Re-check before each intake.
 
+**A11. The bachelor's transcript (added 2026-11-14 for playbook version 3, P2-T25).**
+Who: student. Depends on: none. Used as the `transcript` need of B2 and B3 (`uni_assist_apply`,
+`direct_apply`; playbook version 3).
+- S2, section "For master's applications", accordion "University studies certificates": "Please upload
+  all certificates in their entirety. Include the diploma certificate as well as the overview of all
+  subjects and grades (transcript)." **confirmed**
+  - Check 1: curl of the raw page, 2026-11-14 22:34 UTC, HTTP 200, sha256
+    `4ccf4a3166742df0eed95c5f2cf3bfdd70d78a059d2cfca43fad84f528a49bf1`, tags stripped, word for word.
+    The A4 quote is still on the page in the same section.
+  - Check 2 (W10, 2026-11-13, an independent curl): the same sha256 and the same sentence.
+- Not for master's: "Please upload a complete overview of all subjects and grades (transcript), issued
+  by your university." is in the bachelor's section ("Certificates for previous university studies").
+- No CGPA figure: the page has no "average", "GPA" or "CGPA". uni-assist works out the grade itself
+  from the grading system (A4). Version 3 asks the student for the CGPA at `stated` only, for the grade
+  estimate; it adds no CGPA rule or minimum.
+
 ### Phase B: application
 
 **B1. Pick the application route for each programme.**

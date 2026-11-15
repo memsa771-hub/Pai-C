@@ -68,7 +68,9 @@ def test_high_stakes_classes_of_master_8_2():
 def test_every_field_in_use_has_a_class():
     used = set()
     for path in [*(APP_OS / "playbooks").glob("*.yaml"), *(Path(__file__).parent / "playbooks").glob("*.yaml")]:
-        used |= set(re.findall(r"\bfact: *([a-z_]+)", path.read_text(encoding="utf-8")))
+        # a Knowledge field name has no dot; a dotted `fact:` is a need's student fact key (P1-T8, e.g. the CGPA in
+        # Germany v3, P2-T25), which is the Vault's, not a Knowledge field, and has no fact class
+        used |= set(re.findall(r"\bfact: *([a-z_]+)(?![a-z_.])", path.read_text(encoding="utf-8")))
     for profile in load_profile_dir().values():
         used |= {f.name for f in profile.fields}
     for path in (APP_OS / "knowledge" / "seed").glob("germany_*.yaml"):

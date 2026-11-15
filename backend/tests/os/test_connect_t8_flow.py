@@ -3,8 +3,9 @@ missing-and-wrong-data flow against a real PAI OS. The Counsellor side is the re
 (SQLite, a temp file store); the OS side is the real services on Postgres behind the real bridge adapters, the real
 OS HTTP API, the real kernel, reminders, deadline engine and the os.replan workflow. The reader is the OS offline reader
 on the committed sample documents (no model, no cost). The reconcile job is run inline. Germany master is the real
-playbook (version 2); the Ireland and Pakistan routes are the fake ones (version 2) with the test calendar of
-`needs_seed.yaml`. Fictional students; the mailer is stubbed; no chat message is created at any step."""
+playbook (version 3, the newest since P2-T25; version 2 where a test makes its plan `before_v3`); the Ireland and
+Pakistan routes are the fake ones (version 2) with the test calendar of `needs_seed.yaml`. Fictional students; the
+mailer is stubbed; no chat message is created at any step."""
 
 import time
 from contextlib import contextmanager
@@ -15,7 +16,6 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-import yaml
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import func, insert, select
@@ -31,7 +31,7 @@ from app.os.documents.store import DocumentStore
 from app.os.knowledge import SEED_DIR, Fact, SqlKnowledge, load_seed
 from app.os.knowledge.programmes import PROGRAMME_SEED, Programme, ProgrammeStore, load_programme_seed
 from app.os.outbox import Outbox
-from app.os.playbooks import PLAYBOOK_DIR, Playbook, load_playbook_dir
+from app.os.playbooks import PLAYBOOK_DIR, load_playbook_dir
 from app.os.ports import choice_requests, fact_proposals
 from app.os.replan import events
 from app.os.replan.apply import Replanner
@@ -112,18 +112,18 @@ class Clock:
         self.now = datetime.combine(day, datetime.min.time(), timezone.utc) + timedelta(hours=8)
 
 
-def germany_v3_with_a_gpa_need() -> Playbook:
-    """The shipped Germany v2 plus one need, the CGPA at `stated`, on the two application steps. The shipped version 2 asks
-    only for documents (it has no fact need), so a conflict on a fact cannot reach it; this copy lets the CGPA flow of
-    row 6.21 run on the same route. Test data only: the playbook files are not touched."""
-    data_ = yaml.safe_load((PLAYBOOK_DIR / "germany_master.v2.yaml").read_text(encoding="utf-8"))
-    data_["version"] = 3
-    data_["asks"][GPA] = {"stated": "Tell us your final CGPA", "which_is_right": "Which CGPA is right?",
-                          "citations": data_["asks"][SSC]["citations"]}
-    for task in data_["tasks"]:
-        if task["template_key"] in ("uni_assist_apply", "direct_apply"):
-            task["needs"].append({"fact": GPA, "evidence": "stated"})
-    return Playbook.model_validate(data_)
+V3 = ("germany_master", 3)
+
+
+@contextmanager
+def before_v3(world):
+    """A deployment from before P2-T25: Germany versions 1 and 2 only. A plan made inside is pinned to the newest of
+    those; once the block ends, version 3 is loaded again beside it, as on a deployment that has shipped it."""
+    v3 = world.svc.plans.playbooks.pop(V3)
+    try:
+        yield
+    finally:
+        world.svc.plans.playbooks[V3] = v3
 
 
 def seed_knowledge(kb: SqlKnowledge) -> None:
@@ -452,8 +452,10 @@ def test_6_19_germany_v2_asks_for_the_certificates_and_blocks_the_applications(w
     with signed_in(world, germany_student()) as s, level("master"):
         vault((s.client, s.who, s.params))
         s.before = chat_rows(s.who)
-        # 1. choose with two places: planned on version 2
-        choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
+        # 1. choose with two places: planned on version 2 (made before version 3 shipped; it stays pinned to 2 below,
+        # with version 3 loaded beside it)
+        with before_v3(world):
+            choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
         plan_id = s.plan_id()
         with world.engine.connect() as conn:
             assert conn.execute(select(models.playbook_pins.c.version).where(
@@ -672,8 +674,8 @@ def transcript_read(world, s) -> int:
 
 
 def germany_with_a_stated_cgpa(world, s) -> int:
-    """The student said CGPA 3.4 in chat and chose two places in Germany; the plan is on the version that asks for the CGPA."""
-    world.svc.plans.playbooks[("germany_master", 3)] = germany_v3_with_a_gpa_need()
+    """The student said CGPA 3.4 in chat and chose two places in Germany; the plan is on the shipped version 3, which asks
+    for the CGPA (P2-T25)."""
     vault((s.client, s.who, s.params))
     s.before = chat_rows(s.who)
     choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
@@ -797,7 +799,6 @@ def test_6_21_a_chat_answer_closes_the_step_through_the_close_hook_and_the_vault
     from app.memory.profile_issues import ProfileIssueService
 
     with signed_in(world, germany_student()) as s, level("master"):
-        world.svc.plans.playbooks[("germany_master", 3)] = germany_v3_with_a_gpa_need()
         vault((s.client, s.who, s.params))
         s.before = chat_rows(s.who)
         choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
@@ -1023,7 +1024,7 @@ def pinned(world, plan_id) -> int:
 def test_a_version_1_plan_is_upgraded_only_by_an_accepted_proposal(world):
     from tests.os.test_connect_t6_flow import places_of_plan  # noqa: F401
 
-    with signed_in(world, germany_student()) as s, level("master"), running(world):
+    with signed_in(world, germany_student()) as s, level("master"), running(world), before_v3(world):
         plan_id = germany_with_the_gate_off(world, s)
         assert pinned(world, plan_id) == 1
         before = s.steps()
@@ -1052,6 +1053,46 @@ def test_a_version_1_plan_is_upgraded_only_by_an_accepted_proposal(world):
         assert "school_certificates" not in after
         assert {r.need_ref for r in s.rows("open")} == {SSC, HSSC}
         assert [r["need"]["ref"] for r in s.requests("open")] == sorted([SSC, HSSC])
+        s.throughout()
+        assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
+
+
+@pytest.mark.req("R-21")
+def test_a_version_2_plan_stays_on_2_beside_version_3_and_moves_only_by_an_accepted_proposal(world):
+    """P2-T25: version 3 ships beside version 2. A plan pinned to version 2 keeps its steps and requests through the
+    hourly recompile; it moves to version 3 (the transcript and the CGPA added) only when the student accepts the
+    `playbook_newer` proposal (invariant 10)."""
+    with signed_in(world, germany_student()) as s, level("master"), running(world):
+        vault((s.client, s.who, s.params))
+        s.before = chat_rows(s.who)
+        with before_v3(world):
+            choose(s, world, "DE", ["ovgu-eeit", "btu-artificial-intelligence"])
+        plan_id = s.plan_id()
+        assert pinned(world, plan_id) == 2 and V3 in world.svc.plans.playbooks
+        before = s.steps()
+        asked = sorted(k for k in before if k.startswith("provide@"))
+        assert asked == [f"provide@document:{HSSC}:shown", f"provide@document:{SSC}:shown"]
+        tick(world, world.box.today)  # the hourly recompile reads the pinned version 2
+        assert s.steps() == before and pinned(world, plan_id) == 2
+        assert {r.need_ref for r in s.rows("open")} == {SSC, HSSC}
+        # the replan job sees version 3: one proposal, the plan itself unchanged
+        world.box.set(world.box.today + timedelta(days=1))
+        assert run_replan_job(world.replanner, world.client, world.box.now) == 1
+        newer = os_events(world, plan_id, "playbook_newer")
+        assert len(newer) == 1 and (newer[0].payload["version"], newer[0].payload["from"]) == (3, 2)
+        deadline = time.time() + 60
+        while not pending_proposals(world, plan_id) and time.time() < deadline:
+            time.sleep(0.2)
+        (proposal,) = pending_proposals(world, plan_id)
+        assert proposal.big and [o["op"] for o in proposal.ops] == ["upgrade_playbook"]
+        assert s.steps() == before and pinned(world, plan_id) == 2
+        # accepted: pinned to version 3; the transcript and the CGPA are asked as well
+        world.replanner.accept(s.id, proposal.id)
+        assert pinned(world, plan_id) == 3
+        after = s.steps()
+        assert sorted(k for k in after if k.startswith("provide@")) == sorted(
+            asked + [f"provide@document:{TRANSCRIPT_DOC}:shown", f"provide@fact:{GPA}:stated"])
+        assert {r.need_ref for r in s.rows("open")} == {SSC, HSSC, TRANSCRIPT_DOC, GPA}
         s.throughout()
         assert_consistent(s.who.factory)  # the end-of-test check (R-04, R-05)
 
