@@ -403,14 +403,16 @@ class RegistryStore:
                                  r.kind, r.subject) for r in rows]
 
     def list_progresses(self, region: str | None = None) -> list[ListProgress]:
-        """Every official list with the count loaded against the count as published (R-35a)."""
+        """Every official list with the count loaded against the count as published (R-35a). A row counts for the lists
+        `kept_lists` gives it: a row closed by the undo of the import that created it counts for none (FU-1, P2-T27).
+        A row closed or merged for any other reason still counts, as before (the owner's question, W10)."""
         lists = self.list(kind="official_list", region=region, limit=10_000)
         with self.engine.connect() as conn:
             loaded: dict[str, int] = {}
-            rows = conn.execute(select(T.c.list_ids).where(T.c.tenant_id == self.tenant_id,
-                                                           T.c.list_ids != [])).scalars()
-            for ids in rows:
-                for list_id in set(ids):
+            rows = conn.execute(select(T.c.list_ids, T.c.status, T.c.attrs).where(
+                T.c.tenant_id == self.tenant_id, T.c.list_ids != [])).all()
+            for row in rows:
+                for list_id in set(kept_lists(row)):
                     loaded[list_id] = loaded.get(list_id, 0) + 1
         return [self._progress(e, loaded.get(e.entity_id, 0)) for e in lists]
 
@@ -418,10 +420,10 @@ class RegistryStore:
         entry = self.get(list_id)
         if entry is None or entry.kind != "official_list":
             raise KeyError(list_id)
-        with self.engine.connect() as conn:
-            n = conn.execute(select(func.count()).select_from(T).where(
-                T.c.tenant_id == self.tenant_id, T.c.list_ids.contains([list_id]))).scalar_one()
-        return self._progress(entry, n)
+        with self.engine.connect() as conn:  # counted as `list_progresses` counts (`kept_lists`, FU-1)
+            rows = conn.execute(select(T.c.list_ids, T.c.status, T.c.attrs).where(
+                T.c.tenant_id == self.tenant_id, T.c.list_ids.contains([list_id]))).all()
+        return self._progress(entry, sum(1 for row in rows if list_id in kept_lists(row)))
 
     @staticmethod
     def _progress(e: RegistryEntry, loaded: int) -> ListProgress:

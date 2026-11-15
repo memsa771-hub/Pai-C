@@ -151,7 +151,7 @@ Data gaps found in the local run of 2026-11-14 (source: the local ledger and `.l
 
 Follow-ups from the local reviews (FU-1 to FU-10, as the ledger records them):
 
-- **FU-1**: list progress must not count withdrawn rows (gate (a) could go green from undone imports); whether genuinely closed rows count is the owner's decision (W10).
+- **FU-1**: list progress must not count withdrawn rows (gate (a) could go green from undone imports). **Withdrawn rows: addressed by T27**: `list_progresses` and `list_progress` count a row only for the lists `kept_lists` gives it, so a row closed by an import undo (status `closed` plus `withdrawn_by_import`) counts for no list, and an undone alias membership (T28 `add_lists`) does not count either. **Still open for the owner (W10):** whether a row closed or merged for any other reason counts. Today it still counts (unchanged, pinned by `tests/os/sheets/test_list_progress_withdrawn.py`).
 - **FU-2**: per-list evidence (`source_url` and quote per list) for R-76; the first list's URL and quote are replaced on the row and kept only in revisions. Own task.
 - **FU-3**: an aliased row on another list could add that list to its target; later decision.
 - **FU-4**: merge review F1/F2: a `validate --institutions-from` dry run plans OTHER files without their own alias files; alias files load after the OTHER loop.
