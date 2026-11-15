@@ -1,7 +1,8 @@
 """P3-T1 byte-for-byte guard: every shipped and fixture playbook, compiled with synthetic inputs, as stable JSON.
 
 The snapshot file (`golden/compile_snapshot.json`) was written by this module at the base commit 30d70d2b, before the
-family schema existed. `test_p3t1_family.py` compiles again and compares the bytes. Regenerate only on purpose:
+family schema existed. It was regenerated on 2026-11-15 at 74d4be51 (germany_master.v3 added by P2-T25, still without
+the family schema); the P3-T1 head produces the same bytes (sha256 e44a4bae...). `test_p3t1_family.py` compiles again and compares the bytes. Regenerate only on purpose:
 `python -m tests.os.compile_snapshot` (from backend/).
 """
 

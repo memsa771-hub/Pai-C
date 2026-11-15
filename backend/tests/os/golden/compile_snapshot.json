@@ -6075,6 +6075,2998 @@
    ]
   }
  },
+ "app:germany_master.v3.yaml": {
+  "date_facts": {
+   "answered": [],
+   "at_risk": false,
+   "playbook_key": "germany_master",
+   "playbook_version": 3,
+   "tasks": [
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:decision_date",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:decision_date",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:admission_test",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:admission_test",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S6",
+       "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": null,
+     "instance_key": "applications_submitted",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "system.milestone",
+     "template_key": "applications_submitted",
+     "title": "All applications submitted"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S9",
+       "url": "https://pakistan.diplo.de/pk-en/service/1995528-1995528"
+      }
+     ],
+     "critical": true,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 21,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "blocked_account",
+     "kind": "student",
+     "latest_finish": "2027-03-28 23:59:59+02:00",
+     "latest_start": "2027-03-07 23:59:59+01:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 34,
+     "task_type": "student.act",
+     "template_key": "blocked_account",
+     "title": "Open a blocked account (or arrange another proof of funds)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S4",
+       "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "choose",
+     "instance_key": "choose_programmes",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "choose_programmes",
+     "title": "Confirm the programmes you will apply to"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "english_test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "english_test",
+     "title": "Take a recognised English test (score per programme)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "health_insurance",
+       true
+      ],
+      [
+       "register_address",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-03-05 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "enrol",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "enrol",
+     "title": "Enrol at your university"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S2",
+       "url": "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "grading_system_doc",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "grading_system_doc",
+     "title": "Upload your university's official grading system"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-26 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "health_insurance",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "health_insurance",
+     "title": "Get health insurance that the university accepts for enrolment"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      },
+      {
+       "source": "S8",
+       "url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "hec_attestation",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "hec_attestation",
+     "title": "Get your degree and transcripts attested by HEC (online e-Attestation)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "min_passing_grade_letter",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "min_passing_grade_letter",
+     "title": "Get a statement of your university's minimum passing grade for the degree"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-26 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "register_address",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "register_address",
+     "title": "Register your address at the local registration office"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "enrol",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-03-08 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "residence_permit",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "residence_permit",
+     "title": "Apply for your residence permit before the visa expires"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-a.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      }
+     ],
+     "critical": true,
+     "depends_on": [
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-22 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "approve",
+     "instance_key": "review_visa_file",
+     "kind": "student",
+     "latest_finish": "2027-03-30 23:59:59+02:00",
+     "latest_start": "2027-03-28 23:59:59+02:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 34,
+     "task_type": "student.approve",
+     "template_key": "review_visa_file",
+     "title": "Review and approve your visa file"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S15",
+       "url": "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "travel_insurance",
+     "kind": "student",
+     "latest_finish": "2027-03-28 23:59:59+02:00",
+     "latest_start": "2027-03-26 23:59:59+01:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 53,
+     "task_type": "student.act",
+     "template_key": "travel_insurance",
+     "title": "Buy travel health insurance from your travel date"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "note": "Apply by 1 April 2027: 15 weeks before the earliest semester start of your programmes (15 July 2027), so that the visa (about 90 days) can arrive in time.",
+       "source": "fact:semester_start",
+       "url": "https://facts.test/p"
+      },
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      },
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": true,
+     "depends_on": [
+      [
+       "admission_result@prog-a.test",
+       true
+      ],
+      [
+       "admission_result@prog-b.test",
+       true
+      ],
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "review_visa_file",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-24 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "semester_start"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "semester_start"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "visa_apply",
+     "kind": "student",
+     "latest_finish": "2027-04-01 23:59:59+02:00",
+     "latest_start": "2027-03-30 23:59:59+02:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": true,
+     "slack_days": 34,
+     "task_type": "student.act",
+     "template_key": "visa_apply",
+     "title": "Apply for the student visa on the Consular Services Portal"
+    }
+   ]
+  },
+  "empty_student": {
+   "answered": [],
+   "at_risk": false,
+   "playbook_key": "germany_master",
+   "playbook_version": 3,
+   "tasks": [
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:decision_date",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:decision_date",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:admission_test",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:admission_test",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S6",
+       "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": null,
+     "instance_key": "applications_submitted",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "system.milestone",
+     "template_key": "applications_submitted",
+     "title": "All applications submitted"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S9",
+       "url": "https://pakistan.diplo.de/pk-en/service/1995528-1995528"
+      }
+     ],
+     "critical": true,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 21,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "blocked_account",
+     "kind": "student",
+     "latest_finish": "2027-03-28 23:59:59+02:00",
+     "latest_start": "2027-03-07 23:59:59+01:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 34,
+     "task_type": "student.act",
+     "template_key": "blocked_account",
+     "title": "Open a blocked account (or arrange another proof of funds)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S4",
+       "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "choose",
+     "instance_key": "choose_programmes",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "choose_programmes",
+     "title": "Confirm the programmes you will apply to"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "english_test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "english_test",
+     "title": "Take a recognised English test (score per programme)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "health_insurance",
+       true
+      ],
+      [
+       "register_address",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-03-05 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "enrol",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "enrol",
+     "title": "Enrol at your university"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S2",
+       "url": "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "grading_system_doc",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "grading_system_doc",
+     "title": "Upload your university's official grading system"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-26 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "health_insurance",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "health_insurance",
+     "title": "Get health insurance that the university accepts for enrolment"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      },
+      {
+       "source": "S8",
+       "url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "hec_attestation",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "hec_attestation",
+     "title": "Get your degree and transcripts attested by HEC (online e-Attestation)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "min_passing_grade_letter",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "min_passing_grade_letter",
+     "title": "Get a statement of your university's minimum passing grade for the degree"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-26 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "register_address",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "register_address",
+     "title": "Register your address at the local registration office"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "enrol",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-03-08 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "residence_permit",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "residence_permit",
+     "title": "Apply for your residence permit before the visa expires"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-a.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "fact:required_documents",
+       "url": "https://facts.test/p"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      }
+     ],
+     "critical": true,
+     "depends_on": [
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-22 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "approve",
+     "instance_key": "review_visa_file",
+     "kind": "student",
+     "latest_finish": "2027-03-30 23:59:59+02:00",
+     "latest_start": "2027-03-28 23:59:59+02:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 34,
+     "task_type": "student.approve",
+     "template_key": "review_visa_file",
+     "title": "Review and approve your visa file"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S15",
+       "url": "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "travel_insurance",
+     "kind": "student",
+     "latest_finish": "2027-03-28 23:59:59+02:00",
+     "latest_start": "2027-03-26 23:59:59+01:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": 53,
+     "task_type": "student.act",
+     "template_key": "travel_insurance",
+     "title": "Buy travel health insurance from your travel date"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "note": "Apply by 1 April 2027: 15 weeks before the earliest semester start of your programmes (15 July 2027), so that the visa (about 90 days) can arrive in time.",
+       "source": "fact:semester_start",
+       "url": "https://facts.test/p"
+      },
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      },
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": true,
+     "depends_on": [
+      [
+       "admission_result@prog-a.test",
+       true
+      ],
+      [
+       "admission_result@prog-b.test",
+       true
+      ],
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "review_visa_file",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-24 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "semester_start"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "semester_start"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "visa_apply",
+     "kind": "student",
+     "latest_finish": "2027-04-01 23:59:59+02:00",
+     "latest_start": "2027-03-30 23:59:59+02:00",
+     "programme_ref": null,
+     "protected": false,
+     "provisional": true,
+     "slack_days": 34,
+     "task_type": "student.act",
+     "template_key": "visa_apply",
+     "title": "Apply for the student visa on the Consular Services Portal"
+    }
+   ]
+  },
+  "no_facts": {
+   "answered": [],
+   "at_risk": false,
+   "playbook_key": "germany_master",
+   "playbook_version": 3,
+   "tasks": [
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-03-07 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "applications_submitted",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 1,
+     "earliest_start": "2027-03-07 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": "choose",
+     "instance_key": "admission_result@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "admission_result",
+     "title": "Tell us this programme's admission result"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "admission_test@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "admission_test",
+     "title": "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "choose_programmes",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-04 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "provide",
+     "instance_key": "application_documents@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "application_documents",
+     "title": "Prepare this programme's application documents (CV, letters, module descriptions)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S6",
+       "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "direct_apply@prog-a.test",
+       true
+      ],
+      [
+       "direct_apply@prog-b.test",
+       true
+      ],
+      [
+       "uni_assist_apply@prog-a.test",
+       true
+      ],
+      [
+       "uni_assist_apply@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-03-07 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": null,
+     "instance_key": "applications_submitted",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "system.milestone",
+     "template_key": "applications_submitted",
+     "title": "All applications submitted"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S9",
+       "url": "https://pakistan.diplo.de/pk-en/service/1995528-1995528"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 21,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "blocked_account",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "blocked_account",
+     "title": "Open a blocked account (or arrange another proof of funds)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S4",
+       "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "choose",
+     "instance_key": "choose_programmes",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.choose",
+     "template_key": "choose_programmes",
+     "title": "Confirm the programmes you will apply to"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:admission_test",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm admission_test for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "application_route"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:application_route",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm application_route for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "deadline_close"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:deadline_close",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm deadline_close for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:decision_date",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm decision_date for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "portal_url"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:portal_url",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm portal_url for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:required_documents",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm required_documents for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "semester_start"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-a.test:semester_start",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm semester_start for prog-a.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "admission_test"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:admission_test",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm admission_test for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "application_route"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:application_route",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm application_route for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "deadline_close"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:deadline_close",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm deadline_close for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "decision_date"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:decision_date",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm decision_date for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "portal_url"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:portal_url",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm portal_url for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:required_documents",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm required_documents for prog-b.test"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 0,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "semester_start"
+      ]
+     ],
+     "inbox_kind": null,
+     "instance_key": "confirm_fact@prog-b.test:semester_start",
+     "kind": "work",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "knowledge.confirm_fact",
+     "template_key": "confirm_fact",
+     "title": "Confirm semester_start for prog-b.test"
+    },
+    {
+     "blocked_reason": "fact_missing:deadline_close",
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-a.test",
+       true
+      ],
+      [
+       "english_test",
+       true
+      ],
+      [
+       "hec_attestation",
+       true
+      ],
+      [
+       "review_pack@prog-a.test",
+       true
+      ],
+      [
+       "uni_assist_apply@prog-a.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-03-05 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "application_route"
+      ],
+      [
+       "programme",
+       "prog-a.test",
+       "deadline_close"
+      ],
+      [
+       "programme",
+       "prog-a.test",
+       "portal_url"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "direct_apply@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "direct_apply",
+     "title": "Apply in the university's own portal"
+    },
+    {
+     "blocked_reason": "fact_missing:deadline_close",
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-b.test",
+       true
+      ],
+      [
+       "english_test",
+       true
+      ],
+      [
+       "hec_attestation",
+       true
+      ],
+      [
+       "review_pack@prog-b.test",
+       true
+      ],
+      [
+       "uni_assist_apply@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-03-05 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "application_route"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "deadline_close"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "portal_url"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "direct_apply@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "direct_apply",
+     "title": "Apply in the university's own portal"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 30,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "english_test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "english_test",
+     "title": "Take a recognised English test (score per programme)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "health_insurance",
+       true
+      ],
+      [
+       "register_address",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 3,
+     "earliest_start": "2027-03-17 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "enrol",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "enrol",
+     "title": "Enrol at your university"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S2",
+       "url": "https://www.uni-assist.de/en/how-to-apply/plan-your-application/educational-certificates-translations/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "grading_system_doc",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "grading_system_doc",
+     "title": "Upload your university's official grading system"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S18",
+       "url": "https://www.daad.de/deutschland/nach-deutschland/bewerbung/en/58221-health-insurance/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-03-10 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "health_insurance",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "health_insurance",
+     "title": "Get health insurance that the university accepts for enrolment"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      },
+      {
+       "source": "S8",
+       "url": "https://www.hec.gov.pk/english/services/students/das/Pages/Degree-Attestation.aspx"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "hec_attestation",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "hec_attestation",
+     "title": "Get your degree and transcripts attested by HEC (online e-Attestation)"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S1",
+       "url": "https://www.uni-assist.de/en/tools/info-country-by-country/details-country/country/pk/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "provide",
+     "instance_key": "min_passing_grade_letter",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.provide",
+     "template_key": "min_passing_grade_letter",
+     "title": "Get a statement of your university's minimum passing grade for the degree"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "visa_apply",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 7,
+     "earliest_start": "2027-03-10 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "register_address",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "register_address",
+     "title": "Register your address at the local registration office"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S17",
+       "url": "https://www.daad.de/en/studying-in-germany/living-in-germany/registering/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "enrol",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 14,
+     "earliest_start": "2027-03-20 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "residence_permit",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "residence_permit",
+     "title": "Apply for your residence permit before the visa expires"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-a.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [],
+     "critical": false,
+     "depends_on": [
+      [
+       "application_documents@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-11 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "required_documents"
+      ]
+     ],
+     "inbox_kind": "approve",
+     "instance_key": "review_pack@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_pack",
+     "title": "Review and approve this programme's application pack"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-22 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "approve",
+     "instance_key": "review_visa_file",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.approve",
+     "template_key": "review_visa_file",
+     "title": "Review and approve your visa file"
+    },
+    {
+     "blocked_reason": null,
+     "citations": [
+      {
+       "source": "S15",
+       "url": "https://pakistan.diplo.de/resource/blob/2208710/4a44b499964d27c04ecb6e5770fdb824/study-visa---leaflet-data.pdf"
+      }
+     ],
+     "critical": false,
+     "depends_on": [],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-02-01 00:00:00+01:00",
+     "estimated": false,
+     "fact_refs": [],
+     "inbox_kind": "act",
+     "instance_key": "travel_insurance",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "travel_insurance",
+     "title": "Buy travel health insurance from your travel date"
+    },
+    {
+     "blocked_reason": "fact_missing:deadline_close",
+     "citations": [
+      {
+       "source": "S4",
+       "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+      },
+      {
+       "source": "S5",
+       "url": "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+      },
+      {
+       "source": "S6",
+       "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "admission_test@prog-a.test",
+       true
+      ],
+      [
+       "application_documents@prog-a.test",
+       true
+      ],
+      [
+       "english_test",
+       true
+      ],
+      [
+       "grading_system_doc",
+       true
+      ],
+      [
+       "hec_attestation",
+       true
+      ],
+      [
+       "min_passing_grade_letter",
+       true
+      ],
+      [
+       "review_pack@prog-a.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-03-03 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "application_route"
+      ],
+      [
+       "programme",
+       "prog-a.test",
+       "deadline_close"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "uni_assist_apply@prog-a.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-a.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "uni_assist_apply",
+     "title": "Submit the uni-assist application and pay the handling fee"
+    },
+    {
+     "blocked_reason": "fact_missing:deadline_close",
+     "citations": [
+      {
+       "source": "S4",
+       "url": "https://www.uni-assist.de/en/faqs/plan-your-application/"
+      },
+      {
+       "source": "S5",
+       "url": "https://www.uni-assist.de/en/how-to-apply/apply-online/pay-submit/"
+      },
+      {
+       "source": "S6",
+       "url": "https://www.uni-assist.de/en/faqs/apply-online/"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "admission_test@prog-b.test",
+       true
+      ],
+      [
+       "application_documents@prog-b.test",
+       true
+      ],
+      [
+       "english_test",
+       true
+      ],
+      [
+       "grading_system_doc",
+       true
+      ],
+      [
+       "hec_attestation",
+       true
+      ],
+      [
+       "min_passing_grade_letter",
+       true
+      ],
+      [
+       "review_pack@prog-b.test",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-03-03 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-b.test",
+       "application_route"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "deadline_close"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "uni_assist_apply@prog-b.test",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": "prog-b.test",
+     "protected": false,
+     "provisional": true,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "uni_assist_apply",
+     "title": "Submit the uni-assist application and pay the handling fee"
+    },
+    {
+     "blocked_reason": "fact_missing:semester_start",
+     "citations": [
+      {
+       "source": "S11",
+       "url": "https://pakistan.diplo.de/pk-en/service/2-study-visa-seite-1676104"
+      },
+      {
+       "source": "S13",
+       "url": "https://digital.diplo.de/studium"
+      }
+     ],
+     "critical": false,
+     "depends_on": [
+      [
+       "admission_result@prog-a.test",
+       true
+      ],
+      [
+       "admission_result@prog-b.test",
+       true
+      ],
+      [
+       "blocked_account",
+       true
+      ],
+      [
+       "review_visa_file",
+       true
+      ],
+      [
+       "travel_insurance",
+       true
+      ]
+     ],
+     "due_tz": "Europe/Berlin",
+     "duration_days": 2,
+     "earliest_start": "2027-03-08 00:00:00+01:00",
+     "estimated": true,
+     "fact_refs": [
+      [
+       "programme",
+       "prog-a.test",
+       "semester_start"
+      ],
+      [
+       "programme",
+       "prog-b.test",
+       "semester_start"
+      ]
+     ],
+     "inbox_kind": "act",
+     "instance_key": "visa_apply",
+     "kind": "student",
+     "latest_finish": null,
+     "latest_start": null,
+     "programme_ref": null,
+     "protected": false,
+     "provisional": false,
+     "slack_days": null,
+     "task_type": "student.act",
+     "template_key": "visa_apply",
+     "title": "Apply for the student visa on the Consular Services Portal"
+    }
+   ]
+  }
+ },
  "tests:calendar/pakistan_inter.v3.yaml": {
   "date_facts": {
    "answered": [],
