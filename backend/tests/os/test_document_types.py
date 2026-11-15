@@ -9,7 +9,9 @@ from app.os.documents.types import TYPES_DIR, DocumentTypeError, load_document_t
 
 TYPES = {"passport", "degree_certificate", "transcript", "ssc_certificate", "hssc_certificate", "ielts_trf",
          "min_passing_grade_letter",  # the letter: Slice 4 Task 4, added by config only
-         "admission_letter", "blocked_account_confirmation", "insurance_certificate"}  # Slice 6b, by config only
+         "admission_letter", "blocked_account_confirmation", "insurance_certificate",  # Slice 6b, by config only
+         "national_identity_card", "equivalence_certificate", "o_a_level_statement", "domicile_certificate",
+         "character_certificate", "migration_certificate", "fee_challan_receipt"}  # P3-T8 (R-40), by config only
 
 
 def test_all_types_load():

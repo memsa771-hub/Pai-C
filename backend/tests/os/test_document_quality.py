@@ -11,6 +11,7 @@ from app.os.documents.checks import cross_check, load_name_variants
 from app.os.documents.types import load_document_types
 from app.os.documents.validators import validate
 from tests.os.quality import make_sample_docs as samples
+from tests.os.quality.make_intermediate_docs import NEW_TYPES
 from tests.os.quality.doc_scoring import score
 from tests.os.quality.run_document_quality import bundle_verdict, main
 
@@ -35,7 +36,7 @@ def test_sample_set_shape():
     base = {n: d for n, d in docs.items() if not d.get("variant_of")}
     spike2_types = set(TYPES) - {"min_passing_grade_letter",  # the letter came with Slice 4, after Spike 2
                                  "admission_letter", "blocked_account_confirmation",  # Slice 6b's visa documents
-                                 "insurance_certificate"}
+                                 "insurance_certificate"} - set(NEW_TYPES)  # P3-T8: the intermediate set
     assert len(base) == 30 and {d["type"] for d in base.values()} == spike2_types  # 5 bundles x 6 types
     assert sorted({d["person"] for d in base.values()}) == ["b1", "b2", "b3", "b4", "b5"]
     assert {n for n, d in docs.items() if d.get("variant_of")} == {"b1_passport_rotated.png", "b5_transcript_lowres.jpg"}
