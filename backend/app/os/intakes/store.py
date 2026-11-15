@@ -1,6 +1,7 @@
 """The intake rows (P2-D23). `current` is reached only with a recorded gate pass (R-66); the gate itself is T9's."""
 
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -14,6 +15,9 @@ T = models.intakes
 _CODE = re.compile(r"[a-z][a-z0-9_]*")
 # planned -> open -> current -> closed; an open intake may close without ever being current
 _NEXT = {"planned": ("open", "closed"), "open": ("current", "closed"), "current": ("closed",), "closed": ()}
+
+
+Place = tuple[str | None, str | None]  # a chosen place's (region, family), from its programme row (ADR-001 D9)
 
 
 class IntakeError(ValueError):
@@ -124,22 +128,44 @@ class IntakeStore:
             raise IntakeError(f"intake {intake_id} is not open")
         return _intake(row)
 
-    def plannable(self, term: str, year: int) -> bool:
+    def plannable(self, term: str, year: int, places: Iterable[Place] = ()) -> bool:
         """R-63: a student may plan for any open or current intake. An intake nobody registered is not restricted
-        (today's behaviour); one that is registered only as planned or closed is not plannable."""
+        (today's behaviour); one that is registered only as planned or closed is not plannable.
+        ADR-001 D9, `places`: the (region, family) of each chosen place (`places_of`). A place whose
+        (region, family, term, year) intake is registered must have it open or current; a place with none registered
+        (or no region or family) is held to the rule above. No places: the rule above alone, exactly as before."""
+        owns = [self._own(p, term, year) for p in places]
+        if any(o is not None and o.state not in ("open", "current") for o in owns):
+            return False
+        held_to_rule = not owns or any(o is None for o in owns)
+        return self._plannable(term, year) if held_to_rule else True
+
+    def _plannable(self, term: str, year: int) -> bool:
         states = self._states(term, year)
         return not states or bool(states & {"open", "current"})
 
-    def fallback_applies(self, term: str, year: int) -> bool:
+    def fallback_applies(self, term: str, year: int, place: Place | None = None) -> bool:
         """P2-D24: plans of this intake read the previous year's labelled facts while the intake is open and no
-        region of it is current yet. No registered intake: no fallback (today's behaviour)."""
+        region of it is current yet. No registered intake: no fallback (today's behaviour).
+        ADR-001 D9, `place`: a place whose own (region, family, term, year) intake is registered falls back while that
+        intake is open; a place with none registered keeps the rule above."""
+        own = self._own(place, term, year)
+        if own is not None:
+            return own.state == "open"
         states = self._states(term, year)
         return "open" in states and "current" not in states
 
-    def fallback_year(self, term: str, year: int) -> int | None:
+    def fallback_year(self, term: str, year: int, place: Place | None = None) -> int | None:
         """The one earlier year the fallback may read for plans of this intake: the year of the intake it was opened
         from when that is set, else `year - 1`. None when the fallback does not apply. Several open regions of one
-        (term, year): the newest of their source years."""
+        (term, year): the newest of their source years.
+        ADR-001 D9, `place`: a place whose own intake is registered reads that intake's source year alone."""
+        own = self._own(place, term, year)
+        if own is not None:
+            if own.state != "open":
+                return None
+            source = self.by_id(own.opened_from_id) if own.opened_from_id is not None else None
+            return source.year if source is not None else year - 1
         if not self.fallback_applies(term, year):
             return None
         O = T.alias("opened_from")
@@ -149,7 +175,26 @@ class IntakeStore:
                 T.c.tenant_id == self.tenant_id, T.c.term == term, T.c.year == year, T.c.state == "open")).all()
         return max(r.year if r.year is not None else year - 1 for r in rows)
 
+    def _own(self, place: Place | None, term: str, year: int) -> Intake | None:
+        """The place's own registered intake, or None (no place, no region or family, or nothing registered)."""
+        if place is None or not place[0] or not place[1]:
+            return None
+        return self.get(place[0], place[1], term, year)
+
     def _states(self, term: str, year: int) -> set[str]:
         with self.engine.connect() as conn:
             return set(conn.execute(select(T.c.state).where(and_(
                 T.c.tenant_id == self.tenant_id, T.c.term == term, T.c.year == year))).scalars().all())
+
+
+def places_of(engine: Engine, tenant_id: str, refs: Sequence[str]) -> dict[str, Place]:
+    """ADR-001 D9: each programme's (region, family), read from its programme row, never from a playbook name. A ref
+    with no row, or a row with no region or family, has no registered intake (`IntakeStore._own` returns None)."""
+    if not refs:
+        return {}
+    P = models.programmes
+    with engine.connect() as conn:
+        rows = conn.execute(select(P.c.ref, P.c.region, P.c.family).where(
+            P.c.tenant_id == tenant_id, P.c.ref.in_(list(refs)))).all()
+    found = {r.ref: (r.region, r.family) for r in rows}
+    return {ref: found.get(ref, (None, None)) for ref in refs}
