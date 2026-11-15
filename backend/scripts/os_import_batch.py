@@ -3,6 +3,7 @@
     python -m scripts.os_import_batch template OUT.xlsx
     python -m scripts.os_import_batch validate FILE --country PK [--lists DIR] [--allow-list DIR] [--report OUT.csv]
                                                [--aliases A.yaml] [--institutions-from OTHER.xlsx]...
+                                               [--reviewers [--batch-ref REF] [--assume-attested REF [REF ...]]]
     python -m scripts.os_import_batch import FILE --country PK --owner-accepted <decision ref> --actor NAME [--refetch]
     python -m scripts.os_import_batch import FILE --country PK --reviewers --batch-ref REF --actor NAME [--refetch]
     python -m scripts.os_import_batch undo IMPORT_ID --actor NAME
@@ -19,6 +20,9 @@ lists every row beside the file. `--aliases FILE` (may repeat) gives alias files
 accepted alias makes an id of the file name an entity loaded under another id; the file itself stays unchanged. An
 alias counts only when both its checkers attested the alias file's ref (`aliases-<sha256 of the alias file>`) in the
 review queue; `validate --assume-aliases-attested` shows the plan as if they had.
+`validate --reviewers` plans as `import --reviewers` would (the batch ref is --batch-ref, else the file's stem);
+`--assume-attested REF...` assumes, without checking, that those reviewer refs attested the batch ref (P2-T31). The
+import has no such flag: it reads the attestations from the review queue.
 The allow-list family of a row is the `family` of every official list its entity is on (`--lists` files for a dry run,
 the registry for an import); `--family` is used only when none of them has one (P2-T19). `validate --allow-list DIR`
 judges every source against the allow-list files in DIR as the import judges it against the same entries; without it the
@@ -98,6 +102,11 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                                          help="what if every official list were loaded (dry run only)")
     sub.choices["validate"].add_argument("--assume-aliases-attested", action="store_true",
                                          help="what if both checkers of every alias had attested it (dry run only)")
+    sub.choices["validate"].add_argument("--reviewers", action="store_true",
+                                         help="plan as `import --reviewers` would (dry run; see --assume-attested)")
+    sub.choices["validate"].add_argument("--assume-attested", nargs="+", default=[], metavar="REF",
+                                         help="with --reviewers: what if these reviewer refs had attested the batch "
+                                              "ref (dry run only; not checked)")
     sub.choices["validate"].add_argument("--institutions-from", action="append", default=[], metavar="OTHER",
                                          help="resolve inst_ids against the institutions OTHER would load (dry run only)")
     imp = sub.choices["import"]
@@ -117,8 +126,17 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
             out(f"wrote {write_template(Path(args.out))}")
             return 0
         if args.cmd == "validate":
+            if args.assume_attested and not args.reviewers:
+                raise ValueError("--assume-attested needs --reviewers")
+            mode = REVIEWERS if args.reviewers else OWNER_ACCEPTED
+            batch_ref = (args.batch_ref or Path(args.file).stem) if args.reviewers else (args.batch_ref or "")
             urls, regions, fams = _lists(Path(args.lists) if args.lists else None, args.country)
             official, notes = None, []
+            if args.reviewers:  # the dry run has no review queue: an attestation is only ever assumed here
+                refs = tuple(dict.fromkeys(r.strip() for r in args.assume_attested if r.strip()))
+                notes.append(f"reviewers: batch ref '{batch_ref}'; attestation ASSUMED, NOT checked, for: "
+                             f"{', '.join(refs) or 'nobody'}; the import accepts only checkers that attested the "
+                             "batch ref in the review queue")
             if args.allow_list:
                 from app.os.knowledge.sources.allowlist import file_lookup, load_allowlist
 
@@ -135,7 +153,7 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                              "not on the allow-list at unconfirmed (source_not_on_allow_list)")
 
             def context():
-                c = build_context(None, country=args.country, mode=OWNER_ACCEPTED, batch_ref=args.batch_ref or "",
+                c = build_context(None, country=args.country, mode=mode, batch_ref=batch_ref,
                                   family=args.family, decision_ref=args.decision_ref, list_urls=urls,
                                   list_regions=regions, list_families=fams,
                                   require_list=not args.no_list_needed)
@@ -149,8 +167,14 @@ def main(argv: list[str] | None = None, deps: ImportDeps | None = None, out=prin
                 out(f"institutions from {Path(other).name}: "
                     f"{sum(1 for r in planned if r.sheet == 'Institutions' and r.bucket in ('accepted', 'unconfirmed'))}")
             ctx.aliases = tuple(load_aliases(Path(a)) for a in args.aliases)
-            if args.assume_aliases_attested:  # the dry run has no review queue; only alias refs are assumed
-                ctx.attested = lambda name, ref: ref.startswith("aliases-")
+            assumed = set(refs) if args.reviewers else set()
+            alias_refs = bool(args.assume_aliases_attested)
+
+            def attested(name: str, ref: str) -> bool:  # assumed, never checked (the dry run has no review queue)
+                return (alias_refs and ref.startswith("aliases-")) or (name in assumed and ref == batch_ref)
+
+            if assumed or alias_refs:
+                ctx.attested = attested
             _, results = plan_file(Path(args.file), ctx)
             if args.report:
                 write_report(results, Path(args.report))

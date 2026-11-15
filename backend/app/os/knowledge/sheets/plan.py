@@ -33,8 +33,8 @@ from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
 from app.os.registry.calendars import calendar_types
-from app.os.registry.model import (KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED, SERVES_A_REGION,
-                                   RegistryEntry, slug)
+from app.os.registry.model import (ALLOWED_PARENTS, KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED,
+                                   SERVES_A_REGION, RegistryEntry, slug)
 
 BUCKETS = ("accepted", "unconfirmed", "queued", "rejected", "skipped")
 OWNER_ACCEPTED, REVIEWERS = "owner_accepted", "reviewers"
@@ -544,11 +544,21 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
             served = ctx.list_regions.get(kept, NATIONAL)
             if served not in (NATIONAL, region):
                 return "region_conflicts_with_list", f"{kept} is a list of {served}; the row's region is {region}"
-    parent = None
+    parent, parent_kind_unknown = None, False
     if _text(r.get("parent_id")):
-        parent = planned.get(_text(r.get("parent_id"))) or ctx.existing_institutions(_text(r.get("parent_id")))
+        pid = _text(r.get("parent_id")) or ""
+        parent = planned.get(pid) or ctx.existing_institutions(pid)
         if parent is None:
             return ("alias_target_not_loaded" if r.get("_alias") else "parent_not_loaded"), str(r.get("parent_id"))
+        # the registry refuses a parent of a kind ALLOWED_PARENTS does not name (P2-T31, FU-11): the plan rejects it
+        # first, so the dry run and the import agree. The parent's kind: its row in this file, else the registry.
+        pkind = first[pid][0] if planned.get(pid) and pid in first else (ctx.registry_info(parent) or {}).get("kind")
+        if pkind is None:  # unknown: as before T31, the registry decides at the import
+            parent_kind_unknown = True
+        elif pkind not in ALLOWED_PARENTS[kind]:
+            allowed = ", ".join(ALLOWED_PARENTS[kind]) or "none"
+            return "parent_kind_not_allowed", (f"the row is a {kind}; its parent {pid} ({parent}) is a {pkind}; "
+                                               f"the parent of a {kind} may be: {allowed}")
     tz = _text(r.get("timezone"))
     if tz is not None:
         try:
@@ -574,6 +584,9 @@ def _institution_entry(r: dict, rid: str, res: RowResult, ctx: PlanContext, plan
     res.payload.update(entry=entry, kind=kind, read_method=rm, region=region, url=url, quote=quote, timezone=tz,
                        calendar_type=ctype, lists=on_lists)
     _cap(res, url, region, quote, ctx, rm, on_lists, kind)
+    if parent_kind_unknown:
+        note = f"parent {parent}: kind unknown, not checked (the registry checks it at the import)"
+        res.detail = "; ".join(x for x in (res.detail, note) if x)
     if res.bucket in ("accepted", "unconfirmed"):
         planned[rid] = entry.entity_id
     return None, ""

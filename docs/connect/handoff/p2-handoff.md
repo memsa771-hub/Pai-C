@@ -152,7 +152,7 @@ Data gaps found in the local run of 2026-11-14 (source: the local ledger and `.l
 - **P4-034..036** (Balochistan divisional-merit MBBS seats in other provinces) are filed under BL-ADM-001, an admission system; they are rejected `parent_not_institution` until research gives a real institution id or another model.
 - **Batch 3's 110 `no_value` programmes** (v4 MBBS/BDS seat rows with the number only in the quote) are rejected; their re-entered values are the v5 (74) and v6 (34) seats workbooks, which wait for the re-fetch.
 
-Follow-ups from the local reviews (FU-1 to FU-10, as the ledger records them):
+Follow-ups from the local reviews (FU-1 to FU-12, as the ledger records them):
 
 - **FU-1**: list progress must not count withdrawn rows (gate (a) could go green from undone imports). **Withdrawn rows: addressed by T27**: `list_progresses` and `list_progress` count a row only for the lists `kept_lists` gives it, so a row closed by an import undo (status `closed` plus `withdrawn_by_import`) counts for no list, and an undone alias membership (T28 `add_lists`) does not count either. **Still open for the owner (W10):** whether a row closed or merged for any other reason counts. Today it still counts (unchanged, pinned by `tests/os/sheets/test_list_progress_withdrawn.py`).
 - **FU-2**: per-list evidence (`source_url` and quote per list) for R-76; the first list's URL and quote are replaced on the row and kept only in revisions. Own task.
@@ -167,6 +167,14 @@ Follow-ups from the local reviews (FU-1 to FU-10, as the ledger records them):
 - **T24 choice:** `routes/builder.py::_check_programmes` is left unfiltered. Every list and suggestion already hides an excluded-field programme, so this check is reached only from a stale screen or a hand-made request. With the Counsellor on, rule 8 opens a case. The replan proposes removing such a place on the next student-fact change, not when the plan starts.
 - **FU-13** (T24 review S1): `backend/app/pai_c/connect/places.py::places_for` should call `pai_os_bridge.programmes_for(route["key"], term, year, workspace_id)`, with one test, so the Counsellor's place picker leaves out an excluded field too (R-15 "the route builder"). A Counsellor file (CODEOWNERS, not frozen): a small task with the Counsellor lead's review, before P2 sign-off. Until then rule 8 opens a case for an excluded chosen field. If StudentFacts fails, `programmes_for` returns the unfiltered list (logged), never `[]`.
 - **S2, for the Counsellor lead to decide** (T24 review): a field whose path the student restored is no longer excluded on the Counsellor side (`consistency.py` `in_force`, `exclusions._restored`), but StudentFacts (`connect/student_facts.py::_item_facts`) still sends every ruled-out field as `constraint.excluded_fields`. So for a restored field the OS hides its programmes and proposes removing a planned place, while the Counsellor shows them. The fix, if wanted, is on the Counsellor side, in StudentFacts.
+- **FU-11**: the Institutions plan checked only that a parent exists, not its kind, so the dry run accepted a row the
+  registry then refused (`registry_refused`). **Addressed by T31**: the plan rejects a parent of a kind
+  `ALLOWED_PARENTS` does not name as `parent_kind_not_allowed` (the parent's kind from its row in the file, else the
+  registry). A parent whose kind is unknown is not checked, as before, and the row's detail says so.
+- **FU-12**: `validate` planned only in the owner-accepted mode, so a reviewers-mode batch showed every row
+  `unconfirmed`. **Addressed by T31**: `validate --reviewers [--batch-ref REF] --assume-attested REF...` plans as
+  `import --reviewers` would, with the named refs assumed (not checked) to have attested the batch ref. The import has
+  no assume flag.
 
 Code limits and known gaps:
 

@@ -76,6 +76,28 @@ row alike, and the rest of the file loads. Facts rows on that programme are reje
 programme that is not loaded. A programme row whose institution the registry still refuses at load time is rejected
 `registry_refused`, and the import goes on (the same backstop as for Institutions rows).
 
+## A parent of the wrong kind (P2-T31)
+
+An Institutions row's `parent_id` must name an entity of a kind the registry allows under the row's kind
+(`ALLOWED_PARENTS` in `backend/app/os/registry/model.py`; for example a campus or an institution under an institution,
+a calendar under an admission system, admission body, board or institution). Otherwise the row is rejected with reason
+`parent_kind_not_allowed`; the detail names the row's kind, the parent's kind and the allowed kinds. The parent's kind
+comes from its row in the same file, else from the registry. `validate` and `import` reject the row alike (before T31
+the dry run accepted it and the import refused it as `registry_refused`). When the parent's kind is unknown the row is
+not checked, as before, and its detail says "kind unknown, not checked"; the registry still refuses a wrong parent at
+load time (`registry_refused`).
+
+## Dry run of a reviewers-mode batch (P2-T31)
+
+`validate` plans in the owner-accepted mode unless `--reviewers` is given. `validate --reviewers` plans as
+`import --reviewers` would: the batch ref is `--batch-ref`, else the file's stem (as in the import). The dry run has no
+review queue, so `--assume-attested REF [REF ...]` assumes, without checking, that those reviewer refs attested the
+batch ref; the output says on its own line that the attestation is ASSUMED, NOT checked. With both checkers of a row
+assumed, the row plans as an import with both refs attested would (`accepted`, `verified`); with only checker 1
+assumed it is `confirmed` (one check), with only checker 2 or nobody `unconfirmed`. `--assume-attested` needs
+`--reviewers`; it combines with `--assume-aliases-attested`. `import` has no assume flag: it reads attestations from the
+review queue (`scripts/os_reviewers.py`).
+
 ## Alias files
 
 A returned file is kept unchanged as the source record. When a file uses its own id for an entity that another batch already lists under a different id, the link between the two ids goes in an **alias file**. The returned file is never edited. An alias file is YAML that is supplied with the batch:
@@ -313,7 +335,9 @@ A list batch (all the rows of one official list) is built with `backend/scripts/
 
   Formula-like cells are neutralised in the workbook and in the held CSV.
 - **Validate.** `python -m scripts.os_import_batch validate OUT.xlsx --country PK --lists ../docs/research/lists`
-  plans every written row onto the list. The dry run plans in the owner-accepted mode, where reviewer refs are not
-  checks, so the rows show as `unconfirmed`. In a reviewers-mode import, with both refs attested, they are verified.
+  plans every written row onto the list. Without `--reviewers` the dry run plans in the owner-accepted mode, where
+  reviewer refs are not checks, so the rows show as `unconfirmed`. Add `--reviewers --batch-ref REF --assume-attested
+  E1REF E2REF` to see the reviewers-mode import with both refs attested (verified); see "Dry run of a reviewers-mode
+  batch" above.
 - **Types.** `public_college` and `private_college` (the H3 list types of college lists) are institution types in
   format.yaml.
