@@ -160,9 +160,12 @@ def run_replan_job(replanner: Replanner, client: DBOSClient, now) -> int:
         try:
             replanner.plans.check_newer(plan_id)
             ev.detect_approved_changed(engine, tenant, plan_id)
-            detectors.detect_reached(engine, tenant, plan_id, replanner.plans.today())  # R-39: a list or result day came
         except Exception:  # noqa: BLE001  (logged; the plan is swept again in 5 minutes)
             log.exception("replan sweep failed for plan %s", plan_id)
+        try:  # R-39: a merit-list or result day came; its own guard, so a failed check above does not skip it
+            detectors.detect_reached(engine, tenant, plan_id, replanner.plans.today())
+        except Exception:  # noqa: BLE001  (logged; swept again in 5 minutes)
+            log.exception("R-39 sweep failed for plan %s", plan_id)
     replanner.expire_due(now)
     queued = 0
     for e in ev.pending(engine, tenant):
