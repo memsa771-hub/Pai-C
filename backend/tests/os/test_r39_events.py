@@ -119,7 +119,7 @@ def test_triggers_are_fields_and_classes_only():
     assert trig.merit_list_fields == {"merit_list_date"} and trig.result_fields == {"result_date"}
     assert trig.fee_classes == {"fee"} and trig.schedule_classes == {"schedule_date", "deadline", "test_date"}
     assert dict(trig.answers) == {"merit_list.not_listed": {"choice": "not_listed"}}
-    raw = (Path(detectors.__file__).with_name("event_triggers.yaml")).read_text(encoding="utf-8").lower()
+    raw = detectors.TRIGGERS_FILE.read_text(encoding="utf-8").lower()
     for name in ("sindh", "punjab", "seccap", "board", "karachi", "lahore", "islamabad", "khyber", "germany"):
         assert name not in raw  # no region or body name
 

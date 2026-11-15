@@ -25,7 +25,7 @@ from app.os.knowledge.port import CONFIRMED_LEVELS
 from app.os.replan import events as ev
 
 log = logging.getLogger("app.os.replan.detectors")
-TRIGGERS_FILE = Path(__file__).with_name("event_triggers.yaml")
+TRIGGERS_FILE = Path(__file__).parent / "data" / "event_triggers.yaml"  # not beside the route configs (config.py)
 PUBLISHED, NOT_LISTED, NEXT_ROUND = "merit_list.published", "merit_list.not_listed", "merit_list.next_round"
 FEE_DUE, RESULT, SCHEDULE = "fee_deposit.due", "test.result_published", "admission.schedule_changed"
 R39 = (PUBLISHED, NOT_LISTED, NEXT_ROUND, FEE_DUE, RESULT, SCHEDULE)
