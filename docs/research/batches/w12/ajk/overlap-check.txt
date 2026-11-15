@@ -1,0 +1,61 @@
+files: 17 target rows: 1898
+   PAI-Research-Batch1-National-v4.xlsx
+   PAI-Research-Batch2-Punjab-v4.xlsx
+   PAI-Research-Batch3-Sindh-v4.xlsx
+   PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+   PAI-Research-Batch5-Universities-BS-v4.xlsx
+   PAI-Research-W12-biek-affiliated-government-colleges.xlsx
+   PAI-Research-W12-biek-affiliated-private-colleges.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-bwp.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-dgk.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-fsd.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-grw.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-lhr.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-mul.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-sgd.xlsx
+   PAI-Research-W12-hed-punjab-public-colleges-swl.xlsx
+   PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx
+ajk rows: 177
+
+EXACT normalised-name matches: 0
+
+Distinctive-token matches (all of the AJK row's non-generic tokens appear in the target name): 18
+  ('ajk-hed-degree-colleges', '56', 'GIRLS DEGREE COLLEGE KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-83', 'GOVT. COLLEGE FOR WOMEN KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-degree-colleges', '56', 'GIRLS DEGREE COLLEGE KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-100', 'GOVT DEGREE COLLEGE FOR BOYS, KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-model-science-colleges', '1', 'MODEL SCIENCE COLLEGE BAGH', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-141', 'Nabi Bagh Z.M. Govt. Science College, Preedy Street Saddar', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-model-science-colleges', '1', 'MODEL SCIENCE COLLEGE BAGH', ('PAI-Research-W12-hed-punjab-public-colleges-lhr.xlsx', 'PB-HEDCOL-LHR-45', 'GOVT. COLLEGE FOR WOMEN SHAD BAGH LAHORE', 'punjab', 'LAHORE', 'public_college'))
+  ('ajk-hed-model-science-colleges', '3', 'MODEL SCIENCE COLLEGE KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-83', 'GOVT. COLLEGE FOR WOMEN KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-model-science-colleges', '3', 'MODEL SCIENCE COLLEGE KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-100', 'GOVT DEGREE COLLEGE FOR BOYS, KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-model-science-colleges', '5', 'MODEL SCIENCE COLLEGE MUZAFFARABAD', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-12', 'BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi.', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-model-science-colleges', '5', 'MODEL SCIENCE COLLEGE MUZAFFARABAD', ('PAI-Research-W12-hed-punjab-public-colleges-mul.xlsx', 'PB-HEDCOL-MUL-40', 'Govt. Degree College for Women, Muzaffarabad, Multan', 'punjab', 'MULTAN', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '1', 'POSTGRADUATE COLLEGE for Girls MUZAFFARABAD', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-12', 'BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi.', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '1', 'POSTGRADUATE COLLEGE for Girls MUZAFFARABAD', ('PAI-Research-W12-hed-punjab-public-colleges-mul.xlsx', 'PB-HEDCOL-MUL-40', 'Govt. Degree College for Women, Muzaffarabad, Multan', 'punjab', 'MULTAN', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '6', 'POST GRADUATE COLLEGE FOR GIRLS BAGH', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-141', 'Nabi Bagh Z.M. Govt. Science College, Preedy Street Saddar', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '6', 'POST GRADUATE COLLEGE FOR GIRLS BAGH', ('PAI-Research-W12-hed-punjab-public-colleges-lhr.xlsx', 'PB-HEDCOL-LHR-45', 'GOVT. COLLEGE FOR WOMEN SHAD BAGH LAHORE', 'punjab', 'LAHORE', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '9', 'POST GRADUATE COLLEGE FOR BOYS KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-83', 'GOVT. COLLEGE FOR WOMEN KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '9', 'POST GRADUATE COLLEGE FOR BOYS KOTLI', ('PAI-Research-W12-hed-punjab-public-colleges-rwp.xlsx', 'PB-HEDCOL-RWP-100', 'GOVT DEGREE COLLEGE FOR BOYS, KOTLI SATTIAN, RAWALPINDI', 'punjab', 'RAWALPINDI', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '10', 'POST GRADUATE COLLEGE FOR BOYS BAGH', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-141', 'Nabi Bagh Z.M. Govt. Science College, Preedy Street Saddar', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '10', 'POST GRADUATE COLLEGE FOR BOYS BAGH', ('PAI-Research-W12-hed-punjab-public-colleges-lhr.xlsx', 'PB-HEDCOL-LHR-45', 'GOVT. COLLEGE FOR WOMEN SHAD BAGH LAHORE', 'punjab', 'LAHORE', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '13', 'POST GRADUATE COLLEGE FOR BOYS MUZAFFARABAD', ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-12', 'BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi.', 'sindh', 'Karachi', 'public_college'))
+  ('ajk-hed-postgraduate-colleges', '13', 'POST GRADUATE COLLEGE FOR BOYS MUZAFFARABAD', ('PAI-Research-W12-hed-punjab-public-colleges-mul.xlsx', 'PB-HEDCOL-MUL-40', 'Govt. Degree College for Women, Muzaffarabad, Multan', 'punjab', 'MULTAN', 'public_college'))
+
+All AJK-region target rows (region contains 'jammu' or 'ajk'):
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-BRD-028', 'AJK BISE Mirpur', 'Azad Jammu & Kashmir', '', 'examination_board')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-ORG-002', 'DCRD (AJK)', 'Azad Jammu & Kashmir', '', 'ibcc_member_not_student_board')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-001', 'Al-Khair University', 'Azad Jammu & Kashmir', 'Bhimber', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-002', 'Mirpur University of Science & Technology', 'Azad Jammu & Kashmir', 'Mirpur', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-003', 'Mohi-ud-Din Islamic University', 'Azad Jammu & Kashmir', 'Nerian Sharif', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-004', 'The Azad Jammu & Kashmir University of Bhimber', 'Azad Jammu & Kashmir', 'Bhimber', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-005', 'University of Azad Jammu & Kashmir', 'Azad Jammu & Kashmir', 'Muzaffarabad', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-006', 'University of Kotli', 'Azad Jammu & Kashmir', 'Kotli', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-007', 'University of Poonch', 'Azad Jammu & Kashmir', 'Poonch', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch1-National-v4.xlsx', 'PK-UNI-008', 'Women University of Azad Jammu & Kashmir', 'Azad Jammu & Kashmir', 'Bagh', 'hec_recognised_university_or_dai')
+  ('PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx', 'AJ-ADM-001', 'Joint Admission Committee (JAC), AJ&K — MBBS/BDS admissions', 'AJK', 'Muzaffarabad', 'admission_body')
+  ('PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx', 'AJ-BRD-001', 'AJK Board of Intermediate and Secondary Education, Mirpur', 'AJK', 'Mirpur', 'exam_board')
+  ('PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx', 'AJ-ADM-002', 'Higher Education Department AJ&K — government colleges (FA/FSc)', 'AJK', 'Muzaffarabad', 'admission_body')
+  ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-16', 'Farabi Govt. Boys Higher Secondary School Kashmir Road.', 'sindh', 'Karachi', 'public_college')
+  ('PAI-Research-W12-biek-affiliated-government-colleges.xlsx', 'SD-BIEK-GOV-145', 'PECHS Education Foundation Govt. Degree Science College, Kashmir Road', 'sindh', 'Karachi', 'public_college')
+  ('PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx', 'PK-PMDC-1', 'Mohiuddin Islamic Medical College', 'azad_jammu_and_kashmir', '', 'private_medical_college')
+  ('PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx', 'PK-PMDC-123', 'Azad Jammu & Kashmir Medical College', 'azad_jammu_and_kashmir', '', 'public_medical_college')
+  ('PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx', 'PK-PMDC-124', 'Mohtarma Benazir Bhutto Shaheed Medical College', 'azad_jammu_and_kashmir', '', 'public_medical_college')

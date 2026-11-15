@@ -1,0 +1,34 @@
+{
+  "ajk-hed-postgraduate-colleges": {
+    "file": "post-graduate-colleges.html",
+    "sha256": "9ebdfa8a3f94763d2251b2e97c6fc72583ff43f9102b20b8447ac5b786e71adc",
+    "tables_in_doc": 2,
+    "rows": 14,
+    "expected": 14,
+    "problems": []
+  },
+  "ajk-hed-degree-colleges": {
+    "file": "degree-colleges.html",
+    "sha256": "56238b085c549935c6dea4d2a9deccebf2e1410cae3480bc6cab86fba81d3693",
+    "tables_in_doc": 2,
+    "rows": 75,
+    "expected": 75,
+    "problems": []
+  },
+  "ajk-hed-model-science-colleges": {
+    "file": "model-science-colleges.html",
+    "sha256": "11a79bf04809940a0acf6b45e433206e3ae8b6ff6bbd0a9482bdbdaafeb56819",
+    "tables_in_doc": 3,
+    "rows": 7,
+    "expected": 7,
+    "problems": []
+  },
+  "ajk-hed-inter-colleges": {
+    "file": "inter-colleges.html",
+    "sha256": "481cd26730613f1805f0c2aea799fb1e3528f1594a8bbb9aba5f61a635aac12d",
+    "tables_in_doc": 2,
+    "rows": 81,
+    "expected": 81,
+    "problems": []
+  }
+}

@@ -1,0 +1,94 @@
+{
+ "ajk-hed-postgraduate-colleges": {
+  "file": "post-graduate-colleges.html",
+  "sha256": "dfd2d4888d5787438d49c4e0b28c228144dea2bfba610801e311a4e7ef4cf7e3",
+  "rows": 14,
+  "expected": 14,
+  "count_ok": true,
+  "serials_ok": true,
+  "empty_names": [],
+  "tables_used": [
+   2
+  ],
+  "hidden_rows": 1,
+  "skipped": [
+   {
+    "reason": "not a serial/name row",
+    "cells": [
+     "The tests and interviews have been postponed due to a court stay order."
+    ],
+    "table": 1,
+    "line": 148
+   }
+  ]
+ },
+ "ajk-hed-degree-colleges": {
+  "file": "degree-colleges.html",
+  "sha256": "2fa516b94a7d9855b2e4a255ceeaccc6c99fe85baa6395818a843ccfc07e3145",
+  "rows": 75,
+  "expected": 75,
+  "count_ok": true,
+  "serials_ok": true,
+  "empty_names": [],
+  "tables_used": [
+   2
+  ],
+  "hidden_rows": 1,
+  "skipped": [
+   {
+    "reason": "not a serial/name row",
+    "cells": [
+     "The tests and interviews have been postponed due to a court stay order."
+    ],
+    "table": 1,
+    "line": 148
+   }
+  ]
+ },
+ "ajk-hed-model-science-colleges": {
+  "file": "model-science-colleges.html",
+  "sha256": "b40960ecd75f00c58c48e71abe454fc7ca924c7002685f2b256ae559a60494e2",
+  "rows": 7,
+  "expected": 7,
+  "count_ok": true,
+  "serials_ok": true,
+  "empty_names": [],
+  "tables_used": [
+   2
+  ],
+  "hidden_rows": 1,
+  "skipped": [
+   {
+    "reason": "not a serial/name row",
+    "cells": [
+     "The tests and interviews have been postponed due to a court stay order."
+    ],
+    "table": 1,
+    "line": 148
+   }
+  ]
+ },
+ "ajk-hed-inter-colleges": {
+  "file": "inter-colleges.html",
+  "sha256": "838de00de46aca977c34edd6c63fc83084dae0934120edfa76796509322dea61",
+  "rows": 81,
+  "expected": 81,
+  "count_ok": true,
+  "serials_ok": true,
+  "empty_names": [],
+  "tables_used": [
+   2
+  ],
+  "hidden_rows": 1,
+  "skipped": [
+   {
+    "reason": "not a serial/name row",
+    "cells": [
+     "The tests and interviews have been postponed due to a court stay order."
+    ],
+    "table": 1,
+    "line": 148
+   }
+  ]
+ }
+}
