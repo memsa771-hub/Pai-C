@@ -58,3 +58,30 @@ bodies:
     quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
       "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
     retrieved: '2026-11-14'
+# Added 2026-11-15 (W12 ALLOW): check 1 (claude-w12-allow-check-1) and check 2 (claude-w12-allow-check-2) agree.
+- body_ref: ''
+  tier: regulator
+  domains:
+  - pmdc.pk
+  list_ref: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+  reviewed_by: claude-w12-allow-check-1, claude-w12-allow-check-2
+  inst_id: PK-REG-003
+  name: Pakistan Medical & Dental Council (PMDC)
+  evidence:
+    url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+    quote: '<li><a href="https&#58;//pmdc.pk/">Pakistan Medical &amp; Dental Council (PMDC)</a><br></li>'
+    retrieved: '2026-11-15'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+    quote: '<title> Quality Assurance Agency Accreditation Councils </title> ... <li><a href="https&#58;//pmdc.pk/">Pakistan
+      Medical &amp; Dental Council (PMDC)</a><br></li>'
+    retrieved: '2026-11-15'
+  notes:
+  - 'Region basis: the PMDC list of colleges with attached hospitals (https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf; 17 pages, CreationDate
+    2026-05-19, the file of pmdc-colleges-with-hospitals in national.yaml) has rows whose address states this region.
+    Both checks quote them (whitespace collapsed):'
+  - '170. Jhalawan Medical College, Khuzdar - Baluchistan'
+  - '171. Loralai Medical College, Loralai - Baluchistan'
+  - '172. Makran Medical College, Turbat - Baluchistan'
+  - Check 1's HEC quote began '<h1>HEC Accreditation Councils', which is not verbatim (check 2); evidence keeps only
+    the verbatim pmdc.pk link.

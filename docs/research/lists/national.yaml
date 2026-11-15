@@ -36,6 +36,7 @@ lists:
     name: "List of Medical & Dental Colleges with Attached Teaching Hospital(s)"
     url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf"
     institution_type: medical_dental_college
+    family: bachelor   # MBBS/BDS colleges; checked by W12 ALLOW checks 1 and 2 (2026-11-15)
     date: 2026-05-19   # PDF creation date (metadata); the file name says 07-11-2025
     row_count: 190
     count_quote: null

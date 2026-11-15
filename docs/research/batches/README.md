@@ -191,7 +191,8 @@ alias file changes its sha256 and so its attest ref.
 ## Allow-lists in the repo (P2-T20, 2026-11-14)
 
 - **Where they are.** `backend/app/os/knowledge/sources/lists/<region>-<family>.yaml`: 16 files (7 regions and
-  `national`, each `bachelor` and `intermediate`), 58 entries (56 from round a, 2 from round b, below). The worker
+  `national`, each `bachelor` and `intermediate`), 63 entries (56 from round a, 2 from round b, 5 from the W12 round,
+  below). The worker
   loads them into `os_source_domains` at start.
 - **Where they came from.** The W13 allow-list review of 2026-11-14. Check 1 (`claude-allowlist-check-1`) drafted one
   entry per proven host, each with the official page that names the domain (HEC recognised-university profile pages,
@@ -216,6 +217,26 @@ alias file changes its sha256 and so its attest ref.
     entry for it under bachelor would also list admission.hed.gkp.pk under bachelor. It stays the proof page
     (`list_ref`) of admission.hed.gkp.pk. Add it when a row cites it and both checks give its families.
   - Still left out: hed.ajk.gov.pk, jac.ajk.gov.pk, www.imcgf72.edu.pk, gcwg.punjab.gov.pk.
+- **W12 round (2026-11-15).** Check 1 (`claude-w12-allow-check-1`) and an independent check 2
+  (`claude-w12-allow-check-2`) re-fetched every page; only what both agree on is added (5 entries). `reviewed_by`
+  names both; `evidence` is check 1's quote, `check2_evidence` check 2's, `notes` the region basis.
+  - `pmdc.pk`, regulator, bachelor of `azad_jammu_and_kashmir`, `balochistan`, `sindh` and
+    `islamabad_capital_territory` (it was only in `national` and `punjab`). Proof (`list_ref`): the HEC Accreditation
+    Councils page links it. Region basis: rows of the PMDC colleges-with-hospitals PDF whose address states the region
+    (for example '165. ... Thatta, Sindh, Pakistan.'). Check 1's quote of the page's `<h1>` was not verbatim; the
+    evidence keeps only the verbatim link, and `check2_evidence` has check 2's corrected quote.
+  - Not `khyber_pakhtunkhwa` or `gilgit_baltistan`: no PDF row states that province (addresses give only cities such
+    as Peshawar; 'Khyber' is only in college names), and no row names Gilgit-Baltistan at all. Add them only with a
+    sourced city-to-region basis.
+  - `eadmissions.fde.gov.pk`, admission_body, `islamabad_capital_territory` intermediate (HSSC admissions). Proof:
+    fde.gov.pk (Federal Directorate of Education) links it. Tiered like the other admission portals.
+  - `pmdc-colleges-with-hospitals` in `docs/research/lists/national.yaml` now has `family: bachelor` (H3 data): the
+    Sindh and Punjab bachelor walkthroughs name it as the denominator for MBBS/BDS colleges.
+  - Left out again: `hed.ajk.gov.pk`. ajk.gov.pk still carries hidden spam (a Replica Rolex `<h1>` on the home page);
+    its spam-free helplines page is on the same compromised site, so it is not independent proof, and no independent
+    official page names it. `magenta-sheep-235554.hostingersite.com`: fde.gov.pk's 'Admissions' box links it, but it
+    is a Hostinger staging host (HTTP 500), never listable. `ajkbise.net`: its home page now has hidden 'slot gacor'
+    links (check 2), so it stays out.
 - **Left out.**
   - `hed.ajk.gov.pk` (AJK, intermediate): check 2 marked it unclear. Its only proof page, ajk.gov.pk, carried
     injected spam on 2026-11-14. Owner question open.
