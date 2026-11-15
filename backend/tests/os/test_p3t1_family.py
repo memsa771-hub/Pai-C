@@ -228,11 +228,19 @@ def _services(engine, os_db, on: bool):
 
 @pytest.fixture
 def both(engine, clean, os_db):
+    from sqlalchemy import update
+
+    from app.os import models
     from app.os.knowledge.programmes import Programme, ProgrammeStore
 
+    # P3-T2 (ADR-001 D4): a family playbook sees the programmes of its family and level, not of its key. The place is
+    # an imported one (route_key `registry`), with the family and level columns the registry gives it.
     ProgrammeStore(engine, "pai").upsert(Programme(
-        ref="fam-p1.test", route_key=FAM.key, university="University", name="Programme fam-p1", aliases=(),
+        ref="fam-p1.test", route_key="registry", university="University", name="Programme fam-p1", aliases=(),
         start_urls=("https://fam.test/p1",), official_domains=("fam.test",)))
+    with engine.begin() as conn:
+        conn.execute(update(models.programmes).where(models.programmes.c.ref == "fam-p1.test").values(
+            family=FAM.family, level=FAM.route.level))
     yield _services(engine, os_db, on=False), _services(engine, os_db, on=True)
     ports.configure(None)
 
