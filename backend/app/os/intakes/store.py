@@ -1,7 +1,7 @@
 """The intake rows (P2-D23). `current` is reached only with a recorded gate pass (R-66); the gate itself is T9's."""
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -174,6 +174,14 @@ class IntakeStore:
                 T.outerjoin(O, and_(O.c.id == T.c.opened_from_id, O.c.tenant_id == T.c.tenant_id))).where(
                 T.c.tenant_id == self.tenant_id, T.c.term == term, T.c.year == year, T.c.state == "open")).all()
         return max(r.year if r.year is not None else year - 1 for r in rows)
+
+    def fallback_years(self, term: str, year: int, places: Mapping[str, Place]) -> tuple[int | None, dict[str, int | None]]:
+        """ADR-001 D9: the fallback year of the plan's intake by the rule above, and each place's own (`fallback_year`
+        with its place). A place with no registered intake gets the rule's year, so a plan with no such place reads
+        exactly as before."""
+        rule = self.fallback_year(term, year)
+        own = {ref: self._own(place, term, year) for ref, place in places.items()}
+        return rule, {ref: rule if o is None else self.fallback_year(term, year, places[ref]) for ref, o in own.items()}
 
     def _own(self, place: Place | None, term: str, year: int) -> Intake | None:
         """The place's own registered intake, or None (no place, no region or family, or nothing registered)."""

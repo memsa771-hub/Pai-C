@@ -9,7 +9,7 @@ from app.os import models
 from app.os.compiler import PlanDraft, compile_plan, date_of, needed_calendars, needed_fields
 from app.os.contracts.route_contract import RouteContract
 from app.os.contracts.route_contract_v2 import RouteContractV2
-from app.os.intakes import IntakeNotOpen, IntakeStore
+from app.os.intakes import IntakeNotOpen, IntakeStore, places_of
 from app.os.kernel import Kernel, PlanRef, StaleDraft
 from app.os.knowledge import KnowledgePort, merit
 from app.os.packs.visa import ADMITTED, REJECTED, VisaChoiceStore, answers, preselect
@@ -79,10 +79,19 @@ class PlanService:
         # P2-D24: while the plan's intake is open and not yet current, a key with no fact for it reads the newest earlier
         # year's fact, labelled. No registered intake (or none open): the strict read, exactly as before.
         # The fallback reads one earlier year: the year of the intake this one was opened from, else the year before.
+        # ADR-001 D9: a programme fact is read by its place's own region intake when one is registered; route and
+        # calendar facts belong to no one place and keep the rule of the plan's intake.
         term = contract.target_intake.term
-        source = IntakeStore(self.engine, self.kernel.tenant_id).fallback_year(term, year)
-        read = ({"intake_term": term, "fallback_previous": True, "fallback_year": source}
-                if source is not None else {})
+        source, own_source = IntakeStore(self.engine, self.kernel.tenant_id).fallback_years(
+            term, year, places_of(self.engine, self.kernel.tenant_id, refs))
+
+        def read_of(src: int | None) -> dict:
+            return {"intake_term": term, "fallback_previous": True, "fallback_year": src} if src is not None else {}
+
+        read = read_of(source)
+        by_source: dict[int | None, list[str]] = {}
+        for ref in refs:
+            by_source.setdefault(own_source[ref], []).append(ref)
         calendars = needed_calendars(playbook)  # P2-T11: official calendars named by the playbook, read by registry id
         calendar_facts = ({k: f for k, f in self.knowledge.registry_facts(
             sorted({c for c, _ in calendars}), sorted({n for _, n in calendars}), year, **read).items()
@@ -92,7 +101,7 @@ class PlanService:
         route_facts, programme_facts = for_student(  # owner ruling 2026-11-08: a reported fact holds only the reporters' steps
             self.engine, self.kernel.tenant_id, contract.student_ref,
             self.knowledge.route_facts(playbook.key, sorted(route_fields), year, **read),
-            self.knowledge.programme_facts(refs, sorted(programme_fields), year, **read))
+            self._programme_facts(refs, sorted(programme_fields), year, read, by_source, read_of))
         return compile_plan(
             contract, playbook, route_facts, programme_facts,
             self.today(), self.disabled_types(),
@@ -100,6 +109,18 @@ class PlanService:
             excluded={"visa": self.not_visa_programmes(contract, plan_id)}, student=student,
             calendar_facts=calendar_facts,
         )
+
+    def _programme_facts(self, refs: list[str], fields: list[str], year: int, read: dict,
+                         by_source: Mapping[int | None, list[str]], read_of: Callable[[int | None], dict]) -> dict:
+        """One read when every place reads alike (always so with no registered region intake: the call of before
+        D9); else one read per fallback year, merged (each programme's keys are its own)."""
+        if len(by_source) <= 1:
+            only = next(iter(by_source), None)
+            return self.knowledge.programme_facts(refs, fields, year, **(read_of(only) if by_source else read))
+        facts: dict = {}
+        for src, group in by_source.items():
+            facts.update(self.knowledge.programme_facts(group, fields, year, **read_of(src)))
+        return facts
 
     def needs_gate(self, contract: RouteContract | RouteContractV2, with_needs: bool | None = None) -> bool:
         """Whether a playbook that declares `needs` may be chosen for this student (P1-T8, D-w1, D-w3): the student's
@@ -143,7 +164,9 @@ class PlanService:
         out, the gate is asked."""
         existing = self._existing_plan(contract)
         term, year = _intake_of(contract)
-        if existing is None and not IntakeStore(self.engine, self.kernel.tenant_id).plannable(term, year):  # R-63
+        if existing is None and not IntakeStore(self.engine, self.kernel.tenant_id).plannable(term, year, places_of(
+                self.engine, self.kernel.tenant_id, [p.programme_ref for p in contract.programmes]).values()):
+            # R-63; ADR-001 D9: every place's own region intake
             raise IntakeNotOpen(f"the {term} {year} intake is not open for planning yet")
         playbook = (self._pinned(existing) if existing is not None else select_playbook(
             self.playbooks, contract.origin_country, contract.destination_country, contract.level,
