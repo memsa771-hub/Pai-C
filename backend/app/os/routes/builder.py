@@ -19,6 +19,7 @@ from app.os.eligibility.notes import on_profile_change
 from app.os.intakes import IntakeStore
 from app.os.kernel import PlanRef, contract_sha256
 from app.os.kernel.states import PLAN_OPEN, is_started
+from app.os.knowledge.programmes import programmes_of
 from app.os.knowledge.requests import visible_programmes
 from app.os.playbooks import newest_plain, offered
 from app.os.ports import choice_requests, choice_sink
@@ -92,8 +93,9 @@ def _has_plan(plans, student_ref: str, route_key: str, intake: IntakeRef) -> boo
     return found is not None
 
 
-def _check_programmes(plans, route_key: str, year: int, refs: list[str], term: str | None = None) -> None:
-    visible = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term)}
+def _check_programmes(plans, book, year: int, refs: list[str], term: str | None = None) -> None:
+    """Every ref is one of the playbook's programmes (`programmes_of`, P3-T2) a student can choose for the year."""
+    visible = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, programmes_of(book), year, term)}
     unknown = [r for r in refs if r not in visible]
     if unknown:
         raise NotAllowed(f"not a programme of this route for {year}: {', '.join(unknown)}")
@@ -128,7 +130,7 @@ def start(plans, student_ref: str, route_key: str, intake: IntakeRef,
         raise NotAllowed(f"unknown route '{route_key}'")  # D14: a family's new plans wait for its release flag
     if len(choices) > 10:
         raise NotAllowed("choose at most 10 programmes")
-    _check_programmes(plans, route_key, intake.year, [c.programme_ref for c in choices], intake.term)
+    _check_programmes(plans, book, intake.year, [c.programme_ref for c in choices], intake.term)
     if not IntakeStore(plans.engine, plans.kernel.tenant_id).plannable(intake.term, intake.year):  # R-63
         raise NotAllowed(f"the {intake.term} {intake.year} intake is not open for planning yet")
     try:
@@ -253,7 +255,7 @@ def swap(plans, student_ref: str, plan_id: int, out_ref: str, in_ref: str) -> in
         raise NotAllowed(f"{in_ref} is already in your plan")
     book = plans._pinned(plan_id)
     year = contract.target_intake.year
-    _check_programmes(plans, book.key, year, [in_ref])
+    _check_programmes(plans, book, year, [in_ref])
     with plans.engine.connect() as conn:
         facts = conn.execute(select(func.count()).select_from(F).where(
             F.c.tenant_id == plans.kernel.tenant_id, F.c.scope == "programme", F.c.ref == in_ref,

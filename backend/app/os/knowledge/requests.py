@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.os import models
 from app.os.knowledge.fields import is_excluded
-from app.os.knowledge.programmes import Programme, _programme
+from app.os.knowledge.programmes import Programme, ProgrammeScope, _programme, scope_of
 
 REQUESTS_PER_DAY = 3
 REQUESTED_NOTE = "requested by a student"
@@ -42,9 +42,12 @@ def _same(a: str, b: str) -> bool:
     return " ".join(a.casefold().split()) == " ".join(b.casefold().split())
 
 
-def _existing(conn, tenant_id: str, route_key: str, url: str, university: str, name: str) -> str | None:
+def _existing(conn, tenant_id: str, scope: ProgrammeScope, url: str, university: str, name: str) -> str | None:
+    """The route's programme with this page, or this university and name (P3-T2: the route's programmes are those of
+    `programmes_of`, so on a family route a programme the registry already places there is found, not requested
+    again)."""
     rows = conn.execute(select(P.c.ref, P.c.university, P.c.name, P.c.start_urls).where(
-        P.c.tenant_id == tenant_id, P.c.route_key == route_key)).all()
+        P.c.tenant_id == tenant_id, scope.where(P))).all()
     for r in rows:
         urls = set()
         for u in r.start_urls:
@@ -59,10 +62,11 @@ def _existing(conn, tenant_id: str, route_key: str, url: str, university: str, n
 
 def request_programme(engine: Engine, tenant_id: str, student_ref: str, route_key: str, university: str, name: str,
                       url: str, *, now: datetime, enqueue: Callable[[str], object],
-                      intake_year: int | None = None) -> tuple[str, bool]:
+                      intake_year: int | None = None, scope: ProgrammeScope | None = None) -> tuple[str, bool]:
     """(programme_ref, created). `enqueue(ref)` starts its research (for the request's year): for a new programme,
     and for a known one with no facts for `intake_year` yet (another year, or an enqueue that was lost).
-    Research is idempotent per programme, year and day, so a repeat is harmless."""
+    Research is idempotent per programme, year and day, so a repeat is harmless. `scope`: the route's
+    `programmes_of(playbook)` (P3-T2); without it, the programmes of `route_key`, as before."""
     canon, host = _normalise(url)
     university, name = university.strip(), name.strip()
     if not university or not name:
@@ -73,7 +77,7 @@ def request_programme(engine: Engine, tenant_id: str, student_ref: str, route_ke
             R.c.created_at > now - timedelta(hours=24))).scalar()
         if asked >= REQUESTS_PER_DAY:
             raise RequestLimit(f"at most {REQUESTS_PER_DAY} programme requests a day")
-        ref = _existing(conn, tenant_id, route_key, canon, university, name)
+        ref = _existing(conn, tenant_id, scope or scope_of(route_key), canon, university, name)
         created = False
         if ref is None:
             ref = "req-" + hashlib.sha256(canon.encode()).hexdigest()[:12]
@@ -104,15 +108,16 @@ def _has_facts(tenant_id: str, intake_year: int | None = None, intake_term: str 
     return exists(q.where(F.c.intake_year == intake_year) if intake_year is not None else q)
 
 
-def visible_programmes(engine: Engine, tenant_id: str, route_key: str, intake_year: int,
+def visible_programmes(engine: Engine, tenant_id: str, route: "str | ProgrammeScope", intake_year: int,
                        intake_term: str | None = None, excluded: Iterable[str] = ()) -> list[Programme]:
     """The route's programmes a student can choose: active ones, and requested ones with facts for the year (and the
-    term, when given). `excluded`: the student's excluded field codes (R-15, read through StudentFacts by the caller);
-    a programme in one is left out, one with an empty field stays."""
+    term, when given). `route`: the playbook's `programmes_of` (P3-T2, ADR-001 D4); a bare key is the `route_key`
+    match. `excluded`: the student's excluded field codes (R-15, read through StudentFacts by the caller); a programme
+    in one is left out, one with an empty field stays."""
     excluded = frozenset(excluded)
     with engine.connect() as conn:
         rows = conn.execute(select(P).where(
-            P.c.tenant_id == tenant_id, P.c.route_key == route_key,
+            P.c.tenant_id == tenant_id, scope_of(route).where(P),
             (P.c.status == "active") | ((P.c.status == "requested") & _has_facts(tenant_id, intake_year, intake_term)),
         ).order_by(P.c.ref)).all()
     return [_programme(r) for r in rows if not is_excluded(r.field, excluded)]

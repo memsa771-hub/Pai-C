@@ -82,7 +82,7 @@ from app.os.statements.facts_check import unsupported
 from app.os.statements.rules import resolve_rules
 from app.os.statements.run import inputs_for, sources
 from dataclasses import asdict
-from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.programmes import ProgrammeStore, programmes_of
 from app.os.knowledge.research.run import enqueue_one
 from app.os.api.services import Services
 from app.os.consent import ConsentStore, current_terms, gate
@@ -428,6 +428,7 @@ def build_router(get_services: Callable[[], Services]) -> APIRouter:
             ref, created = request_programme(
                 svc.engine, tenant, student, body.route, body.university, body.name, body.url,
                 now=clock.now(), intake_year=body.intake_year,
+                scope=programmes_of(self_serve.newest_books(svc.plans)[body.route]),  # P3-T2: the route's programmes
                 enqueue=lambda r: enqueue_one(svc.engine, svc.dbos_client(), tenant, r, body.intake_year, svc.today()))
         except RequestLimit as e:
             raise HTTPException(status_code=429, detail=str(e)) from None

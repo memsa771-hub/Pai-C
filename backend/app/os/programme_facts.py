@@ -10,14 +10,20 @@ from app.os.compiler.compile import needed_fields
 from app.os.contracts.programme_facts import FactEntry, ProgrammeFactsV1, SourceRef
 from app.os.contracts.route_contract import IntakeRef
 from app.os.knowledge import KnowledgePort, display, merit
-from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.programmes import Programme, ProgrammeStore, programmes_of
 from app.os.playbooks import newest_plain
 
 K = models.knowledge_facts
 
 
-def _fields(engine: Engine, tenant_id: str, books, programme_ref: str, route_key: str, year: int) -> list[str]:
-    book = newest_plain(books.values()).get(route_key)
+def _book_of(books, programme: Programme):
+    """The newest playbook whose programmes (`programmes_of`, P3-T2) hold this one: for a programme of a route key, that
+    route's playbook, as before; for one the registry places in a family, the family's playbook at its level."""
+    return next((b for _, b in sorted(newest_plain(books.values()).items()) if programmes_of(b).holds(programme)), None)
+
+
+def _fields(engine: Engine, tenant_id: str, books, programme: Programme, year: int) -> list[str]:
+    programme_ref, book = programme.ref, _book_of(books, programme)
     names = set(needed_fields(book)[1]) if book is not None else set()
     with engine.connect() as conn:
         names |= set(conn.execute(select(K.c.field).distinct().where(
@@ -32,7 +38,7 @@ def build(engine: Engine, tenant_id: str, knowledge: KnowledgePort, books, progr
     programme = ProgrammeStore(engine, tenant_id).get(programme_ref)
     if programme is None:
         return None
-    fields = _fields(engine, tenant_id, books, programme_ref, programme.route_key, intake.year)
+    fields = _fields(engine, tenant_id, books, programme, intake.year)
     found = knowledge.programme_facts([programme_ref], fields, intake.year, intake_term=intake.term,
                                       fallback_previous=True)
     entries = []

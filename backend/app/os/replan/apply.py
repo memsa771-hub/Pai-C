@@ -195,13 +195,14 @@ class Replanner:
     def _suggestions(self, contract, book, ref: str) -> list[str]:
         """Up to 3 programmes on the route the student likely meets, not in the plan, most confirmed facts first."""
         from app.os.eligibility.notes import profile_of, programme_cards
+        from app.os.knowledge.programmes import programmes_of
         from app.os.knowledge.requests import visible_programmes
 
         year, chosen = contract.target_intake.year, {p.programme_ref for p in contract.programmes}
         from app.os.knowledge.fields import excluded_for  # R-15: a swap never brings in an excluded field
 
         gone = excluded_for(contract.student_ref, engine=self.engine, tenant_id=self.tenant)
-        others = [p.ref for p in visible_programmes(self.engine, self.tenant, book.key, year, excluded=gone)
+        others = [p.ref for p in visible_programmes(self.engine, self.tenant, programmes_of(book), year, excluded=gone)
                   if p.ref not in chosen]
         if not others or book.eligibility is None:
             return [r for r in others if self.confirmed(r, year)][:3]

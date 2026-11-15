@@ -19,7 +19,7 @@ from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel import PlanIdentityTaken, StaleDraft
 from app.os.kernel.states import PLAN_CLOSED, PLAN_OPEN
 from app.os.intakes import IntakeError
-from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.programmes import ProgrammeStore, programmes_of
 from app.os.playbooks import PlaybookError, select_playbook
 from app.os.replan.store import OverrideStore, ProposalStore
 from app.os.settings import released_families
@@ -257,7 +257,7 @@ def _adopt(svc, intake: Intake, decision: DecisionRecordV2) -> IntakeResult | No
                                decision.level, released=_released(svc, decision, "self_serve"))
     except PlaybookError:
         return None
-    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
+    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(programmes_of(book))}
     if any(p.programme_ref not in known for p in decision.programmes):
         return None
     contract = _contract_of(decision)
@@ -327,7 +327,7 @@ def process(svc, intake: Intake) -> IntakeResult:
                                decision.level, released=_released(svc, decision, SOURCE, external_ref=True))
     except PlaybookError:
         return _refuse_v2(svc, intake, decision, "route_not_supported")
-    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(book.key)}
+    known = {p.ref for p in ProgrammeStore(svc.engine, svc.kernel.tenant_id).active(programmes_of(book))}
     if any(p.programme_ref not in known for p in decision.programmes):
         return _refuse_v2(svc, intake, decision, "unknown_programme")
     own = [p for p in _plans_of(svc, decision.student_ref, "self_serve") if p.status in PLAN_OPEN]

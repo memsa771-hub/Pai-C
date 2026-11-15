@@ -15,7 +15,7 @@ from app.os.contracts.programme_list_v2 import ProgrammeEntryV2, ProgrammeListV2
 from app.os.contracts.route_contract import IntakeRef
 from app.os.knowledge.fact_classes import fact_class, is_high_stakes
 from app.os.knowledge.fields import is_excluded
-from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.programmes import ProgrammeStore, programmes_of
 from app.os.playbooks import newest_plain
 from app.os.registry.coverage import LEVELS, coverage_map
 
@@ -33,7 +33,7 @@ def build(engine: Engine, tenant_id: str, books, route_key: str, intake: IntakeR
     if book is None:
         return ProgrammeListV2(route_key=route_key, intake=intake, programmes=[])
     needed = sorted(needed_fields(book)[1])
-    programmes = [p for p in ProgrammeStore(engine, tenant_id).active(route_key) if not is_excluded(p.field, excluded)]
+    programmes = [p for p in ProgrammeStore(engine, tenant_id).active(programmes_of(book)) if not is_excluded(p.field, excluded)]
     with engine.connect() as conn:
         rows = conn.execute(select(K).where(
             K.c.tenant_id == tenant_id, K.c.scope == "programme", K.c.ref.in_([p.ref for p in programmes] or [""]),

@@ -16,7 +16,7 @@ from app.os.contracts.programme_list_v2 import ProgrammeListV2
 from app.os.contracts.route_contract import IntakeRef
 from app.os.kernel.states import PLAN_OPEN
 from app.os.playbooks import newest_plain
-from app.os.knowledge.programmes import ProgrammeStore
+from app.os.knowledge.programmes import ProgrammeStore, programmes_of
 from app.os.replan.store import OverrideStore
 from app.os.merit_check import build as build_merit
 from app.os.plan_view import build_plan_view
@@ -63,7 +63,7 @@ def programme_list(route_key: str, intake: IntakeRef, student_ref: str | None = 
         return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[])
     _, fields = needed_fields(book)
     excluded = _excluded(svc, student_ref)
-    programmes = [p for p in ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
+    programmes = [p for p in ProgrammeStore(svc.engine, svc.settings.tenant_id).active(programmes_of(book))
                   if not is_excluded(p.field, excluded)]
     facts = svc.knowledge.programme_facts([p.ref for p in programmes], sorted(fields), intake.year)
     return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[

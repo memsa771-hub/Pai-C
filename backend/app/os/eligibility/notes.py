@@ -17,6 +17,7 @@ from app.os.documents.store import ProfileStore
 from app.os.eligibility.evaluate import Card, evaluate
 from app.os.eligibility.facts import current_types, fact_fields, held_types, profile_from_facts
 from app.os.eligibility.swaps import suggest
+from app.os.knowledge.programmes import programmes_of
 from app.os.knowledge.requests import visible_programmes
 from app.os.ports import document_files, student_facts
 
@@ -117,7 +118,7 @@ def refresh(plans, student_ref: str, plan_id: int, only: str | None = None) -> t
             from app.os.knowledge.fields import excluded_for  # R-15: no suggestion in an excluded field
 
             gone = excluded_for(student_ref, engine=plans.engine, tenant_id=plans.kernel.tenant_id)
-            others = [p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, book.key, year,
+            others = [p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, programmes_of(book), year,
                                                         excluded=gone)]
             cands = programme_cards(plans, rules, others, year, profile)
             return [s.programme_ref for s in suggest(card, list(cands.values()), set(chosen))]

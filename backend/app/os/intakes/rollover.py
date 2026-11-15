@@ -140,6 +140,28 @@ class BackfillResult:
     skipped: list[Skipped]
 
 
+_SEVERAL = object()  # a programme that more than one route's playbooks see: no term is guessed between them
+
+
+def _routes_of_programmes(conn, tenant_id: str, playbooks: Mapping[tuple[str, int], Playbook]) -> dict:
+    """Each programme ref -> the route key whose playbooks see it (`programmes_of`, P3-T2, ADR-001 D4): its own
+    `route_key` for a route without a family, as before; the family playbook's key for a programme the registry places
+    in that family and level. `_SEVERAL` when playbooks of more than one key see it; absent when none does."""
+    from app.os.knowledge.programmes import programmes_of
+
+    G = models.programmes
+    scopes = {programmes_of(b) for b in playbooks.values()}
+    out: dict = {}
+    for p in conn.execute(select(G.c.ref, G.c.route_key, G.c.family, G.c.level, G.c.status).where(
+            G.c.tenant_id == tenant_id)).all():
+        keys = {sc.route_key for sc in scopes if sc.holds(p)}
+        if len(keys) == 1:
+            out[p.ref] = next(iter(keys))
+        elif keys:
+            out[p.ref] = _SEVERAL
+    return out
+
+
 def backfill_intake_terms(engine: Engine, tenant_id: str, playbooks: Mapping[tuple[str, int], Playbook]
                           ) -> BackfillResult:
     """P2-D5 / D-t1-1: facts from before P2 have `intake_term = ''`. Each gets the term its route's playbooks declare
@@ -154,14 +176,13 @@ def backfill_intake_terms(engine: Engine, tenant_id: str, playbooks: Mapping[tup
         terms_of.setdefault(book.key, set()).update(book.intake_terms)
     updated, skipped = 0, []
     with engine.begin() as conn:
-        route_of = dict(conn.execute(select(models.programmes.c.ref, models.programmes.c.route_key).where(
-            models.programmes.c.tenant_id == tenant_id)).all())
+        route_of = _routes_of_programmes(conn, tenant_id, playbooks)
         rows = conn.execute(select(F).where(F.c.tenant_id == tenant_id, F.c.intake_term == "")
                             .order_by(F.c.id).with_for_update()).all()
         for r in rows:
             key = r.ref if r.scope == "route" else route_of.get(r.ref)
-            terms = terms_of.get(key) if key is not None else None
-            reason = ("unknown_ref" if terms is None else "no_term" if not terms
+            terms = terms_of.get(key) if key not in (None, _SEVERAL) else None
+            reason = ("several_routes" if key is _SEVERAL else "unknown_ref" if terms is None else "no_term" if not terms
                       else "several_terms" if len(terms) > 1 else None)
             if reason is None:
                 (term,) = terms

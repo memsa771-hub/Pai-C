@@ -13,7 +13,7 @@ from app.os.api.queries import plan_out, removed_programmes
 from app.os.eligibility.evaluate import Card
 from app.os.eligibility.notes import profile_of, programme_cards
 from app.os.eligibility.swaps import suggest
-from app.os.knowledge.programmes import _programme
+from app.os.knowledge.programmes import _programme, programmes_of
 from app.os.knowledge.fields import excluded_for, is_excluded
 from app.os.knowledge.requests import requested_without_facts, visible_programmes
 
@@ -68,7 +68,7 @@ def _term_rule(term: str | None):
     return F.c.intake_term.in_([term, ""]) if term is not None else True
 
 
-def _requested_by(plans, student_ref: str, route_key: str, year: int, term: str | None = None) -> list:
+def _requested_by(plans, student_ref: str, book, year: int, term: str | None = None) -> list:
     """Programmes this student asked for that research has found nothing for yet (they see them as being researched)."""
     tenant = plans.kernel.tenant_id
     has_facts = exists(select(F.c.id).where(F.c.tenant_id == tenant, F.c.scope == "programme", F.c.ref == G.c.ref,
@@ -76,7 +76,7 @@ def _requested_by(plans, student_ref: str, route_key: str, year: int, term: str 
                                             _term_rule(term)))
     asked = select(RQ.c.programme_ref).where(RQ.c.tenant_id == tenant, RQ.c.student_ref == student_ref)
     with plans.engine.connect() as conn:
-        rows = conn.execute(select(G).where(G.c.tenant_id == tenant, G.c.route_key == route_key,
+        rows = conn.execute(select(G).where(G.c.tenant_id == tenant, programmes_of(book).where(G),
                                             G.c.status == "requested", ~has_facts, G.c.ref.in_(asked))
                             .order_by(G.c.ref)).all()
     return [_programme(r) for r in rows]
@@ -94,7 +94,7 @@ def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list
         return None
     term = _term(book)
     excluded = _excluded(plans, student_ref)
-    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term, excluded)
+    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, programmes_of(book), year, term, excluded)
     rules = book.eligibility
     cards = (programme_cards(plans, rules, [p.ref for p in visible], year, profile_of(plans, student_ref))
              if rules is not None else {})
@@ -109,7 +109,7 @@ def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list
                     "research_state": "researched" if p.ref in researched else "being_researched",
                     "requested_by_student": p.status == "requested", "confirmed_facts": confirmed,
                     "card": card_out(card) if p.ref in researched else None})
-    for p in _requested_by(plans, student_ref, route_key, year, term):
+    for p in _requested_by(plans, student_ref, book, year, term):
         if is_excluded(p.field, excluded):
             continue
         out.append({"ref": p.ref, "university": p.university, "name": p.name, "research_state": "being_researched",
@@ -134,7 +134,7 @@ def eligibility(plans, student_ref: str, programme_ref: str, route_key: str, yea
     book = newest_books(plans).get(route_key)
     if book is None:
         return None
-    visible = {p.ref: p for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year,
+    visible = {p.ref: p for p in visible_programmes(plans.engine, plans.kernel.tenant_id, programmes_of(book), year,
                                                     _term(book))}
     if programme_ref not in visible:
         return None
@@ -143,7 +143,7 @@ def eligibility(plans, student_ref: str, programme_ref: str, route_key: str, yea
     cards = programme_cards(plans, book.eligibility, list(visible), year, profile_of(plans, student_ref))
     card = cards[programme_ref][0]
     # R-15: the asked programme keeps its card, but a suggestion is never in a field the student excluded
-    allowed = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, _term(book),
+    allowed = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, programmes_of(book), year, _term(book),
                                                  _excluded(plans, student_ref))}
     picks = suggest(card, [c for c in cards.values() if c[0].programme_ref in allowed],
                     _chosen(plans, student_ref, route_key, year))
