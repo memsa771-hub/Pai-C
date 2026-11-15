@@ -263,6 +263,8 @@ def compile_plan(
         steps = sorted(t.template_key for t in playbook.tasks if t.uses_systems)
         raise SystemsNotResolved(f"playbook {playbook.key} v{playbook.version}: step(s) {steps} need the registry's "
                                  f"admission systems, which the compiler does not resolve yet (P3-T4)")
+    from app.os.knowledge.fact_classes import deciding_level
+
     chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     removed = {o.target for o in overrides if o.op == "cancel_programme"}
@@ -282,6 +284,11 @@ def compile_plan(
         """Confirmed, and for this plan's own intake: a fact of another year (the labelled previous-year read, P2-D24,
         R-26) is never firm, so what it dates stays provisional and its value is checked again."""
         return fact is not None and fact.confirmed and fact.intake_year == year
+
+    def decides(fact: Fact | None, name: str) -> bool:
+        """Firm enough to decide a condition: firm, and at the trust level the field asks for (`decides_at` in
+        fact_classes.yaml; ADR-001 D3: a system's admission mode decides only when `verified`)."""
+        return firm(fact) and (deciding_level(name) != "verified" or fact.verified)
 
     def other_year(fact: Fact | None) -> bool:
         return fact is not None and fact.intake_year != year
@@ -303,13 +310,13 @@ def compile_plan(
             if t.condition:
                 fact, fref = lookup(ref, t.condition.fact)
                 result = evaluate(t.condition, fact)
-                if result is False and firm(fact):
+                if result is False and decides(fact, t.condition.fact):
                     continue
                 if result is False:  # decided by an unconfirmed fact: drop, but keep the decision checkable
                     need_confirm(fref)
                     continue
                 inst.fact_refs.append(fref)
-                if not firm(fact):
+                if not decides(fact, t.condition.fact):
                     inst.provisional = True
                     need_confirm(fref)
             lead_days = 0

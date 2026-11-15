@@ -32,6 +32,7 @@ from app.os.knowledge.regions import UnknownRegion, normalise_region
 from app.os.knowledge.sheets.aliases import AliasFile, bind
 from app.os.knowledge.sheets.format import Format, load_format
 from app.os.knowledge.sheets.reader import Batch
+from app.os.registry.admission_modes import check_mode_fact, vocabulary as mode_vocabulary
 from app.os.registry.calendars import calendar_types
 from app.os.registry.model import (ALLOWED_PARENTS, KIND_PREFIX, NATIONAL, PROGRAMME_PARENTS, REGION_REQUIRED,
                                    SERVES_A_REGION, RegistryEntry, slug)
@@ -861,6 +862,13 @@ def _fact_checks(r, rid, field_name, high, res: RowResult, chk: Checks, ctx: Pla
         if tz is None:
             return "no_timezone", ref
         fact_value, calendar_class = {"date": day.isoformat(), "tz": tz}, ctype.fields[field_name]
+    # a system's admission mode (ADR-001 D3): one of the vocabulary's modes, only on an admission system; stored as the
+    # bare mode key, the value a playbook condition compares
+    mode_problem = check_mode_fact(field_name, value, (meta or {}).get("kind") if scope == "registry" else None)
+    if mode_problem:
+        return mode_problem
+    if field_name == mode_vocabulary().field:
+        fact_value = value
     key = (scope, ref, field_name, term, year)
     if key in seen_keys:
         return "duplicate_key", f"{entity} {field_name} {intake_text}"
