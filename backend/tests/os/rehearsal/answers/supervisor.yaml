@@ -39,3 +39,29 @@ task_failed:
   ops:
     - {op: escalate, reason: "A step failed; a person will look at it."}
   summary: "Offline answer: escalated the failed step to support."
+# R-39 (P3-T7): the rules record these and close them without handing over (rules.RECORD_ONLY); listed so every type has
+# an offline answer.
+merit_list.published:
+  ops:
+    - {op: escalate, reason: "A merit list is out; a person will check the plan."}
+  summary: "Offline answer: escalated the published merit list to support."
+merit_list.not_listed:
+  ops:
+    - {op: escalate, reason: "The student is not on a merit list; a person will check the plan."}
+  summary: "Offline answer: escalated the merit-list answer to support."
+merit_list.next_round:
+  ops:
+    - {op: escalate, reason: "A further merit list round has a date; a person will check the plan."}
+  summary: "Offline answer: escalated the next merit list round to support."
+fee_deposit.due:
+  ops:
+    - {op: escalate, reason: "A fee has a date to pay by; a person will check the plan."}
+  summary: "Offline answer: escalated the fee date to support."
+test.result_published:
+  ops:
+    - {op: escalate, reason: "A result is out; a person will check the plan."}
+  summary: "Offline answer: escalated the published result to support."
+admission.schedule_changed:
+  ops:
+    - {op: escalate, reason: "An admission date changed; a person will check the plan."}
+  summary: "Offline answer: escalated the schedule change to support."
