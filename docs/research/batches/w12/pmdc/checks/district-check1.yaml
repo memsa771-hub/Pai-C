@@ -1,0 +1,1372 @@
+# FU-15 research check 1 (claude-fu15-district-check-1), 2026-11-15. Exact city-word -> district match only.
+ref: claude-fu15-district-check-1
+source:
+  publisher: "Pakistan Bureau of Statistics (pbs.gov.pk), 7th Population and Housing Census 2023, Table 1 (Area, population by sex ... annual growth rate), province-wise PDFs"
+  index_page: "https://pbs.gov.pk/result-excel/ (lists the Table 1 province/district/Islamabad files)"
+  retrieved: "2026-11-15 (curl, ~01:49 UTC)"
+  server_last_modified: "Wed, 22 Jan 2025 (HTTP Last-Modified 08:29:26-08:29:27 GMT)"
+  extraction: "pypdf 7.1.0 extract_text in docker run --rm pai-ci-py; a pair is every line starting '<NAME> DISTRICT' in the province file; region = the file's province"
+  documents:
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_punjab_province.pdf", sha256: 63df3bec54bdc753d4462f830484bf57dc4ceb34eca2b37dce479c02421ff54c, top_row: "PUNJAB", region: punjab}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_sindh_province.pdf", sha256: c066bb906bdacef9bf989c0c64870c30ca9d7e7f8c9abd8a07271072600defb1, top_row: "SINDH", region: sindh}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_kp_province.pdf", sha256: 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24, top_row: "KHYBER PAKHTUNKHWA", region: khyber_pakhtunkhwa}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_balochistan_province.pdf", sha256: 34fcfbf77dca2ed90f2cbbe5d6536e7ca916254c2f96549bdc9fa310cbeedaa1, top_row: "BALOCHISTAN", region: balochistan}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_islamabad.pdf", sha256: 8deb2282dd70fc564a863c26c7a0adbd7651379aade08dbcc7f8279426423da3, top_row: "ISLAMABAD", region: islamabad_capital_territory}
+  coverage_note: "The 2023 census tables cover the four provinces and Islamabad only. AJK and Gilgit-Baltistan are not in them, so no AJK/GB district can be placed from this source. KP file also prints MALAKAND PROTECTED AREA (page 2), which is not labelled DISTRICT and is not used."
+district_table:  # 135 districts; names verbatim as printed (suffix DISTRICT dropped)
+  - {district: "BAHAWALNAGAR", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "BAHAWALPUR", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "RAHIM YAR KHAN", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "DERA GHAZI KHAN", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "LAYYAH", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "MUZAFFARGARH", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "RAJANPUR", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "CHINIOT", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "FAISALABAD", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "JHANG", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "TOBA TEK SINGH", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "GUJRANWALA", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "GUJRAT", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "HAFIZABAD", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "MANDI BAHAUDDIN", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "NAROWAL", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "SIALKOT", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "KASUR", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {district: "LAHORE", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "NANKANA SAHIB", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "SHEIKHUPURA", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "KHANEWAL", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "LODHRAN", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "MULTAN", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "VEHARI", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "ATTOCK", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "CHAKWAL", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "JHELUM", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "RAWALPINDI", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "OKARA", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "PAKPATTAN", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "SAHIWAL", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "BHAKKAR", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "KHUSHAB", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "MIANWALI", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "SARGODHA", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {district: "BADIN", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "DADU", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "HYDERABAD", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "JAMSHORO", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "MATIARI", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "SUJAWAL", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "TANDO ALLAHYAR", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "TANDO MUHAMMAD KHAN", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "THATTA", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KARACHI CENTRAL", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KARACHI EAST", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KARACHI SOUTH", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KARACHI WEST", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KEAMARI", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KORANGI", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "MALIR", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "JACOBABAD", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KAMBAR SHAHDAD KOT", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "KASHMORE", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "LARKANA", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "SHIKARPUR", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {district: "MIRPUR KHAS", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "THARPARKAR", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "UMER KOT", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "NAUSHAHRO FEROZE", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "SANGHAR", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "SHAHEED BENAZIRABAD", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "GHOTKI", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "KHAIRPUR", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "SUKKUR", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {district: "BANNU", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "LAKKI MARWAT", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "NORTH WAZIRISTAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "DERA ISMAIL KHAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "SOUTH WAZIRISTAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "TANK", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "ABBOTTABAD", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "BATAGRAM", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "HARIPUR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "KOLAI PALAS KOHISTAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "LOWER KOHISTAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "MANSEHRA", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "TORGHAR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "UPPER KOHISTAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "HANGU", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "KARAK", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "KOHAT", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "KURRAM", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "ORAKZAI", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {district: "BAJAUR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "BUNER", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "LOWER CHITRAL", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "LOWER DIR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "SHANGLA", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "SWAT", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "UPPER CHITRAL", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "UPPER DIR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "MARDAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "SWABI", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "CHARSADDA", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "KHYBER", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "MOHMAND", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "NOWSHERA", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "PESHAWAR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {district: "AWARAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "KALAT", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "KHUZDAR", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "LASBELA", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "MASTUNG", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "SURAB", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "BARKHAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "DUKI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "LORALAI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "MUSAKHEL", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "GWADAR", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "KECH", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "PANJGUR", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "JAFFARABAD", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "JHAL MAGSI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "KACHHI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "NASIRABAD", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "SOHBATPUR", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {district: "CHAMAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "KILLA ABDULLAH", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "PISHIN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "QUETTA", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "CHAGAI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "KHARAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "NUSHKI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "WASHUK", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "DERA BUGTI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "HARNAI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "KOHLU", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "SIBI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "ZIARAT", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "KILLA SAIFULLAH", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "SHERANI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "ZHOB", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {district: "ISLAMABAD", region: islamabad_capital_territory, doc: table_1_islamabad.pdf, page: 1}
+district_names_in_two_regions: []
+match_rule: "last comma-separated segment of the PMDC address cell; lower-case; every non-alphanumeric char -> space; whitespace collapsed; must equal a normalized district name exactly and that name must sit in one region only"
+rows:
+  - row_id: PK-PMDC-2
+    name: "Quetta Institute of Medical Sciences"
+    address: "Adjacent CMH,Shar-e-Chiltan, Quetta-Cantt."
+    address_e1_e2_agree: true
+    last_segment: "Quetta-Cantt."
+    normalized: "quetta cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; contains district word(s) ['QUETTA'] inside a longer place name (not an exact match)"
+  - row_id: PK-PMDC-5
+    name: "Frontier Medical College"
+    address: "P.O. Public School, Abbottabad."
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad."
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-6
+    name: "Jinnah Medical College"
+    address: "Budhai, Near Peshawar Motorways Toll Plaza, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-7
+    name: "Kabir Medical College"
+    address: "57-C, Gulmohar Lane, University Town, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-8
+    name: "Northwest School of Medicine"
+    address: "Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-9
+    name: "Pak International Medical College"
+    address: "Plot-2, Sector B-2, Hayatabad, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-10
+    name: "Peshawar Medical College"
+    address: "Warsak Road, Opposite PTCL Exchange, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-11
+    name: "Rehman Medical College"
+    address: "5/B-2, Phase-5, Hayatabad, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-12
+    name: "Women Medical College"
+    address: "Murree Road, Abbottabad."
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad."
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-13
+    name: "Swat Medical College"
+    address: "Swat."
+    address_e1_e2_agree: true
+    last_segment: "Swat."
+    normalized: "swat"
+    status: "matched"
+    district: "SWAT"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-24
+    name: "CMH Institute of Medical Sciences"
+    address: "Bahawalpur"
+    address_e1_e2_agree: true
+    last_segment: "Bahawalpur"
+    normalized: "bahawalpur"
+    status: "matched"
+    district: "BAHAWALPUR"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-25
+    name: "CMH Kharian Medical College"
+    address: "Kharian Cantt"
+    address_e1_e2_agree: true
+    last_segment: "Kharian Cantt"
+    normalized: "kharian cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-26
+    name: "CMH Lahore Medical College"
+    address: "Abdul Rehman Road, Lahore Cantt."
+    address_e1_e2_agree: true
+    last_segment: "Lahore Cantt."
+    normalized: "lahore cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; contains district word(s) ['LAHORE'] inside a longer place name (not an exact match)"
+  - row_id: PK-PMDC-27
+    name: "CMH Multan Institute of Medical Sciences (CIMS)"
+    address: "Multan Cantt."
+    address_e1_e2_agree: true
+    last_segment: "Multan Cantt."
+    normalized: "multan cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; contains district word(s) ['MULTAN'] inside a longer place name (not an exact match)"
+  - row_id: PK-PMDC-33
+    name: "HITEC Institute of Medical Sciences"
+    address: "Taxila"
+    address_e1_e2_agree: true
+    last_segment: "Taxila"
+    normalized: "taxila"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-37
+    name: "Islamic International Medical College"
+    address: "Al-Mizan, IIMC Trust Medical Complex, Peshawar Road, Rawalpindi."
+    address_e1_e2_agree: true
+    last_segment: "Rawalpindi."
+    normalized: "rawalpindi"
+    status: "matched"
+    district: "RAWALPINDI"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-54
+    name: "Wah Medical College"
+    address: "P.O.F. Wah Hospital, Wah Cantt."
+    address_e1_e2_agree: true
+    last_segment: "Wah Cantt."
+    normalized: "wah cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-57
+    name: "Aga Khan University Medical College"
+    address: "Stadium Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-58
+    name: "Al-Tibri Medical College"
+    address: "Near Al-Ibrahim Hospital, Old Thana Gadap Town,Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-59
+    name: "Bahria University Medical College"
+    address: "13-National Stadium Road,Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-60
+    name: "Faculty of Medicine & Allied Medical Sciences/Isra University"
+    address: "Hala Road, P.O. Box-313, Hyderabad."
+    address_e1_e2_agree: true
+    last_segment: "Hyderabad."
+    normalized: "hyderabad"
+    status: "matched"
+    district: "HYDERABAD"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-61
+    name: "Indus Medical College"
+    address: "Tando M.Khan"
+    address_e1_e2_agree: true
+    last_segment: "Tando M.Khan"
+    normalized: "tando m khan"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-62
+    name: "Jinnah Medical & Dental College"
+    address: "22-23 Shaheed-e-Millat Road,Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-63
+    name: "Karachi Institute of Medical Sciences/ KIMS"
+    address: "Malir Cantt. Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Malir Cantt. Karachi."
+    normalized: "malir cantt karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; contains district word(s) ['MALIR'] inside a longer place name (not an exact match)"
+  - row_id: PK-PMDC-64
+    name: "Liaquat College of Medicine & Dentistry"
+    address: "ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-65
+    name: "Liaquat National Medical College"
+    address: "Liaquat National Hospital, Stadium Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-66
+    name: "Muhammad Medical College"
+    address: "Hyderabad Road, Ratnabad, Mirpurkhas."
+    address_e1_e2_agree: true
+    last_segment: "Mirpurkhas."
+    normalized: "mirpurkhas"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; differs only by spacing from district 'MIRPUR KHAS' (not an exact match)"
+  - row_id: PK-PMDC-67
+    name: "Sir Syed College of Medical Sciences for Girls"
+    address: "ST-32, Block-5, Boating Basin, Clifton,Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-68
+    name: "United Medical & Dental College"
+    address: "43/7-B, Block 06, PECHS, Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-69
+    name: "Ziauddin Medical College"
+    address: "Block-6, Shahra-e-Ghalib, Clifton, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-70
+    name: "Fazaia Ruth Pfao Medical College"
+    address: "Shahrah-e-Faisal, PAF Faisal Base, Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-71
+    name: "Hamdard College of Medicine & Dentistry"
+    address: "Madinat-al-Hikmah, Mohammad Bin Qasim Avenue, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-72
+    name: "Baqai Medical College"
+    address: "51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-73
+    name: "Suleman Roshan Medical College"
+    address: "Tando Adam."
+    address_e1_e2_agree: true
+    last_segment: "Tando Adam."
+    normalized: "tando adam"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-78
+    name: "Dental Section Abbottabad International Medical College"
+    address: "Mansehra Road, Abbottabad."
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad."
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-79
+    name: "Dental Section Women Medical College"
+    address: "Murree Road, Abbottabad."
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad."
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-80
+    name: "Peshawar Dental College"
+    address: "Warsak Road, Opposite PTCL Exchange, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-81
+    name: "Rehman College of Dentistry"
+    address: "Peshawar"
+    address_e1_e2_agree: true
+    last_segment: "Peshawar"
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-82
+    name: "Dental Section, Frontier Medical College"
+    address: "P.O. Public School, Abbottabad."
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad."
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-83
+    name: "Sardar Begum Dental College"
+    address: "46-E, Jamaluddin Afghani Road, University Town,Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-89
+    name: "Dental College, HITEC Institute of Medical Sciences"
+    address: "Taxila Cantt."
+    address_e1_e2_agree: true
+    last_segment: "Taxila Cantt."
+    normalized: "taxila cantt"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-100
+    name: "Institute of Dentistry, CMH Lahore Medical College"
+    address: "Abdur Rehman Road, Lahore."
+    address_e1_e2_agree: true
+    last_segment: "Lahore."
+    normalized: "lahore"
+    status: "matched"
+    district: "LAHORE"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-101
+    name: "CMH Institute of Medical Sciences / CIMS Dental College"
+    address: "Multan"
+    address_e1_e2_agree: true
+    last_segment: "Multan"
+    normalized: "multan"
+    status: "matched"
+    district: "MULTAN"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-109
+    name: "Shifa College of Dentistry"
+    address: "Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan, Rawalpindi."
+    address_e1_e2_agree: true
+    last_segment: "Rawalpindi."
+    normalized: "rawalpindi"
+    status: "matched"
+    district: "RAWALPINDI"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-110
+    name: "Altamash Institute of Dental Medicine"
+    address: "2-R, Sunset Boulovard Phase-IV, Defence Housing Authority, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-111
+    name: "Baqai Dental College"
+    address: "51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-112
+    name: "Bhittai Dental & Medical College"
+    address: "Umerkot Road, Mirpurkhas."
+    address_e1_e2_agree: true
+    last_segment: "Mirpurkhas."
+    normalized: "mirpurkhas"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; differs only by spacing from district 'MIRPUR KHAS' (not an exact match)"
+  - row_id: PK-PMDC-113
+    name: "Dental Section, Bahria University Medical & Dental College"
+    address: "13-National Stadium Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-114
+    name: "Dental College, Sir Syed College of Medical Sciences for Girls"
+    address: "ST-32, Block-5, Boating Basin, Clifton, Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-115
+    name: "Dental Section, Jinnah Medical & Dental College"
+    address: "Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-116
+    name: "Dental Section, Liaquat College of Medicine & Dentistry"
+    address: "ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-117
+    name: "Fatima Jinnah Dental College"
+    address: "Block-D, Bhittai Colony, Korangi Greek,Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-118
+    name: "Isra Dental College"
+    address: "Hala Road, P.O. Box-313, Hyderabad."
+    address_e1_e2_agree: true
+    last_segment: "Hyderabad."
+    normalized: "hyderabad"
+    status: "matched"
+    district: "HYDERABAD"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-119
+    name: "Ziauddin Dental College"
+    address: "Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-120
+    name: "Muhammad Dental College"
+    address: "Mirpurkhas"
+    address_e1_e2_agree: true
+    last_segment: "Mirpurkhas"
+    normalized: "mirpurkhas"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; differs only by spacing from district 'MIRPUR KHAS' (not an exact match)"
+  - row_id: PK-PMDC-121
+    name: "Dental Section, Hamdard College of Medicine & Dentistry"
+    address: "Madinat Al-Hikmah,Shahrah-e-Madinat ul Hikmah, Mohammad Bin Qasim Avenue, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-125
+    name: "Poonch Medical College"
+    address: "Rawalakot"
+    address_e1_e2_agree: true
+    last_segment: "Rawalakot"
+    normalized: "rawalakot"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-127
+    name: "Ayub Medical College"
+    address: "Abbottabad"
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad"
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-128
+    name: "Bacha Khan Medical College"
+    address: "Mardan"
+    address_e1_e2_agree: true
+    last_segment: "Mardan"
+    normalized: "mardan"
+    status: "matched"
+    district: "MARDAN"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-129
+    name: "Bannu Medical College"
+    address: "Bannu"
+    address_e1_e2_agree: true
+    last_segment: "Bannu"
+    normalized: "bannu"
+    status: "matched"
+    district: "BANNU"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-130
+    name: "Gajju Khan Medical College"
+    address: "Swabi"
+    address_e1_e2_agree: true
+    last_segment: "Swabi"
+    normalized: "swabi"
+    status: "matched"
+    district: "SWABI"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-131
+    name: "Gomal Medical College"
+    address: "D. I. Khan"
+    address_e1_e2_agree: true
+    last_segment: "D. I. Khan"
+    normalized: "d i khan"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-132
+    name: "Khyber Girls Medical College"
+    address: "PDA Building, Block IV, Phase V, Hayatabad, Peshawar."
+    address_e1_e2_agree: true
+    last_segment: "Peshawar."
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-133
+    name: "Khyber Medical College"
+    address: "Peshawar"
+    address_e1_e2_agree: true
+    last_segment: "Peshawar"
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-134
+    name: "KMU Institute of Medical Sciences/ KIMS"
+    address: "Divisional Headquarter Hospital, KDA, Kohat."
+    address_e1_e2_agree: true
+    last_segment: "Kohat."
+    normalized: "kohat"
+    status: "matched"
+    district: "KOHAT"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-135
+    name: "Nowshera Medical College"
+    address: "Nowshera"
+    address_e1_e2_agree: true
+    last_segment: "Nowshera"
+    normalized: "nowshera"
+    status: "matched"
+    district: "NOWSHERA"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-136
+    name: "Saidu Medical College"
+    address: "Swat."
+    address_e1_e2_agree: true
+    last_segment: "Swat."
+    normalized: "swat"
+    status: "matched"
+    district: "SWAT"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-139
+    name: "Army Medical College"
+    address: "Abid Majeed Road, Rawalpindi."
+    address_e1_e2_agree: true
+    last_segment: "Rawalpindi."
+    normalized: "rawalpindi"
+    status: "matched"
+    district: "RAWALPINDI"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-157
+    name: "Bilawal Medical College"
+    address: "Jamshoro."
+    address_e1_e2_agree: true
+    last_segment: "Jamshoro."
+    normalized: "jamshoro"
+    status: "matched"
+    district: "JAMSHORO"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-158
+    name: "Chandka Medical College"
+    address: "Larkana"
+    address_e1_e2_agree: true
+    last_segment: "Larkana"
+    normalized: "larkana"
+    status: "matched"
+    district: "LARKANA"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-159
+    name: "Dow International Medical College"
+    address: "KDA Scheme 35, Gulzar-e-Hijri, New Suparco, Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-160
+    name: "Dow Medical College"
+    address: "Baba-e-Urdu Road, Karach."
+    address_e1_e2_agree: true
+    last_segment: "Karach."
+    normalized: "karach"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+  - row_id: PK-PMDC-162
+    name: "Ghulam Muhammad Mahar Medical College"
+    address: "Sukkur"
+    address_e1_e2_agree: true
+    last_segment: "Sukkur"
+    normalized: "sukkur"
+    status: "matched"
+    district: "SUKKUR"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-168
+    name: "Sindh Medical College"
+    address: "Sarfaraz Rafique Shaheed Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-173
+    name: "Dental Section, Bolan Medical College"
+    address: "Quetta."
+    address_e1_e2_agree: true
+    last_segment: "Quetta."
+    normalized: "quetta"
+    status: "matched"
+    district: "QUETTA"
+    region: "balochistan"
+    doc: "table_1_balochistan_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-174
+    name: "Bacha Khan Dental College"
+    address: "Mardan"
+    address_e1_e2_agree: true
+    last_segment: "Mardan"
+    normalized: "mardan"
+    status: "matched"
+    district: "MARDAN"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-175
+    name: "Dental College, Ayub Medical College"
+    address: "Abbottabad"
+    address_e1_e2_agree: true
+    last_segment: "Abbottabad"
+    normalized: "abbottabad"
+    status: "matched"
+    district: "ABBOTTABAD"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-176
+    name: "Khyber College of Dentistry"
+    address: "Peshawar"
+    address_e1_e2_agree: true
+    last_segment: "Peshawar"
+    normalized: "peshawar"
+    status: "matched"
+    district: "PESHAWAR"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-177
+    name: "KMU Institute of Dental Sciences/ KIDS"
+    address: "Kohat."
+    address_e1_e2_agree: true
+    last_segment: "Kohat."
+    normalized: "kohat"
+    status: "matched"
+    district: "KOHAT"
+    region: "khyber_pakhtunkhwa"
+    doc: "table_1_kp_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-179
+    name: "Dental Section, Army Medical College"
+    address: "Abid Majeed Road, Rawalpindi."
+    address_e1_e2_agree: true
+    last_segment: "Rawalpindi."
+    normalized: "rawalpindi"
+    status: "matched"
+    district: "RAWALPINDI"
+    region: "punjab"
+    doc: "table_1_punjab_province.pdf"
+    page: 2
+  - row_id: PK-PMDC-182
+    name: "Bibi Assefa Dental College"
+    address: "Larkana"
+    address_e1_e2_agree: true
+    last_segment: "Larkana"
+    normalized: "larkana"
+    status: "matched"
+    district: "LARKANA"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-183
+    name: "Dental College, Dow International Medical College"
+    address: "Ojha Campus, Baba-e-Urdu Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-184
+    name: "Dental Section, Karachi Medical & Dental College"
+    address: "Block M, North Nazimabad, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-185
+    name: "Dr. Ishratul Ebad Institute of Oral Health Sciences"
+    address: "Sarfaraz Rafique Shaheed Road, Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-186
+    name: "Faculty of Dentistry, Liaquat University of Medical & Health Sciences"
+    address: "Jamshoro"
+    address_e1_e2_agree: true
+    last_segment: "Jamshoro"
+    normalized: "jamshoro"
+    status: "matched"
+    district: "JAMSHORO"
+    region: "sindh"
+    doc: "table_1_sindh_province.pdf"
+    page: 1
+  - row_id: PK-PMDC-187
+    name: "Sindh Institute of Oral Health Sciences/ JSMU"
+    address: "Karachi."
+    address_e1_e2_agree: true
+    last_segment: "Karachi."
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-188
+    name: "Dow Dental College"
+    address: "Baba-e-Urdu Road, Karachi"
+    address_e1_e2_agree: true
+    last_segment: "Karachi"
+    normalized: "karachi"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list; printed as KARACHI DIVISION (table_1_sindh_province.pdf p1), not as a district"
+  - row_id: PK-PMDC-190
+    name: "Saidu College of Dentistry"
+    address: "Saidu Sharif, Sawat."
+    address_e1_e2_agree: true
+    last_segment: "Sawat."
+    normalized: "sawat"
+    status: "unmatched"
+    reason: "not a district name in the PBS 2023 Table 1 list"
+summary:
+  rows: 88
+  matched: 43
+  unmatched: 45
+  matched_by_region: {"balochistan": 1, "khyber_pakhtunkhwa": 28, "punjab": 7, "sindh": 7}
+  addresses_e1_e2_disagree: 0
+extended_rule:
+  rule: "controller extension: (a) the normalized last segment may also equal a DIVISION name printed in a province file; (b) or it may equal a district/division name with all spaces removed (both sides), only if exactly one distinct name matches in that form. A name in two regions never matches. No other loosening."
+  division_table:  # 30 divisions, extracted from the same PDFs (lines printed '<NAME> DIVISION')
+    - {division: "BAHAWALPUR", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+    - {division: "DERA GHAZI KHAN", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+    - {division: "FAISALABAD", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+    - {division: "GUJRANWALA", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+    - {division: "LAHORE", region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+    - {division: "MULTAN", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+    - {division: "RAWALPINDI", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+    - {division: "SAHIWAL", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+    - {division: "SARGODHA", region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+    - {division: "HYDERABAD", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+    - {division: "KARACHI", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+    - {division: "LARKANA", region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+    - {division: "MIRPUR KHAS", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+    - {division: "SHAHEED BENAZIRABAD", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+    - {division: "SUKKUR", region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+    - {division: "BANNU", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+    - {division: "DERA ISMAIL KHAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+    - {division: "HAZARA", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+    - {division: "KOHAT", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+    - {division: "MALAKAND", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+    - {division: "MARDAN", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+    - {division: "PESHAWAR", region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+    - {division: "KALAT", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+    - {division: "LORALAI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+    - {division: "MEKRAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+    - {division: "NASIRABAD", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+    - {division: "QUETTA", region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+    - {division: "RAKHSHAN", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+    - {division: "SIBI", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+    - {division: "ZHOB", region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  rows:
+    - row_id: PK-PMDC-2
+      last_segment: "Quetta-Cantt."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-25
+      last_segment: "Kharian Cantt"
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-26
+      last_segment: "Lahore Cantt."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-27
+      last_segment: "Multan Cantt."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-33
+      last_segment: "Taxila"
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-54
+      last_segment: "Wah Cantt."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-57
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-58
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-59
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-61
+      last_segment: "Tando M.Khan"
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-62
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-63
+      last_segment: "Malir Cantt. Karachi."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-64
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-65
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-66
+      last_segment: "Mirpurkhas."
+      status: "matched"
+      match_form: "spaces_removed"
+      unit_name: "MIRPUR KHAS"
+      unit: "district"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 2
+      also_printed_as: ["MIRPUR KHAS DIVISION (table_1_sindh_province.pdf p2)"]
+    - row_id: PK-PMDC-67
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-68
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-69
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-70
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-71
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-72
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-73
+      last_segment: "Tando Adam."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-89
+      last_segment: "Taxila Cantt."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-110
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-111
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-112
+      last_segment: "Mirpurkhas."
+      status: "matched"
+      match_form: "spaces_removed"
+      unit_name: "MIRPUR KHAS"
+      unit: "district"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 2
+      also_printed_as: ["MIRPUR KHAS DIVISION (table_1_sindh_province.pdf p2)"]
+    - row_id: PK-PMDC-113
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-114
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-115
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-116
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-117
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-119
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-120
+      last_segment: "Mirpurkhas"
+      status: "matched"
+      match_form: "spaces_removed"
+      unit_name: "MIRPUR KHAS"
+      unit: "district"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 2
+      also_printed_as: ["MIRPUR KHAS DIVISION (table_1_sindh_province.pdf p2)"]
+    - row_id: PK-PMDC-121
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-125
+      last_segment: "Rawalakot"
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-131
+      last_segment: "D. I. Khan"
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-159
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-160
+      last_segment: "Karach."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+    - row_id: PK-PMDC-168
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-183
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-184
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-185
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-187
+      last_segment: "Karachi."
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-188
+      last_segment: "Karachi"
+      status: "matched"
+      match_form: "exact"
+      unit_name: "KARACHI"
+      unit: "division"
+      region: "sindh"
+      doc: "table_1_sindh_province.pdf"
+      page: 1
+    - row_id: PK-PMDC-190
+      last_segment: "Sawat."
+      status: "unmatched"
+      reason: "no district or division name equals it, exactly or with spaces removed"
+  summary:
+    rejudged: 45
+    newly_matched: 31
+    still_unmatched: 14
+    newly_matched_by_region: {"sindh": 31}
+    newly_matched_by_unit: {"district": 3, "division": 28}
+    total_matched_88_rows: 74

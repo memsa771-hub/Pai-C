@@ -93,3 +93,25 @@ bodies:
       candidates may first visit ETEA website, www.etea.edu.pk and apply for the posts online."; "6. Online Application
       Form will be available on www.etea.edu.pk on 11th February 2022."'
     retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - pmdc.pk
+  list_ref: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+  reviewed_by: claude-allow-kp-pmdc-check-1, claude-allow-kp-pmdc-check-2
+  inst_id: PK-REG-003
+  name: Pakistan Medical & Dental Council (PMDC)
+  evidence:
+    url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+    quote: '<li><a href="https&#58;//pmdc.pk/">Pakistan Medical &amp; Dental Council (PMDC)</a><br></li>'
+    retrieved: '2026-11-15'
+  check2_evidence:
+    url: https://nhsrc.gov.pk/
+    quote: '<li><a href="https://pmdc.pk/"><i class="fa fa-angle-right" aria-hidden="true"></i>Pakistan Medical and
+      Dental Council (PMDC)</a></li>'
+    retrieved: '2026-11-15'
+  notes:
+  - 'Region basis (W12 ALLOW-KP checks 1 and 2, 2026-11-15): no PMDC address states the province; 28 PMDC list rows
+    are placed in this region by the PBS 2023 census district table (docs/research/batches/w12/pmdc/district-regions.yaml,
+    KP Table 1 sha256 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24): Peshawar, Abbottabad, Kohat,
+    Mardan, Swat, Bannu, Swabi, Nowshera. Rests on the FU-15 district rule (for the owner to confirm).'

@@ -1,0 +1,67 @@
+# Check 1 for adding pmdc.pk to the khyber_pakhtunkhwa-bachelor allow-list. Independent of check2.yaml (not read).
+ref: claude-allow-kp-pmdc-check-1
+date: "2026-11-15"
+entry: {domain: pmdc.pk, tier: regulator, region: khyber_pakhtunkhwa, family: bachelor}
+
+domain_proof:
+  url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+  method: "curl -sSL, HTTP 200, no redirect; retrieved 2026-11-15 ~02:31 UTC; sha256 of HTML 5630ae6e30a685b32459f4e2e9daf842615ee2419eab9a01bd1cc49c1a403f6e"
+  title_quote: '<title> Quality Assurance Agency Accreditation Councils </title>'   # whitespace collapsed
+  quote: '<li><a href="https&#58;//pmdc.pk/">Pakistan Medical &amp; Dental Council (PMDC)</a><br></li>'
+  context: 'listed under "Existing Accreditation Councils/Professional Bodies&#58;"'
+  result: confirmed   # same verbatim link as sindh-bachelor.yaml evidence
+
+kp_basis:
+  workbook: pai-connect-d7/docs/research/batches/PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx
+  workbook_sha256: 44a6bdc0004263d74e02fd31fa950cf797d43b2165201464421b3af1bd9e8b90
+  workbook_method: "sheet Institutions read with a stdlib zip/xml parser; rows with region == khyber_pakhtunkhwa: 28"
+  address_source: "address cell of source-extractions/E1 and E2 CSVs (E1 and E2 give the same address for all 28)"
+  pbs_pdf:
+    url: https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_kp_province.pdf
+    sha256: 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24   # equals district-regions.yaml
+    retrieved: "2026-11-15 ~02:31 UTC, own curl, HTTP 200"
+    header_quote: "TABLE 1 : AREA, POPULATION BY SEX, SEX RATIO, POPULATION DENSITY, URBAN POPULATION, HOUSEHOLD SIZE AND ANNUAL GROWTH RATE, CENSUS-2023"
+    total_row: "KHYBER PAKHTUNKHWA"
+    read_method: "pdftotext -layout (mingw64); 41 distinct unit names with DISTRICT/DIVISION"
+  rule: "last comma part of the address, lower-cased, non-alphanumerics to space, whitespace collapsed; must equal a KP unit name"
+  rows:   # key | address (verbatim) | last part | KP unit printed in the PDF
+    - "5 | P.O. Public School, Abbottabad. | abbottabad | ABBOTTABAD DISTRICT"
+    - "6 | Budhai, Near Peshawar Motorways Toll Plaza, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "7 | 57-C, Gulmohar Lane, University Town, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "8 | Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "9 | Plot-2, Sector B-2, Hayatabad, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "10 | Warsak Road, Opposite PTCL Exchange, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "11 | 5/B-2, Phase-5, Hayatabad, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "12 | Murree Road, Abbottabad. | abbottabad | ABBOTTABAD DISTRICT"
+    - "13 | Swat. | swat | SWAT DISTRICT"
+    - "78 | Mansehra Road, Abbottabad. | abbottabad | ABBOTTABAD DISTRICT"
+    - "79 | Murree Road, Abbottabad. | abbottabad | ABBOTTABAD DISTRICT"
+    - "80 | Warsak Road, Opposite PTCL Exchange, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "81 | Peshawar | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "82 | P.O. Public School, Abbottabad. | abbottabad | ABBOTTABAD DISTRICT"
+    - "83 | 46-E, Jamaluddin Afghani Road, University Town,Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "127 | Abbottabad | abbottabad | ABBOTTABAD DISTRICT"
+    - "128 | Mardan | mardan | MARDAN DISTRICT / DIVISION"
+    - "129 | Bannu | bannu | BANNU DISTRICT / DIVISION"
+    - "130 | Swabi | swabi | SWABI DISTRICT"
+    - "132 | PDA Building, Block IV, Phase V, Hayatabad, Peshawar. | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "133 | Peshawar | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "134 | Divisional Headquarter Hospital, KDA, Kohat. | kohat | KOHAT DISTRICT / DIVISION"
+    - "135 | Nowshera | nowshera | NOWSHERA DISTRICT"
+    - "136 | Swat. | swat | SWAT DISTRICT"
+    - "174 | Mardan | mardan | MARDAN DISTRICT / DIVISION"
+    - "175 | Abbottabad | abbottabad | ABBOTTABAD DISTRICT"
+    - "176 | Peshawar | peshawar | PESHAWAR DISTRICT / DIVISION"
+    - "177 | Kohat. | kohat | KOHAT DISTRICT / DIVISION"
+  confirmed: 28
+  of: 28
+  notes:
+    - "Every match is exact (no space-free fallback needed). All 28 also match a DISTRICT line, not only a DIVISION."
+    - "Only the KP PDF was downloaded by me. That these 8 names are not printed in another province rests on district-regions.yaml (0 non-KP units with these names), not on my own download."
+    - "No PMDC address in these 28 rows states the province; the KP basis is the PBS district table only (controller rule FU-15, for the owner to confirm)."
+
+verdict: "yes"
+verdict_reason: >-
+  pmdc.pk is linked verbatim as the PMDC by the HEC Accreditation Councils page, and 28 of 28 KP-region rows of the
+  PMDC list (v2 workbook) have an address whose last part is a district in the PBS 2023 Table 1 KP file (sha256
+  matches). This holds under the FU-15 district rule, which is itself still for the owner to confirm.

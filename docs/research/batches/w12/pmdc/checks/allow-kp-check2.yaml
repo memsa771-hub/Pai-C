@@ -1,0 +1,101 @@
+ref: claude-allow-kp-pmdc-check-2
+date: "2026-11-15"
+entry: {domain: pmdc.pk, tier: regulator, region: khyber_pakhtunkhwa, family: bachelor}
+independence: "check1.yaml not read. Own curl downloads, own pypdf (layout mode) parser in docker run --rm pai-ci-py (python -I). Workbook CSVs (E1/E2) read only after my result, for the comparison below."
+
+domain_proof:
+  url: "https://nhsrc.gov.pk/"
+  page: "Ministry of National Health Services, Regulations and Coordination (Government of Pakistan) home page; <title>MINISTRY OF NATIONAL HEALTH SERVICES REGULATIONS AND COORDINATION"
+  method: "curl -sSL (HTTP 200), 2026-11-15 ~02:31 UTC, sha256 of HTML bac031799facc01e98890f9956be94cefb7d17d65fce412f9fc33701bd004143"
+  quote_1: '<li><a href="https://pmdc.pk/"><i class="fa fa-angle-right" aria-hidden="true"></i> Pakistan Medical and Dental Council</a></li>'
+  quote_1_context: "footer list 'Quick Links' (line 1454)"
+  quote_2: '<li><a href="https://pmdc.pk/"><i class="fa fa-angle-right" aria-hidden="true"></i>Pakistan Medical and Dental Council (PMDC)</a></li>'
+  quote_2_context: "list of attached/related bodies with DRAP, PN&MC, NIH, PIMS etc. (line 1476)"
+  note: "Independent of the HEC Accreditation Councils page. PMDC sits under this ministry; the PMDC list itself also refers to 'M/o NHSR&C, Islamabad' for notifications."
+  result: proven
+
+downloads:
+  pmdc_list:
+    url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf"
+    http: 200
+    bytes: 307407
+    sha256: 4193caa23be4cdf4374cbb41928a225faf8fb44e371133b022c4cd2261d460e1
+    pages: 17
+    creation_date: "D:20260519155305+05'00'"
+    rows_parsed: 190   # serials 1-190, none missing
+  pbs_kp_table1:
+    url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_kp_province.pdf"
+    http: 200
+    bytes: 138083
+    sha256: 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24   # same as district-regions.yaml
+    pages: 2
+    units_parsed: 41   # 7 divisions + 34 districts (lines '<NAME> DISTRICT|DIVISION'); equals the 41 khyber_pakhtunkhwa units in district-regions.yaml
+    units_not_counted: ["MALAKAND PROTECTED AREA (neither DISTRICT nor DIVISION; MALAKAND DIVISION is counted)"]
+    name_check: "none of the 8 matched names (ABBOTTABAD, BANNU, KOHAT, MARDAN, NOWSHERA, PESHAWAR, SWABI, SWAT) appears for another region in district-regions.yaml"
+
+method: >-
+  Left column (name + address) split from the hospital column by position; trailing notes removed
+  ('(Letter sent to M/o NHSR&C ...)', '(Provisionally recognized by erstwhile PMC)', 'Note: ...', section headers).
+  Last part = (a) the last comma-separated part of the cell, or (b) the last comma-separated part of the cell's last
+  printed line (address printed on its own line with no comma, e.g. 'Ayub Medical College' / 'Abbottabad').
+  Normalised: lower case, non-alphanumerics to space, whitespace collapsed; must equal a KP unit name (DISTRICT/DIVISION
+  dropped) exactly, or the unique space-free form. No abbreviations, no misspellings, no Cantt.
+
+kp_rows:
+  count: 30
+  count_comma_rule_only: 18
+  count_last_line_rule_only: 28
+  units_hit: {PESHAWAR: 14, ABBOTTABAD: 9, KOHAT: 2, MARDAN: 2, SWAT: 2, BANNU: 1, SWABI: 1, NOWSHERA: 1}
+  rows:
+    - {sno: 3, page: 1, unit: ABBOTTABAD, rule: comma+last_line, cell: "Abbottabad International Medical College Mansehra Road, Abbottabad."}
+    - {sno: 4, page: 1, unit: PESHAWAR, rule: comma+last_line, cell: "Muhammad College of Medicine, (Former Al-Razi Medical College), Budhni Road, Yaseenabad, Peshawar"}
+    - {sno: 5, page: 1, unit: ABBOTTABAD, rule: comma+last_line, cell: "Frontier Medical College P.O. Public School, Abbottabad."}
+    - {sno: 6, page: 1, unit: PESHAWAR, rule: comma+last_line, cell: "Jinnah Medical College Budhai, Near Peshawar Motorways Plaza, Peshawar."}
+    - {sno: 7, page: 1, unit: PESHAWAR, rule: comma+last_line, cell: "Kabir Medical College 57-C, Gulmohar Lane, University Town, Peshawar."}
+    - {sno: 8, page: 1, unit: PESHAWAR, rule: last_line, cell: "Northwest School of Medicine Peshawar."}
+    - {sno: 9, page: 1, unit: PESHAWAR, rule: comma+last_line, cell: "Pak International Medical College Plot-2, Sector B-2, Hayatabad, Peshawar."}
+    - {sno: 10, page: 1, unit: PESHAWAR, rule: comma+last_line, cell: "Peshawar Medical College Warsak Road, Opposite PTCL Exchange, Peshawar."}
+    - {sno: 11, page: 2, unit: PESHAWAR, rule: comma+last_line, cell: "Rehman Medical College 5/B-2, Phase-5, Hayatabad, Peshawar."}
+    - {sno: 12, page: 2, unit: ABBOTTABAD, rule: comma+last_line, cell: "Women Medical College Murree Road, Abbottabad."}
+    - {sno: 13, page: 2, unit: SWAT, rule: comma, cell: "Swat Medical College, Swat."}
+    - {sno: 78, page: 8, unit: ABBOTTABAD, rule: comma+last_line, cell: "Dental Section Abbottabad International Medical College Mansehra Road, Abbottabad."}
+    - {sno: 79, page: 8, unit: ABBOTTABAD, rule: comma+last_line, cell: "Dental Section Women Medical College Murree Road, Abbottabad."}
+    - {sno: 80, page: 8, unit: PESHAWAR, rule: comma+last_line, cell: "Peshawar Dental College Warsak Road, Opposite PTCL Exchange, Peshawar."}
+    - {sno: 81, page: 8, unit: PESHAWAR, rule: last_line, cell: "Rehman College of Dentistry Peshawar"}
+    - {sno: 82, page: 8, unit: ABBOTTABAD, rule: comma, cell: "Dental Section, Frontier Medical College P.O. Public School, Abbottabad."}
+    - {sno: 83, page: 8, unit: PESHAWAR, rule: comma+last_line, cell: "Sardar Begum Dental College 46-E, Jamaluddin Afghani Road, University Town,Peshawar."}
+    - {sno: 127, page: 12, unit: ABBOTTABAD, rule: last_line, cell: "Ayub Medical College Abbottabad"}
+    - {sno: 128, page: 12, unit: MARDAN, rule: last_line, cell: "Bacha Khan Medical College Mardan"}
+    - {sno: 129, page: 12, unit: BANNU, rule: last_line, cell: "Bannu Medical College Bannu"}
+    - {sno: 130, page: 12, unit: SWABI, rule: last_line, cell: "Gajju Khan Medical College Swabi"}
+    - {sno: 132, page: 12, unit: PESHAWAR, rule: comma+last_line, cell: "Khyber Girls Medical College PDA Building, Block IV, Phase V, Hayatabad, Peshawar."}
+    - {sno: 133, page: 12, unit: PESHAWAR, rule: last_line, cell: "Khyber Medical College Peshawar"}
+    - {sno: 134, page: 12, unit: KOHAT, rule: comma+last_line, cell: "KMU Institute of Medical Sciences/ KIMS Divisional Headquarter Hospital, KDA, Kohat."}
+    - {sno: 135, page: 12, unit: NOWSHERA, rule: last_line, cell: "Nowshera Medical College Nowshera"}
+    - {sno: 136, page: 12, unit: SWAT, rule: comma+last_line, cell: "Saidu Medical College, Swat."}
+    - {sno: 174, page: 16, unit: MARDAN, rule: last_line, cell: "Bacha Khan Dental College Mardan"}
+    - {sno: 175, page: 16, unit: ABBOTTABAD, rule: last_line, cell: "Dental College, Ayub Medical College Abbottabad"}
+    - {sno: 176, page: 16, unit: PESHAWAR, rule: last_line, cell: "Khyber College of Dentistry Peshawar"}
+    - {sno: 177, page: 16, unit: KOHAT, rule: last_line, cell: "KMU Institute of Dental Sciences/ KIDS Kohat."}
+  not_matched_but_kp_looking:
+    - {sno: 131, cell: "Gomal Medical College D. I. Khan", reason: "abbreviation of DERA ISMAIL KHAN; not a printed unit name"}
+    - {sno: 190, cell: "Saidu College of Dentistry, Saidu Sharif, Sawat.", reason: "misspelling 'Sawat'; not a unit name"}
+  comparison_with_workbook:
+    files: ["pai-connect-d7/docs/research/batches/w12/pmdc/E1/pmdc-colleges-with-hospitals.csv", ".../E2/pmdc-colleges-with-hospitals.csv"]
+    workbook_kp_count: 28   # region khyber_pakhtunkhwa in both E1 and E2
+    workbook_kp_rows: [5, 6, 7, 8, 9, 10, 11, 12, 13, 78, 79, 80, 81, 82, 83, 127, 128, 129, 130, 132, 133, 134, 135, 136, 174, 175, 176, 177]
+    agree: 28
+    only_mine: [3, 4]
+    only_workbook: []
+    note: >-
+      Rows 3 (…Mansehra Road, Abbottabad.) and 4 (…Yaseenabad, Peshawar) end in a KP district by my rule but have an empty
+      region in the workbook. Reason not determined here (possibly outside the rows the district rule was applied to,
+      per district-regions.yaml 'only for the rows both checks judged'). It does not change the verdict: 28 rows agree.
+
+verdict:
+  answer: "yes"
+  reason: >-
+    pmdc.pk is linked as 'Pakistan Medical and Dental Council (PMDC)' on the federal health ministry site nhsrc.gov.pk
+    (second official source besides HEC), and at least 28 (my count 30) PMDC-listed MBBS/BDS colleges have an address
+    whose last part is a KP district/division name per the PBS 2023 Table 1 KP file.
+  caveat: "The KP region basis is the district/division rule (controller rule, for the owner to confirm), not a province word printed in the PMDC addresses."

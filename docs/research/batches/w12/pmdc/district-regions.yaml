@@ -1,0 +1,193 @@
+# District / division -> region of backend/app/os/knowledge/regions.yaml (PK), from the PBS 2023 census Table 1
+# province files (FU-15, W12 D-PMDC v2, 2026-11-15; controller rule, for the owner to confirm). Read by derive.py,
+# which stops unless `units` equals the table of both checks below and its per-row result equals both checks'.
+# Nothing here is typed by hand: it was written from checks/district-check2.yaml `unit_table` and compared with
+# checks/district-check1.yaml `district_table` + `extended_rule.division_table` (165 = 135 districts + 30 divisions,
+# identical sets of name, unit, region, doc and page).
+source:
+  publisher: "Pakistan Bureau of Statistics (pbs.gov.pk), 7th Population and Housing Census 2023, Table 1, province files"
+  retrieved: "2026-11-15 (check 1 curl ~01:49 UTC; check 2 curl 01:55 UTC; same sha256 for every file)"
+  coverage: "the four provinces and Islamabad only; AJK and Gilgit-Baltistan are not in these tables"
+  documents:
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_punjab_province.pdf", sha256: 63df3bec54bdc753d4462f830484bf57dc4ceb34eca2b37dce479c02421ff54c, region: punjab}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_sindh_province.pdf", sha256: c066bb906bdacef9bf989c0c64870c30ca9d7e7f8c9abd8a07271072600defb1, region: sindh}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_kp_province.pdf", sha256: 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24, region: khyber_pakhtunkhwa}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_balochistan_province.pdf", sha256: 34fcfbf77dca2ed90f2cbbe5d6536e7ca916254c2f96549bdc9fa310cbeedaa1, region: balochistan}
+    - {url: "https://pbs.gov.pk/wp-content/uploads/census_tables/tables/table_1_islamabad.pdf", sha256: 8deb2282dd70fc564a863c26c7a0adbd7651379aade08dbcc7f8279426423da3, region: islamabad_capital_territory}
+checks:
+  - {ref: claude-fu15-district-check-1, file: checks/district-check1.yaml, date: "2026-11-15"}
+  - {ref: claude-fu15-district-check-2, file: checks/district-check2.yaml, date: "2026-11-15"}
+rule: >-
+  Only where the address has no province or territory word (region-words.yaml) and only for the rows both checks judged
+  (the rows the D-PMDC dry run rejected missing_region). Take the last comma-separated part of the address cell (the
+  name cell where the address is empty); lower-case it; turn every non-alphanumeric character into a space; collapse
+  whitespace. It matches when it equals a unit name normalised the same way (the word DISTRICT or DIVISION dropped),
+  or else when it equals one with all spaces removed on both sides and exactly one unit name has that space-free form.
+  A name printed in two regions never matches. No other loosening: no Cantt, no misspelling, no city that is not a
+  district or division name.
+units:  # name as printed (DISTRICT / DIVISION dropped); unit; region = the province of the file; doc; page
+  - {name: "BAHAWALPUR", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "BAHAWALNAGAR", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "BAHAWALPUR", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "RAHIM YAR KHAN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "DERA GHAZI KHAN", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "DERA GHAZI KHAN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "LAYYAH", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "MUZAFFARGARH", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "RAJANPUR", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "FAISALABAD", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "CHINIOT", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "FAISALABAD", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "JHANG", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "TOBA TEK SINGH", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "GUJRANWALA", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "GUJRANWALA", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "GUJRAT", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "HAFIZABAD", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "MANDI BAHAUDDIN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "NAROWAL", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "SIALKOT", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "LAHORE", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "KASUR", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 1}
+  - {name: "LAHORE", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "NANKANA SAHIB", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "SHEIKHUPURA", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "MULTAN", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "KHANEWAL", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "LODHRAN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "MULTAN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "VEHARI", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "RAWALPINDI", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "ATTOCK", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "CHAKWAL", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "JHELUM", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "RAWALPINDI", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "SAHIWAL", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "OKARA", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "PAKPATTAN", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "SAHIWAL", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "SARGODHA", unit: division, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "BHAKKAR", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "KHUSHAB", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "MIANWALI", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "SARGODHA", unit: district, region: punjab, doc: table_1_punjab_province.pdf, page: 2}
+  - {name: "HYDERABAD", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "BADIN", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "DADU", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "HYDERABAD", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "JAMSHORO", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "MATIARI", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "SUJAWAL", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "TANDO ALLAHYAR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "TANDO MUHAMMAD KHAN", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "THATTA", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KARACHI", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KARACHI CENTRAL", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KARACHI EAST", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KARACHI SOUTH", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KARACHI WEST", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KEAMARI", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KORANGI", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "MALIR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "LARKANA", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "JACOBABAD", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KAMBAR SHAHDAD KOT", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "KASHMORE", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "LARKANA", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "SHIKARPUR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 1}
+  - {name: "MIRPUR KHAS", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "MIRPUR KHAS", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "THARPARKAR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "UMER KOT", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "SHAHEED BENAZIRABAD", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "NAUSHAHRO FEROZE", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "SANGHAR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "SHAHEED BENAZIRABAD", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "SUKKUR", unit: division, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "GHOTKI", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "KHAIRPUR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "SUKKUR", unit: district, region: sindh, doc: table_1_sindh_province.pdf, page: 2}
+  - {name: "BANNU", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "BANNU", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "LAKKI MARWAT", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "NORTH WAZIRISTAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "DERA ISMAIL KHAN", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "DERA ISMAIL KHAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "SOUTH WAZIRISTAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "TANK", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "HAZARA", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "ABBOTTABAD", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "BATAGRAM", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "HARIPUR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "KOLAI PALAS KOHISTAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "LOWER KOHISTAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "MANSEHRA", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "TORGHAR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "UPPER KOHISTAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "KOHAT", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "HANGU", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "KARAK", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "KOHAT", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "KURRAM", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "ORAKZAI", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "MALAKAND", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 1}
+  - {name: "BAJAUR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "BUNER", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "LOWER CHITRAL", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "LOWER DIR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "SHANGLA", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "SWAT", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "UPPER CHITRAL", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "UPPER DIR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "MARDAN", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "MARDAN", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "SWABI", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "PESHAWAR", unit: division, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "CHARSADDA", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "KHYBER", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "MOHMAND", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "NOWSHERA", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "PESHAWAR", unit: district, region: khyber_pakhtunkhwa, doc: table_1_kp_province.pdf, page: 2}
+  - {name: "KALAT", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "AWARAN", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "KALAT", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "KHUZDAR", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "LASBELA", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "MASTUNG", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "SURAB", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "LORALAI", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "BARKHAN", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "DUKI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "LORALAI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "MUSAKHEL", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "MEKRAN", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "GWADAR", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "KECH", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "PANJGUR", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "NASIRABAD", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "JAFFARABAD", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "JHAL MAGSI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "KACHHI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "NASIRABAD", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "SOHBATPUR", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "QUETTA", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 1}
+  - {name: "CHAMAN", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "KILLA ABDULLAH", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "PISHIN", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "QUETTA", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "RAKHSHAN", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "CHAGAI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "KHARAN", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "NUSHKI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "WASHUK", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "SIBI", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "DERA BUGTI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "HARNAI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "KOHLU", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "SIBI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "ZIARAT", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "ZHOB", unit: division, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "KILLA SAIFULLAH", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "SHERANI", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "ZHOB", unit: district, region: balochistan, doc: table_1_balochistan_province.pdf, page: 2}
+  - {name: "ISLAMABAD", unit: district, region: islamabad_capital_territory, doc: table_1_islamabad.pdf, page: 1}

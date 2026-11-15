@@ -5,7 +5,7 @@
 # required: one not accepted rejects its row, so no duplicate entity is loaded. Check 2 `unclear` has no
 # value in format.yaml check2_values, so `approved` is left empty and the verdict is kept in a comment.
 file: PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx
-sha256: 2b97d5b17e6cdb1a7cdc50a78953bed0a80bdee50168fa987257e4c4cd90bd48
+sha256: 44a6bdc0004263d74e02fd31fa950cf797d43b2165201464421b3af1bd9e8b90
 aliases:
   - from: PK-PMDC-14
     # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
