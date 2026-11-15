@@ -110,8 +110,9 @@ def test_a_two_region_plan_with_one_region_closed_is_refused(world, engine):
 def test_the_fallback_is_taken_per_region(world, engine):
     svc, kb, s = world
     for ref in ("p_a", "p_b"):
-        kb.upsert("programme", ref, "deadline_close", f(2025, "2025-12-15"))
-        kb.upsert("programme", ref, "deadline_close", f(2026, "2026-12-15"))
+        # synthetic dates still ahead of TODAY, so a borrowed one dates the step
+        kb.upsert("programme", ref, "deadline_close", f(2025, "2027-01-10"))
+        kb.upsert("programme", ref, "deadline_close", f(2026, "2027-01-20"))
     old = s.create(*ONE, "winter", 2025, state="open")
     make_current(engine, old.id, GATE)
     rollover(engine, "pai", region="r_one", family=FAM, term="winter", year=2027)  # open, opened from 2025
