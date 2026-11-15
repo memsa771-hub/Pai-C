@@ -9,6 +9,8 @@ import yaml
 
 CLASSES_FILE = Path(__file__).with_name("fact_classes.yaml")
 UNCLASSIFIED = "unclassified"
+# The trust levels a field may need before its fact decides a step, lowest first (`decides_at`; ADR-001 D3).
+DECIDING_LEVELS = ("confirmed", "verified")
 
 
 @dataclass(frozen=True)
@@ -19,7 +21,7 @@ class FactClass:
 
 
 @cache
-def _load(path: Path = CLASSES_FILE) -> tuple[dict[str, FactClass], dict[str, str]]:
+def _load(path: Path = CLASSES_FILE) -> tuple[dict[str, FactClass], dict[str, str], dict[str, str]]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     cls = {k: FactClass(k, bool(v["high_stakes"]), v["label"]) for k, v in data["classes"].items()}
     if UNCLASSIFIED not in cls or not cls[UNCLASSIFIED].high_stakes:
@@ -28,7 +30,14 @@ def _load(path: Path = CLASSES_FILE) -> tuple[dict[str, FactClass], dict[str, st
     unknown = sorted({c for c in fields.values() if c not in cls})
     if unknown:
         raise ValueError(f"fields name unknown classes: {unknown}")
-    return cls, fields
+    decides = dict(data.get("decides_at") or {})
+    bad = sorted(f"{f}: {lvl}" for f, lvl in decides.items() if lvl not in DECIDING_LEVELS)
+    if bad:
+        raise ValueError(f"decides_at names unknown levels (use one of {list(DECIDING_LEVELS)}): {bad}")
+    unlisted = sorted(f for f in decides if f not in fields)
+    if unlisted:
+        raise ValueError(f"decides_at names fields that are not in `fields`: {unlisted}")
+    return cls, fields, decides
 
 
 def classes() -> dict[str, FactClass]:
@@ -37,7 +46,7 @@ def classes() -> dict[str, FactClass]:
 
 def fact_class(field: str, explicit: str | None = None) -> str:
     """The class of a fact: its own `fact_class` when set, else its field's class, else `unclassified`."""
-    cls, fields = _load()
+    cls, fields, _ = _load()
     if explicit is not None:
         if explicit not in cls:
             raise ValueError(f"unknown fact class '{explicit}'")
@@ -47,3 +56,9 @@ def fact_class(field: str, explicit: str | None = None) -> str:
 
 def is_high_stakes(cls: str) -> bool:
     return _load()[0][cls].high_stakes
+
+
+def deciding_level(field: str) -> str:
+    """The trust level a fact of this field needs before a step it decides counts as firm: `confirmed` unless
+    `decides_at` raises it (ADR-001 D3: a system's admission mode decides only when `verified`)."""
+    return _load()[2].get(field, DECIDING_LEVELS[0])

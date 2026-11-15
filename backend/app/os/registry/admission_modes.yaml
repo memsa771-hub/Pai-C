@@ -1,0 +1,40 @@
+# Admission modes (ADR-001 D3; master R-38): the generic ways an admission system takes applications. A system's mode is
+# a Knowledge fact `field` on its `admission_system` row (fact class in knowledge/fact_classes.yaml), sourced from the
+# official URL and verbatim quote, and entered only through the import and review lane. Which system has which mode is
+# data that arrives through the import; none is set here, and no region, body or portal is named (R-58).
+#
+# For each mode: what it means, which admission-calendar date fields its steps may read (the shape of calendars.yaml:
+# calendar type -> date fields), whose calendar holds those dates (`calendar_of`, a registry kind), and which registry
+# links from the system its steps rely on (registry/store.py link rels).
+#
+# D3 (Q9): a step gated by the mode stays provisional until the mode fact is `verified`. The level is read generically
+# from `decides_at` in fact_classes.yaml; `requires` here states it, and the loader refuses the two disagreeing.
+version: 1
+field: admission_mode
+entity_kind: admission_system
+requires: verified
+modes:
+  central_ranked:
+    label: Central ranked admission
+    description: >-
+      One system takes a single application per student for all the places it admits, with the places ranked in order
+      of preference, and allocates seats from its own merit list, possibly in rounds.
+    calendars: {admission: [application_open, application_close, merit_list_date, classes_start]}
+    calendar_of: admission_system
+    links: [admits, has_category]
+  central_portal:
+    label: Central portal
+    description: >-
+      One online system takes the applications for the places it admits. Whether and how it ranks preferences is not
+      part of this mode; each such rule is its own fact.
+    calendars: {admission: [application_open, application_close]}
+    calendar_of: admission_system
+    links: [admits]
+  per_institution:
+    label: Per institution
+    description: >-
+      Each institution takes and decides its own applications. The system only names the places it covers; the dates
+      come from each institution's own admission calendar.
+    calendars: {admission: [application_open, application_close, merit_list_date, classes_start]}
+    calendar_of: institution
+    links: [admits]

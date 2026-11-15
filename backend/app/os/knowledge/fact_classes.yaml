@@ -1,7 +1,9 @@
 # Fact classes and the high-stakes rule (P2 spec P2-D7, master R-25 and §8.2). High-stakes facts show as fact only
 # when `verified`; other facts from `confirmed` (knowledge/display.py). `fields` maps a Knowledge field name to its
 # class; a fact may also carry its class in `os_knowledge_facts.fact_class`. A field not listed here is
-# `unclassified`, which is high-stakes (fail safe, plan D-t1-3).
+# `unclassified`, which is high-stakes (fail safe, plan D-t1-3). `decides_at` names the fields whose fact must reach a
+# trust level above `confirmed` before a step it decides (a playbook condition) is firm; a field not listed decides from
+# `confirmed`.
 version: 1
 classes:
   # high-stakes (master §8.2)
@@ -50,3 +52,7 @@ fields:
   intakes: intake
   merit_formula: merit_formula
   closing_merit: closing_merit
+  admission_mode: application_route  # a system's mode, a key of registry/admission_modes.yaml (ADR-001 D3)
+# ADR-001 D3 (Q9): every step gated by a system's admission mode stays provisional until the mode fact is `verified`.
+decides_at:
+  admission_mode: verified
