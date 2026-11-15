@@ -1,0 +1,132 @@
+# Aliases for PAI-Research-W12-biek-affiliated-government-colleges.xlsx (import --aliases; docs/research/batches/README.md, 'Alias files').
+# Made by w12/biek/make_aliases.py. Verdicts: w12/biek/checks/alias-check1.yaml (check 1) and
+# alias-check2.yaml (check 2, independent). Controller ruling 2026-11-15: an alias is accepted only
+# where both checks say same. Every alias is required: one not accepted rejects its row, so no
+# duplicate entity is loaded. Check 2 `unclear` has no value in format.yaml check2_values, so
+# `approved` is left empty and the verdict is kept in a comment on that alias.
+file: PAI-Research-W12-biek-affiliated-government-colleges.xlsx
+sha256: 5ae5fb6852f1d429b28dce33939f42f5cd14b9b6af7b5ebc347419f57c43e379
+aliases:
+  - from: SD-BIEK-GOV-1
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2215
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "1. Abdullah Govt. College for Women, North Nazimabad Block-U,North Nazimabad, Karachi.Ph.#.99260061"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "ABDULLAH GOVT. COLLEGE FOR WOMEN KQ2215"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-3
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2172
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "3. Adamjee Govt. Science Colleg OFF: Business Recorder Road, Karachi.Ph# 99215689 Fax# 99215649 Mob:0321_3808806 0300_2757987"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI KQ2172"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-4
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2173
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "4. Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: 99204736"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "AISHA BAWANI GOVT COLLEGE MORNING KQ2173"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-5
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2193
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "5. Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: Nil"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "AISHA BAWANI GOVT COLLEGE EVENING KQ2193"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-8
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2167
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "8. Allama Iqbal Govt. Girls Degree College shah Faisal ST-14, Block-2, Shah Faisal, Karachi."}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "ALLAMA IQBAL GOVT GIRLS COLLEGE KQ2167"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-9
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2158
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "9. APWA Govt. Degree College for Women, Karimabad F.B. Area, Karimabad, Karachi. Ph: 99246095"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "APWA GOVT.COLLEGE FOR WOMEN KQ2158"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-11
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2207
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "11. BAMM PECHS Govt. College for Women, PECHS Enwer Adil Road, Above Green Nursery Road No. 10, Block-2, PECHS, Karachi. Ph 34553737 Mob: 0333-3185798 Fax: 34315200"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-12
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2273
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "12. BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi. Muzaffarabad Near Hospital Chowrangi Landhi Karachi."}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "BIBI ASIFA GOVT. DEGREE GIRLS COLLEGE KQ2273"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-14
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2194
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "14. D.J. Sindh Govt. Science College Dr. Ziauddin Ahmed Road Karachi. PH 99211517"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "D.J SINDH GOVT SCIENCE COLLEGE KQ2194"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-15
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2232
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "15. Dukhtar-e-Mashriq Govt Degree Grils College Jamshed Road No.2 Jamshed Road No 2 karachi Ph:-034912552"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "DUKHTAR E MASHRIQ GOVT. DEGREE GIRLS COLLEGE KQ2232"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-37
+    # check 1: same; check 2: same -> accepted
+    to: SD-COL-KQ2339
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "37. Govt. Degree Boys College, 9-E Baldia Town Sector 9-E, Saeedabad, Baldia Town, Karachi. Ph# 32820149"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI KQ2339"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-6
+    # check 1: same; check 2: unclear -> not accepted (held)
+    to: SD-COL-KQ2150
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING KQ2150"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-7
+    # check 1: same; check 2: unclear -> not accepted (held)
+    to: SD-COL-KQ2163
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "7. Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening) Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-27
+    # check 1: unclear; check 2: unclear -> not accepted (held)
+    to: SD-COL-KQ2236
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "27. Govt. College for Women, Shahrah-e-Liaquat Shahrah-e-Liaquat, Karachi."}
+    target_evidence: {url: "https://seccap.dgcs.gos.pk/colleges", quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236"}
+    check1: {result: unclear, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-GOV-181
+    # check 1: unclear; check 2: same -> not accepted (held)
+    to: SD-BIEK-GOV-95
+    evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "181. Govt. Higher Secondary School, Kathore Gadap Kamal Khan Jakhio, Kathore, Gadap Town, Karachi"}
+    target_evidence: {url: "https://www.biek.edu.pk/gmaleCol.asp", quote: "95. Govt. Higher Secondary School, Kathore Kamal Khan Jakhio, Kathore, Gadap Town, Karachi Ph # 02134484002/ 0333_2181938"}
+    check1: {result: unclear, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true

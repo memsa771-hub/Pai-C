@@ -1,0 +1,845 @@
+# W12 D-BIEK alias check 2 (claude-w12-biek-alias-check-2), independent. 2026-11-15. Not an alias file; input for one.
+# Read-only. Text source: BIEK E2 CSVs (sha256 identical to the E1 files check 1 read). Batch rows: v4 workbooks,
+# Institutions sheets, read with openpyxl in `docker run --rm pai-ci-py python -I`.
+# Verdicts judged from printed text only. claude_note is batch 3's own entry (SECCAP gender/level/shift), not a source
+# quote, and is treated as weaker evidence than name/source_quote.
+check: claude-w12-biek-alias-check-2
+date: 2026-11-15
+inputs:
+  - {list_id: biek-affiliated-government-colleges, file: E2/biek-affiliated-government-colleges.csv, sha256: 15d07be04e5e0eed850fc1cef9f4f724b6665245c734054df83c974301211af3}
+  - {list_id: biek-affiliated-private-colleges, file: E2/biek-affiliated-private-colleges.csv, sha256: 3c9a789e5d0066fde56d2f9639f7f8f0b32b5b8859f51911bc024e3b0ee5ddae}
+  - {batch_file: docs/research/batches/PAI-Research-Batch1-National-v4.xlsx, sheet: Institutions, rows_read: 354}
+  - {batch_file: docs/research/batches/PAI-Research-Batch2-Punjab-v4.xlsx, sheet: Institutions, rows_read: 79}
+  - {batch_file: docs/research/batches/PAI-Research-Batch3-Sindh-v4.xlsx, sheet: Institutions, rows_read: 72}
+  - {batch_file: docs/research/batches/PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx, sheet: Institutions, rows_read: 46}
+  - {batch_file: docs/research/batches/PAI-Research-Batch5-Universities-BS-v4.xlsx, sheet: Institutions, rows_read: 19}
+  - {check1: alias-check1.yaml, used_for: "pair list only; every verdict below re-judged from the printed text"}
+method:
+  - "Rules applied: (1) a BIEK Evening or No.2 line matches only a batch row that prints the same shift/number in name or source_quote; claude_note alone is weaker evidence. (2) a shift inferred from a sibling line is weaker evidence; accepted only where both sides are a closed two-member set and the other member matches on printed text. (3) an address or district word that differs from the batch row is a reason for unclear."
+  - "Own candidate search, method A (BIEK -> batch): tokens of the full BIEK quote (name + address) against tokens of every batch row's name (all 570 rows, not screened by region); generic words dropped; document-frequency weights; a pair kept when it covered >= 50% of the batch name's weight or shared a token found in <= 4 documents. 364 pairs, read by hand."
+  - "Own candidate search, method B (batch -> BIEK): for 164 batch rows that are Sindh / Karachi / National / multi-campus, each significant name token matched against BIEK quote tokens with fuzzy spelling (SequenceMatcher >= 0.8 for words of 5+ letters, e.g. Bawani/Bawany, Lyari/Liyari, Mohtarma/Muhtarma, Zulfikar/Zulfiqar). Read by hand."
+  - "Extra greps of BIEK text for university/DAI names (Dadabhoy, Greenwich, Preston, Indus, ILMA, KASB, Newports, Nazeer, Saifee, SZABIST, Sohail, Salim, Baqai, Ziauddin, Habib, Hamdard, Textile, FAST/NUCES, COMSATS, NUML) and for every 'Govt. College for Women' line against KQ2236."
+  - "Row count note: openpyxl gives 570 non-empty Institutions rows (354+79+72+46+19); check 1 says 572. All 14 Karachi SD-COL-KQ rows are present in both counts."
+check1_flagged_pairs:
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "1", name: "Abdullah Govt. College for Women, North Nazimabad", quote: "1. Abdullah Govt. College for Women, North Nazimabad Block-U,North Nazimabad, Karachi.Ph.#.99260061"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2215, name: "ABDULLAH GOVT. COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "ABDULLAH GOVT. COLLEGE FOR WOMEN KQ2215", claude_note: "Girls, Degree, Morning; 2,706 seats. SECCAP college code KQ2215."}
+    reason: "Name word for word (BIEK adds the locality 'North Nazimabad'). Both women. No shift printed on either; BIEK has no Evening Abdullah line. Locality North Nazimabad does not contradict district Karachi Central. Haji Abdullah Haroon (gov 129/130) is another name."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "3", name: "Adamjee Govt. Science Colleg", quote: "3. Adamjee Govt. Science Colleg OFF: Business Recorder Road, Karachi.Ph# 99215689 Fax# 99215649 Mob:0321_3808806 0300_2757987"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2172, name: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI", city: "Karachi East", source_quote: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI KQ2172", claude_note: "Boys, Degree, Morning; 1,100 seats. SECCAP college code KQ2172."}
+    reason: "'Adamjee Govt. Science Colleg' (page typo) = 'ADAMJEE GOVT. SCIENCE COLLEGE KARACHI'. Only government Adamjee line; private 115/165 are other names. No shift on either side. Business Recorder Road does not contradict Karachi East."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "5", name: "Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society", quote: "5. Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: Nil"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2193, name: "AISHA BAWANI GOVT COLLEGE EVENING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE EVENING KQ2193", claude_note: "Boys, Degree, Evening; 354 seats. SECCAP college code KQ2193."}
+    reason: "Aisha Bawany/Bawani spelling only. BIEK prints '(Evening)' and the batch name and source_quote print EVENING: same shift printed on both sides. Sindhi Muslim Housing Society does not contradict Karachi East."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "4", name: "Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society", quote: "4. Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: 99204736"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2173, name: "AISHA BAWANI GOVT COLLEGE MORNING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE MORNING KQ2173", claude_note: "Boys, Intermediate, Morning; 504 seats. SECCAP college code KQ2173."}
+    reason: "Accepted, with the weaker-evidence caveat. BIEK line 4 prints 'No.1', not 'Morning'; the batch prints MORNING in name and source_quote. Accepted because both sides are a closed two-member set at one name: BIEK has exactly two government Aisha Bawany lines (4 'No.1', 5 'No.2, (Evening)', same address) and the batch has exactly two rows (KQ2173 MORNING, KQ2193 EVENING); line 5 matches KQ2193 on a printed shift, so line 4 can only be the non-evening college. Name and area agree. No address conflict. If the loader requires a printed shift word on the BIEK side, downgrade to unclear."
+  - verdict: unclear
+    agrees_with_check1: no
+    biek: {list_id: biek-affiliated-government-colleges, key: "6", name: "Allama Iqbal Govt. Boys Science College No.1 Model Colny", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2150, name: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING KQ2150", claude_note: "Boys, Intermediate, Morning; 1,006 seats. SECCAP college code KQ2150."}
+    reason: "Name agrees ('Allama Iqbal Govt. Boys Science College') and the No.1 / No.2 (Evening) pairing on BIEK lines 6/7 mirrors batch KQ2150 MORNING / KQ2163 NO.02, so the shift inference alone I would accept. But the BIEK address prints 'Model Colony, Malir' and the batch district is 'KARACHI KORANGI', while the same batch uses 'KARACHI MALIR' as a district for other rows (e.g. KQ2273). That is a printed area word that differs, so by the stated rule this is unclear, not same. Resolve with a source that prints this college's address or district (e.g. the SECCAP college page in official_url, not read here)."
+  - verdict: unclear
+    agrees_with_check1: no
+    biek: {list_id: biek-affiliated-government-colleges, key: "7", name: "Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening)", quote: "7. Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening) Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2163, name: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163", claude_note: "Boys, Degree, Evening; 902 seats. SECCAP college code KQ2163."}
+    reason: "Name agrees ('Allama Iqbal Govt. Degree ... Arts & Commerce College No.2' = '... DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02'), and the number No.2 / NO.02 is printed on both sides, so the shift rule is met by the printed number; the batch 'Evening' sits only in claude_note and I give it no weight. Same blocker as gov 6: BIEK address 'Model Colony, Malir' vs batch district 'KARACHI KORANGI'. Unclear for the area word; gov 6 and gov 7 should be resolved together, since they share one address and phone."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "8", name: "Allama Iqbal Govt. Girls Degree College shah Faisal", quote: "8. Allama Iqbal Govt. Girls Degree College shah Faisal ST-14, Block-2, Shah Faisal, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2167, name: "ALLAMA IQBAL GOVT GIRLS COLLEGE", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT GIRLS COLLEGE KQ2167", claude_note: "Girls, Degree, Morning; 1,104 seats. SECCAP college code KQ2167."}
+    reason: "'Allama Iqbal Govt. Girls Degree College' = 'ALLAMA IQBAL GOVT GIRLS COLLEGE'; both girls; only Allama Iqbal girls line on either side. No shift on either side. Address 'Shah Faisal' does not contradict KARACHI KORANGI (no differing district word printed)."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "9", name: "APWA Govt. Degree College for Women, Karimabad", quote: "9. APWA Govt. Degree College for Women, Karimabad F.B. Area, Karimabad, Karachi. Ph: 99246095"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2158, name: "APWA GOVT.COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "APWA GOVT.COLLEGE FOR WOMEN KQ2158", claude_note: "Girls, Degree, Morning; 2,358 seats. SECCAP college code KQ2158."}
+    reason: "'APWA Govt. Degree College for Women' = 'APWA GOVT.COLLEGE FOR WOMEN'; both women. BIEK's other APWA line (10) is a Girls Higher Secondary School. F.B. Area, Karimabad does not contradict Karachi Central. No shift on either."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "11", name: "BAMM PECHS Govt. College for Women, PECHS", quote: "11. BAMM PECHS Govt. College for Women, PECHS Enwer Adil Road, Above Green Nursery Road No. 10, Block-2, PECHS, Karachi. Ph 34553737 Mob: 0333-3185798 Fax: 34315200"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "Identical name 'BAMM PECHS Govt. College for Women'. PECHS address, Karachi East district; no conflict, no shift on either."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "12", name: "BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi.", quote: "12. BiBi Asifa Bhutto Govt. Girls Degree College, Muzaffarabad Landhi. Muzaffarabad Near Hospital Chowrangi Landhi Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2273, name: "BIBI ASIFA GOVT. DEGREE GIRLS COLLEGE", city: "KARACHI MALIR", source_quote: "BIBI ASIFA GOVT. DEGREE GIRLS COLLEGE KQ2273", claude_note: "Girls, Intermediate, Morning; 905 seats. SECCAP college code KQ2273."}
+    reason: "Accepted. 'BiBi Asifa Bhutto Govt. Girls Degree College' vs 'BIBI ASIFA GOVT. DEGREE GIRLS COLLEGE': BIEK adds 'Bhutto', otherwise same words, both girls degree. 'Bibi Asifa' is unique on both sides (BIEK 119 'Chand BiBi Road' is an address). The BIEK address 'Muzaffarabad ... Landhi' names a locality; it does not print a district word that differs from 'KARACHI MALIR' (Landhi is not one of the batch's district labels), so rule 3 is not triggered. Caveat stays: the area is not confirmed by text, only not contradicted."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "14", name: "D.J. Sindh Govt. Science College", quote: "14. D.J. Sindh Govt. Science College Dr. Ziauddin Ahmed Road Karachi. PH 99211517"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2194, name: "D.J SINDH GOVT SCIENCE COLLEGE", city: "Karachi South", source_quote: "D.J SINDH GOVT SCIENCE COLLEGE KQ2194", claude_note: "Boys, Degree, Morning; 1,802 seats. SECCAP college code KQ2194."}
+    reason: "Identical name 'D.J. Sindh Govt. Science College'. Dr. Ziauddin Ahmed Road vs Karachi South, no conflict. No shift on either."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "15", name: "Dukhtar-e-Mashriq Govt Degree Grils College Jamshed Road No.2", quote: "15. Dukhtar-e-Mashriq Govt Degree Grils College Jamshed Road No.2 Jamshed Road No 2 karachi Ph:-034912552"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2232, name: "DUKHTAR E MASHRIQ GOVT. DEGREE GIRLS COLLEGE", city: "Karachi East", source_quote: "DUKHTAR E MASHRIQ GOVT. DEGREE GIRLS COLLEGE KQ2232", claude_note: "Girls, Degree, Morning; 600 seats. SECCAP college code KQ2232."}
+    reason: "'Dukhtar-e-Mashriq Govt Degree Grils College' (typo) = 'DUKHTAR E MASHRIQ GOVT. DEGREE GIRLS COLLEGE'. 'Jamshed Road No.2' is part of the address (printed twice), not a college number. Karachi East, no conflict."
+  - verdict: same
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "37", name: "Govt. Degree Boys College, 9-E Baldia Town", quote: "37. Govt. Degree Boys College, 9-E Baldia Town Sector 9-E, Saeedabad, Baldia Town, Karachi. Ph# 32820149"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2339, name: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI", city: "KARACHI KEEMARI", source_quote: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI KQ2339", claude_note: "Boys, Intermediate, Morning; 201 seats. SECCAP college code KQ2339."}
+    reason: "Name, 'Sector 9-E' and 'Baldia Town' all printed on both sides; both boys degree. BIEK 41 (same phone) is Sector 4-E, so it is not this row."
+  - verdict: unclear
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "27", name: "Govt. College for Women, Shahrah-e-Liaquat", quote: "27. Govt. College for Women, Shahrah-e-Liaquat Shahrah-e-Liaquat, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "Same college name and road, both women, but the batch row is explicitly '(CAMPUS-II) AT PUNJABI CLUB' and no BIEK line prints Campus-II or Punjabi Club. BIEK 27 may be the main campus only. Do not alias without a source naming the campus. The other BIEK lines on Shahrah-e-Liaquat (152 S.M. Govt. Science College, private 165 Adamjee Model School) are other names."
+check1_different_pairs:
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "4", name: "Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society", quote: "4. Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: 99204736"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2193, name: "AISHA BAWANI GOVT COLLEGE EVENING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE EVENING KQ2193", claude_note: "Boys, Degree, Evening; 354 seats. SECCAP college code KQ2193."}
+    reason: "BIEK No.1 (its evening sibling is line 5, No.2) vs batch EVENING."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "5", name: "Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society", quote: "5. Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: Nil"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2173, name: "AISHA BAWANI GOVT COLLEGE MORNING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE MORNING KQ2173", claude_note: "Boys, Intermediate, Morning; 504 seats. SECCAP college code KQ2173."}
+    reason: "BIEK prints (Evening); batch prints MORNING."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "7", name: "Aisha Bawany Girls College(Inermediate)", quote: "7. Aisha Bawany Girls College(Inermediate) 185, Main Shahrah-e-Faisal, Karachi Ph: 35216624"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2173, name: "AISHA BAWANI GOVT COLLEGE MORNING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE MORNING KQ2173", claude_note: "Boys, Intermediate, Morning; 504 seats. SECCAP college code KQ2173."}
+    reason: "Private-list girls college at Main Shahrah-e-Faisal vs government college; different list and address."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "7", name: "Aisha Bawany Girls College(Inermediate)", quote: "7. Aisha Bawany Girls College(Inermediate) 185, Main Shahrah-e-Faisal, Karachi Ph: 35216624"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2193, name: "AISHA BAWANI GOVT COLLEGE EVENING", city: "Karachi East", source_quote: "AISHA BAWANI GOVT COLLEGE EVENING KQ2193", claude_note: "Boys, Degree, Evening; 354 seats. SECCAP college code KQ2193."}
+    reason: "Private-list girls college at Main Shahrah-e-Faisal vs government evening college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "4", name: "Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society", quote: "4. Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: 99204736"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-SB0479, name: "AISHA GIRLS DEGREE COLLEGE NAWABSHAH", city: "Shaheed Benazirabad", source_quote: "AISHA GIRLS DEGREE COLLEGE NAWABSHAH SB0479", claude_note: "Girls, Degree, Morning; 802 seats. SECCAP college code SB0479."}
+    reason: "Different name ('Aisha Bawany' vs 'Aisha Girls Degree College') and city (Nawabshah)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "7", name: "Aisha Bawany Girls College(Inermediate)", quote: "7. Aisha Bawany Girls College(Inermediate) 185, Main Shahrah-e-Faisal, Karachi Ph: 35216624"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-SB0479, name: "AISHA GIRLS DEGREE COLLEGE NAWABSHAH", city: "Shaheed Benazirabad", source_quote: "AISHA GIRLS DEGREE COLLEGE NAWABSHAH SB0479", claude_note: "Girls, Degree, Morning; 802 seats. SECCAP college code SB0479."}
+    reason: "Karachi private college vs Nawabshah government college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "6", name: "Allama Iqbal Govt. Boys Science College No.1 Model Colny", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2163, name: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163", claude_note: "Boys, Degree, Evening; 902 seats. SECCAP college code KQ2163."}
+    reason: "Boys Science College No.1 vs Degree Arts and Commerce College No.02."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "6", name: "Allama Iqbal Govt. Boys Science College No.1 Model Colny", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2167, name: "ALLAMA IQBAL GOVT GIRLS COLLEGE", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT GIRLS COLLEGE KQ2167", claude_note: "Girls, Degree, Morning; 1,104 seats. SECCAP college code KQ2167."}
+    reason: "Boys vs girls."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "7", name: "Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening)", quote: "7. Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening) Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2150, name: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING KQ2150", claude_note: "Boys, Intermediate, Morning; 1,006 seats. SECCAP college code KQ2150."}
+    reason: "Arts & Commerce No.2 (Evening) vs Boys Science College MORNING."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "7", name: "Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening)", quote: "7. Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening) Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2167, name: "ALLAMA IQBAL GOVT GIRLS COLLEGE", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT GIRLS COLLEGE KQ2167", claude_note: "Girls, Degree, Morning; 1,104 seats. SECCAP college code KQ2167."}
+    reason: "Arts & Commerce No.2 (Evening) vs a girls college; name and number differ."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "8", name: "Allama Iqbal Govt. Girls Degree College shah Faisal", quote: "8. Allama Iqbal Govt. Girls Degree College shah Faisal ST-14, Block-2, Shah Faisal, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2150, name: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING KQ2150", claude_note: "Boys, Intermediate, Morning; 1,006 seats. SECCAP college code KQ2150."}
+    reason: "Girls vs boys."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "8", name: "Allama Iqbal Govt. Girls Degree College shah Faisal", quote: "8. Allama Iqbal Govt. Girls Degree College shah Faisal ST-14, Block-2, Shah Faisal, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2163, name: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163", claude_note: "Boys, Degree, Evening; 902 seats. SECCAP college code KQ2163."}
+    reason: "Girls vs boys; no number on BIEK 8."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "164", name: "Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth", quote: "164. Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth Block 16 F.B. Area Karahi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2150, name: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT BOYS SCIENCE COLLEGE MORNING KQ2150", claude_note: "Boys, Intermediate, Morning; 1,006 seats. SECCAP college code KQ2150."}
+    reason: "A higher secondary school near Sohrab Goth, F.B. Area vs a science college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "164", name: "Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth", quote: "164. Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth Block 16 F.B. Area Karahi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2163, name: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163", claude_note: "Boys, Degree, Evening; 902 seats. SECCAP college code KQ2163."}
+    reason: "Higher secondary school vs degree arts & commerce college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "164", name: "Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth", quote: "164. Allama Iqbal Govt. Boys Higher Secondary School near Sohrab Goth Block 16 F.B. Area Karahi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2167, name: "ALLAMA IQBAL GOVT GIRLS COLLEGE", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT GIRLS COLLEGE KQ2167", claude_note: "Girls, Degree, Morning; 1,104 seats. SECCAP college code KQ2167."}
+    reason: "Boys school vs girls college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "10", name: "APWA Govt. Girls Higher Secondary School, Liaquatabad", quote: "10. APWA Govt. Girls Higher Secondary School, Liaquatabad S.M Tufiq Road Near, Super Market,Liaquatabad, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2158, name: "APWA GOVT.COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "APWA GOVT.COLLEGE FOR WOMEN KQ2158", claude_note: "Girls, Degree, Morning; 2,358 seats. SECCAP college code KQ2158."}
+    reason: "Girls Higher Secondary School, Liaquatabad vs college for women; BIEK 9 is the college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "65", name: "Govt. Degree Girls College Green Belt, Mehmoodabad PECHS Block 6", quote: "65. Govt. Degree Girls College Green Belt, Mehmoodabad PECHS Block 6 Green Belt, Mehmoodabad, PECHS, Block-6 Karachi. Ph 35452791 / 0300-2110923"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "'Govt. Degree Girls College Green Belt, Mehmoodabad' shares only 'PECHS' in the address; different name."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "145", name: "PECHS Education Foundation Govt. Degree Science College, Kashmir Road", quote: "145. PECHS Education Foundation Govt. Degree Science College, Kashmir Road 161 - 162-M, Block-3, PECHS, Opp: Kashmir Road, Karachi-29. Ph # 34558413"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "'PECHS Education Foundation Govt. Degree Science College' vs 'BAMM PECHS Govt College for Women'; different name."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "34", name: "College of Accounting and Management Science PECHS Campus", quote: "34. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi Ph: 37238551"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "Private College of Accounting and Management Science vs government women's college; only 'PECHS' shared."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "42", name: "College of Accounting and Management Science PECHS Campus", quote: "42. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "As private 34 (its duplicate)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "87", name: "Meritorious Science College PECHS", quote: "87. Meritorious Science College PECHS 71-K, Block-2, PECHS, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "Private 'Meritorious Science College PECHS'; different name and sector."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "121", name: "Tabani’s College, PECHS", quote: "121. Tabani’s College, PECHS 187-P, 188-N Block-2, PECHS, Near PECHS Girls College, Ph: 111-064-065"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "Private 'Tabani's College, PECHS'; different name and sector."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "172", name: "A.L.K. College PECHS", quote: "172. A.L.K. College PECHS Street 183 D Block 2 PECHS Near Jheel Park Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2207, name: "BAMM PECHS GOVT COLLEGE FOR WOMEN", city: "Karachi East", source_quote: "BAMM PECHS GOVT COLLEGE FOR WOMEN KQ2207", claude_note: "Girls, Degree, Morning; 1,504 seats. SECCAP college code KQ2207."}
+    reason: "Private 'A.L.K. College PECHS'; different name and sector."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "152", name: "S.M. Govt. Science College", quote: "152. S.M. Govt. Science College Sindh Madrasah Compound, Shahrah-e-Liaquat, Karachi. 99217505"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2194, name: "D.J SINDH GOVT SCIENCE COLLEGE", city: "Karachi South", source_quote: "D.J SINDH GOVT SCIENCE COLLEGE KQ2194", claude_note: "Boys, Degree, Morning; 1,802 seats. SECCAP college code KQ2194."}
+    reason: "S.M. Govt. Science College (Sindh Madrasah Compound) vs D.J. Sindh Govt. Science College; different name."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "152", name: "S.M. Govt. Science College", quote: "152. S.M. Govt. Science College Sindh Madrasah Compound, Shahrah-e-Liaquat, Karachi. 99217505"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "S.M. Govt. Science College vs Govt College for Women Campus-II; only the road is shared."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "41", name: "Govt. Degree Boys College, Baldia Town", quote: "41. Govt. Degree Boys College, Baldia Town Sector 4-E, Saeedabad, Baldia Town, Karachi. Ph# 32820149"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2339, name: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI", city: "KARACHI KEEMARI", source_quote: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI KQ2339", claude_note: "Boys, Intermediate, Morning; 201 seats. SECCAP college code KQ2339."}
+    reason: "Same name stem and phone as BIEK 37, but BIEK 41 prints Sector 4-E and the batch prints Sector 9-E."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "91", name: "Govt. Girls Degree Science & Arts College, Saeedabad, Baldia Town", quote: "91. Govt. Girls Degree Science & Arts College, Saeedabad, Baldia Town Sector B-3, Saeedabad, Baldia Town, Karachi.Ph: 32818498-99"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2339, name: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI", city: "KARACHI KEEMARI", source_quote: "GOVERNMENT DEGREE BOYS COLLEGE, SECTOR 9-E, BALDIA TOWN, KARACHI KQ2339", claude_note: "Boys, Intermediate, Morning; 201 seats. SECCAP college code KQ2339."}
+    reason: "Girls degree science & arts college vs boys degree college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "129", name: "Haji Abdullah Haroon Govt. College, No.1, (Morning) Khadda Market , Lyari", quote: "129. Haji Abdullah Haroon Govt. College, No.1, (Morning) Khadda Market , Lyari Shah Wali Ullah Road, Khadda Market, Lyari, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2215, name: "ABDULLAH GOVT. COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "ABDULLAH GOVT. COLLEGE FOR WOMEN KQ2215", claude_note: "Girls, Degree, Morning; 2,706 seats. SECCAP college code KQ2215."}
+    reason: "'Haji Abdullah Haroon Govt. College' (Lyari, Morning) vs 'Abdullah Govt. College for Women'; different name."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "130", name: "Haji Abdullah Haroon Govt. College,No. 2 (Evening) Khadda Market, Lyari", quote: "130. Haji Abdullah Haroon Govt. College,No. 2 (Evening) Khadda Market, Lyari Shah Wali Ullah Road, Khadda Market, Lyari, Karachi. Ph # 37526728"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2215, name: "ABDULLAH GOVT. COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "ABDULLAH GOVT. COLLEGE FOR WOMEN KQ2215", claude_note: "Girls, Degree, Morning; 2,706 seats. SECCAP college code KQ2215."}
+    reason: "Haji Abdullah Haroon Evening college vs Abdullah College for Women."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "115", name: "Sir Adamjee Institute", quote: "115. Sir Adamjee Institute ST-11 A, Hussainabad, Block-2,F.B. Area, Karachi. Ph: 36376231-6"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2172, name: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI", city: "Karachi East", source_quote: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI KQ2172", claude_note: "Boys, Degree, Morning; 1,100 seats. SECCAP college code KQ2172."}
+    reason: "Private 'Sir Adamjee Institute' vs the government science college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "165", name: "Adamjee Model School & College (Higher Secondary)", quote: "165. Adamjee Model School & College (Higher Secondary) M 18 Shahrah e Liaquat Akbar Road Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2172, name: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI", city: "Karachi East", source_quote: "ADAMJEE GOVT. SCIENCE COLLEGE KARACHI KQ2172", claude_note: "Boys, Degree, Morning; 1,100 seats. SECCAP college code KQ2172."}
+    reason: "Private 'Adamjee Model School & College' at Shahrah-e-Liaquat vs government science college at Business Recorder Road."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "24", name: "Govt. City College, No.1, Moosa Colony", quote: "24. Govt. City College, No.1, Moosa Colony Moosa Colony, Behind Ziauddin Hospital PH # 99246090"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-HB0726, name: "GOVERNMENT CITY COLLEGE HYDERABAD", city: "Hyderabad", source_quote: "GOVERNMENT CITY COLLEGE HYDERABAD HB0726", claude_note: "Boys, Degree, Morning; 1,250 seats. SECCAP college code HB0726."}
+    reason: "Govt. City College, Moosa Colony (Karachi) vs Government City College Hyderabad."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "25", name: "Govt. City College No.2 (Evening), Moosa Colony", quote: "25. Govt. City College No.2 (Evening), Moosa Colony Moosa Colony, Behind Ziauddin Hospital, Karachi. Ph.# 99206090"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-HB0726, name: "GOVERNMENT CITY COLLEGE HYDERABAD", city: "Hyderabad", source_quote: "GOVERNMENT CITY COLLEGE HYDERABAD HB0726", claude_note: "Boys, Degree, Morning; 1,250 seats. SECCAP college code HB0726."}
+    reason: "Karachi evening college vs Hyderabad college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "116", name: "South City College", quote: "116. South City College 50 M, Block-6, PECHS, Karachi."}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-HB0726, name: "GOVERNMENT CITY COLLEGE HYDERABAD", city: "Hyderabad", source_quote: "GOVERNMENT CITY COLLEGE HYDERABAD HB0726", claude_note: "Boys, Degree, Morning; 1,250 seats. SECCAP college code HB0726."}
+    reason: "Private 'South City College' (PECHS) vs Hyderabad government college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "169", name: "Govt. College of Physical Education", quote: "169. Govt. College of Physical Education Uiversity Road Gulilhan e Iqbal Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-SY0517, name: "GOVERNMENT COLLEGE OF EDUCATION SUKKUR", city: "Sukkur", source_quote: "GOVERNMENT COLLEGE OF EDUCATION SUKKUR SY0517", claude_note: "Co-education, Degree, Morning; seats not announced. SECCAP college code SY0517."}
+    reason: "College of Physical Education, Karachi vs College of Education, Sukkur."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "4", name: "Aga Khan Higher Secondary School(Evening Shift)", quote: "4. Aga Khan Higher Secondary School(Evening Shift) 1-5/B-VII, Karimabad, F.B. Area,Block-7, Karachi. Ph: 36826751-9"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-203, name: "Aga Khan University", city: "Karachi", source_quote: "data-position=\"Aga Khan University\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Higher secondary school (evening shift) vs Aga Khan University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "5", name: "Aga Khan Higher Secondary School, (Morning Shift)", quote: "5. Aga Khan Higher Secondary School, (Morning Shift) 1-5/B-VII, Karimabad, F.B. Area, Block-7, Karachi. Ph: 36826751-9 0333-3366892"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-203, name: "Aga Khan University", city: "Karachi", source_quote: "data-position=\"Aga Khan University\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Higher secondary school (morning shift) vs Aga Khan University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "4", name: "Aga Khan Higher Secondary School(Evening Shift)", quote: "4. Aga Khan Higher Secondary School(Evening Shift) 1-5/B-VII, Karimabad, F.B. Area,Block-7, Karachi. Ph: 36826751-9"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-BRD-030, name: "Aga Khan University Examination Board (AKU-EB)", city: "", source_quote: "[...](https://examinationboard.aku.edu/Pages/home.aspx/) AKU-EB", claude_note: "Listed under 'Other Boards'. [v2 2026-11-03 match] Live read of IBCC forum members page 2026-11-03: entry and link present as quoted ('[...]' stands for the logo image)."}
+    reason: "A school vs an examination board."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "128", name: "H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony", quote: "128. H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony P.I.B. Colony, Karachi. Ph.# 99333139 Fax:99232046"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-203, name: "Aga Khan University", city: "Karachi", source_quote: "data-position=\"Aga Khan University\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Government girls arts & commerce college, PIB Colony vs Aga Khan University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "21", name: "Bahria College Karsaz,", quote: "21. Bahria College Karsaz, Habib Ibrahim Rehmatuulah Road, Karsaz,"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "An intermediate college (Karsaz) vs Bahria University; different institution type and name."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "22", name: "Bahria College, M.T.Khan Road", quote: "22. Bahria College, M.T.Khan Road Nore-1, M.T. Khan Road, Karachi."}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria College, M.T. Khan Road vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "23", name: "Bahria Foundation College, Gulshan-e-Iqbal", quote: "23. Bahria Foundation College, Gulshan-e-Iqbal E-115, 118, Main Abul Hasan Isphahani Road, Block-7, Gulshan-e-Iqbal, Karachi,"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria Foundation College vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "24", name: "Bahria Foundation College, Nazimabad", quote: "24. Bahria Foundation College, Nazimabad 4E, 11/8, Nazimabad No. IV, Karachi"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria Foundation College vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "25", name: "Bahria Model College Karim NCRE", quote: "25. Bahria Model College Karim NCRE Karim NCRE, Near Navy Flats, Maripur Road Agra Taj Colony, Lyari, Karachi. Ph:32534571, 32500419 Fax: 32534571"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria Model College vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "26", name: "Bharia College, DHA Campus", quote: "26. Bharia College, DHA Campus Near PN Shifa Korangi Road DHA Phase-II, Karachi, Ph: 021-48506614"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "'Bharia College, DHA Campus' vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "27", name: "Bahria College EAB-I Majeed Campus", quote: "27. Bahria College EAB-I Majeed Campus Bahria College EAB-I Majeed Campus Stadium Road Near Dalmia Karachi Ph: 48503374-34680530"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria College EAB-I Majeed Campus vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "64", name: "Haroon Bahria Intemediate College for Boys & Girls", quote: "64. Haroon Bahria Intemediate College for Boys & Girls SK Sector-4, Haroon Bahria Co-operative Housing Society Hub River Road, Naval Colony, Karachi. Ph: 32818770, 32036821"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Haroon Bahria Intermediate College (Haroon Bahria housing society) vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "155", name: "Bahria College Khalid Campus", quote: "155. Bahria College Khalid Campus Khalid SRE Younusabad, Karachi"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-BAHRIA, name: "Bahria University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "Bahria College Khalid Campus vs Bahria University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "28", name: "Baqai Cadet College (Higher Secondary)", quote: "28. Baqai Cadet College (Higher Secondary) MC-213, Deh Conkar, Gadap Road,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-207, name: "Baqai Medical University", city: "Karachi", source_quote: "data-position=\"Baqai Medical University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Baqai Cadet College (Higher Secondary) vs Baqai Medical University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "26", name: "Bharia College, DHA Campus", quote: "26. Bharia College, DHA Campus Near PN Shifa Korangi Road DHA Phase-II, Karachi, Ph: 021-48506614"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-212, name: "DHA Suffa University", city: "Karachi", source_quote: "data-position=\"DHA Suffa University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Bahria college at DHA vs DHA Suffa University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "48", name: "DHA College & School System SKBZ Campus", quote: "48. DHA College & School System SKBZ Campus Khayaban-e-Rahat, Phase-VI, D.H.A., Karachi. Ph: 35845871 & 35341531-2"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-212, name: "DHA Suffa University", city: "Karachi", source_quote: "data-position=\"DHA Suffa University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "DHA College & School System campus vs DHA Suffa University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "50", name: "DHACSS Intermediate College", quote: "50. DHACSS Intermediate College Khayaban-e-Rahat, Phase-VI, Defence Housing Society, Karachi Ph: 35845970-35342844-45 Fax: 5846584 0300-9243104"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-212, name: "DHA Suffa University", city: "Karachi", source_quote: "data-position=\"DHA Suffa University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "DHACSS Intermediate College vs DHA Suffa University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "51", name: "Ziauddin Intermediate College", quote: "51. Ziauddin Intermediate College D-64, Block-H, Norht Nazimabad, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-284, name: "Zia-ud-Din University", city: "Karachi", source_quote: "data-position=\"Zia-ud-Din University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Ziauddin Intermediate College (North Nazimabad) vs Zia-ud-Din University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "51", name: "Ziauddin Intermediate College", quote: "51. Ziauddin Intermediate College D-64, Block-H, Norht Nazimabad, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-BRD-031, name: "Ziauddin University Examination Board", city: "", source_quote: "[...](https://zueb.edu.pk/) Ziauddin Board", claude_note: "Listed under 'Other Boards'. [v2 2026-11-03 match] Live read of IBCC forum members page 2026-11-03: entry and link present as quoted ('[...]' stands for the logo image)."}
+    reason: "A college vs an examination board."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "43", name: "Commecs College Gulistan-e-Jauhar", quote: "43. Commecs College Gulistan-e-Jauhar ST-9, Block-13, Scheme No. 36,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-211, name: "Commecs Institute of Business & Emerging Sciences", city: "Karachi", source_quote: "data-position=\"Commecs Institute of Business & Emerging Sciences\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "'Commecs College Gulistan-e-Jauhar' vs 'Commecs Institute of Business & Emerging Sciences': shared brand word only; the printed names differ and one is an intermediate college, the other an HEC-recognised institute."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "72", name: "Iqra Huffaz Boys College", quote: "72. Iqra Huffaz Boys College St-2/1, Block-T, North Nazimabad, Karachi Ph:36634125,36634128"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-231, name: "Iqra University", city: "Karachi", source_quote: "data-position=\"Iqra University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Iqra Huffaz Boys College vs Iqra University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "73", name: "Iqra Huffaz Girls College", quote: "73. Iqra Huffaz Girls College F-108, Block-B, North Nazimabad, Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-231, name: "Iqra University", city: "Karachi", source_quote: "data-position=\"Iqra University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Iqra Huffaz Girls College vs Iqra University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "78", name: "Jinnah Intermediate College", quote: "78. Jinnah Intermediate College Block 8-D, Nazimabad No.5, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-234, name: "Jinnah University for Women", city: "Karachi", source_quote: "data-position=\"Jinnah University for Women\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Jinnah Intermediate College vs Jinnah University for Women."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "134", name: "Jinnah Govt. College, Nazimzbad", quote: "134. Jinnah Govt. College, Nazimzbad 5-C, Nazimabad, Karachi. Ph.99260291-92 Mob:03456016336"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-234, name: "Jinnah University for Women", city: "Karachi", source_quote: "data-position=\"Jinnah University for Women\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Jinnah Govt. College, Nazimabad vs Jinnah University for Women."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "153", name: "S.M.B. Fatima Jinnah Govt. Girls Degree College, Garden", quote: "153. S.M.B. Fatima Jinnah Govt. Girls Degree College, Garden Nishter Road, Near Zoological, Garden Karachi. Ph# 99215693, FAX # 99215574"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-234, name: "Jinnah University for Women", city: "Karachi", source_quote: "data-position=\"Jinnah University for Women\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "S.M.B. Fatima Jinnah Govt. Girls Degree College vs Jinnah University for Women."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "89", name: "Metropolitan Girls College", quote: "89. Metropolitan Girls College C-10, Block-20, F.B. Area, Karachi,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-243, name: "Metropolitan University Karachi", city: "Karachi", source_quote: "data-position=\"Metropolitan University Karachi\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Metropolitan Girls College (F.B. Area) vs Metropolitan University Karachi."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "128", name: "The Metropolitan Intermediate College, Gulistan-e-Jauhar", quote: "128. The Metropolitan Intermediate College, Gulistan-e-Jauhar Block-15, Street-18, Gulistan-e-Jauhar, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-243, name: "Metropolitan University Karachi", city: "Karachi", source_quote: "data-position=\"Metropolitan University Karachi\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "The Metropolitan Intermediate College vs Metropolitan University Karachi."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "89", name: "Metropolitan Girls College", quote: "89. Metropolitan Girls College C-10, Block-20, F.B. Area, Karachi,"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-MED-06, name: "Karachi Metropolitan University (KMDC)", city: "", source_quote: "| 06 | Karachi Metropolitan University (KMDC) |", claude_note: "Listed in the Government of Sindh MBBS/BDS prospectus 2026-27 table of contents. [v2 2026-11-03 match] Name row present verbatim in the 2026-27 prospectus table of contents (live read 2026-11-03)."}
+    reason: "Girls college vs Karachi Metropolitan University (KMDC)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "97", name: "PAF Intermediate College Masroor Karachi", quote: "97. PAF Intermediate College Masroor Karachi Pakistan Air Force Base Masroor, Gulbai Maripur, Kemari Town, Karachi Ph: 99525501"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-248, name: "PAF Air War College Institute, Karachi", city: "Karachi", source_quote: "data-position=\"PAF Air War College Institute, Karachi\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "PAF Intermediate College Masroor vs PAF Air War College Institute."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "173", name: "Hamdard Intermeaiate College for Science & Commerce", quote: "173. Hamdard Intermeaiate College for Science & Commerce Allama Rasheed Turabi Road Block H North Nazimabad Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-222, name: "Hamdard University", city: "Karachi", source_quote: "data-position=\"Hamdard University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Hamdard Intermediate College for Science & Commerce vs Hamdard University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "159", name: "Sindh Madarsa-tul-Islam Higher Secondary School", quote: "159. Sindh Madarsa-tul-Islam Higher Secondary School Aiwan-e- Tijarat Road Karachi. PH: 021-99211278"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-268, name: "Sindh Madresatul Islam University", city: "Karachi", source_quote: "data-position=\"Sindh Madresatul Islam University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Sindh Madarsa-tul-Islam Higher Secondary School vs Sindh Madresatul Islam University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "152", name: "S.M. Govt. Science College", quote: "152. S.M. Govt. Science College Sindh Madrasah Compound, Shahrah-e-Liaquat, Karachi. 99217505"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-268, name: "Sindh Madresatul Islam University", city: "Karachi", source_quote: "data-position=\"Sindh Madresatul Islam University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "S.M. Govt. Science College (in the Sindh Madrasah compound) vs the university; government college vs university."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "104", name: "Govt. Girls Higher Secondary School University Campus", quote: "104. Govt. Girls Higher Secondary School University Campus University Campus, University Road, Karachi Ph: 0302-2797780"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-280, name: "University of Karachi", city: "Karachi", source_quote: "data-position=\"University of Karachi\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. Girls Higher Secondary School, University Campus vs University of Karachi."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "143", name: "Nusrat Bhutto Govt. Degree Boys College, Lyari.", quote: "143. Nusrat Bhutto Govt. Degree Boys College, Lyari. Shah Waliullah Road, Niazi Chowk UC-02 Lyari Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-209, name: "Benazir Bhutto Shaheed University Lyari", city: "Karachi", source_quote: "data-position=\"Benazir Bhutto Shaheed University Lyari\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Nusrat Bhutto Govt. Degree Boys College, Lyari vs Benazir Bhutto Shaheed University Lyari."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "154", name: "Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari", quote: "154. Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari Mewa Shah Road, New Kumhar Wara Gareeb Shah Road, Liyari,Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-209, name: "Benazir Bhutto Shaheed University Lyari", city: "Karachi", source_quote: "data-position=\"Benazir Bhutto Shaheed University Lyari\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college, Liyari vs a university in Lyari."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "154", name: "Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari", quote: "154. Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari Mewa Shah Road, New Kumhar Wara Gareeb Shah Road, Liyari,Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-MED-09, name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari", city: "", source_quote: "| 09 | Shaheed Mohtarma Benazir Bhutto Medical College, Lyari |", claude_note: "Listed in the Government of Sindh MBBS/BDS prospectus 2026-27 table of contents. [v2 2026-11-03 match] Name row present verbatim in the 2026-27 prospectus table of contents (live read 2026-11-03)."}
+    reason: "Girls degree college vs a medical college."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "156", name: "Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony", quote: "156. Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony Azam Basti, Near Manzoor Colony, Karachi. Ph # 0322-2978391, 0322-2978351"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-MED-09, name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari", city: "", source_quote: "| 09 | Shaheed Mohtarma Benazir Bhutto Medical College, Lyari |", claude_note: "Listed in the Government of Sindh MBBS/BDS prospectus 2026-27 table of contents. [v2 2026-11-03 match] Name row present verbatim in the 2026-27 prospectus table of contents (live read 2026-11-03)."}
+    reason: "Girls degree college, Manzoor Colony vs medical college, Lyari."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "156", name: "Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony", quote: "156. Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony Azam Basti, Near Manzoor Colony, Karachi. Ph # 0322-2978391, 0322-2978351"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-258, name: "Shaheed Benazir Bhutto City University", city: "Karachi", source_quote: "data-position=\"Shaheed Benazir Bhutto City University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college vs Shaheed Benazir Bhutto City University."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "157", name: "Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town", quote: "157. Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town Sector 16-E, Gulshan-e-Bihar, Orangi Town, Karachi. Ph# 36611756, 36619341 Mob:0300-3682262"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-263, name: "Shaheed Zulfikar Ali Bhutto Institute of Science & Technology", city: "Karachi", source_quote: "data-position=\"Shaheed Zulfikar Ali Bhutto Institute of Science & Technology\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Boys degree college, Orangi vs SZABIST."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "157", name: "Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town", quote: "157. Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town Sector 16-E, Gulshan-e-Bihar, Orangi Town, Karachi. Ph# 36611756, 36619341 Mob:0300-3682262"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-264, name: "Shaheed Zulfiqar Ali Bhutto University of Law", city: "Karachi", source_quote: "data-position=\"Shaheed Zulfiqar Ali Bhutto University of Law\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Boys degree college vs SZABU (law university)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-government-colleges, key: "160", name: "Sir Syed Govt. Girls College, Nazimabad", quote: "160. Sir Syed Govt. Girls College, Nazimabad Altaf Ali Brailivy Road,1st Chorangi, Nazimabad, Karachi. Ph.99260243 Mob:0302-2949537"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-269, name: "Sir Syed University of Engineering & Technology", city: "Karachi", source_quote: "data-position=\"Sir Syed University of Engineering & Technology\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Sir Syed Govt. Girls College vs Sir Syed University of Engineering & Technology."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "62", name: "Gulistan Shah Abdul Latif Boys Higher Seconday School", quote: "62. Gulistan Shah Abdul Latif Boys Higher Seconday School Sub Block-A, Block-B, Sindhi Muslim"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-256, name: "Shah Abdul Latif University", city: "Khairpur", source_quote: "data-position=\"Shah Abdul Latif University\" … charteredby=\"Government of Sindh\" city=\"Khairpur\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Gulistan Shah Abdul Latif Boys HSS (Karachi) vs Shah Abdul Latif University (Khairpur)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "63", name: "Gulistan Shah Abdul Latif Girls Higher Seconday School", quote: "63. Gulistan Shah Abdul Latif Girls Higher Seconday School Sub Block-B, Block-A, Ghulam Ali Memon Road Sindhi Muslim Co-operative Housing Society, Karachi, Ph:34531675"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-256, name: "Shah Abdul Latif University", city: "Khairpur", source_quote: "data-position=\"Shah Abdul Latif University\" … charteredby=\"Government of Sindh\" city=\"Khairpur\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls HSS (Karachi) vs Shah Abdul Latif University (Khairpur)."
+  - verdict: different
+    agrees_with_check1: yes
+    biek: {list_id: biek-affiliated-private-colleges, key: "85", name: "Mehran Degree College", quote: "85. Mehran Degree College C-116, Block-6, F.B.Area, Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-242, name: "Mehran University of Engineering & Technology", city: "Khairpur", source_quote: "data-position=\"Mehran University of Engineering & Technology\" … charteredby=\"Government of Sindh\" city=\"Khairpur\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Mehran Degree College, F.B. Area vs Mehran University of Engineering & Technology."
+biek_internal_duplicates:
+  - verdict: same
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-private-colleges, key: "34", name: "College of Accounting and Management Science PECHS Campus", quote: "34. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi Ph: 37238551"}
+    b: {list_id: biek-affiliated-private-colleges, key: "42", name: "College of Accounting and Management Science PECHS Campus", quote: "42. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi"}
+    reason: "Identical name and identical address '175-P Block -2 PECHS Karachi'; line 42 only lacks the phone. Nothing printed separates them. One entity; line 42 is a duplicate list line."
+  - verdict: same
+    agrees_with_check1: no
+    a: {list_id: biek-affiliated-government-colleges, key: "95", name: "Govt. Higher Secondary School, Kathore", quote: "95. Govt. Higher Secondary School, Kathore Kamal Khan Jakhio, Kathore, Gadap Town, Karachi Ph # 02134484002/ 0333_2181938"}
+    b: {list_id: biek-affiliated-government-colleges, key: "181", name: "Govt. Higher Secondary School, Kathore Gadap", quote: "181. Govt. Higher Secondary School, Kathore Gadap Kamal Khan Jakhio, Kathore, Gadap Town, Karachi"}
+    reason: "Same address string 'Kamal Khan Jakhio, Kathore, Gadap Town, Karachi'. The only name difference is the word 'Gadap', which is already the town in both addresses. No gender, shift, medium or number is printed to separate them, unlike the real same-site pairs on this list (101/102 S.M/U.M, 4/5 No.1/No.2, 137/138). Line 181 lacks the phone, the same pattern as private 34/42. I judge it one school listed twice. Disagree with check 1's unclear; if the loader wants zero risk, keep as unclear-but-probably-same."
+  - verdict: unclear
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-private-colleges, key: "48", name: "DHA College & School System SKBZ Campus", quote: "48. DHA College & School System SKBZ Campus Khayaban-e-Rahat, Phase-VI, D.H.A., Karachi. Ph: 35845871 & 35341531-2"}
+    b: {list_id: biek-affiliated-private-colleges, key: "50", name: "DHACSS Intermediate College", quote: "50. DHACSS Intermediate College Khayaban-e-Rahat, Phase-VI, Defence Housing Society, Karachi Ph: 35845970-35342844-45 Fax: 5846584 0300-9243104"}
+    reason: "Same address 'Khayaban-e-Rahat, Phase-VI, D.H.A./Defence Housing Society', and 'DHACSS' reads like the initials of 'DHA College & School System', but the printed names differ ('SKBZ Campus' vs 'Intermediate College') and the phone numbers differ (35845871 / 35341531-2 vs 35845970 / 35342844-45). A school-system campus and its separately registered intermediate college at one site is not ruled out. A third line, private 49 'DHACSS College for Women (Intermediate)', is at Khayaban-e-Ghalib, so DHACSS runs more than one college."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "4", name: "Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society", quote: "4. Aisha Bawany Govt. College No.1, Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: 99204736"}
+    b: {list_id: biek-affiliated-government-colleges, key: "5", name: "Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society", quote: "5. Aisha Bawany Govt. College No.2, (Evening) Sindhi Muslim Housing Society Sindhi Muslim Housing Society Block -B Rehmat Ali Road Near Masjid Molana Rumi Karachi PH: Nil"}
+    reason: "No.1 vs No.2 (Evening), same address."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "6", name: "Allama Iqbal Govt. Boys Science College No.1 Model Colny", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    b: {list_id: biek-affiliated-government-colleges, key: "7", name: "Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening)", quote: "7. Allama Iqbal Govt. Degree Arts & Commerce College No.2 (Evening) Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    reason: "Different names (Boys Science College No.1 vs Degree Arts & Commerce College No.2 (Evening)), same address and phone."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "31", name: "Govt. College of Commerce & Economics,No-1 Polo Ground", quote: "31. Govt. College of Commerce & Economics,No-1 Polo Ground Dr. Ziauddin Ahmed Road, Opp: Polo Ground ,Karachi. Ph # 99204778 0300_2235150"}
+    b: {list_id: biek-affiliated-government-colleges, key: "32", name: "Govt. College of Commerce & Economics, No-2 Polo Ground(Evening)", quote: "32. Govt. College of Commerce & Economics, No-2 Polo Ground(Evening) Dr. Ziauddin Ahmed Road, Opp: Polo Ground ,Karachi. Ph # 99204778 0300_2235150"}
+    reason: "No-1 vs No-2 (Evening)."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "115", name: "Govt. Islamia Arts & Commerce College, No 1 (Morning)", quote: "115. Govt. Islamia Arts & Commerce College, No 1 (Morning) Jigar Muradabadi Road off M.A. Jinnah Road, Karachi. Ph # 99231207"}
+    b: {list_id: biek-affiliated-government-colleges, key: "116", name: "Govt. Islamia Arts & Commerce College, No 2 (Evening)", quote: "116. Govt. Islamia Arts & Commerce College, No 2 (Evening) Jigar Muradabadi Road off M.A. Jinnah Road, Karachi. Ph # 99239336"}
+    reason: "No 1 (Morning) vs No 2 (Evening); different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "129", name: "Haji Abdullah Haroon Govt. College, No.1, (Morning) Khadda Market , Lyari", quote: "129. Haji Abdullah Haroon Govt. College, No.1, (Morning) Khadda Market , Lyari Shah Wali Ullah Road, Khadda Market, Lyari, Karachi."}
+    b: {list_id: biek-affiliated-government-colleges, key: "130", name: "Haji Abdullah Haroon Govt. College,No. 2 (Evening) Khadda Market, Lyari", quote: "130. Haji Abdullah Haroon Govt. College,No. 2 (Evening) Khadda Market, Lyari Shah Wali Ullah Road, Khadda Market, Lyari, Karachi. Ph # 37526728"}
+    reason: "No.1 (Morning) vs No.2 (Evening)."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "137", name: "Liaquat Govt. College No.2 (Evening), Malir Kala Board", quote: "137. Liaquat Govt. College No.2 (Evening), Malir Kala Board Main Begum Khursheed Road, Near Moeen abad Bus Stop, Malir, Kala Board, Karachi. Ph.34112300 0333_2221559/0300-3482659"}
+    b: {list_id: biek-affiliated-government-colleges, key: "138", name: "Liaquat Govt. Girls College No.1, Malir Kala Board", quote: "138. Liaquat Govt. Girls College No.1, Malir Kala Board Main Begum Khursheed Road, Near Moeen abad Bus Stop, Malir, Kala Board, Karachi. Ph.34409001 0333-2221559/0300-2630183"}
+    reason: "'Liaquat Govt. College No.2 (Evening)' vs 'Liaquat Govt. Girls College No.1'; different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-private-colleges, key: "4", name: "Aga Khan Higher Secondary School(Evening Shift)", quote: "4. Aga Khan Higher Secondary School(Evening Shift) 1-5/B-VII, Karimabad, F.B. Area,Block-7, Karachi. Ph: 36826751-9"}
+    b: {list_id: biek-affiliated-private-colleges, key: "5", name: "Aga Khan Higher Secondary School, (Morning Shift)", quote: "5. Aga Khan Higher Secondary School, (Morning Shift) 1-5/B-VII, Karimabad, F.B. Area, Block-7, Karachi. Ph: 36826751-9 0333-3366892"}
+    reason: "Evening Shift vs Morning Shift."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-private-colleges, key: "119", name: "St. Patrick's College (Evening)", quote: "119. St. Patrick's College (Evening) Ahmed Muneer S.J. Shaheed Road, Saddar, Karachi. Ph: 32780487, 32790349-50"}
+    b: {list_id: biek-affiliated-private-colleges, key: "120", name: "St. Patrick's College(Morning)", quote: "120. St. Patrick's College(Morning) Ahmed Muneer S.J. Shaheed Road, Saddar, Karachi, Ph:. 32780487 / 32790349/32790350"}
+    reason: "(Evening) vs (Morning)."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "120", name: "Govt. National College No 1 Shaheed e Millat Road", quote: "120. Govt. National College No 1 Shaheed e Millat Road Shaheed-e-Millat Road, Karachi-5 Ph:-99231199"}
+    b: {list_id: biek-affiliated-government-colleges, key: "121", name: "Govt.NationalCollege No 2 Shaheed e Millat Road", quote: "121. Govt.NationalCollege No 2 Shaheed e Millat Road Shaheed-e-Millat Road, Karachi-5 Ph:-99231199"}
+    reason: "No 1 vs No 2; BIEK numbers them as two colleges."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "150", name: "S.M. Govt. Arts & Commerce College No.1", quote: "150. S.M. Govt. Arts & Commerce College No.1 Shahrah-e-Kamal Attaturk, Opp. Burns Garden, Karachi. Ph # 99212241, Mob:0345-6175424 FAX#.99213078"}
+    b: {list_id: biek-affiliated-government-colleges, key: "151", name: "S.M. Govt. Arts & Commerce College No.2", quote: "151. S.M. Govt. Arts & Commerce College No.2 Shahrah-e-Kamal Attaturk, Opp. Burns Garden, Karachi. Ph # 99213055"}
+    reason: "No.1 vs No.2; different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "122", name: "Govt. Premier College for Girls North Nazimabad, Block -H", quote: "122. Govt. Premier College for Girls North Nazimabad, Block -H Block-H, ST-7, North Nazimabad, Karachi. Ph # 99260227"}
+    b: {list_id: biek-affiliated-government-colleges, key: "124", name: "Govt. Premier College No.2, North Nazimabad, Block- H", quote: "124. Govt. Premier College No.2, North Nazimabad, Block- H Block-H, ST-7, North Nazimabad, Karachi. Ph # 36327488"}
+    reason: "'Premier College for Girls' vs 'Premier College No.2'; different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "101", name: "Govt. Girls Higher Secondary School (S.M) Chanasar Village Mehmoodabad", quote: "101. Govt. Girls Higher Secondary School (S.M) Chanasar Village Mehmoodabad Liaquat Ashraf Colony, Near Parsi Gate, Chanesar Village, Mehmoodabad Road, Karachi. Ph 0301-2749947"}
+    b: {list_id: biek-affiliated-government-colleges, key: "102", name: "Govt. Girls Higher Secondary School (U.M) Chanasar Village Mehmoodabad", quote: "102. Govt. Girls Higher Secondary School (U.M) Chanasar Village Mehmoodabad Liaquat Ashraf Colony, Near Parsi Gate, Chanesar Village, Mehmoodabad Road, Karachi. Ph 0322-2652883, 0324_4651099"}
+    reason: "(S.M) vs (U.M) at one site."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "36", name: "Govt. Degree Boys & Girls Science Arts & Commerce College, Murad Memon Goath", quote: "36. Govt. Degree Boys & Girls Science Arts & Commerce College, Murad Memon Goath Murad Memon Goth, Malir, Karachi.P.O Box No.75040, Ph # 34561456 Same Fax No. Mob: 0300-2609322 P.O.BOX 75040"}
+    b: {list_id: biek-affiliated-government-colleges, key: "109", name: "Govt. Girls Higher Secondary School, Murad Memon Goath", quote: "109. Govt. Girls Higher Secondary School, Murad Memon Goath Murad Memon Goth, Malir, Karachi. P.O.Box No.75040 Ph# 3450083 0300_2566121, 0301-8230923"}
+    reason: "Degree boys & girls college vs girls higher secondary school at one village."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "73", name: "Govt. Degree Girls College, PIB Colony", quote: "73. Govt. Degree Girls College, PIB Colony PIB Colony, Karachi. Ph # 99333010"}
+    b: {list_id: biek-affiliated-government-colleges, key: "128", name: "H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony", quote: "128. H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony P.I.B. Colony, Karachi. Ph.# 99333139 Fax:99232046"}
+    reason: "Two differently named girls colleges in PIB Colony; different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "135", name: "Khatoon-e-Pakistan Govt. Degree College, Stadium Road", quote: "135. Khatoon-e-Pakistan Govt. Degree College, Stadium Road Stadium Road, Karachi. Ph # 99270704 Fax No. 99231192"}
+    b: {list_id: biek-affiliated-government-colleges, key: "147", name: "Raana Liaquat Ali Khan Govt. College of Home Economics", quote: "147. Raana Liaquat Ali Khan Govt. College of Home Economics Stadium Road, Karachi.Ph # 99230703"}
+    reason: "Khatoon-e-Pakistan college vs Raana Liaquat Ali Khan college of home economics; different phones."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "92", name: "Govt. Girls Degree College, Gulshan e Hadeed", quote: "92. Govt. Girls Degree College, Gulshan e Hadeed Phase 2 Opp K-Electric Office Gulshan e Hadeed Karachi"}
+    b: {list_id: biek-affiliated-private-colleges, key: "139", name: "E-Complex, College of Science, Commerce and Arts", quote: "139. E-Complex, College of Science, Commerce and Arts Phase I, Gulshan-e-Hadeed Bin Qasim Karachi, 021-34716488"}
+    reason: "Government girls degree college vs private E-Complex college, both Gulshan-e-Hadeed."
+  - verdict: different
+    agrees_with_check1: yes
+    a: {list_id: biek-affiliated-government-colleges, key: "37", name: "Govt. Degree Boys College, 9-E Baldia Town", quote: "37. Govt. Degree Boys College, 9-E Baldia Town Sector 9-E, Saeedabad, Baldia Town, Karachi. Ph# 32820149"}
+    b: {list_id: biek-affiliated-government-colleges, key: "41", name: "Govt. Degree Boys College, Baldia Town", quote: "41. Govt. Degree Boys College, Baldia Town Sector 4-E, Saeedabad, Baldia Town, Karachi. Ph# 32820149"}
+    reason: "Sector 9-E vs Sector 4-E (same phone)."
+  - verdict: different
+    agrees_with_check1: n/a (not in check 1)
+    a: {list_id: biek-affiliated-government-colleges, key: "24", name: "Govt. City College, No.1, Moosa Colony", quote: "24. Govt. City College, No.1, Moosa Colony Moosa Colony, Behind Ziauddin Hospital PH # 99246090"}
+    b: {list_id: biek-affiliated-government-colleges, key: "25", name: "Govt. City College No.2 (Evening), Moosa Colony", quote: "25. Govt. City College No.2 (Evening), Moosa Colony Moosa Colony, Behind Ziauddin Hospital, Karachi. Ph.# 99206090"}
+    reason: "No.1 vs No.2 (Evening), Moosa Colony; different phones. Not listed by check 1; added for completeness."
+  - verdict: different
+    agrees_with_check1: n/a (not in check 1)
+    a: {list_id: biek-affiliated-government-colleges, key: "161", name: "Sirajuddaullah Govt. College (Morning) No.1", quote: "161. Sirajuddaullah Govt. College (Morning) No.1 Near Al-Azam Square, Federal Capital Area, Liaquatabad Town , Karachi Karach Ph.99246079"}
+    b: {list_id: biek-affiliated-government-colleges, key: "162", name: "Sirajuddaullah Govt. College (Evening) No.2", quote: "162. Sirajuddaullah Govt. College (Evening) No.2 Near Al-Azam Square, Federal Capital Area, Liaquatabad Town , Karachi. Ph.99246078 / 0314-2346992"}
+    reason: "(Morning) No.1 vs (Evening) No.2; different phones. Not listed by check 1."
+  - verdict: different
+    agrees_with_check1: n/a (not in check 1)
+    a: {list_id: biek-affiliated-government-colleges, key: "131", name: "Jamia Millia Govt. Degree College No.1, (Morning) Malir", quote: "131. Jamia Millia Govt. Degree College No.1, (Morning) Malir Iftikharuddin Danish Road. Malir, Karachi-23. Ph # 33449462"}
+    b: {list_id: biek-affiliated-government-colleges, key: "132", name: "Jamia Millia Govt.Degree College No.2, (Evening) Malir", quote: "132. Jamia Millia Govt.Degree College No.2, (Evening) Malir Malir, Karachi-23. Ph # 34402635 0300_9217587"}
+    reason: "Jamia Millia No.1 (Morning) vs No.2 (Evening). Not listed by check 1."
+  - verdict: different
+    agrees_with_check1: n/a (not in check 1)
+    a: {list_id: biek-affiliated-private-colleges, key: "55", name: "Fatimiyah College (Boys Campus)", quote: "55. Fatimiyah College (Boys Campus) Plot No.270, Britto Road,"}
+    b: {list_id: biek-affiliated-private-colleges, key: "56", name: "Fatimiyah College (Girls Campus)", quote: "56. Fatimiyah College (Girls Campus) Plot No.271, Britto Road, Near Numaish, Karachi. Ph: 32222451, 32221710 32233274"}
+    reason: "Fatimiyah College Boys Campus (Plot 270) vs Girls Campus (Plot 271). Not listed by check 1."
+  - verdict: different
+    agrees_with_check1: n/a (not in check 1)
+    a: {list_id: biek-affiliated-private-colleges, key: "134", name: "Usman Public School Campus-I", quote: "134. Usman Public School Campus-I ST-28, Sector 11-A, North Karachi, Karachi"}
+    b: {list_id: biek-affiliated-private-colleges, key: "135", name: "Usman Public School Campus-II (Secondary & Higher) Secondary)", quote: "135. Usman Public School Campus-II (Secondary & Higher) Secondary) ST-60, Sector 11-A, North Karachi, Karachi"}
+    reason: "Usman Public School Campus-I (ST-28) vs Campus-II (ST-60). Not listed by check 1."
+new_pairs_not_in_check1:
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "5", name: "Aga Khan Higher Secondary School, (Morning Shift)", quote: "5. Aga Khan Higher Secondary School, (Morning Shift) 1-5/B-VII, Karimabad, F.B. Area, Block-7, Karachi. Ph: 36826751-9 0333-3366892"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-BRD-030, name: "Aga Khan University Examination Board (AKU-EB)", city: "", source_quote: "[...](https://examinationboard.aku.edu/Pages/home.aspx/) AKU-EB", claude_note: "Listed under 'Other Boards'. [v2 2026-11-03 match] Live read of IBCC forum members page 2026-11-03: entry and link present as quoted ('[...]' stands for the logo image)."}
+    reason: "Aga Khan HSS (Morning Shift) vs the AKU examination board. Check 1 listed only the evening line against the board."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "97", name: "PAF Intermediate College Masroor Karachi", quote: "97. PAF Intermediate College Masroor Karachi Pakistan Air Force Base Masroor, Gulbai Maripur, Kemari Town, Karachi Ph: 99525501"}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-AIR, name: "Air University", city: "Islamabad", source_quote: "", claude_note: "Added to anchor new rows; HEC recognition not checked against the HEC list this session. chartered_by left blank."}
+    reason: "PAF Intermediate College Masroor vs Air University (Islamabad, multi-campus); match on 'Air' in the address only."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "93", name: "New Fazaia Intermediate College Malir Cantt.", quote: "93. New Fazaia Intermediate College Malir Cantt. PAF Base, Malir Cantt., Karachi,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-248, name: "PAF Air War College Institute, Karachi", city: "Karachi", source_quote: "data-position=\"PAF Air War College Institute, Karachi\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "New Fazaia Intermediate College Malir Cantt (address 'PAF Base') vs PAF Air War College Institute."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "94", name: "New Fazaia Intermediate College, Korangi Creek", quote: "94. New Fazaia Intermediate College, Korangi Creek PAF Base Korangi Creek,Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-248, name: "PAF Air War College Institute, Karachi", city: "Karachi", source_quote: "data-position=\"PAF Air War College Institute, Karachi\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "New Fazaia Intermediate College, Korangi Creek vs PAF Air War College Institute."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "95", name: "New Fazaia Intermediate College,Base Faisal", quote: "95. New Fazaia Intermediate College,Base Faisal PAF Base Faisal, Shahrah-e-Faisal, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-248, name: "PAF Air War College Institute, Karachi", city: "Karachi", source_quote: "data-position=\"PAF Air War College Institute, Karachi\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "New Fazaia Intermediate College, Base Faisal vs PAF Air War College Institute."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "110", name: "Govt. Girls Higher Secondary School, PAF Drigh Road", quote: "110. Govt. Girls Higher Secondary School, PAF Drigh Road P.A.F. Drigh Road Cantt Bazar, Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-248, name: "PAF Air War College Institute, Karachi", city: "Karachi", source_quote: "data-position=\"PAF Air War College Institute, Karachi\" … charteredby=\"Government of Pakistan\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. Girls HSS, PAF Drigh Road vs PAF Air War College Institute."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "88", name: "Metropolis Intermediate College for Girls", quote: "88. Metropolis Intermediate College for Girls C-42-43, Block-13, F.B. Area, Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-243, name: "Metropolitan University Karachi", city: "Karachi", source_quote: "data-position=\"Metropolitan University Karachi\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "'Metropolis Intermediate College for Girls' vs Metropolitan University Karachi; different word and type."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "89", name: "Metropolitan Girls College", quote: "89. Metropolitan Girls College C-10, Block-20, F.B. Area, Karachi,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-238, name: "Karachi Metropolitan University, Karachi", city: "Abbottabad", source_quote: "data-position=\"Karachi Metropolitan University, Karachi\" … charteredby=\"Government of Sindh\" city=\"Abbottabad\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Metropolitan Girls College vs Karachi Metropolitan University (row city printed as Abbottabad)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "128", name: "The Metropolitan Intermediate College, Gulistan-e-Jauhar", quote: "128. The Metropolitan Intermediate College, Gulistan-e-Jauhar Block-15, Street-18, Gulistan-e-Jauhar, Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-238, name: "Karachi Metropolitan University, Karachi", city: "Abbottabad", source_quote: "data-position=\"Karachi Metropolitan University, Karachi\" … charteredby=\"Government of Sindh\" city=\"Abbottabad\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "The Metropolitan Intermediate College vs Karachi Metropolitan University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "64", name: "Haroon Bahria Intemediate College for Boys & Girls", quote: "64. Haroon Bahria Intemediate College for Boys & Girls SK Sector-4, Haroon Bahria Co-operative Housing Society Hub River Road, Naval Colony, Karachi. Ph: 32818770, 32036821"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-249, name: "Pakistan Naval Academy", city: "Karachi", source_quote: "data-position=\"Pakistan Naval Academy\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Haroon Bahria Intermediate College ('Naval Colony' in address) vs Pakistan Naval Academy."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "12", name: "Al-Hamd College of Professional Education", quote: "12. Al-Hamd College of Professional Education 166-E, Block-3, P.E.C.H.S., Off: Khalid Bin Waleed Road, Karachi. Ph:34387082-83,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-009, name: "Al-Hamd Islamic University", city: "Quetta", source_quote: "data-position=\"Al-Hamd Islamic University\" … charteredby=\"Government of Balochistan\" city=\"Quetta\" discipline=\"General\" sector=\"Private\" province=\"Balochistan\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Al-Hamd College of Professional Education (PECHS, Karachi) vs Al-Hamd Islamic University (Quetta)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "14", name: "Al-Khair College of Higher Education", quote: "14. Al-Khair College of Higher Education Plot No. B-5, Sector 5-M, North Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-001, name: "Al-Khair University", city: "Bhimber", source_quote: "data-position=\"Al-Khair University\" … charteredby=\"Government of AJK\" city=\"Bhimber\" discipline=\"General\" sector=\"Private\" province=\"Azad Jammu & Kashmir\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Al-Khair College of Higher Education (North Karachi) vs Al-Khair University (Bhimber)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "166", name: "Beaconhouse School Syestem (Higher Secondary) Gulisatan e jauhar Campus", quote: "166. Beaconhouse School Syestem (Higher Secondary) Gulisatan e jauhar Campus St 4/A Block 1 Scheme 36 Gulistan e jauhar karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-102, name: "Beaconhouse National University", city: "Lahore", source_quote: "data-position=\"Beaconhouse National University\" … charteredby=\"Government of Punjab\" city=\"Lahore\" discipline=\"General\" sector=\"Private\" province=\"Punjab\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Beaconhouse School System HSS, Gulistan-e-Jauhar vs Beaconhouse National University (Lahore)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "72", name: "Iqra Huffaz Boys College", quote: "72. Iqra Huffaz Boys College St-2/1, Block-T, North Nazimabad, Karachi Ph:36634125,36634128"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-062, name: "Iqra National University", city: "Peshawar", source_quote: "data-position=\"Iqra National University\" … charteredby=\"Government of Khyber Pakhtunkhwa\" city=\"Peshawar\" discipline=\"General\" sector=\"Private\" province=\"Khyber Pakhtunkhwa\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Iqra Huffaz Boys College (Karachi) vs Iqra National University (Peshawar)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "73", name: "Iqra Huffaz Girls College", quote: "73. Iqra Huffaz Girls College F-108, Block-B, North Nazimabad, Karachi."}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-062, name: "Iqra National University", city: "Peshawar", source_quote: "data-position=\"Iqra National University\" … charteredby=\"Government of Khyber Pakhtunkhwa\" city=\"Peshawar\" discipline=\"General\" sector=\"Private\" province=\"Khyber Pakhtunkhwa\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Iqra Huffaz Girls College (Karachi) vs Iqra National University (Peshawar)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "85", name: "Mehran Degree College", quote: "85. Mehran Degree College C-116, Block-6, F.B.Area, Karachi."}
+    batch: {file: PAI-Research-Batch5-Universities-BS-v4.xlsx, inst_id: UNI-MUET, name: "Mehran University of Engineering & Technology, Jamshoro", city: "Jamshoro", source_quote: "", claude_note: "District-wise seat categories (Category A/C). [v2 2026-11-03 match] Policy page reachable; no injected links reported."}
+    reason: "Mehran Degree College, F.B. Area vs Mehran University of Engineering & Technology, Jamshoro."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "157", name: "Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town", quote: "157. Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College,Gulshan-e-Behar Orangi Town Sector 16-E, Gulshan-e-Bihar, Orangi Town, Karachi. Ph# 36611756, 36619341 Mob:0300-3682262"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-047, name: "Shaheed Zulfiqar Ali Bhutto Medical University", city: "Islamabad", source_quote: "data-position=\"Shaheed Zulfiqar Ali Bhutto Medical University\" … charteredby=\"Government of Pakistan\" city=\"Islamabad\" discipline=\"Medical\" sector=\"Public\" province=\"Islamabad Capital Territory\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Shaheed Zulfiqar Ali Bhutto Govt. Boys Degree College, Orangi vs Shaheed Zulfiqar Ali Bhutto Medical University (Islamabad)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "154", name: "Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari", quote: "154. Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari Mewa Shah Road, New Kumhar Wara Gareeb Shah Road, Liyari,Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-258, name: "Shaheed Benazir Bhutto City University", city: "Karachi", source_quote: "data-position=\"Shaheed Benazir Bhutto City University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college, Liyari vs Shaheed Benazir Bhutto City University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "154", name: "Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari", quote: "154. Shaheed Benazir Bhutto Govt. Grils Degree College, Liyari Mewa Shah Road, New Kumhar Wara Gareeb Shah Road, Liyari,Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-259, name: "Shaheed Benazir Bhutto Dewan University", city: "Karachi", source_quote: "data-position=\"Shaheed Benazir Bhutto Dewan University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college vs Shaheed Benazir Bhutto Dewan University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "156", name: "Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony", quote: "156. Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony Azam Basti, Near Manzoor Colony, Karachi. Ph # 0322-2978391, 0322-2978351"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-209, name: "Benazir Bhutto Shaheed University Lyari", city: "Karachi", source_quote: "data-position=\"Benazir Bhutto Shaheed University Lyari\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college, Manzoor Colony vs Benazir Bhutto Shaheed University Lyari."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "156", name: "Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony", quote: "156. Shaheed Muhtarma Benazir Bhutto Govt. Degree Girls College, Manzoor Colony Azam Basti, Near Manzoor Colony, Karachi. Ph # 0322-2978391, 0322-2978351"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-259, name: "Shaheed Benazir Bhutto Dewan University", city: "Karachi", source_quote: "data-position=\"Shaheed Benazir Bhutto Dewan University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Girls degree college vs Shaheed Benazir Bhutto Dewan University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "155", name: "Shaheed Flying Officer Marium Mukhtar Govt. Girls College, Liaquatabad", quote: "155. Shaheed Flying Officer Marium Mukhtar Govt. Girls College, Liaquatabad Near Super Market, Liaquatabad, in premiss of APWA Govt. Girls H.S.S. Karachi Ph: 99330195"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2158, name: "APWA GOVT.COLLEGE FOR WOMEN", city: "Karachi Central", source_quote: "APWA GOVT.COLLEGE FOR WOMEN KQ2158", claude_note: "Girls, Degree, Morning; 2,358 seats. SECCAP college code KQ2158."}
+    reason: "'Shaheed Flying Officer Marium Mukhtar Govt. Girls College, Liaquatabad' is printed 'in premiss of APWA Govt. Girls H.S.S.'; the APWA word is an address reference. Different name from 'APWA GOVT.COLLEGE FOR WOMEN' (that is BIEK 9, Karimabad)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "173", name: "Hussaini Govt. Boys Higher Secondary School Nazimabad No.3", quote: "173. Hussaini Govt. Boys Higher Secondary School Nazimabad No.3 Nazimabad No. 3,Petrol Pump, Near Hamdard Centre karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-222, name: "Hamdard University", city: "Karachi", source_quote: "data-position=\"Hamdard University\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Hussaini Govt. Boys HSS ('Near Hamdard Centre' in address) vs Hamdard University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "68", name: "Govt. Deg. Girls College, Landhi Mill Area", quote: "68. Govt. Deg. Girls College, Landhi Mill Area Industrial Area, Landhi, Near Younis Textile, Kar. Ph: 35084849"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-272, name: "Textile Institute of Pakistan", city: "Karachi", source_quote: "data-position=\"Textile Institute of Pakistan\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"General\" sector=\"Private\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. Girls College, Landhi ('Near Younis Textile' in address) vs Textile Institute of Pakistan."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "169", name: "Govt. College of Physical Education", quote: "169. Govt. College of Physical Education Uiversity Road Gulilhan e Iqbal Karachi"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-275, name: "The Sindh Institute of Physical Medicine and Rehabilitation, Karachi", city: "Karachi", source_quote: "data-position=\"The Sindh Institute of Physical Medicine and Rehabilitation, Karachi\" … charteredby=\"Government of Sindh\" city=\"Karachi\" discipline=\"Medical\" sector=\"Public\" province=\"Sindh\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. College of Physical Education vs Sindh Institute of Physical Medicine and Rehabilitation."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "165", name: "Adamjee Model School & College (Higher Secondary)", quote: "165. Adamjee Model School & College (Higher Secondary) M 18 Shahrah e Liaquat Akbar Road Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "Private Adamjee Model School & College at 'M 18 Shahrah e Liaquat' vs Govt College for Women Campus-II; only the road is shared."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "28", name: "Govt. College for Women, 11-F New Karachi", quote: "28. Govt. College for Women, 11-F New Karachi Sector 11-F, New Karachi, Karachi. PH 36930236"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "'Govt. College for Women, 11-F New Karachi' vs the Shahrah-e-Liaquat Campus-II; different locality."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "29", name: "Govt. College for Women, Korangi No.6", quote: "29. Govt. College for Women, Korangi No.6 Korangi-6, Karachi.Ph# 35048764"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "'Govt. College for Women, Korangi No.6' vs Shahrah-e-Liaquat Campus-II; different locality."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "30", name: "Govt. College for Women, Saudabad Malir", quote: "30. Govt. College for Women, Saudabad Malir Malir Saudabad, Karachi. Ph.34111576"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "'Govt. College for Women, Saudabad Malir' vs Shahrah-e-Liaquat Campus-II; different locality."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "168", name: "Govt. College for Women, Korangi No. 4 Karachi", quote: "168. Govt. College for Women, Korangi No. 4 Karachi Korangi No.4 Karachi"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2236, name: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB", city: "Karachi South", source_quote: "GOVERNMENT COLLEGE FOR WOMEN SHAHRAH-E-LIAQUAT (CAMPUS-II) AT PUNJABI CLUB KQ2236", claude_note: "Girls, Intermediate, Morning; 706 seats. SECCAP college code KQ2236."}
+    reason: "'Govt. College for Women, Korangi No. 4' vs Shahrah-e-Liaquat Campus-II; different locality."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "33", name: "Govt. Degree Arts & Commerce College (Evening) Malir Khokhrapar", quote: "33. Govt. Degree Arts & Commerce College (Evening) Malir Khokhrapar Saudabad, No.2 Sabir Colony, Malir, Khokharapar, Ph.345-13710 0300-3468422 fax No. 34501559"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-KQ2163, name: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02", city: "KARACHI KORANGI", source_quote: "ALLAMA IQBAL GOVT DEGREE BOYS ARTS AND COMMERCE COLLEGE NO.02 KQ2163", claude_note: "Boys, Degree, Evening; 902 seats. SECCAP college code KQ2163."}
+    reason: "'Govt. Degree Arts & Commerce College (Evening) Malir Khokhrapar' vs 'ALLAMA IQBAL ... ARTS AND COMMERCE COLLEGE NO.02': both evening arts & commerce, but BIEK 33 has no 'Allama Iqbal' and a different address (Khokhrapar); BIEK 7 is the Allama Iqbal one."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "89", name: "Govt. Degree Science College, Liaquatabad", quote: "89. Govt. Degree Science College, Liaquatabad Liaquatabad at Qasimabad, Ph:-99230696 03122465641"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-HB0731, name: "GOVERNMENT BOYS DEGREE COLLEGE QASIMABAD, HYDERABAD.", city: "Hyderabad", source_quote: "GOVERNMENT BOYS DEGREE COLLEGE QASIMABAD, HYDERABAD. HB0731", claude_note: "Boys, Degree, Morning; 1,002 seats. SECCAP college code HB0731."}
+    reason: "'Govt. Degree Science College, Liaquatabad' (address 'Liaquatabad at Qasimabad', no city printed) vs 'GOVERNMENT BOYS DEGREE COLLEGE QASIMABAD, HYDERABAD': different name; the batch row prints Hyderabad, BIEK prints Liaquatabad."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "89", name: "Govt. Degree Science College, Liaquatabad", quote: "89. Govt. Degree Science College, Liaquatabad Liaquatabad at Qasimabad, Ph:-99230696 03122465641"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-HB0762, name: "GOVERNMENT COLLEGE OF INFORMATION TECHNOLOGY @ QASIMABAD HYDERABAD", city: "Hyderabad", source_quote: "GOVERNMENT COLLEGE OF INFORMATION TECHNOLOGY @ QASIMABAD HYDERABAD HB0762", claude_note: "Co-education, Intermediate, Morning; 500 seats. SECCAP college code HB0762."}
+    reason: "Same BIEK line vs 'GOVERNMENT COLLEGE OF INFORMATION TECHNOLOGY @ QASIMABAD HYDERABAD'; different name and city."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "118", name: "Govt. Islamia Science College, Jigar Muradabdi Road", quote: "118. Govt. Islamia Science College, Jigar Muradabdi Road Shikarpur Colony, Jigar Muradabadi Road Karachi.Ph # 99231199"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-SQ0371, name: "C &amp; S GOVERNMENT DEGREE COLLEGE SHIKARPUR", city: "Shikarpur", source_quote: "C &amp; S GOVERNMENT DEGREE COLLEGE SHIKARPUR SQ0371", claude_note: "Boys, Degree, Morning; 1,750 seats. SECCAP college code SQ0371."}
+    reason: "Govt. Islamia Science College (address 'Shikarpur Colony', Karachi) vs C & S Government Degree College Shikarpur; different name and city."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "115", name: "Govt. Islamia Arts & Commerce College, No 1 (Morning)", quote: "115. Govt. Islamia Arts & Commerce College, No 1 (Morning) Jigar Muradabadi Road off M.A. Jinnah Road, Karachi. Ph # 99231207"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-126, name: "Islamia University", city: "Bahawal Pur", source_quote: "data-position=\"Islamia University\" … charteredby=\"Government of Punjab\" city=\"Bahawal Pur\" discipline=\"General\" sector=\"Public\" province=\"Punjab\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. Islamia Arts & Commerce College (Karachi) vs Islamia University (Bahawalpur)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "117", name: "Govt. Islamia College for Women, Linse Area", quote: "117. Govt. Islamia College for Women, Linse Area Sector 1 A, Jacob Line, Lines Area Karachi. Ph # 32787875 Fax:32790327"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-126, name: "Islamia University", city: "Bahawal Pur", source_quote: "data-position=\"Islamia University\" … charteredby=\"Government of Punjab\" city=\"Bahawal Pur\" discipline=\"General\" sector=\"Public\" province=\"Punjab\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Govt. Islamia College for Women (Karachi) vs Islamia University (Bahawalpur)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-private-colleges, key: "39", name: "Chiniot Islamia College", quote: "39. Chiniot Islamia College Plot No. ST-13/2-2A, Block-7,"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-126, name: "Islamia University", city: "Bahawal Pur", source_quote: "data-position=\"Islamia University\" … charteredby=\"Government of Punjab\" city=\"Bahawal Pur\" discipline=\"General\" sector=\"Public\" province=\"Punjab\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "Chiniot Islamia College (Karachi) vs Islamia University (Bahawalpur)."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "128", name: "H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony", quote: "128. H.R.H. Agha Khan Govt. Degree Girls Arts & Commerce College, PIB Colony P.I.B. Colony, Karachi. Ph.# 99333139 Fax:99232046"}
+    batch: {file: PAI-Research-Batch3-Sindh-v4.xlsx, inst_id: SD-COL-SY0515, name: "GOVERNMENT AGHA NIZAMUDDIN  GIRLS DEGREE COLLEGE SUKKUR", city: "Sukkur", source_quote: "GOVERNMENT AGHA NIZAMUDDIN  GIRLS DEGREE COLLEGE SUKKUR SY0515", claude_note: "Girls, Degree, Evening; 625 seats. SECCAP college code SY0515."}
+    reason: "H.R.H. Agha Khan Govt. Girls college (PIB Colony) vs Government Agha Nizamuddin Girls Degree College Sukkur."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "6", name: "Allama Iqbal Govt. Boys Science College No.1 Model Colny", quote: "6. Allama Iqbal Govt. Boys Science College No.1 Model Colny Sheet No.25, Model Colony,Malir Karachi Ph:99238517 0300_3427536"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-BRD-032, name: "Allama Iqbal Open University (AIOU)", city: "", source_quote: "[...](https://www.aiou.edu.pk/) AIOU", claude_note: "Listed under 'Other Boards' (distance matric/intermediate). [v2 2026-11-03 match] Live read of IBCC forum members page 2026-11-03: entry and link present as quoted ('[...]' stands for the logo image)."}
+    reason: "Allama Iqbal Govt. Boys Science College vs Allama Iqbal Open University."
+  - verdict: different
+    agrees_with_check1: "n/a (not in check 1)"
+    biek: {list_id: biek-affiliated-government-colleges, key: "153", name: "S.M.B. Fatima Jinnah Govt. Girls Degree College, Garden", quote: "153. S.M.B. Fatima Jinnah Govt. Girls Degree College, Garden Nishter Road, Near Zoological, Garden Karachi. Ph# 99215693, FAX # 99215574"}
+    batch: {file: PAI-Research-Batch1-National-v4.xlsx, inst_id: PK-UNI-107, name: "Fatima Jinnah Women University, Rawalpindi", city: "Rawalpindi", source_quote: "data-position=\"Fatima Jinnah Women University, Rawalpindi\" … charteredby=\"Government of Punjab\" city=\"Rawalpindi\" discipline=\"General\" sector=\"Public\" province=\"Punjab\"", claude_note: "Official website not yet collected (batch 3); the HEC page for the institution is linked. [v2 2026-11-03 match] Live read of HEC recognised list 2026-11-03 (284 entries): name, province, city, sector, discipline, chartered_by, HEC page link and quote all match."}
+    reason: "S.M.B. Fatima Jinnah Govt. Girls Degree College (Karachi) vs Fatima Jinnah Women University (Rawalpindi)."
+summary:
+  karachi_sd_col_rows: 14
+  check1_flagged_pairs: 14
+  my_same: 11   # gov 1, 3, 4, 5, 8, 9, 11, 12, 14, 15, 37
+  my_unclear: 3 # gov 6 -> KQ2150, gov 7 -> KQ2163 (both: BIEK 'Model Colony, Malir' vs batch 'KARACHI KORANGI'), gov 27 -> KQ2236 (Campus-II)
+  disagreements_with_check1:
+    - {pair: "government#6 -> SD-COL-KQ2150", check1: same, check2: unclear, why: "printed area word Malir vs batch district KARACHI KORANGI (batch uses KARACHI MALIR as a district elsewhere)"}
+    - {pair: "government#7 -> SD-COL-KQ2163", check1: same, check2: unclear, why: "same address conflict as #6; the No.2 / NO.02 match itself is accepted, the claude_note Evening is given no weight"}
+    - {pair: "government#95 = government#181 (internal)", check1: unclear, check2: same, why: "identical address; the only name difference ('Gadap') is the town already in both addresses; nothing printed separates them"}
+  accepted_weaker_evidence:
+    - "government#4 -> SD-COL-KQ2173: shift read from the closed No.1 / No.2 (Evening) pair; accepted because line 5 matches KQ2193 on a printed shift on both sides"
+    - "government#12 -> SD-COL-KQ2273: Landhi locality vs KARACHI MALIR district is not a differing district word in the text; accepted"
+  check1_different_pairs: {count: 79, agree: 79}
+  internal_duplicates: {pairs: 25, same: 2, unclear: 1, different: 22, same_pairs: ["private#34 = private#42", "government#95 = government#181"], unclear_pairs: ["private#48 / private#50"]}
+  new_pairs_not_in_check1: {count: 40, same: 0, unclear: 0, different: 40}
+  missed_aliases_found: 0   # no BIEK line matches any batch 1, 2, 4, 5 row or any batch 3 MED/ADM row; no private BIEK line matches any batch row
+  alias_ready_same_pairs:
+    - {from_list: biek-affiliated-government-colleges, key: "1", to: SD-COL-KQ2215}
+    - {from_list: biek-affiliated-government-colleges, key: "3", to: SD-COL-KQ2172}
+    - {from_list: biek-affiliated-government-colleges, key: "4", to: SD-COL-KQ2173}
+    - {from_list: biek-affiliated-government-colleges, key: "5", to: SD-COL-KQ2193}
+    - {from_list: biek-affiliated-government-colleges, key: "8", to: SD-COL-KQ2167}
+    - {from_list: biek-affiliated-government-colleges, key: "9", to: SD-COL-KQ2158}
+    - {from_list: biek-affiliated-government-colleges, key: "11", to: SD-COL-KQ2207}
+    - {from_list: biek-affiliated-government-colleges, key: "12", to: SD-COL-KQ2273}
+    - {from_list: biek-affiliated-government-colleges, key: "14", to: SD-COL-KQ2194}
+    - {from_list: biek-affiliated-government-colleges, key: "15", to: SD-COL-KQ2232}
+    - {from_list: biek-affiliated-government-colleges, key: "37", to: SD-COL-KQ2339}
+  hold_for_resolution: ["government#6 -> SD-COL-KQ2150", "government#7 -> SD-COL-KQ2163", "government#27 -> SD-COL-KQ2236", "private#48 / private#50"]
