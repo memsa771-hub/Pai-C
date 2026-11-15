@@ -1,0 +1,687 @@
+# Aliases for PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx (import --aliases; docs/research/batches/README.md, 'Alias files').
+# Made by w12/pmdc/make_aliases.py. Verdicts: w12/pmdc/checks/alias-check1.yaml (check 1) and
+# alias-check2.yaml (check 2, independent). Controller ruling 2026-11-15: an alias is accepted only where
+# both checks say same (74). Held (not accepted): 18, 56, 104, 141, 145, 163, 164, 166. Every alias is
+# required: one not accepted rejects its row, so no duplicate entity is loaded. Check 2 `unclear` has no
+# value in format.yaml check2_values, so `approved` is left empty and the verdict is kept in a comment.
+file: PAI-Research-W12-pmdc-colleges-with-hospitals.xlsx
+sha256: 2b97d5b17e6cdb1a7cdc50a78953bed0a80bdee50168fa987257e4c4cd90bd48
+aliases:
+  - from: PK-PMDC-14
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-055
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Abwa Medical College, 1-KM Khurrianwala- Jaranwala Road, Faisalabad."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 31 | Abwa Medical College, Faisalabad | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-15
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-030
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulaverad Allama Iqbal Town, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 6 | Akhtar Saeed Medical &amp; Dental College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-16
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-032
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Al Aleem Medical College, Gulab Devi Education Complex Ferozepur Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 8 | Al-Aleem Medical College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-18
+    # check 1: same; check 2: unclear -> not accepted (held); target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # target: check 1 names this alias_target
+    to: PB-MED-054
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Amna Inayat Medical College, Faizpur Interchange, M-2 Motorway, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 30 | Amna Inayat Medical College, Sheikhupura | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-19
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-040
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Avicenna Medical College, Link Bedian Road, DHA-IX, Ferozepur Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 16 | Avicenna Medical College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-20
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-043
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Aziz Fatimah Medical & Dental College, West Canal Road, Old Ghafoor Bashir Children Hospital Building, Faisalabad."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 19 | Aziz Fatima Medical &amp; Dental College, Faisalabad | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-21
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-037
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Azra Naheed Medical College, Superior University, Main Raiwind Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 13 | Azra Naheed Medical College (Superior University), Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-22
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-041
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Bakhtawar Amin Medical & Dental College, Mattital Road, Northern Bypass, Multan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 17 | Bakhtawar Amin Medical &amp; Dental College, Multan | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-23
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-034
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Central Parks Medical College 21-KM Ferozepur Road, (Kahna Nou) Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 10 | Central Park Medical College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-28
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-038
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Continental Medical College 2-Civic Centre, Township, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 14 | Continental Medical College, Lahore | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-30
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-031
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "FMH College of Medicine & Dentistry Shadman, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 7 | FMH College of Medicine &amp; Dentistry, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-34
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-052
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Independent Medical College Faisalabad."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 28 | Independent Medical College, Faisalabad | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-35
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-053
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Islam Medical College Pasrur Road, Sialkot."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 29 | Islam Medical College, Sialkot | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-38
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-028
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Lahore Medical & Dental College Tulspura, Canal Bank North, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 4 | Lahore Medical &amp; Dental College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-39
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-042
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "M. Islam Medical College Gujranwala"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 18 | M. Islam Medical College, Gujranwala | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-40
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-046
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 22 | Multan Medical &amp; Dental College, Multan | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-41
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-047
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Niazi Medical & Dental College 10-KM Lahore, Sargodha."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 23 | Niazi Medical &amp; Dental College, Sargodha | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-42
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-035
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rahbar Medical & Dental College Lahore"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 11 | Rahbar Medical &amp; Dental College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-43
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-049
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rai Medical College Sargodha"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 25 | Rai Medical College, Sargodha | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-44
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-029
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rashid Latif Medical College 14-Abu Bakar Block, New Garden Town, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 5 | Rashid Latif Medical College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-46
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-050
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sahara Medical College Narowal"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 26 | Sahara Medical College, Narowal | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-47
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-051
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Shahida Islam Medical College Lodhran"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 27 | Shahida Islam Medical College, Lodhran | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-48
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-026
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Shalamar Medical & Dental College Shalamar Link Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 2 | Shalamar Medical &amp; Dental College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-49
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-027
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sharif Medical & Dental College Jati Umra, Raiwind Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 3 | Sharif Medical &amp; Dental College, Lahore | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-51
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-044
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sialkot Medical College Sialkot"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 20 | Sialkot Medical College, Sialkot | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-52
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-036
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 12 | University College of Medicine &amp; Dentistry, Lahore (University of Lahore) | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-53
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-045
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "University Medical & Dental College 4-KM, Sargodha Road, Faisalabad."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 21 | University Medical &amp; Dental College, Faisalabad (For Women Only) (University of Faisalabad) | 150 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-55
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-056
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 32 | Watim Medical College, Rawalpindi | 100* |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-56
+    # check 1: same; check 2: unclear -> not accepted (held); target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # target: check 1 names this alias_target
+    to: PB-MED-048
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Pak Red Crescent Medical & Dental College 2-Shahra-e-Fatima Jinnah,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 24 | Pak Red Crescent Medical &amp; Dental College, Kasur | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-74
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-039
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Abu Umara Medical & Dental College 9-Km, Main Raiwind Road, Bhobatian Chowk Lahore"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 15 | Abu Umara Medical &amp; Dental College, Lahore | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-75
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-025
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Akhtar Saeed Medical College, Rawalpindi Campus Bahria Golf City, Murree Expressway Rawalpindi."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 1 | Akhtar Saeed Medical College, Rawalpindi | 100 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-84
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-058
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Avicenna Dental College Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 1 | Avicenna Dental College, Lahore | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-85
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-060
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "College of Dentistry, Bakhtawar Amin Medical & Dental College Mattital Road, Northern Bypass, Multan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 3 | Dental College, Bakhtawar Amin Medical &amp; Dental College, Multan | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-86
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-067
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "College of Dentistry, Sharif Medical & Dental College Jati Umra, Raiwind Road,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 10 | Dental Section, Sharif Medical &amp; Dental College, Lahore | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-87
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-063
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental College, Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulevard, Allama Iqbal Town, Lahore"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 6 | Dental Section, Akhtar Saeed Medical &amp; Dental College, Lahore | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-88
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-064
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental Section, FMH College of Medicine & Dentistry Shadman,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 7 | Dental Section, FMH College of Medicine &amp; Dentistry, Lahore | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-91
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-065
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental College, Lahore Medical & Dental College Tulspura, Canal Bank North,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 8 | Dental Section, Lahore Medical &amp; Dental College, Lahore | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-92
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-061
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental College, Niazi Medical & Dental College Sargodha"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 4 | Dental College, Niazi Medical &amp; Dental College, Sargodha | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-94
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-062
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental College, University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 5 | Dental College, University College of Medicine &amp; Dentistry, Lahore | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-95
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-068
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental College, University Medical & Dental College 4-KM Sargodha Road, Faisalabad"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 11 | Dental Section, University Medical &amp; Dental College, Faisalabad (Female Only) | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-96
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-066
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental Section, Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 9 | Dental Section, Multan Medical &amp; Dental College, Multan | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-97
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-069
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Faryal Dental College Sheikhupura."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 12 | Faryal Dental College, Sheikhupura | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-102
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-070
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Islam Dental College Pasrur Road, Sialkot."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 13 | Islam Dental College, Sialkot | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-104
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # target: check 1 names no alias_target; its only candidate
+    to: PB-MED-071
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Margalla College of Dentistry Quaid-e-Azam Avenue, Gulrez Phase-III, Near High Court, Rawalpindi."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 14 | Margalla Institute of Health Sciences, Rawalpindi | 75 |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-105
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-073
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rashid Latif Dental College Lahore"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 16 | Rashid Latif Dental College, Lahore | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-106
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-075
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Watim Dental College T Chowk, Rawat Rawalpindi."}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 18 | Watim Dental College, Rawalpindi | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-107
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-074
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Shahida Islam Dental College Lodhran"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 17 | Shahida Islam Dental College, Lodhran | 75 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-108
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-059
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Azra Naheed Dental College, Lahore. (Provisionally recognized by erstwhile PMC)"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 2 | Azra Naheed Dental College, Lahore | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-122
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-072
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rahbar College of Dentistry, Lahore"}
+    target_evidence: {url: "https://www.uhs.edu.pk/images/Prospectus26.pdf", quote: "| 15 | Rahbar College of Dentistry, Lahore | 50 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-126
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: BL-MED-01
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Bolan Medical College Quetta"}
+    target_evidence: {url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf", quote: "BOLAN MEDICAL COLLEGE, QUETTA"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-137
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-002
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Allama Iqbal Medical College Allama Shabbir Ahmad Usmani Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 2 | Allama Iqbal Medical College, Lahore | 314 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-138
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-016
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Ameer-ud-Din (PGMI) Medical College Lahore General Hospital,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 16 | Ameer-ud-Din Medical College, Lahore | 104 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-140
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-014
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "D.G. Khan Medical College Dera Ghazi Khan"}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 14 | D.G. Khan Medical College, Dera Ghazi Khan | 85 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-141
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # target: check 1 names no single target; its first listed candidate (of PB-MED-004, PK-UNI-106)
+    to: PB-MED-004
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University), Queens Road,Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 4 | Fatima Jinnah Medical College, Lahore | 284 |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-142
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: IC-MED-01
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Federal Medical College, Al Farabi Centre, Hanna Road, G-8/4, Islamabad."}
+    target_evidence: {url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg", quote: "1- Federal Medical College, Islamabad"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-143
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-013
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Gujranwala Medical College Satellite Town,Pasrur Road, Gujranwala."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 13 | Gujranwala Medical College, Gujranwala | 91 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-144
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-015
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Khawaja Muhammad Safdar Medical College Commissioner Road,Sialkot."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 15 | Khawaja Muhammad Safdar Medical College, Sialkot | 95 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-145
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # target: check 1 names no single target; its first listed candidate (of PB-MED-001, PK-UNI-128)
+    to: PB-MED-001
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "King Edward Medical University Nila Gumbad, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 1 | King Edward Medical College, Lahore | 313 |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-146
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-017
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Narowal M.C, Narowal"}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 17 | Narowal Medical College, Narowal | 99 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-147
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-011
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Nawaz Sharif Medical College Hafiz Hayat Campus, University of Gujrat, Gujrat."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 11 | Nawaz Sharif Medical College, Gujrat | 49 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-148
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-003
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Nishtar Medical College Nishtar Road, Multan"}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 3 | Nishtar Medical College, Multan | 268 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-149
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-006
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Punjab Medical College Sargodha Road, Faisalabad."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 6 | Punjab Medical College, Faisalabad | 270 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-150
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-008
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Quaid-e-Azam Medical College Bahawal Victoria Hospital, Circular Road, Bahawalpur."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 8 | Quaid-e-Azam Medical College, Bahawalpur | 297 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-151
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-007
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Rawalpindi Medical College New Teaching Block, Holy Family Hospital, Rawalpindi."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 7 | Rawalpindi Medical College, Rawalpindi | 325 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-152
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-012
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sahiwal Medical College Civil Hospital, Sahiwal."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 12 | Sahiwal Medical College, Sahiwal | 91 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-153
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-010
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sargodha Medical College Johar Block, University Road, Sargodha."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 10 | Sargodha Medical College, Sargodha | 95 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-154
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-005
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Services Institute of Medical Sciences Services Hospital, Jail Road, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 5 | Services Institute of Medical Sciences, Lahore | 211 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-155
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: IC-MED-02
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College Shaikh Zayed Hospital, Lahore."}
+    target_evidence: {url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg", quote: "2- Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-156
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    # this line is held in the workbook (name_disagrees); quote = the quote cell of E1 and E2
+    to: PB-MED-009
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Sheikh Zayed Medical College,Rahim Yar Khan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 9 | Sheikh Zayed Medical College, Rahim Yar Khan | 130 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-161
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch3-Sindh-v4.xlsx
+    to: SD-MED-07
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Gambat Medical College Gambat-Khairpur Mirs"}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 07 | Gambat Medical College, Gambat |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-163
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch3-Sindh-v4.xlsx
+    # target: check 1 names no alias_target; its only candidate
+    to: SD-MED-06
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Karachi Medical & Dental College Block M, North Nazimabad, Karachi."}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 06 | Karachi Metropolitan University (KMDC) |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-164
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch3-Sindh-v4.xlsx
+    # target: check 1 names no single target; its first listed candidate (of SD-MED-03, PK-UNI-240)
+    to: SD-MED-03
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Liaquat University of Medical & Health Sciences Jamshoro"}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 03 | Liaquat University of Medical &amp; Health Sciences, Jamshoro |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-166
+    # check 1: unclear; check 2: unclear -> not accepted (held); target in PAI-Research-Batch3-Sindh-v4.xlsx
+    # target: check 1 names no single target; its first listed candidate (of SD-MED-04, PK-UNI-250)
+    to: SD-MED-04
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Peoples University of Medical & Health Sciences for Women Shaheed Benazir-Abad, Nawab-shah."}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 04 | Peoples University of Medical &amp; Health Sciences for Women, SBA |"}
+    check1: {result: unclear, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-167
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch3-Sindh-v4.xlsx
+    to: SD-MED-09
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Shaheed Mohtarma Benazir Bhutto Medical College, Behind Lyari General Hospital, Tamery Road, Lyari, Karachi."}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 09 | Shaheed Mohtarma Benazir Bhutto Medical College, Lyari |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-169
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch3-Sindh-v4.xlsx
+    to: SD-MED-08
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Khairpur Medical College Khairpur Mirs"}
+    target_evidence: {url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf", quote: "| 08 | Khairpur Medical College, Khairpur Mirs |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-170
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: BL-MED-02
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Jhalawan Medical College, Khuzdar - Baluchistan"}
+    target_evidence: {url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf", quote: "JHALAWAN MEDICAL COLLEGE (JMC), KHUZDAR"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-171
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: BL-MED-03
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Loralai Medical College, Loralai - Baluchistan"}
+    target_evidence: {url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf", quote: "LORALAI MEDICAL COLLEGE (LMC), LORALAI"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-172
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: BL-MED-04
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Makran Medical College, Turbat - Baluchistan"}
+    target_evidence: {url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf", quote: "MEKRAN MEDICAL COLLEGE (MMC), TURBAT"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-178
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-018
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "De'montmorency College of Dentistry, Yakki Gate, Lahore."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 1 | de' Montmorency College of Dentistry, Lahore | 96 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-180
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-020
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Dental Section, Punjab Medical College Sargodha Road, Faisalabad"}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 3 | Dental Institute, Punjab Medical College, Faisalabad | 49 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-181
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch2-Punjab-v4.xlsx
+    to: PB-MED-019
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "Institute of Dentistry, Nishtar Medical College Nishtar Road, Multan."}
+    target_evidence: {url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf", quote: "| 2 | Nishtar Institute of Dentistry, Multan | 40 |"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: PK-PMDC-189
+    # check 1: same; check 2: same -> accepted; target in PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+    to: IC-MED-03
+    evidence: {url: "https://pmdc.pk/Documents/Others/Recognised%20Institutes%20with%20attached%20Hospitals%20(Final%20List%20)%20%2007-11-2025%20for%20web%20-.pdf", quote: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University Islamabad"}
+    target_evidence: {url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg", quote: "1- School of Dentistry, Islamabad"}
+    check1: {result: correct, name: "claude-w12-pmdc-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-pmdc-alias-check-2", date: "2026-11-15"}
+    required: true

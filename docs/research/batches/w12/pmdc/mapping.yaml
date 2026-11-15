@@ -1,0 +1,6 @@
+id_prefix: PK-PMDC-
+type_column: type
+region: column
+region_column: region
+read_method: "curl + pypdf 7.1.0 (PDF text layer)"
+retrieved: 2026-11-15

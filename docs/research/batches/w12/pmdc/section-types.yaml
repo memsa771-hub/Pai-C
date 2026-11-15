@@ -1,0 +1,8 @@
+# PMDC section -> Institutions type (controller ruling 1, W12 D-PMDC, 2026-11-15, for the owner to confirm).
+# The section is each extraction's own `section` cell (the 14.04pt section heading above the row; both extractions agree
+# on 190/190). Every value is a type of kind institution in backend/app/os/knowledge/sheets/format.yaml `type_kinds`,
+# spelled as batch 2 (PAI-Research-Batch2-Punjab-v4.xlsx) uses it. Read by derive.py.
+private_medical: private_medical_college
+private_dental: private_dental_college
+public_medical: public_medical_college
+public_dental: public_dental_college

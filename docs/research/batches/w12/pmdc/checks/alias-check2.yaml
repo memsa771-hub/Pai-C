@@ -1,0 +1,1654 @@
+# W12 D-PMDC alias check 2 (claude-w12-pmdc-alias-check-2). Independent of check 1. Judged only from printed text (PMDC quote and
+# batch name/region/city/source_quote). No web; no pmdc-matches*.csv read. Strings JSON-quoted (valid YAML).
+# Method (different from check 1): (a) manual read of every PMDC line against a full listing of all 396 non-board batch rows;
+# (b) distinctive-token scan of the PMDC name vs all 570 batch-1..5 Institutions rows (generic words removed);
+# (c) institution names embedded in the PMDC address (e.g. 'Superior University', 'University of Gujrat').
+# Pairs that only share a generic word (Jinnah, Khan, Muhammad, Shaheed, a city name) were dropped as non-candidates.
+check: {ref: claude-w12-pmdc-alias-check-2, date: "2026-11-15"}
+pmdc_file: ".local-ci/work/W12/PMDC/E2/pmdc-colleges-with-hospitals.csv"
+pmdc_file_sha256: e65bbaf7ce554b48a0b9625546c1a6103c3684512ccb136338905f4808ea42a3
+note_on_check1_input: "check 1 read E1 (sha 5d274708...); the quote column is identical in E2, only the name/address split differs on keys 3,4,21,29,75,76,92,146,147,156,165"
+lines:
+  - key: 1
+    pmdc_quote: "Mohiuddin Islamic Medical College D/4, Industrial Area, Mirpur-AJ&K."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-003, verdict: different, batch_name: "Mohi-ud-Din Islamic University", batch_region: "Azad Jammu & Kashmir", batch_city: "Nerian Sharif", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Mohi-ud-Din Islamic University, Nerian Sharif vs Mohiuddin Islamic Medical College, Mirpur)"}
+  - key: 14
+    pmdc_quote: "Abwa Medical College, 1-KM Khurrianwala- Jaranwala Road, Faisalabad."
+    section: private_medical
+    verdict: same
+    target: PB-MED-055
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-055
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-055, verdict: same, batch_name: "Abwa Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 15
+    pmdc_quote: "Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulaverad Allama Iqbal Town, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-030
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-030
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-030, verdict: same, batch_name: "Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-025, verdict: different, batch_name: "Akhtar Saeed Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "different campus / city of the same group: campuses are separate institutions (batch row is Rawalpindi; PMDC line is Lahore, Allama Iqbal Town)"}
+      - {inst_id: PB-MED-063, verdict: different, batch_name: "Dental Section, Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 16
+    pmdc_quote: "Al Aleem Medical College, Gulab Devi Education Complex Ferozepur Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-032
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-032
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-032, verdict: same, batch_name: "Al-Aleem Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name ('Al Aleem' vs 'Al-Aleem')"}
+  - key: 18
+    pmdc_quote: "Amna Inayat Medical College, Faizpur Interchange, M-2 Motorway, Lahore."
+    section: private_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: same
+    check1_target: PB-MED-054
+    agrees_with_check1: false
+    pairs:
+      - {inst_id: PB-MED-054, verdict: unclear, batch_name: "Amna Inayat Medical College, Sheikhupura", batch_region: "Punjab", batch_city: "Sheikhupura", check1_pair_verdict: same, reason: "name identical, but PMDC address says 'Faizpur Interchange, M-2 Motorway, Lahore' while batch city is Sheikhupura (quote '| 30 | Amna Inayat Medical College, Sheikhupura | 100 |'); nothing printed settles the city, so not judged same"}
+  - key: 19
+    pmdc_quote: "Avicenna Medical College, Link Bedian Road, DHA-IX, Ferozepur Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-040
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-040
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-040, verdict: same, batch_name: "Avicenna Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-058, verdict: different, batch_name: "Avicenna Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 20
+    pmdc_quote: "Aziz Fatimah Medical & Dental College, West Canal Road, Old Ghafoor Bashir Children Hospital Building, Faisalabad."
+    section: private_medical
+    verdict: same
+    target: PB-MED-043
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-043
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-043, verdict: same, batch_name: "Aziz Fatima Medical & Dental College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name ('Fatimah' vs 'Fatima')"}
+  - key: 21
+    pmdc_quote: "Azra Naheed Medical College, Superior University, Main Raiwind Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-037
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-037
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-037, verdict: same, batch_name: "Azra Naheed Medical College (Superior University), Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name; both name Superior University"}
+      - {inst_id: PB-MED-059, verdict: different, batch_name: "Azra Naheed Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+      - {inst_id: PK-UNI-169, verdict: different, batch_name: "The Superior University", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (PMDC address names Superior University)"}
+  - key: 22
+    pmdc_quote: "Bakhtawar Amin Medical & Dental College, Mattital Road, Northern Bypass, Multan."
+    section: private_medical
+    verdict: same
+    target: PB-MED-041
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-041
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-041, verdict: same, batch_name: "Bakhtawar Amin Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-060, verdict: different, batch_name: "Dental College, Bakhtawar Amin Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 23
+    pmdc_quote: "Central Parks Medical College 21-KM Ferozepur Road, (Kahna Nou) Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-034
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-034
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-034, verdict: same, batch_name: "Central Park Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name ('Central Parks' vs 'Central Park')"}
+  - key: 28
+    pmdc_quote: "Continental Medical College 2-Civic Centre, Township, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-038
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-038
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-038, verdict: same, batch_name: "Continental Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 29
+    pmdc_quote: "Fazaia Medical College Air University Sector E-9, Islamabad"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-023, verdict: different, batch_name: "Air University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (PMDC address names Air University)"}
+      - {inst_id: UNI-AIR, verdict: different, batch_name: "Air University", batch_region: "ICT (multi-campus)", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 30
+    pmdc_quote: "FMH College of Medicine & Dentistry Shadman, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-031
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-031
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-031, verdict: same, batch_name: "FMH College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-064, verdict: different, batch_name: "Dental Section, FMH College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 31
+    pmdc_quote: "Foundation University Medical College Defence Avenue, DHA, Phase-I, Islamabad"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-030, verdict: different, batch_name: "Foundation University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 33
+    pmdc_quote: "HITEC Institute of Medical Sciences Taxila"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-119, verdict: different, batch_name: "HITEC University", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 34
+    pmdc_quote: "Independent Medical College Faisalabad."
+    section: private_medical
+    verdict: same
+    target: PB-MED-052
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-052
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-052, verdict: same, batch_name: "Independent Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 35
+    pmdc_quote: "Islam Medical College Pasrur Road, Sialkot."
+    section: private_medical
+    verdict: same
+    target: PB-MED-053
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-053
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-053, verdict: same, batch_name: "Islam Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-042, verdict: different, batch_name: "M. Islam Medical College, Gujranwala", batch_region: "Punjab", batch_city: "Gujranwala", check1_pair_verdict: different, reason: "names share a word but name a different institution (M. Islam, Gujranwala)"}
+      - {inst_id: PB-MED-070, verdict: different, batch_name: "Islam Dental College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 38
+    pmdc_quote: "Lahore Medical & Dental College Tulspura, Canal Bank North, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-028
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-028
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-028, verdict: same, batch_name: "Lahore Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-065, verdict: different, batch_name: "Dental Section, Lahore Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 39
+    pmdc_quote: "M. Islam Medical College Gujranwala"
+    section: private_medical
+    verdict: same
+    target: PB-MED-042
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-042
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-042, verdict: same, batch_name: "M. Islam Medical College, Gujranwala", batch_region: "Punjab", batch_city: "Gujranwala", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-053, verdict: different, batch_name: "Islam Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: different, reason: "names share a word but name a different institution (Islam Medical College, Sialkot)"}
+  - key: 40
+    pmdc_quote: "Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."
+    section: private_medical
+    verdict: same
+    target: PB-MED-046
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-046
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-046, verdict: same, batch_name: "Multan Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-066, verdict: different, batch_name: "Dental Section, Multan Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 41
+    pmdc_quote: "Niazi Medical & Dental College 10-KM Lahore, Sargodha."
+    section: private_medical
+    verdict: same
+    target: PB-MED-047
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-047
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-047, verdict: same, batch_name: "Niazi Medical & Dental College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name (PMDC '10-KM Lahore, Sargodha' = Sargodha)"}
+      - {inst_id: PB-MED-061, verdict: different, batch_name: "Dental College, Niazi Medical & Dental College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 42
+    pmdc_quote: "Rahbar Medical & Dental College Lahore"
+    section: private_medical
+    verdict: same
+    target: PB-MED-035
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-035
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-035, verdict: same, batch_name: "Rahbar Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-072, verdict: different, batch_name: "Rahbar College of Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 43
+    pmdc_quote: "Rai Medical College Sargodha"
+    section: private_medical
+    verdict: same
+    target: PB-MED-049
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-049
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-049, verdict: same, batch_name: "Rai Medical College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 44
+    pmdc_quote: "Rashid Latif Medical College 14-Abu Bakar Block, New Garden Town, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-029
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-029
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-029, verdict: same, batch_name: "Rashid Latif Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-033, verdict: different, batch_name: "RLKU Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "names share a word but name a different institution (RLKU Medical & Dental College is a separate batch row)"}
+      - {inst_id: PB-MED-073, verdict: different, batch_name: "Rashid Latif Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+      - {inst_id: PK-UNI-161, verdict: different, batch_name: "Rashid Latif Khan University, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Rashid Latif Khan University)"}
+  - key: 46
+    pmdc_quote: "Sahara Medical College Narowal"
+    section: private_medical
+    verdict: same
+    target: PB-MED-050
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-050
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-050, verdict: same, batch_name: "Sahara Medical College, Narowal", batch_region: "Punjab", batch_city: "Narowal", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 47
+    pmdc_quote: "Shahida Islam Medical College Lodhran"
+    section: private_medical
+    verdict: same
+    target: PB-MED-051
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-051
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-051, verdict: same, batch_name: "Shahida Islam Medical College, Lodhran", batch_region: "Punjab", batch_city: "Lodhran", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-074, verdict: different, batch_name: "Shahida Islam Dental College, Lodhran", batch_region: "Punjab", batch_city: "Lodhran", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 48
+    pmdc_quote: "Shalamar Medical & Dental College Shalamar Link Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-026
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-026
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-026, verdict: same, batch_name: "Shalamar Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 49
+    pmdc_quote: "Sharif Medical & Dental College Jati Umra, Raiwind Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-027
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-027
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-027, verdict: same, batch_name: "Sharif Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-067, verdict: different, batch_name: "Dental Section, Sharif Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 50
+    pmdc_quote: "Shifa College of Medicine Pitrus Bukhari Road, Sector H-8/4, Islamabad."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-048, verdict: different, batch_name: "Shifa Tameer-e-Millat University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 51
+    pmdc_quote: "Sialkot Medical College Sialkot"
+    section: private_medical
+    verdict: same
+    target: PB-MED-044
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-044
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-044, verdict: same, batch_name: "Sialkot Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-053, verdict: different, batch_name: "Islam Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: different, reason: "names share a word but name a different institution"}
+      - {inst_id: PB-MED-015, verdict: different, batch_name: "Khawaja Muhammad Safdar Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Khawaja Muhammad Safdar MC, Sialkot)"}
+  - key: 52
+    pmdc_quote: "University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."
+    section: private_medical
+    verdict: same
+    target: PB-MED-036
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-036
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-036, verdict: same, batch_name: "University College of Medicine & Dentistry, Lahore (University of Lahore)", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-062, verdict: different, batch_name: "Dental College, University College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-185, verdict: different, batch_name: "University of Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (University of Lahore)"}
+  - key: 53
+    pmdc_quote: "University Medical & Dental College 4-KM, Sargodha Road, Faisalabad."
+    section: private_medical
+    verdict: same
+    target: PB-MED-045
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-045
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-045, verdict: same, batch_name: "University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad)", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-068, verdict: different, batch_name: "Dental Section, University Medical & Dental College, Faisalabad (Female Only)", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-170, verdict: different, batch_name: "The University of Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (The University of Faisalabad)"}
+  - key: 54
+    pmdc_quote: "Wah Medical College P.O.F. Wah Hospital, Wah Cantt."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-199, verdict: different, batch_name: "University of Wah", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (University of Wah); PMDC line names P.O.F. Wah Hospital, not the university"}
+  - key: 55
+    pmdc_quote: "Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_medical
+    verdict: same
+    target: PB-MED-056
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-056
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-056, verdict: same, batch_name: "Watim Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name (PMDC 'T-Chowk, Rawat, Rawalpindi')"}
+      - {inst_id: PB-MED-075, verdict: different, batch_name: "Watim Dental College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 56
+    pmdc_quote: "Pak Red Crescent Medical & Dental College 2-Shahra-e-Fatima Jinnah,Lahore."
+    section: private_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: same
+    check1_target: PB-MED-048
+    agrees_with_check1: false
+    pairs:
+      - {inst_id: PB-MED-048, verdict: unclear, batch_name: "Pak Red Crescent Medical & Dental College, Kasur", batch_region: "Punjab", batch_city: "Kasur", check1_pair_verdict: same, reason: "name identical, but PMDC address says '2-Shahra-e-Fatima Jinnah, Lahore' while batch city is Kasur (quote '| 24 | Pak Red Crescent Medical &amp; Dental College, Kasur | 100 |'); nothing printed settles the city"}
+  - key: 57
+    pmdc_quote: "Aga Khan University Medical College Stadium Road, Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-203, verdict: different, batch_name: "Aga Khan University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 59
+    pmdc_quote: "Bahria University Medical College 13-National Stadium Road,Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-025, verdict: different, batch_name: "Bahria University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: UNI-BAHRIA, verdict: different, batch_name: "Bahria University", batch_region: "ICT (multi-campus)", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 60
+    pmdc_quote: "Faculty of Medicine & Allied Medical Sciences/Isra University Hala Road, P.O. Box-313, Hyderabad."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-232, verdict: different, batch_name: "Isra University", batch_region: "Sindh", batch_city: "Hyderabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (PMDC line is a Faculty of Isra University)"}
+  - key: 61
+    pmdc_quote: "Indus Medical College Tando M.Khan"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-227, verdict: different, batch_name: "Indus University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "names share a word but name a different institution (Indus University, Karachi vs Indus Medical College, Tando M.Khan)"}
+  - key: 64
+    pmdc_quote: "Liaquat College of Medicine & Dentistry ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-240, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: different, reason: "names share a word but name a different institution (Liaquat College of Medicine & Dentistry, Karachi is not LUMHS)"}
+      - {inst_id: SD-MED-03, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 65
+    pmdc_quote: "Liaquat National Medical College Liaquat National Hospital, Stadium Road, Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-240, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: different, reason: "names share a word but name a different institution (Liaquat National Medical College is not LUMHS)"}
+      - {inst_id: SD-MED-03, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 67
+    pmdc_quote: "Sir Syed College of Medical Sciences for Girls ST-32, Block-5, Boating Basin, Clifton,Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-269, verdict: different, batch_name: "Sir Syed University of Engineering & Technology", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Sir Syed University of Engineering & Technology)"}
+  - key: 69
+    pmdc_quote: "Ziauddin Medical College Block-6, Shahra-e-Ghalib, Clifton, Karachi."
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-BRD-031, verdict: different, batch_name: "Ziauddin University Examination Board", batch_region: "National (private)", batch_city: null, check1_pair_verdict: different, reason: "batch row is an examination board, not the college"}
+      - {inst_id: PK-UNI-284, verdict: different, batch_name: "Zia-ud-Din University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Zia-ud-Din University)"}
+  - key: 70
+    pmdc_quote: "Fazaia Ruth Pfao Medical College Shahrah-e-Faisal, PAF Faisal Base, Karachi (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: GB-COL-006, verdict: different, batch_name: "Ruth Pfau Govt. Firls I/C Sultanabad, Gilgit", batch_region: "GB", batch_city: "Gilgit", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Ruth Pfau girls college, Gilgit)"}
+  - key: 71
+    pmdc_quote: "Hamdard College of Medicine & Dentistry, Madinat-al-Hikmah, Mohammad Bin Qasim Avenue, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-222, verdict: different, batch_name: "Hamdard University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 72
+    pmdc_quote: "Baqai Medical College 51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-207, verdict: different, batch_name: "Baqai Medical University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 74
+    pmdc_quote: "Abu Umara Medical & Dental College 9-Km, Main Raiwind Road, Bhobatian Chowk Lahore"
+    section: private_medical
+    verdict: same
+    target: PB-MED-039
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-039
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-039, verdict: same, batch_name: "Abu Umara Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 75
+    pmdc_quote: "Akhtar Saeed Medical College, Rawalpindi Campus Bahria Golf City, Murree Expressway Rawalpindi."
+    section: private_medical
+    verdict: same
+    target: PB-MED-025
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-025
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-025, verdict: same, batch_name: "Akhtar Saeed Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name (Rawalpindi campus = batch row in Rawalpindi)"}
+      - {inst_id: PB-MED-030, verdict: different, batch_name: "Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "different campus / city of the same group: campuses are separate institutions"}
+      - {inst_id: PB-MED-063, verdict: different, batch_name: "Dental Section, Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent, other campus"}
+  - key: 76
+    pmdc_quote: "NUST School of Health Sciences, National University of Sciences & Technology (NUST) Sector H-12 Islamabad"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-041, verdict: different, batch_name: "National University of Sciences & Technology", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 77
+    pmdc_quote: "Bahria University College of Medicine, Islamabad"
+    section: private_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-025, verdict: different, batch_name: "Bahria University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: UNI-BAHRIA, verdict: different, batch_name: "Bahria University", batch_region: "ICT (multi-campus)", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 84
+    pmdc_quote: "Avicenna Dental College Lahore."
+    section: private_dental
+    verdict: same
+    target: PB-MED-058
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-058
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-058, verdict: same, batch_name: "Avicenna Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-040, verdict: different, batch_name: "Avicenna Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 85
+    pmdc_quote: "College of Dentistry, Bakhtawar Amin Medical & Dental College Mattital Road, Northern Bypass, Multan."
+    section: private_dental
+    verdict: same
+    target: PB-MED-060
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-060
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-060, verdict: same, batch_name: "Dental College, Bakhtawar Amin Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "dental college of Bakhtawar Amin M&DC, Multan ('College of Dentistry' vs 'Dental College'); only dental row of that college"}
+      - {inst_id: PB-MED-041, verdict: different, batch_name: "Bakhtawar Amin Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 86
+    pmdc_quote: "College of Dentistry, Sharif Medical & Dental College Jati Umra, Raiwind Road,Lahore."
+    section: private_dental
+    verdict: same
+    target: PB-MED-067
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-067
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-067, verdict: same, batch_name: "Dental Section, Sharif Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "dental unit of Sharif M&DC, Lahore ('College of Dentistry' vs 'Dental Section'); only dental row of that college"}
+      - {inst_id: PB-MED-027, verdict: different, batch_name: "Sharif Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 87
+    pmdc_quote: "Dental College, Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulevard, Allama Iqbal Town, Lahore"
+    section: private_dental
+    verdict: same
+    target: PB-MED-063
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-063
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-063, verdict: same, batch_name: "Dental Section, Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "dental unit of Akhtar Saeed M&DC, Lahore ('Dental College' vs 'Dental Section'); only Lahore dental row of that college"}
+      - {inst_id: PB-MED-030, verdict: different, batch_name: "Akhtar Saeed Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PB-MED-025, verdict: different, batch_name: "Akhtar Saeed Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: not_listed, reason: "different campus / city of the same group: campuses are separate institutions"}
+  - key: 88
+    pmdc_quote: "Dental Section, FMH College of Medicine & Dentistry Shadman,Lahore."
+    section: private_dental
+    verdict: same
+    target: PB-MED-064
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-064
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-064, verdict: same, batch_name: "Dental Section, FMH College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-031, verdict: different, batch_name: "FMH College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 89
+    pmdc_quote: "Dental College, HITEC Institute of Medical Sciences Taxila Cantt."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-119, verdict: different, batch_name: "HITEC University", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 91
+    pmdc_quote: "Dental College, Lahore Medical & Dental College Tulspura, Canal Bank North,Lahore."
+    section: private_dental
+    verdict: same
+    target: PB-MED-065
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-065
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-065, verdict: same, batch_name: "Dental Section, Lahore Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "dental unit of Lahore M&DC ('Dental College' vs 'Dental Section'); only dental row"}
+      - {inst_id: PB-MED-028, verdict: different, batch_name: "Lahore Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 92
+    pmdc_quote: "Dental College, Niazi Medical & Dental College Sargodha"
+    section: private_dental
+    verdict: same
+    target: PB-MED-061
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-061
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-061, verdict: same, batch_name: "Dental College, Niazi Medical & Dental College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-047, verdict: different, batch_name: "Niazi Medical & Dental College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 94
+    pmdc_quote: "Dental College, University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."
+    section: private_dental
+    verdict: same
+    target: PB-MED-062
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-062
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-062, verdict: same, batch_name: "Dental College, University College of Medicine & Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-036, verdict: different, batch_name: "University College of Medicine & Dentistry, Lahore (University of Lahore)", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-185, verdict: different, batch_name: "University of Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 95
+    pmdc_quote: "Dental College, University Medical & Dental College 4-KM Sargodha Road, Faisalabad"
+    section: private_dental
+    verdict: same
+    target: PB-MED-068
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-068
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-068, verdict: same, batch_name: "Dental Section, University Medical & Dental College, Faisalabad (Female Only)", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "dental unit of University M&DC, Faisalabad ('Dental College' vs 'Dental Section ... (Female Only)'); only dental row"}
+      - {inst_id: PB-MED-045, verdict: different, batch_name: "University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad)", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-170, verdict: different, batch_name: "The University of Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 96
+    pmdc_quote: "Dental Section, Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."
+    section: private_dental
+    verdict: same
+    target: PB-MED-066
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-066
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-066, verdict: same, batch_name: "Dental Section, Multan Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-046, verdict: different, batch_name: "Multan Medical & Dental College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 97
+    pmdc_quote: "Faryal Dental College Sheikhupura."
+    section: private_dental
+    verdict: same
+    target: PB-MED-069
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-069
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-069, verdict: same, batch_name: "Faryal Dental College, Sheikhupura", batch_region: "Punjab", batch_city: "Sheikhupura", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 98
+    pmdc_quote: "Foundation University College of Dentistry Islamabad."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-030, verdict: different, batch_name: "Foundation University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 102
+    pmdc_quote: "Islam Dental College Pasrur Road, Sialkot."
+    section: private_dental
+    verdict: same
+    target: PB-MED-070
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-070
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-070, verdict: same, batch_name: "Islam Dental College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-053, verdict: different, batch_name: "Islam Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 104
+    pmdc_quote: "Margalla College of Dentistry Quaid-e-Azam Avenue, Gulrez Phase-III, Near High Court, Rawalpindi."
+    section: private_dental
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-071, verdict: unclear, batch_name: "Margalla Institute of Health Sciences, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: unclear, reason: "both Rawalpindi and both 'Margalla', but names differ ('Margalla College of Dentistry' vs 'Margalla Institute of Health Sciences'); batch quote '| 14 | Margalla Institute of Health Sciences, Rawalpindi | 75 |' does not say dentistry; batch type private_dental_college is not printed source text"}
+  - key: 105
+    pmdc_quote: "Rashid Latif Dental College Lahore"
+    section: private_dental
+    verdict: same
+    target: PB-MED-073
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-073
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-073, verdict: same, batch_name: "Rashid Latif Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-029, verdict: different, batch_name: "Rashid Latif Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+      - {inst_id: PK-UNI-161, verdict: different, batch_name: "Rashid Latif Khan University, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 106
+    pmdc_quote: "Watim Dental College T Chowk, Rawat Rawalpindi."
+    section: private_dental
+    verdict: same
+    target: PB-MED-075
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-075
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-075, verdict: same, batch_name: "Watim Dental College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-056, verdict: different, batch_name: "Watim Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 107
+    pmdc_quote: "Shahida Islam Dental College Lodhran"
+    section: private_dental
+    verdict: same
+    target: PB-MED-074
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-074
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-074, verdict: same, batch_name: "Shahida Islam Dental College, Lodhran", batch_region: "Punjab", batch_city: "Lodhran", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-051, verdict: different, batch_name: "Shahida Islam Medical College, Lodhran", batch_region: "Punjab", batch_city: "Lodhran", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 108
+    pmdc_quote: "Azra Naheed Dental College, Lahore. (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    verdict: same
+    target: PB-MED-059
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-059
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-059, verdict: same, batch_name: "Azra Naheed Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-037, verdict: different, batch_name: "Azra Naheed Medical College (Superior University), Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 109
+    pmdc_quote: "Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-048, verdict: different, batch_name: "Shifa Tameer-e-Millat University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 111
+    pmdc_quote: "Baqai Dental College 51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-207, verdict: different, batch_name: "Baqai Medical University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 113
+    pmdc_quote: "Dental Section, Bahria University Medical & Dental College 13-National Stadium Road, Karachi."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-025, verdict: different, batch_name: "Bahria University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: UNI-BAHRIA, verdict: different, batch_name: "Bahria University", batch_region: "ICT (multi-campus)", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 114
+    pmdc_quote: "Dental College, Sir Syed College of Medical Sciences for Girls ST-32, Block-5, Boating Basin, Clifton, Karachi"
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-269, verdict: different, batch_name: "Sir Syed University of Engineering & Technology", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 116
+    pmdc_quote: "Dental Section, Liaquat College of Medicine & Dentistry ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-240, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+      - {inst_id: SD-MED-03, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 117
+    pmdc_quote: "Fatima Jinnah Dental College Block-D, Bhittai Colony, Korangi Greek,Karachi."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PB-MED-021, verdict: different, batch_name: "Fatima Jinnah Institute of Dental Sciences, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Fatima Jinnah Institute of Dental Sciences, Lahore vs Fatima Jinnah Dental College, Karachi)"}
+      - {inst_id: PB-MED-004, verdict: different, batch_name: "Fatima Jinnah Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+      - {inst_id: PK-UNI-106, verdict: different, batch_name: "Fatima Jinnah Medical University, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 118
+    pmdc_quote: "Isra Dental College Hala Road, P.O. Box-313, Hyderabad."
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-232, verdict: different, batch_name: "Isra University", batch_region: "Sindh", batch_city: "Hyderabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 119
+    pmdc_quote: "Ziauddin Dental College Karachi"
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-BRD-031, verdict: different, batch_name: "Ziauddin University Examination Board", batch_region: "National (private)", batch_city: null, check1_pair_verdict: different, reason: "batch row is an examination board"}
+      - {inst_id: PK-UNI-284, verdict: different, batch_name: "Zia-ud-Din University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 121
+    pmdc_quote: "Dental Section, Hamdard College of Medicine & Dentistry, Madinat Al-Hikmah,Shahrah-e-Madinat ul Hikmah, Mohammad Bin Qasim Avenue, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-222, verdict: different, batch_name: "Hamdard University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 122
+    pmdc_quote: "Rahbar College of Dentistry, Lahore"
+    section: private_dental
+    verdict: same
+    target: PB-MED-072
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-072
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-072, verdict: same, batch_name: "Rahbar College of Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-035, verdict: different, batch_name: "Rahbar Medical & Dental College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: different, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 123
+    pmdc_quote: "Azad Jammu & Kashmir Medical College Jalalabad,Muzaffarabad (AJ&K)"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-005, verdict: different, batch_name: "University of Azad Jammu & Kashmir", batch_region: "Azad Jammu & Kashmir", batch_city: "Muzaffarabad", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (University of Azad Jammu & Kashmir)"}
+  - key: 124
+    pmdc_quote: "Mohtarma Benazir Bhutto Shaheed Medical College Chiterparri,Mirpur (AJ&K)"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-09, verdict: different, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "names share a word but name a different institution (Lyari, Karachi vs Mirpur AJ&K)"}
+      - {inst_id: SD-MED-05, verdict: different, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical University, Larkana", batch_region: "Sindh", batch_city: null, check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college; other province"}
+      - {inst_id: PK-UNI-262, verdict: different, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical University", batch_region: "Sindh", batch_city: "Larkana", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college; other province"}
+  - key: 125
+    pmdc_quote: "Poonch Medical College Rawalakot"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-007, verdict: different, batch_name: "University of Poonch", batch_region: "Azad Jammu & Kashmir", batch_city: "Poonch", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 126
+    pmdc_quote: "Bolan Medical College Quetta"
+    section: public_medical
+    verdict: same
+    target: BL-MED-01
+    target_region: "Balochistan"
+    check1_verdict: same
+    check1_target: BL-MED-01
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: BL-MED-01, verdict: same, batch_name: "Bolan Medical College, Quetta", batch_region: "Balochistan", batch_city: "Quetta", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-015, verdict: different, batch_name: "The Bolan University of Medical and Health Sciences, Quetta", batch_region: "Balochistan", batch_city: "Quetta", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 128
+    pmdc_quote: "Bacha Khan Medical College Mardan"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-053, verdict: different, batch_name: "Bacha Khan University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Charsada", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Bacha Khan University, Charsada)"}
+  - key: 131
+    pmdc_quote: "Gomal Medical College D. I. Khan"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-059, verdict: different, batch_name: "Gomal University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Dera Ismail Khan", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 132
+    pmdc_quote: "Khyber Girls Medical College PDA Building, Block IV, Phase V, Hayatabad, Peshawar."
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-066, verdict: different, batch_name: "Khyber Medical University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: KP-ADM-001, verdict: different, batch_name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS", batch_region: "KP", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 133
+    pmdc_quote: "Khyber Medical College Peshawar"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-066, verdict: different, batch_name: "Khyber Medical University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Khyber Medical University vs Khyber Medical College)"}
+      - {inst_id: KP-ADM-001, verdict: different, batch_name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS", batch_region: "KP", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 134
+    pmdc_quote: "KMU Institute of Medical Sciences/ KIMS Divisional Headquarter Hospital, KDA, Kohat."
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-066, verdict: different, batch_name: "Khyber Medical University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: KP-ADM-001, verdict: different, batch_name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS", batch_region: "KP", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 137
+    pmdc_quote: "Allama Iqbal Medical College Allama Shabbir Ahmad Usmani Road, Lahore."
+    section: public_medical
+    verdict: same
+    target: PB-MED-002
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-002
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-002, verdict: same, batch_name: "Allama Iqbal Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 138
+    pmdc_quote: "Ameer-ud-Din (PGMI) Medical College Lahore General Hospital,Lahore."
+    section: public_medical
+    verdict: same
+    target: PB-MED-016
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-016
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-016, verdict: same, batch_name: "Ameer-ud-Din Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name (PMDC adds '(PGMI)')"}
+  - key: 140
+    pmdc_quote: "D.G. Khan Medical College Dera Ghazi Khan"
+    section: public_medical
+    verdict: same
+    target: PB-MED-014
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-014
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-014, verdict: same, batch_name: "D.G. Khan Medical College, Dera Ghazi Khan", batch_region: "Punjab", batch_city: "Dera Ghazi Khan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 141
+    pmdc_quote: "Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University), Queens Road,Lahore."
+    section: public_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-004, verdict: unclear, batch_name: "Fatima Jinnah Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: unclear, reason: "PMDC text 'Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University)' names both the college (PB-MED-004) and the university (PK-UNI-106); two batch rows could match"}
+      - {inst_id: PK-UNI-106, verdict: unclear, batch_name: "Fatima Jinnah Medical University, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: unclear, reason: "see PB-MED-004"}
+      - {inst_id: PB-MED-021, verdict: different, batch_name: "Fatima Jinnah Institute of Dental Sciences, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "one side is a dental college, the other the medical college of the same group: different institutions"}
+  - key: 142
+    pmdc_quote: "Federal Medical College, Al Farabi Centre, Hanna Road, G-8/4, Islamabad."
+    section: public_medical
+    verdict: same
+    target: IC-MED-01
+    target_region: "ICT"
+    check1_verdict: same
+    check1_target: IC-MED-01
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: IC-MED-01, verdict: same, batch_name: "Federal Medical College, Islamabad", batch_region: "ICT", batch_city: "Islamabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 143
+    pmdc_quote: "Gujranwala Medical College Satellite Town,Pasrur Road, Gujranwala."
+    section: public_medical
+    verdict: same
+    target: PB-MED-013
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-013
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-013, verdict: same, batch_name: "Gujranwala Medical College, Gujranwala", batch_region: "Punjab", batch_city: "Gujranwala", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-042, verdict: different, batch_name: "M. Islam Medical College, Gujranwala", batch_region: "Punjab", batch_city: "Gujranwala", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 144
+    pmdc_quote: "Khawaja Muhammad Safdar Medical College Commissioner Road,Sialkot."
+    section: public_medical
+    verdict: same
+    target: PB-MED-015
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-015
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-015, verdict: same, batch_name: "Khawaja Muhammad Safdar Medical College, Sialkot", batch_region: "Punjab", batch_city: "Sialkot", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 145
+    pmdc_quote: "King Edward Medical University Nila Gumbad, Lahore."
+    section: public_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-128, verdict: unclear, batch_name: "King Edward Medical University", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: unclear, reason: "PMDC name 'King Edward Medical University' equals PK-UNI-128 verbatim, but the batches also hold PB-MED-001 'King Edward Medical College, Lahore' in the same city; two rows could match"}
+      - {inst_id: PB-MED-001, verdict: unclear, batch_name: "King Edward Medical College, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: unclear, reason: "see PK-UNI-128"}
+  - key: 146
+    pmdc_quote: "Narowal M.C, Narowal"
+    section: public_medical
+    verdict: same
+    target: PB-MED-017
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-017
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-017, verdict: same, batch_name: "Narowal Medical College, Narowal", batch_region: "Punjab", batch_city: "Narowal", check1_pair_verdict: same, reason: "'Narowal M.C' = Narowal Medical College; same city; only public Narowal medical row"}
+      - {inst_id: PB-MED-050, verdict: different, batch_name: "Sahara Medical College, Narowal", batch_region: "Punjab", batch_city: "Narowal", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Sahara Medical College, private)"}
+      - {inst_id: PK-UNI-189, verdict: different, batch_name: "University of Narowal", batch_region: "Punjab", batch_city: "Narowal", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 147
+    pmdc_quote: "Nawaz Sharif Medical College Hafiz Hayat Campus, University of Gujrat, Gujrat."
+    section: public_medical
+    verdict: same
+    target: PB-MED-011
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-011
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-011, verdict: same, batch_name: "Nawaz Sharif Medical College, Gujrat", batch_region: "Punjab", batch_city: "Gujrat", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-180, verdict: different, batch_name: "University of Gujrat", batch_region: "Punjab", batch_city: "Gujrat", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (PMDC address names University of Gujrat)"}
+  - key: 148
+    pmdc_quote: "Nishtar Medical College Nishtar Road, Multan"
+    section: public_medical
+    verdict: same
+    target: PB-MED-003
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-003
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-003, verdict: same, batch_name: "Nishtar Medical College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name; PMDC says College and the batch has a separate College row"}
+      - {inst_id: PK-UNI-153, verdict: different, batch_name: "Nishtar Medical University, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PB-MED-019, verdict: different, batch_name: "Nishtar Institute of Dentistry, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 149
+    pmdc_quote: "Punjab Medical College Sargodha Road, Faisalabad."
+    section: public_medical
+    verdict: same
+    target: PB-MED-006
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-006
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-006, verdict: same, batch_name: "Punjab Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-105, verdict: different, batch_name: "Faisalabad Medical University, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PB-MED-020, verdict: different, batch_name: "Dental Institute, Punjab Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 150
+    pmdc_quote: "Quaid-e-Azam Medical College Bahawal Victoria Hospital, Circular Road, Bahawalpur."
+    section: public_medical
+    verdict: same
+    target: PB-MED-008
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-008
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-008, verdict: same, batch_name: "Quaid-e-Azam Medical College, Bahawalpur", batch_region: "Punjab", batch_city: "Bahawalpur", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PB-MED-024, verdict: different, batch_name: "Quaid-e-Azam Medical & Dental College Bahawalpur", batch_region: "Punjab", batch_city: "Bahawalpur", check1_pair_verdict: different, reason: "batch row is 'Quaid-e-Azam Medical & Dental College' typed public_dental_college, new in 2026-27; PMDC line is the medical college at Bahawal Victoria Hospital"}
+  - key: 151
+    pmdc_quote: "Rawalpindi Medical College New Teaching Block, Holy Family Hospital, Rawalpindi."
+    section: public_medical
+    verdict: same
+    target: PB-MED-007
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-007
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-007, verdict: same, batch_name: "Rawalpindi Medical College, Rawalpindi", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-162, verdict: different, batch_name: "Rawalpindi Medical University", batch_region: "Punjab", batch_city: "Rawalpindi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 152
+    pmdc_quote: "Sahiwal Medical College Civil Hospital, Sahiwal."
+    section: public_medical
+    verdict: same
+    target: PB-MED-012
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-012
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-012, verdict: same, batch_name: "Sahiwal Medical College, Sahiwal", batch_region: "Punjab", batch_city: "Sahiwal", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-192, verdict: different, batch_name: "University of Sahiwal", batch_region: "Punjab", batch_city: "Sahiwal", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 153
+    pmdc_quote: "Sargodha Medical College Johar Block, University Road, Sargodha."
+    section: public_medical
+    verdict: same
+    target: PB-MED-010
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-010
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-010, verdict: same, batch_name: "Sargodha Medical College, Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-193, verdict: different, batch_name: "University of Sargodha", batch_region: "Punjab", batch_city: "Sargodha", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 154
+    pmdc_quote: "Services Institute of Medical Sciences Services Hospital, Jail Road, Lahore."
+    section: public_medical
+    verdict: same
+    target: PB-MED-005
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-005
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-005, verdict: same, batch_name: "Services Institute of Medical Sciences, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 155
+    pmdc_quote: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College Shaikh Zayed Hospital, Lahore."
+    section: public_medical
+    verdict: same
+    target: IC-MED-02
+    target_region: "Punjab (federal)"
+    check1_verdict: same
+    check1_target: IC-MED-02
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: IC-MED-02, verdict: same, batch_name: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore", batch_region: "Punjab (federal)", batch_city: "Lahore", check1_pair_verdict: same, reason: "name identical; PMDC address Shaikh Zayed Hospital, Lahore = batch city Lahore; only row"}
+      - {inst_id: PB-MED-009, verdict: different, batch_name: "Sheikh Zayed Medical College, Rahim Yar Khan", batch_region: "Punjab", batch_city: "Rahim Yar Khan", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Sheikh Zayed MC, Rahim Yar Khan)"}
+  - key: 156
+    pmdc_quote: "Sheikh Zayed Medical College,Rahim Yar Khan."
+    section: public_medical
+    verdict: same
+    target: PB-MED-009
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-009
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-009, verdict: same, batch_name: "Sheikh Zayed Medical College, Rahim Yar Khan", batch_region: "Punjab", batch_city: "Rahim Yar Khan", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: IC-MED-02, verdict: different, batch_name: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore", batch_region: "Punjab (federal)", batch_city: "Lahore", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Lahore)"}
+  - key: 159
+    pmdc_quote: "Dow International Medical College KDA Scheme 35, Gulzar-e-Hijri, New Suparco, Karachi"
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-02, verdict: different, batch_name: "Dow University of Health Sciences, Karachi", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-213, verdict: different, batch_name: "DOW University of Health Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 160
+    pmdc_quote: "Dow Medical College Baba-e-Urdu Road, Karach."
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-02, verdict: different, batch_name: "Dow University of Health Sciences, Karachi", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-213, verdict: different, batch_name: "DOW University of Health Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 161
+    pmdc_quote: "Gambat Medical College Gambat-Khairpur Mirs"
+    section: public_medical
+    verdict: same
+    target: SD-MED-07
+    target_region: "Sindh"
+    check1_verdict: same
+    check1_target: SD-MED-07
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-07, verdict: same, batch_name: "Gambat Medical College, Gambat", batch_region: "Sindh", batch_city: null, check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-218, verdict: different, batch_name: "Gambat Institute of Medical Sciences", batch_region: "Sindh", batch_city: "Khairpur", check1_pair_verdict: different, reason: "names share a word but name a different institution (Gambat Institute of Medical Sciences is a differently named row)"}
+  - key: 163
+    pmdc_quote: "Karachi Medical & Dental College Block M, North Nazimabad, Karachi."
+    section: public_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-06, verdict: unclear, batch_name: "Karachi Metropolitan University (KMDC)", batch_region: "Sindh", batch_city: null, check1_pair_verdict: unclear, reason: "batch name 'Karachi Metropolitan University (KMDC)' names a university with KMDC in brackets; PMDC line is the college; PK-UNI-238 also names the university; cannot tell which row, if any, is the college"}
+      - {inst_id: PK-UNI-238, verdict: unclear, batch_name: "Karachi Metropolitan University, Karachi", batch_region: "Sindh", batch_city: "Abbottabad", check1_pair_verdict: not_listed, reason: "same university name; batch city 'Abbottabad' conflicts with Karachi"}
+  - key: 164
+    pmdc_quote: "Liaquat University of Medical & Health Sciences Jamshoro"
+    section: public_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-03, verdict: unclear, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: unclear, reason: "identical name in two batch rows (SD-MED-03 batch 3, PK-UNI-240 batch 1); two rows could match"}
+      - {inst_id: PK-UNI-240, verdict: unclear, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: unclear, reason: "see SD-MED-03"}
+  - key: 165
+    pmdc_quote: "Liaquat Institute of Medical & Health Sciences (LIMHS)Thatta, Sindh, Pakistan."
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-03, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "names share a word but name a different institution (LIMHS Thatta is not LUMHS Jamshoro)"}
+      - {inst_id: PK-UNI-240, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: different, reason: "names share a word but name a different institution"}
+  - key: 166
+    pmdc_quote: "Peoples University of Medical & Health Sciences for Women Shaheed Benazir-Abad, Nawab-shah."
+    section: public_medical
+    verdict: unclear
+    target: null
+    target_region: null
+    check1_verdict: unclear
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-04, verdict: unclear, batch_name: "Peoples University of Medical & Health Sciences for Women, SBA", batch_region: "Sindh", batch_city: null, check1_pair_verdict: unclear, reason: "identical name in two batch rows (SD-MED-04 batch 3, PK-UNI-250 batch 1); two rows could match"}
+      - {inst_id: PK-UNI-250, verdict: unclear, batch_name: "Peoples University of Medical & Health Sciences for Women", batch_region: "Sindh", batch_city: "Nawabshah", check1_pair_verdict: unclear, reason: "see SD-MED-04"}
+  - key: 167
+    pmdc_quote: "Shaheed Mohtarma Benazir Bhutto Medical College, Behind Lyari General Hospital, Tamery Road, Lyari, Karachi."
+    section: public_medical
+    verdict: same
+    target: SD-MED-09
+    target_region: "Sindh"
+    check1_verdict: same
+    check1_target: SD-MED-09
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-09, verdict: same, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari", batch_region: "Sindh", batch_city: null, check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name (Lyari)"}
+      - {inst_id: SD-MED-05, verdict: different, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical University, Larkana", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Larkana)"}
+      - {inst_id: PK-UNI-262, verdict: different, batch_name: "Shaheed Mohtarma Benazir Bhutto Medical University", batch_region: "Sindh", batch_city: "Larkana", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-209, verdict: different, batch_name: "Benazir Bhutto Shaheed University Lyari", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Benazir Bhutto Shaheed University Lyari)"}
+  - key: 168
+    pmdc_quote: "Sindh Medical College Sarfaraz Rafique Shaheed Road, Karachi."
+    section: public_medical
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-267, verdict: different, batch_name: "Sindh Institute of Medical Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution (Sindh Institute of Medical Sciences)"}
+  - key: 169
+    pmdc_quote: "Khairpur Medical College Khairpur Mirs"
+    section: public_medical
+    verdict: same
+    target: SD-MED-08
+    target_region: "Sindh"
+    check1_verdict: same
+    check1_target: SD-MED-08
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-08, verdict: same, batch_name: "Khairpur Medical College, Khairpur Mirs", batch_region: "Sindh", batch_city: null, check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 170
+    pmdc_quote: "Jhalawan Medical College, Khuzdar - Baluchistan"
+    section: public_medical
+    verdict: same
+    target: BL-MED-02
+    target_region: "Balochistan"
+    check1_verdict: same
+    check1_target: BL-MED-02
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: BL-MED-02, verdict: same, batch_name: "Jhalawan Medical College (JMC), Khuzdar", batch_region: "Balochistan", batch_city: "Khuzdar", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 171
+    pmdc_quote: "Loralai Medical College, Loralai - Baluchistan"
+    section: public_medical
+    verdict: same
+    target: BL-MED-03
+    target_region: "Balochistan"
+    check1_verdict: same
+    check1_target: BL-MED-03
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: BL-MED-03, verdict: same, batch_name: "Loralai Medical College (LMC), Loralai", batch_region: "Balochistan", batch_city: "Loralai", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+      - {inst_id: PK-UNI-018, verdict: different, batch_name: "University of Loralai", batch_region: "Balochistan", batch_city: "Loralai", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 172
+    pmdc_quote: "Makran Medical College, Turbat - Baluchistan"
+    section: public_medical
+    verdict: same
+    target: BL-MED-04
+    target_region: "Balochistan"
+    check1_verdict: same
+    check1_target: BL-MED-04
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: BL-MED-04, verdict: same, batch_name: "Mekran Medical College (MMC), Turbat", batch_region: "Balochistan", batch_city: "Turbat", check1_pair_verdict: same, reason: "'Makran' vs batch 'Mekran' (spelling only); same city Turbat; only batch row with this name"}
+      - {inst_id: PK-UNI-019, verdict: different, batch_name: "University of Makran, Panjgur", batch_region: "Balochistan", batch_city: "Punjgur", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (University of Makran, Panjgur)"}
+  - key: 173
+    pmdc_quote: "Dental Section, Bolan Medical College Quetta."
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: BL-MED-01, verdict: different, batch_name: "Bolan Medical College, Quetta", batch_region: "Balochistan", batch_city: "Quetta", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-015, verdict: different, batch_name: "The Bolan University of Medical and Health Sciences, Quetta", batch_region: "Balochistan", batch_city: "Quetta", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 174
+    pmdc_quote: "Bacha Khan Dental College Mardan"
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: null
+    check1_target: null
+    agrees_with_check1: no_check1_candidate
+    pairs:
+      - {inst_id: PK-UNI-053, verdict: different, batch_name: "Bacha Khan University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Charsada", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 176
+    pmdc_quote: "Khyber College of Dentistry Peshawar"
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-066, verdict: different, batch_name: "Khyber Medical University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: KP-ADM-001, verdict: different, batch_name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS", batch_region: "KP", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 177
+    pmdc_quote: "KMU Institute of Dental Sciences/ KIDS Kohat."
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PK-UNI-066, verdict: different, batch_name: "Khyber Medical University", batch_region: "Khyber Pakhtunkhwa", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: KP-ADM-001, verdict: different, batch_name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS", batch_region: "KP", batch_city: "Peshawar", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 178
+    pmdc_quote: "De'montmorency College of Dentistry, Yakki Gate, Lahore."
+    section: public_dental
+    verdict: same
+    target: PB-MED-018
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-018
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-018, verdict: same, batch_name: "de' Montmorency College of Dentistry, Lahore", batch_region: "Punjab", batch_city: "Lahore", check1_pair_verdict: same, reason: "same name (spelling/punctuation/city suffix only), same city in PMDC address and batch city, the only batch row with this name"}
+  - key: 180
+    pmdc_quote: "Dental Section, Punjab Medical College Sargodha Road, Faisalabad"
+    section: public_dental
+    verdict: same
+    target: PB-MED-020
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-020
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-020, verdict: same, batch_name: "Dental Institute, Punjab Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: same, reason: "dental unit of Punjab Medical College ('Dental Section' vs 'Dental Institute'); same city; only row"}
+      - {inst_id: PB-MED-006, verdict: different, batch_name: "Punjab Medical College, Faisalabad", batch_region: "Punjab", batch_city: "Faisalabad", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 181
+    pmdc_quote: "Institute of Dentistry, Nishtar Medical College Nishtar Road, Multan."
+    section: public_dental
+    verdict: same
+    target: PB-MED-019
+    target_region: "Punjab"
+    check1_verdict: same
+    check1_target: PB-MED-019
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: PB-MED-019, verdict: same, batch_name: "Nishtar Institute of Dentistry, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: same, reason: "'Institute of Dentistry, Nishtar Medical College' = 'Nishtar Institute of Dentistry, Multan'; only row"}
+      - {inst_id: PK-UNI-153, verdict: different, batch_name: "Nishtar Medical University, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PB-MED-003, verdict: different, batch_name: "Nishtar Medical College, Multan", batch_region: "Punjab", batch_city: "Multan", check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+  - key: 183
+    pmdc_quote: "Dental College, Dow International Medical College Ojha Campus, Baba-e-Urdu Road, Karachi."
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-02, verdict: different, batch_name: "Dow University of Health Sciences, Karachi", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-213, verdict: different, batch_name: "DOW University of Health Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 184
+    pmdc_quote: "Dental Section, Karachi Medical & Dental College Block M, North Nazimabad, Karachi."
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-06, verdict: different, batch_name: "Karachi Metropolitan University (KMDC)", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "one side is a dental college/section, the other its parent medical college: a dental section is not its parent"}
+      - {inst_id: PK-UNI-238, verdict: different, batch_name: "Karachi Metropolitan University, Karachi", batch_region: "Sindh", batch_city: "Abbottabad", check1_pair_verdict: not_listed, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 186
+    pmdc_quote: "Faculty of Dentistry, Liaquat University of Medical & Health Sciences, Jamshoro"
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-03, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences, Jamshoro", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college (Faculty of Dentistry)"}
+      - {inst_id: PK-UNI-240, verdict: different, batch_name: "Liaquat University of Medical & Health Sciences", batch_region: "Sindh", batch_city: "Jamshoro", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 187
+    pmdc_quote: "Sindh Institute of Oral Health Sciences/ JSMU Karachi."
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-01, verdict: different, batch_name: "Jinnah Sindh Medical University, Karachi", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-233, verdict: different, batch_name: "Jinnah Sindh Medical University", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-267, verdict: different, batch_name: "Sindh Institute of Medical Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: not_listed, reason: "names share a word but name a different institution"}
+  - key: 188
+    pmdc_quote: "Dow Dental College, Baba-e-Urdu Road, Karachi (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: public_dental
+    verdict: different
+    target: null
+    target_region: null
+    check1_verdict: different
+    check1_target: null
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: SD-MED-02, verdict: different, batch_name: "Dow University of Health Sciences, Karachi", batch_region: "Sindh", batch_city: null, check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: PK-UNI-213, verdict: different, batch_name: "DOW University of Health Sciences", batch_region: "Sindh", batch_city: "Karachi", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+  - key: 189
+    pmdc_quote: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University Islamabad"
+    section: public_dental
+    verdict: same
+    target: IC-MED-03
+    target_region: "ICT"
+    check1_verdict: same
+    check1_target: IC-MED-03
+    agrees_with_check1: true
+    pairs:
+      - {inst_id: IC-MED-03, verdict: same, batch_name: "School of Dentistry, Islamabad", batch_region: "ICT", batch_city: "Islamabad", check1_pair_verdict: same, reason: "'School of Dentistry, ... Islamabad' = batch 'School of Dentistry, Islamabad'; same city; only row"}
+      - {inst_id: PK-UNI-047, verdict: different, batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University", batch_region: "Islamabad Capital Territory", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+      - {inst_id: IC-ADM-001, verdict: different, batch_name: "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges", batch_region: "ICT", batch_city: "Islamabad", check1_pair_verdict: different, reason: "batch row is the university; the PMDC line is a college/faculty/school of it or a separately named institution: a university is not its constituent college"}
+new_pairs_not_in_check1:
+  - {key: 1, inst_id: PK-UNI-003, verdict: different}
+  - {key: 21, inst_id: PK-UNI-169, verdict: different}
+  - {key: 44, inst_id: PK-UNI-161, verdict: different}
+  - {key: 51, inst_id: PB-MED-015, verdict: different}
+  - {key: 52, inst_id: PK-UNI-185, verdict: different}
+  - {key: 53, inst_id: PK-UNI-170, verdict: different}
+  - {key: 54, inst_id: PK-UNI-199, verdict: different}
+  - {key: 64, inst_id: SD-MED-03, verdict: different}
+  - {key: 65, inst_id: SD-MED-03, verdict: different}
+  - {key: 67, inst_id: PK-UNI-269, verdict: different}
+  - {key: 69, inst_id: PK-UNI-284, verdict: different}
+  - {key: 70, inst_id: GB-COL-006, verdict: different}
+  - {key: 75, inst_id: PB-MED-063, verdict: different}
+  - {key: 87, inst_id: PB-MED-025, verdict: different}
+  - {key: 94, inst_id: PK-UNI-185, verdict: different}
+  - {key: 95, inst_id: PK-UNI-170, verdict: different}
+  - {key: 105, inst_id: PK-UNI-161, verdict: different}
+  - {key: 114, inst_id: PK-UNI-269, verdict: different}
+  - {key: 116, inst_id: PK-UNI-240, verdict: different}
+  - {key: 116, inst_id: SD-MED-03, verdict: different}
+  - {key: 117, inst_id: PB-MED-021, verdict: different}
+  - {key: 117, inst_id: PB-MED-004, verdict: different}
+  - {key: 117, inst_id: PK-UNI-106, verdict: different}
+  - {key: 119, inst_id: PK-UNI-284, verdict: different}
+  - {key: 123, inst_id: PK-UNI-005, verdict: different}
+  - {key: 124, inst_id: SD-MED-05, verdict: different}
+  - {key: 124, inst_id: PK-UNI-262, verdict: different}
+  - {key: 128, inst_id: PK-UNI-053, verdict: different}
+  - {key: 141, inst_id: PB-MED-021, verdict: different}
+  - {key: 143, inst_id: PB-MED-042, verdict: different}
+  - {key: 146, inst_id: PB-MED-050, verdict: different}
+  - {key: 146, inst_id: PK-UNI-189, verdict: different}
+  - {key: 147, inst_id: PK-UNI-180, verdict: different}
+  - {key: 152, inst_id: PK-UNI-192, verdict: different}
+  - {key: 153, inst_id: PK-UNI-193, verdict: different}
+  - {key: 155, inst_id: PB-MED-009, verdict: different}
+  - {key: 156, inst_id: IC-MED-02, verdict: different}
+  - {key: 163, inst_id: PK-UNI-238, verdict: unclear}
+  - {key: 167, inst_id: PK-UNI-209, verdict: different}
+  - {key: 168, inst_id: PK-UNI-267, verdict: different}
+  - {key: 171, inst_id: PK-UNI-018, verdict: different}
+  - {key: 172, inst_id: PK-UNI-019, verdict: different}
+  - {key: 173, inst_id: PK-UNI-015, verdict: different}
+  - {key: 174, inst_id: PK-UNI-053, verdict: different}
+  - {key: 184, inst_id: PK-UNI-238, verdict: different}
+  - {key: 187, inst_id: PK-UNI-267, verdict: different}
+summary:
+  pmdc_lines: 190
+  lines_with_any_candidate: 133
+  lines_same: 74
+  lines_unclear: 8   # keys [18, 56, 104, 141, 145, 163, 164, 166]
+  lines_different_only: 51
+  lines_without_candidate: 57
+  candidate_pairs: 241
+  new_pairs_found: 46   # all judged different; none adds or changes an alias target
+  alias_target_regions: {"Punjab": 64, "Balochistan": 4, "ICT": 2, "Punjab (federal)": 1, "Sindh": 3}
+  each_target_used_once: true
+  check1_lines_compared: 122
+  check1_lines_agree: 120
+  check1_lines_disagree: [18, 56]
+  check1_pair_verdicts_changed: [{"key": 18, "inst_id": "PB-MED-054", "check1": "same", "check2": "unclear"}, {"key": 56, "inst_id": "PB-MED-048", "check1": "same", "check2": "unclear"}]
+  check1_lines_missing_here: []
+  flags:
+    - "key 18: disagree with check 1. PMDC 'Faizpur Interchange, M-2 Motorway, Lahore' vs PB-MED-054 batch city Sheikhupura; nothing printed settles it, so unclear and no alias target"
+    - "key 56: disagree with check 1. PMDC '2-Shahra-e-Fatima Jinnah, Lahore' vs PB-MED-048 batch city Kasur; nothing printed settles it, so unclear and no alias target"
+    - "key 155: IC-MED-02 region cell is literally 'Punjab (federal)' (openpyxl read of batch 4 v4 Institutions); city Lahore. Not a standard region value: a reviewer must decide the region stored for the alias"
+    - "key 189: IC-MED-03 'School of Dentistry, Islamabad' is typed public_medical_college in batch 4 for a dental school"
+    - "key 163: PK-UNI-238 (Karachi Metropolitan University) has batch city 'Abbottabad' while its name and province say Karachi/Sindh; check 1 did not list this row"
+    - "keys 164, 166: the same university name sits twice in the batches (batch 3 SD-MED-03/04 and batch 1 PK-UNI-240/250): an upstream duplicate-entity issue, separate from PMDC"
+    - "keys 141, 145: the batches hold both a college row and an HEC university row for one name group; a reviewer must pick the row"
+    - "key 104: Margalla names differ (College of Dentistry vs Institute of Health Sciences); unclear, as in check 1"

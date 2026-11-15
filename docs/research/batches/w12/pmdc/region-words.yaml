@@ -1,0 +1,8 @@
+# Province or territory word printed in a PMDC row -> region code of backend/app/os/knowledge/regions.yaml (PK)
+# (controller ruling 2, W12 D-PMDC, 2026-11-15, for the owner to confirm). Matched exactly (case as printed), not
+# inside a longer word. No region is ever taken from a city. A row with none of these words gets an empty region.
+# Read by derive.py.
+"AJ&K": azad_jammu_and_kashmir            # regions.yaml: Azad Jammu and Kashmir
+"Islamabad": islamabad_capital_territory  # regions.yaml alias "Islamabad"; the list names the territory by this word
+"Sindh": sindh                            # regions.yaml: Sindh
+"Baluchistan": balochistan                # regions.yaml alias "Baluchistan"
