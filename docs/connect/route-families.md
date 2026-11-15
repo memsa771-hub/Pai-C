@@ -59,3 +59,26 @@ system, and never silently dropped. A family playbook without such steps compile
   `released=None` or use `newest_plain` without `released`, so they see every playbook.
 - **When it is turned on.** Not in P3. ADR-001 plans to turn on the intermediate family's flag for the P5 pilot
   (Q8).
+
+## Which programmes a family playbook sees (P3-T2, ADR D4)
+
+- **One rule.** `programmes_of(playbook)` (`app/os/knowledge/programmes.py`) decides which programmes a playbook
+  sees. Every reader of a route's programmes uses it: the Counsellor intake (both checks), the self-serve builder
+  (start and swap), the self-serve lists, cards and requests, eligibility notes, replan suggestions, ProgrammeList v1
+  and v2, programme facts, and the term backfill. A test (`test_p3t2_family_binding.py`) fails if OS code reads a
+  route's programmes by its key instead.
+- **A playbook with `family`:** the active programmes whose `family` and `level` columns match the playbook's family
+  and route level, whatever their `route_key`. A student's own request on the route (status `requested`) has no
+  registry place, so it is matched by the route's key, as on any other route.
+- **A playbook without `family`** (Germany and every fixture): the programmes whose `route_key` is the playbook's key,
+  exactly as before.
+- **Where `family` comes from.** The importer writes the run's `--family` on every programme it places (through
+  `RegistryStore.link_programme`, so it is a revision, and an import undo restores it). A Programmes row whose
+  institution is on an official list of another family is rejected with `family_conflicts_with_list`. Without
+  `--family` nothing is written, as before, and the command says so.
+- **Programmes imported before this.** `python -m scripts.os_programme_family_backfill --family CODE --import ID ...`
+  applies the same rule to the programmes those imports placed. The imports did not record their `--family`, so the
+  operator names it. It is a dry run unless `--apply`. Each change is a registry revision with the cause_ref
+  `family-backfill-<UTC time>`, and `--undo <that ref>` restores it (refused if the programme changed since). A
+  programme that already has another family, or whose lists name another family, is reported and left alone. No
+  migration is needed: the column exists since os_0027.
