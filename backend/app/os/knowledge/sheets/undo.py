@@ -126,6 +126,10 @@ def undo_import(engine: Engine, tenant_id: str, import_id: int, *, actor: str,
     cancelled = [ref for r in log.list(10_000) if r.status == "undone" and r.id != import_id
                  for ref in (cause_ref(r.id), f"undo-{r.id}")]
     result = UndoResult()
+    from app.os.knowledge.family_backfill import undone_runs
+
+    with engine.connect() as conn:  # P3-T2: a family backfill that was undone is no change either
+        cancelled += undone_runs(conn, tenant_id)
     changed: list[tuple[str, str, str, int, str, int]] = []  # facts changed back, told to the plans after the commit
     with engine.begin() as conn:
         fact_chains = _fact_chains(conn, tenant_id, cref)
