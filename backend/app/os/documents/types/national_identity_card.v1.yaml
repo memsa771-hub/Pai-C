@@ -1,0 +1,11 @@
+# National identity document: an adult identity card, a child registration certificate or a juvenile card
+# (master R-40: CNIC / B-Form / NADRA Juvenile Card; ADR-001 D13, P3 type and need). Fields: the minimal identity
+# fields every such document has (holder_name, issuing_authority), plus identity_number, which SI-11 cites
+# (registration uses the card's number) and N-37 (a copy of the national ID or Form B). No other field is cited.
+key: national_identity_card
+version: 1
+label: National identity card or child registration certificate
+fields:
+  - {name: holder_name, type: name, cross_check: full_name, hint: "The name of the person the document is for, exactly as printed"}
+  - {name: issuing_authority, type: text, hint: "The office or body that issued the document, as printed"}
+  - {name: identity_number, type: code, hint: "The identity or registration number printed on the card, with its dashes"}

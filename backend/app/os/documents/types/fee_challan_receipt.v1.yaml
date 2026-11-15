@@ -1,0 +1,9 @@
+# Fee challan receipt (master R-40; ADR-001 D13, P3 type; no step needs it until a fee step is cited). No cited
+# line names its fields, so only the minimal identity fields are defined (holder_name, issuing_authority). No amount
+# field: a fee is a Knowledge fact per intake (D7), never read into a type without a citation.
+key: fee_challan_receipt
+version: 1
+label: Fee payment receipt (challan)
+fields:
+  - {name: holder_name, type: name, cross_check: full_name, hint: "The name of the person the document is for, exactly as printed"}
+  - {name: issuing_authority, type: text, hint: "The office or body that issued the document, as printed"}

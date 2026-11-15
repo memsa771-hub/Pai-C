@@ -1,0 +1,8 @@
+# O-level or A-level statement of results (master R-40; ADR-001 D13, P3 type, no step needs it yet). No cited
+# line names its fields, so only the minimal identity fields are defined (holder_name, issuing_authority).
+key: o_a_level_statement
+version: 1
+label: O-level / A-level statement of results
+fields:
+  - {name: holder_name, type: name, cross_check: full_name, hint: "The name of the person the document is for, exactly as printed"}
+  - {name: issuing_authority, type: text, hint: "The office or body that issued the document, as printed"}

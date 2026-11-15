@@ -1,0 +1,11 @@
+# Equivalence certificate for a foreign or O/A-level qualification (master R-40: IBCC equivalence; ADR-001 D13,
+# P3 type and need, conditional). Fields: the minimal identity fields (holder_name, issuing_authority), plus
+# equivalent_level, which II-08 cites (equivalence "at the relevant level") with N-32/N-34 (a qualification counts
+# as the secondary or higher-secondary level). No marks field: no cited line names one.
+key: equivalence_certificate
+version: 1
+label: Equivalence certificate
+fields:
+  - {name: holder_name, type: name, cross_check: full_name, hint: "The name of the person the document is for, exactly as printed"}
+  - {name: issuing_authority, type: text, hint: "The office or body that issued the document, as printed"}
+  - {name: equivalent_level, type: text, hint: "The local level the qualification is declared equivalent to, as printed"}

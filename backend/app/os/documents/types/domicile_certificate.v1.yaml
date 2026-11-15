@@ -1,0 +1,9 @@
+# Domicile certificate (master R-40; ADR-001 D13, P3 type, no step needs it yet for intermediate). No cited line
+# names its fields, so only the minimal identity fields are defined (holder_name, issuing_authority). The place of
+# domicile is not read: no line cites it, and the student's domicile is a Vault fact (constraint.domicile).
+key: domicile_certificate
+version: 1
+label: Domicile certificate
+fields:
+  - {name: holder_name, type: name, cross_check: full_name, hint: "The name of the person the document is for, exactly as printed"}
+  - {name: issuing_authority, type: text, hint: "The office or body that issued the document, as printed"}
