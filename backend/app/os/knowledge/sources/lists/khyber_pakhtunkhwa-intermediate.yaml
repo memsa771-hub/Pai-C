@@ -1,0 +1,44 @@
+# Reviewed allow-list, region khyber_pakhtunkhwa, family intermediate (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+# Entries reviewed by claude-allowlist-check-1b and claude-allowlist-check-2b (W13 round b, 2026-11-14) say so in
+# reviewed_by; the same owner ruling covers them.
+region: khyber_pakhtunkhwa
+family: intermediate
+bodies:
+- body_ref: ''
+  tier: regulator
+  domains:
+  - ibcc.edu.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Inter Boards Coordination Commission (IBCC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Inter Boards Coordination Commission: https://ibcc.edu.pk/'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page: link "Inter Boards Coordination Commission" href "https://ibcc.edu.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - admission.hed.gkp.pk
+  list_ref: https://hed.gkp.pk/
+  reviewed_by: claude-allowlist-check-1b, claude-allowlist-check-2b
+  inst_id: KP-ADM-002
+  name: OCAS KP Colleges (online college admission system of HED KP)
+  evidence:
+    url: https://hed.gkp.pk/
+    quote: 'link "OCAS KP Colleges" href https://admission.hed.gkp.pk/ ; link "Enroll Now" href https://admission.hed.gkp.pk/'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://hed.gkp.pk/
+    quote: 'Footer "Important Links": link "OCAS KP Colleges" href "https://admission.hed.gkp.pk/"; also "Enroll Now" href
+      "https://admission.hed.gkp.pk/" after "News / Updates"'
+    retrieved: '2026-11-14'

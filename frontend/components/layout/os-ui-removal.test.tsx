@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, renderHook } from '@testing-library/react';
+import { cleanup, fireEvent, render, renderHook } from '@testing-library/react';
+import { NotificationCard } from '../notifications/notification-card';
 import { useDesktopWorkspaceState } from './use-desktop-workspace-state';
 import { useNotificationNavigation } from '../notifications/use-notification-navigation';
 import type { NotificationItem } from '@/lib/types';
@@ -54,8 +55,21 @@ it('keeps roadmap notifications and Counselor conversation navigation', async ()
   const { result } = renderHook(useNotificationNavigation);
   await result.current(notification({ createdBy: 'system:roadmaps' }));
   expect(state.openView).toHaveBeenLastCalledWith('roadmap');
+  state.openView.mockClear();
+  // A PAI OS plan notice (created by system:pai-os, relative link_url) opens the Roadmap page too.
+  await result.current(notification({ createdBy: 'system:pai-os', linkUrl: '/ws?view=roadmap', isRead: true }));
+  expect(state.openView).toHaveBeenLastCalledWith('roadmap');
   await result.current(notification({ channelName: 'pai-counselor', isRead: true }));
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor');
   expect(state.openView).toHaveBeenLastCalledWith('threads');
   expect(state.markNotificationRead).toHaveBeenCalledTimes(1);
+});
+
+it('shows no link anchor for a system:pai-os notice with a relative link, and still opens the roadmap', () => {
+  const onNavigate = vi.fn();
+  const { container, getByText } = render(<NotificationCard onRead={vi.fn()} onDismiss={vi.fn()} onNavigate={onNavigate}
+    notification={notification({ createdBy: 'system:pai-os', title: 'Plan update', linkUrl: '/ws?view=roadmap' })} />);
+  expect(container.querySelector('a')).toBeNull();
+  fireEvent.click(getByText('Plan update'));
+  expect(onNavigate).toHaveBeenCalledTimes(1);
 });

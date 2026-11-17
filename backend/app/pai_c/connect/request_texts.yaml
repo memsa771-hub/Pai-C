@@ -1,0 +1,11 @@
+# P1-T8 (D-w16): the line the roadmap shows on a step that waits for something the student must give or settle (R-18,
+# R-19, R-21). Approved by the owner (chat: "just update it directly"). Copy lives here, never in code. Plain English.
+# No country, institution or date.
+version: 1
+approved: true
+texts:
+  provide_stated: "PAI needs this from you. Tell PAI in the chat or on your profile page."
+  provide_shown: "PAI needs to see this. Upload it on the Documents page."
+  provide_confirmed: "Check this on your profile page."
+  which_is_right: "Two places say different things. Choose the right one on your Vault page or in your PAI inbox."
+  result_expected: "Your result is not out yet. PAI will ask for it when it is."

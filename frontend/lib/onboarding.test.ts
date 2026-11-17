@@ -99,3 +99,64 @@ describe('Other text that names a level', () => {
     expect(chipKey(fields, 'level', 'intermediate')).not.toBe(chipKey(fields, 'level', 'bachelor'));
   });
 });
+
+// req: R-47
+describe('marks questions', () => {
+  const MARKS: OnboardingFieldSpec[] = [
+    ...EDUCATION,
+    spec('marksObtained', { isNumber: true, depends_on: { field: 'status', values: ['completed'] } }),
+    spec('marksObtained', { isNumber: true, required: false, depends_on: { field: 'status', values: ['current'] } }),
+    spec('entryTest', { required: false, choices: ['mdcat'] }),
+  ];
+
+  it('does not require a required follow-up its condition hides', () => {
+    const shown = visibleOnboardingFields(MARKS, { level: 'intermediate', status: 'current' });
+    expect(shown.filter((f) => f.name === 'marksObtained').map((f) => f.required)).toEqual([false]);
+    const done = visibleOnboardingFields(MARKS, { level: 'intermediate', status: 'completed' });
+    expect(done.filter((f) => f.name === 'marksObtained').map((f) => f.required)).toEqual([true]);
+  });
+
+  it('leaves an optional question left empty out of the answers', () => {
+    expect(visibleOnboardingAnswers(MARKS, { level: 'other', status: 'current' }))
+      .toEqual({ level: 'other', status: 'current' });
+    expect(visibleOnboardingAnswers(MARKS, { level: 'other', status: 'current', entryTest: 'mdcat' }))
+      .toEqual({ level: 'other', status: 'current', entryTest: 'mdcat' });
+  });
+});
+
+// req: R-80
+describe('Part-I and Part-II marks questions', () => {
+  const inter = { field: 'level', values: ['intermediate'] };
+  const done = { field: 'status', values: ['completed'], and: inter };
+  const yearTwo = { field: 'year', values: ['year_2'], and: { field: 'status', values: ['current'], and: inter } };
+  const PARTS: OnboardingFieldSpec[] = [
+    ...EDUCATION,
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', depends_on: done }),
+    spec('part1MarksTotal', { isNumber: true, required: false, depends_on: done }),
+    spec('part1MarksObtained', { isNumber: true, required: false, atMost: 'part1MarksTotal', depends_on: yearTwo }),
+    spec('part1MarksTotal', { isNumber: true, required: false, depends_on: yearTwo }),
+    spec('part2MarksObtained', { isNumber: true, required: false, atMost: 'part2MarksTotal', depends_on: done }),
+    spec('part2MarksTotal', { isNumber: true, required: false, depends_on: done }),
+  ];
+  const names = (answers: Record<string, string>) => visibleOnboardingFields(PARTS, answers)
+    .map((f) => f.name).filter((n) => n.startsWith('part'));
+
+  it('asks both parts of a completed intermediate student', () => {
+    expect(names({ level: 'intermediate', status: 'completed' }))
+      .toEqual(['part1MarksObtained', 'part1MarksTotal', 'part2MarksObtained', 'part2MarksTotal']);
+  });
+
+  it('asks only Part-I of a second-year student, and nothing in year one or at another level', () => {
+    expect(names({ level: 'intermediate', status: 'current', year: 'year_2' }))
+      .toEqual(['part1MarksObtained', 'part1MarksTotal']);
+    expect(names({ level: 'intermediate', status: 'current', year: 'year_1' })).toEqual([]);
+    expect(names({ level: 'matric', status: 'completed' })).toEqual([]);
+  });
+
+  it('leaves unanswered optional parts out of the answers', () => {
+    const base = { level: 'intermediate', status: 'completed', group: 'pre_medical', year: '2025' };
+    expect(visibleOnboardingAnswers(PARTS, base)).toEqual(base);
+    expect(visibleOnboardingAnswers(PARTS, { ...base, part1MarksObtained: '400', part1MarksTotal: '550' }))
+      .toEqual({ ...base, part1MarksObtained: '400', part1MarksTotal: '550' });
+  });
+});

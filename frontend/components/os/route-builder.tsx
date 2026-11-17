@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { EligibilityCard } from '@/components/os/eligibility-card';
+import type { ConnectMessage } from '@/lib/os-connect';
 import {
   MAX_CHOICES,
   chipLabel,
@@ -35,6 +37,8 @@ interface RouteBuilderProps {
   onRequest: (request: { university: string; name: string; url: string }) => void;
   requestError?: string | null;
   requestSent?: string | null;
+  /** P1-T6: what the server said to the start (a 202 note or a refusal); null shows nothing. */
+  message?: ConnectMessage | null;
 }
 
 function routeName(r: OsRoute): string {
@@ -44,7 +48,7 @@ function routeName(r: OsRoute): string {
 /** The self-serve start (Slice 4 spec §5): route and intake, programmes with eligibility, ranked choices. */
 export function RouteBuilder(props: RouteBuilderProps) {
   const { routes, route, onRoute, year, onYear, programmes, choices, onToggle, onMove, onStart, starting = false,
-          openRef = null, openCard = null, openSuggestions = [], onOpen, onRequest, requestError, requestSent } = props;
+          openRef = null, openCard = null, openSuggestions = [], onOpen, onRequest, requestError, requestSent, message = null } = props;
   const [query, setQuery] = useState('');
   const [asking, setAsking] = useState(false);
   const q = query.trim().toLowerCase();
@@ -152,6 +156,15 @@ export function RouteBuilder(props: RouteBuilderProps) {
               </li>
             ))}
           </ol>
+        )}
+        {message && (
+          <p role={message.tone === 'error' ? 'alert' : 'status'}
+             className={`break-words text-sm ${message.tone === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
+            {message.text}
+            {message.href && message.linkLabel && (
+              <> <Link href={message.href} className="font-semibold text-primary underline-offset-2 hover:underline">{message.linkLabel}</Link></>
+            )}
+          </p>
         )}
         <Button onClick={onStart} disabled={starting || choices.length === 0}>
           {starting ? 'Starting…' : 'Start my plan'}

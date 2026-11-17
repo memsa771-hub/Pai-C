@@ -1,0 +1,33 @@
+# The one map from a Vault write to the StudentFacts keys it touches (P1-T4, R-13). Keys are free text matching the
+# StudentFacts key pattern; this file is the only place the family words live (Task 4 reuses it).
+# Privacy allow-list: education level and marks, test scores, excluded fields, field order, budget band, domicile
+# province, place preference. Never a date of birth, name, guardian e-mail or document value: a type that is not
+# listed here touches no key.
+
+# student_record "education": qualification codes (the Vault catalog `levels` list) grouped into families. The key is
+# education.<family>.<field> for each field below. A code in no family touches nothing.
+education:
+  families:
+    matric: [matric, o_level]
+    intermediate: [fsc, ics, icom, fa, intermediate, a_level, dae]
+    bachelor: [bachelor]
+    master: [masters]
+  fields: [level, marks_obtained, marks_total, percentage, gpa, gpa_scale, grade,
+           part1.marks_obtained, part1.marks_total, part2.marks_obtained, part2.marks_total]
+
+# student_record "test_attempt": test.<type>.score, the type being the Vault catalog `tests` code.
+tests:
+  record: test_attempt
+  key: "test.{type}.score"
+
+# vault_fact field_key -> keys
+facts:
+  finance.budget: [constraint.budget]
+
+# vault_item type -> keys. An option write (ruled out, or considering again after a restore) always touches the
+# excluded fields, so a restore is heard as well as an exclusion.
+items:
+  option: [constraint.excluded_fields]
+  field_order: [constraint.field_order]
+  domicile: [constraint.domicile]
+  place_preference: [preference.place]

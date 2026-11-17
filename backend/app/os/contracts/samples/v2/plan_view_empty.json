@@ -1,0 +1,17 @@
+{
+  "schema": "pai.plan_view.v1",
+  "student_ref": "ws-sample-1",
+  "state": "empty",
+  "state_reason": null,
+  "plan_id": null,
+  "decision_version": null,
+  "revision": null,
+  "route": null,
+  "pages": [],
+  "consent": null,
+  "steps": [],
+  "requests": [],
+  "documents_needed": [],
+  "changes": [],
+  "proposals_waiting": 0
+}

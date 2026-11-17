@@ -379,7 +379,10 @@
       "Letters"
     ],
     "privacy": "Only you and PAI can see your documents. Nothing is shared with a university.",
-    "backToFolders": "Back to folders"
+    "backToFolders": "Back to folders",
+    "readThis": "Let PAI read this",
+    "readThisType": "What is this file?",
+    "readThisHelp": "Say what this file is, and PAI will read it and ask you to check what it found."
   },
   "settings": {
     "intro": "Your account, how PAI looks and sounds, and your data.",
@@ -694,7 +697,19 @@
       "close": "Close",
       "checked": "Checked {date}"
     },
+    "plan": {
+      "due": "Due {date}",
+      "owner_pai": "PAI does this",
+      "owner_student": "You do this",
+      "empty": "Your plan is not ready yet. PAI will tell you when it is.",
+      "needs_student": "PAI is waiting for you on one or more steps.",
+      "paused": "Your plan is paused.",
+      "paused_consent_missing": "Your plan is paused until your consent is back.",
+      "stopped": "This plan has stopped.",
+      "finished": "Your plan is finished."
+    },
     "route": {
+      "unsupported": "PAI can't run this plan yet. You can still follow the steps yourself.",
       "title": "Your route",
       "progress": "{done} of {total}",
       "progressLabel": "{done} of {total} steps done",
@@ -744,6 +759,117 @@
       "legend": "Green is done, yellow is partly done, red is not yet.",
       "none": "PAI has no steps for this field yet.",
       "tick": "Mark as done"
+    },
+    "choice": {
+      "title": "Choose {title}",
+      "intro": "A few short steps. You can change your mind later.",
+      "loading": "Loading your options",
+      "stepOf": "Step {n} of {total}: {name}",
+      "progress": "Steps",
+      "steps": {
+        "destination": "Country",
+        "intake": "Intake",
+        "places": "Places",
+        "dob": "Date of birth",
+        "consent": "Consent",
+        "guardian": "Parent or guardian"
+      },
+      "destination": {
+        "legend": "Where do you want to study?",
+        "unsupported": "PAI OS cannot plan this country yet. You can still choose it.",
+        "supported": "PAI OS can plan this",
+        "required": "Pick a country."
+      },
+      "intake": {
+        "term": "Term",
+        "year": "Year",
+        "termRequired": "Pick a term.",
+        "yearRequired": "Pick a year.",
+        "hint": "When do you want to start?"
+      },
+      "places": {
+        "legend": "Pick up to {max} places",
+        "hint": "Pick the ones you like, then put them in order. 1 is your first choice.",
+        "loading": "Loading places",
+        "none": "No places are listed for this yet. You can add them later.",
+        "noneSupported": "No places are listed for this intake yet. Go back and pick another intake.",
+        "empty": "Pick at least one place.",
+        "full": "You picked {max}. Remove one to add another.",
+        "ranking": "Your order",
+        "rank": "{rank}. {name}",
+        "up": "Move {name} up",
+        "down": "Move {name} down",
+        "remove": "Remove {name}",
+        "error": "Places did not load. Try again.",
+        "retry": "Try again",
+        "stillLoading": "Places are still loading. Wait a moment, then press Next."
+      },
+      "dob": {
+        "label": "Your date of birth",
+        "hint": "PAI uses it to know if a parent or guardian must agree. It is saved to your Vault.",
+        "required": "Add your date of birth.",
+        "vault": "Open your Vault",
+        "vaultNote": "Your date of birth in the Vault needs your confirmation first."
+      },
+      "consent": {
+        "legend": "Your consent",
+        "agree": "I agree",
+        "required": "Tick the box to continue.",
+        "unavailable": "The consent text is not ready yet, so this route cannot be shared. Try again later.",
+        "version": "Text version {version}"
+      },
+      "guardian": {
+        "label": "Parent or guardian email",
+        "hint": "You are under 18, so a parent or guardian must agree too. We email them a link.",
+        "required": "Add a valid email address."
+      },
+      "back": "Back",
+      "next": "Next",
+      "submit": "Choose this route",
+      "cancel": "Cancel",
+      "saving": "Saving",
+      "error": "This did not save. Try again.",
+      "done": {
+        "title": "Your route is saved",
+        "body": "PAI will share it with your plan once everyone has agreed.",
+        "button": "Done",
+        "sent": "We emailed your parent or guardian.",
+        "notSent": "Your route is saved, but the email to your parent or guardian was not sent.",
+        "notSentAction": "Send it again below."
+      },
+      "consentState": {
+        "title": "Sharing with your plan",
+        "student": "Your consent",
+        "guardian": "Parent or guardian",
+        "studentGiven": "Given",
+        "studentMissing": "Withdrawn",
+        "guardianNotNeeded": "Not needed",
+        "guardianGiven": "Agreed",
+        "guardianMissing": "Waiting",
+        "pausedNote": "Your plan is paused until you give consent again.",
+        "withdraw": "Withdraw my consent",
+        "withdrawConfirm": "Withdraw consent? Your plan pauses. Your choices are kept.",
+        "withdrawYes": "Yes, withdraw",
+        "withdrawNo": "Keep it",
+        "give": "Give consent again",
+        "resendPrompt": "Your parent or guardian must agree again. Send them a new link.",
+        "waiting": "Your parent or guardian has not agreed yet.",
+        "resend": "Send the link again",
+        "resendLabel": "Parent or guardian email",
+        "resendSend": "Send link",
+        "resendSent": "We emailed a new link.",
+        "resendRequired": "Add a valid email address.",
+        "error": "This did not save. Try again.",
+        "rate": "Too many emails. Try again later.",
+        "textNotReady": "The consent text is not ready yet. Try again later.",
+        "notSupported": "PAI OS cannot plan this route yet.",
+        "resendRejected": "That email address was not accepted. Check it and try again.",
+        "giveRead": "Read this, then give your consent again.",
+        "giveYes": "I agree, give consent",
+        "giveNo": "Not now",
+        "withdrawLink": "Send my parent or guardian a new withdraw link",
+        "withdrawLinkSent": "We emailed your parent or guardian a new link to withdraw."
+      }
     }
   },
   "pathMayBeOld": "Your Vault changed since PAI wrote this, so parts of it may be out of date.",
@@ -820,6 +946,62 @@
         "question": "Which subjects or study tasks do you do well in?",
         "topic": "I want to tell you what I do well."
       }
+    }
+  },
+  "connect": {
+    "start": {
+      "preparing": "Your choice was sent. Your plan will appear here when it is ready.",
+      "unchanged": "Your plan already matches this choice.",
+      "choose_field_first": "Choose your field in PAI first, then start your plan.",
+      "too_many_places": "Your choice has more places than PAI can hold. Remove some places and try again.",
+      "adopt_first": "Keep your current plan as your PAI plan first.",
+      "adopt_first_link": "Go to your journey",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes."
+    },
+    "change": {
+      "refused": "The Counsellor could not take that change. Your plan stays as it is.",
+      "sent_title": "Changes waiting for an answer",
+      "requested": "Your change was sent. It will show here once it is done.",
+      "request_open": "A change is already waiting. Wait for it to finish before asking for another."
+    },
+    "adoption": {
+      "linked": "Your plan is now your PAI plan.",
+      "linking_wait": "This can take a few minutes.",
+      "several_plans": "You have more than one plan, so PAI cannot keep one of them yet.",
+      "identity_taken": "PAI already has a plan for this route, so it cannot keep this one.",
+      "no_places": "Your plan has no places that PAI can keep.",
+      "no_intake": "Your plan has no start date that PAI can keep.",
+      "plan_changed": "Your plan changed. Look at it again, then keep it.",
+      "no_plan": "That plan is no longer there.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "other": "Your plan could not be kept. Please try again."
+    },
+    "requests": {
+      "use": "Use this value",
+      "kinds": { "vault": "Saved in PAI", "document": "From your document", "said": "What you told PAI" },
+      "levels": { "stated": "you told PAI", "shown": "shown in a document", "confirmed": "you confirmed it" },
+      "asOf": "as of {date}",
+      "pending": "This step closes by itself when PAI has what it needs.",
+      "gone": "That question is no longer there. Your list has been updated.",
+      "unavailable": "PAI cannot take this right now. Please try again in a few minutes.",
+      "failed": "That did not save. Please try again."
+    },
+    "myPlan": {
+      "empty": "Your plan will appear here once you choose a path.",
+      "emptyLink": "Go to your journey",
+      "notInPlanTitle": "Not part of your plan",
+      "notInPlan": "This page is not part of your plan.",
+      "notInPlanLink": "Go to your plan",
+      "levels": {
+        "verified": "Verified",
+        "confirmed": "Confirmed",
+        "not_confirmed": "Not confirmed",
+        "estimated": "Estimated"
+      },
+      "checked": "Checked {date}",
+      "checkedUnknown": "Date checked not recorded",
+      "source": "Source",
+      "dateSource": "Where this date comes from"
     }
   }
 }

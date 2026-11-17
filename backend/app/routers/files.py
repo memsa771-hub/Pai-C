@@ -45,6 +45,7 @@ from app.routers.network import (
 )
 from app.files.storage import get_file_store
 from app.eventing.events import Event
+from app.pai_c.connect.flags import part_on
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ _UPLOAD_READ_CHUNK_SIZE = 1024 * 1024
 
 def _register_student_document(
     db: Session, workspace_id: str, file_id: str, data: bytes,
-    filename: str, content_type: str,
+    filename: str, content_type: str, extract: bool = True,
 ) -> Optional[dict]:
     """Queue document processing when an upload looks like a student document.
 
@@ -77,6 +78,9 @@ def _register_student_document(
     simply not a document — generic workspace storage keeps working exactly as
     before, which is what stops this feature from breaking image and code
     uploads. Returns a small status dict for the response, or None.
+
+    `extract=False` (P1-T7, D-y4): the file is also an OS document, which reads it; the Counsellor still parses and
+    indexes it but does not extract facts from it.
     """
     from app.documents import is_student_document_candidate
     from app.documents.service import DocumentArtifactService
@@ -86,6 +90,7 @@ def _register_student_document(
     try:
         artifact = DocumentArtifactService(db).register_and_enqueue(
             workspace_id, file_id, data, filename, content_type,
+            **({} if extract else {"extract": False}),
         )
     except Exception:  # noqa: BLE001 — an upload must not fail over derived state
         logger.exception("document registration failed file=%s", file_id)
@@ -118,6 +123,46 @@ def _enqueue_document_unindex(db: Session, workspace_id: str, file_ids: list) ->
         )
     except Exception:  # noqa: BLE001 — index tidiness must not fail a purge
         logger.exception("document unindex enqueue failed workspace=%s", workspace_id)
+
+
+def _register_typed_upload(
+    db: Session, workspace_id: str, file_id: str, data: bytes, filename: str,
+    doc_type: Optional[str], actor_source: str,
+) -> Optional[dict]:
+    """The one upload entry point (P1-T7, R-01, D-y2): when the student named a document type and the part is on, the
+    stored file also becomes an OS document. None on every other path (the response then stays as it was). Only the
+    student's own upload counts, not an agent's. The record is committed first: the OS worker reads the file through
+    the Counsellor's table and must find it."""
+    if not doc_type or not part_on("CONNECT_ONE_UPLOAD"):
+        return None
+    from app.security.event_identity import HUMAN_PREFIX
+
+    if not actor_source.startswith(HUMAN_PREFIX):
+        return None
+    db.commit()
+    from app.pai_c.connect import uploads
+
+    return uploads.register_typed(db, workspace_id, file_id, data, filename, doc_type)
+
+
+def _os_reads(os_document: Optional[dict]) -> bool:
+    """True when PAI OS reads (or already reads) this file, so the Counsellor's own extraction is skipped: the OS
+    document was made, or the registration was refused as a `duplicate` (the same bytes already have an OS document)."""
+    return bool(os_document) and ("id" in os_document or os_document.get("refused") == "duplicate")
+
+
+def _forget_os_documents(workspace_id: str, file_ids: list) -> None:
+    """The student trashed or deleted files: the OS documents linked to them go too (P1-T7, D-y7). Called after the
+    commit. A failure is logged by class name and never fails the trash."""
+    if not file_ids or not part_on("CONNECT_ONE_UPLOAD"):
+        return
+    from app import pai_os_bridge
+
+    for file_id in file_ids:
+        try:
+            pai_os_bridge.forget_os_document(workspace_id, file_id)
+        except Exception as exc:  # noqa: BLE001 — see docstring
+            logger.error("OS document could not be forgotten: %s", type(exc).__name__)
 
 
 async def _read_upload_limited(upload: UploadFile) -> Optional[bytes]:
@@ -420,10 +465,12 @@ async def delete_folder(
 
     for record in records:
         record.status = "deleted"
+    folder_ids = [r.id for r in records]
 
     # Commit before emitting (see create_folder) so an EventRejected can't
     # silently discard the soft-delete while returning 200.
     db.commit()
+    _forget_os_documents(str(workspace.id), folder_ids)
 
     await _emit_event(
         Event(
@@ -450,6 +497,7 @@ async def upload_file(
     file: Optional[UploadFile] = File(None),
     network: Optional[str] = Form(None),
     channel_name: Optional[str] = Form(None),
+    doc_type: Optional[str] = Form(None),
     # Auth headers
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
@@ -515,8 +563,12 @@ async def upload_file(
     db.add(record)
     db.flush()
 
+    os_document = _register_typed_upload(
+        db, str(workspace.id), file_id, data, filename, doc_type, uploaded_by,
+    )
     document = _register_student_document(
         db, str(workspace.id), file_id, data, filename, content_type,
+        extract=not _os_reads(os_document),
     )
 
     # Emit event
@@ -541,6 +593,7 @@ async def upload_file(
         "uploaded_by": uploaded_by,
         "created_at": record.created_at.isoformat() if record.created_at else None,
         **({"document": document} if document else {}),
+        **({"os_document": os_document} if os_document else {}),
     })
 
 
@@ -873,6 +926,7 @@ async def upload_files_to_folder(
     network: str = Form(...),
     path: str = Form("", description="Destination folder; empty is the root"),
     channel_name: Optional[str] = Form(None),
+    doc_type: Optional[str] = Form(None),
     on_conflict: str = Form("rename", description="rename | replace | error"),
     x_workspace_token: Optional[str] = Header(None),
     authorization: Optional[str] = Header(None),
@@ -959,6 +1013,7 @@ async def upload_files_to_folder(
             if on_conflict == "rename":
                 target = _next_free_name(taken, folder or "", name)
             else:
+                replaced_ids = []
                 for old in db.execute(
                     select(FileRecord)
                     .where(FileRecord.workspace_id == str(workspace.id))
@@ -966,6 +1021,12 @@ async def upload_files_to_folder(
                     .where(FileRecord.status == "active")
                 ).scalars().all():
                     old.status = "deleted"
+                    replaced_ids.append(old.id)
+                if replaced_ids and part_on("CONNECT_ONE_UPLOAD"):
+                    # P1-T7: the replaced file's OS document goes first, so the same bytes registered again for the
+                    # new file are linked, not refused as a duplicate.
+                    db.commit()
+                    _forget_os_documents(str(workspace.id), replaced_ids)
                 replaced = True
 
         content_type = upload.content_type or "application/octet-stream"
@@ -1007,8 +1068,12 @@ async def upload_files_to_folder(
         db.flush()
         taken.add(target)
 
+        os_document = _register_typed_upload(
+            db, str(workspace.id), file_id, data, target, doc_type, uploaded_by,
+        )
         document = _register_student_document(
             db, str(workspace.id), file_id, data, target, content_type,
+            extract=not _os_reads(os_document),
         )
 
         # Same event as POST /files — existing listeners shouldn't have to
@@ -1032,6 +1097,8 @@ async def upload_files_to_folder(
         payload["renamed_from"] = name if _basename(target) != name else None
         if document:
             payload["document"] = document
+        if os_document:
+            payload["os_document"] = os_document
         uploaded.append(payload)
 
     db.commit()
@@ -1182,10 +1249,12 @@ async def move_to_trash(
     entries: list[dict] = []
     not_found: list[str] = []
     pending_events: list[Event] = []
+    trashed_ids: list[str] = []
 
     def _trash(records: list[FileRecord], path: str, kind: str) -> None:
         trash_id = str(uuid.uuid4())
         for record in records:
+            trashed_ids.append(record.id)
             record.status = "deleted"
             record.deleted_at = now
             record.trash_id = trash_id
@@ -1237,6 +1306,7 @@ async def move_to_trash(
         ))
 
     db.commit()
+    _forget_os_documents(str(workspace.id), trashed_ids)
 
     for event in pending_events:
         await _emit_event(event, workspace, db, token=x_workspace_token or workspace.password_hash)
@@ -1941,6 +2011,10 @@ async def delete_file(
         return json_response(ResponseCode.UNAUTHORIZED, "Unidentified caller")
 
     record.status = "deleted"
+    forget = part_on("CONNECT_ONE_UPLOAD")
+    if forget:
+        db.commit()  # P1-T7: the OS document is forgotten only for a delete that is really committed
+        _forget_os_documents(str(workspace.id), [file_id])
 
     event = Event(
         type="workspace.file.deleted",

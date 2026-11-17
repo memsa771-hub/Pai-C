@@ -1,0 +1,20 @@
+{
+  "_note": "Greeting phrases the Counsellor may open a reply with (casefolded, without punctuation). A reply that opens with one of these (plus at most max_extra_words more words, such as a name) after an earlier assistant greeting in the same conversation has that sentence dropped (R-47 C6).",
+  "phrases": [
+    "assalam o alaikum",
+    "assalamu alaikum",
+    "asalam o alaikum",
+    "assalam alaikum",
+    "salam",
+    "wa alaikum assalam",
+    "walaikum assalam",
+    "wa alaikum salam",
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening"
+  ],
+  "max_extra_words": 2
+}

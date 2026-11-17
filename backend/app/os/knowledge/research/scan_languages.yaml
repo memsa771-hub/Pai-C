@@ -1,0 +1,5 @@
+# Languages the scan engines read (P2-D13). The keys are our language codes (the same as `language` on a fact);
+# the values are each engine's own code. A scan reads all `default_languages` unless the caller names some.
+default_languages: [en, ur]
+tesseract: {en: eng, ur: urd}
+docling: {en: en, ur: ur}

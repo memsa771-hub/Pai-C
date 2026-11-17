@@ -1,0 +1,65 @@
+# The consent texts for the Counsellor -> PAI OS choice (R-10). Plain, short English. No legal claims.
+# `approved` is the gate: while it is false, consent.ensure_usable() refuses unless CONNECT_CONSENT_DRAFT is on.
+# Placeholders in {braces} are filled by the code: {student_first_name}, {hours}, {days}.
+version: "1"
+approved: true
+approved_by: "owner, chat 2026-11-05"
+
+# How long the agree link works. A withdraw link has no fixed end: it works while the consent it guards is live.
+links:
+  agree_hours: 72
+
+# Shown to the student before they agree to the plan.
+student:
+  title: "Share your choice with your plan"
+  body:
+    - "If you agree, PAI shares your choice with your plan: the route you picked, the places you ranked and the intake you want."
+    - "PAI shares nothing else from your Vault."
+    - "You can withdraw at any time. Your plan then pauses and nothing more is done for it until you agree again."
+
+# The email to the guardian of a student under 18.
+guardian_email:
+  fallback_name: "This student"
+  subject: "{student_first_name} asks for your agreement - Placement AI"
+  title: "Your agreement is needed"
+  paragraphs:
+    - "{student_first_name} uses Placement AI to plan their studies. They have chosen a study route and asked us to share that choice with their plan: the route, the places they ranked and the intake."
+    - "{student_first_name} is under 18, so we ask a parent or guardian to agree. Nothing is shared with the plan until you do."
+    - "Please open the link below to read what is shared and to agree. The link is valid for {hours} hours and works once."
+  button: "Read and agree"
+  footer: "If you do not know {student_first_name} or do not want to agree, do nothing. The link stops working by itself. After you agree, the confirmation email has a link to withdraw."
+
+# The page the guardian sees when they open the link.
+guardian_page:
+  title: "{student_first_name} asks for your agreement"
+  body:
+    - "{student_first_name} chose a study route. If you agree, Placement AI shares that choice with their plan: the route, the places they ranked and the intake."
+    - "Nothing else from their account is shared."
+    - "You can withdraw your agreement at any time with the link in the confirmation email. Their plan then pauses."
+  agree_button: "I agree"
+
+# The page the guardian sees when they open the withdraw link of the confirmation email.
+guardian_withdraw_page:
+  title: "Withdraw your agreement for {student_first_name}"
+  body:
+    - "You agreed that Placement AI shares {student_first_name}'s choice with their plan."
+    - "If you withdraw, Placement AI stops sharing it and {student_first_name}'s plan pauses."
+  withdraw_button: "Withdraw my agreement"
+
+# The email sent once the guardian has agreed. It carries the withdraw link.
+guardian_confirmation:
+  subject: "You agreed for {student_first_name} - Placement AI"
+  title: "Thank you, your agreement is saved"
+  paragraphs:
+    - "You agreed that Placement AI shares {student_first_name}'s choice with their plan."
+    - "You can change your mind at any time. Use the link below to withdraw. {student_first_name}'s plan then pauses."
+  button: "Withdraw my agreement"
+  footer: "This link works once. If you did not agree to this, withdraw now."
+
+# The email sent after the guardian withdrew.
+guardian_withdrawn:
+  subject: "You withdrew your agreement - Placement AI"
+  title: "Your agreement is withdrawn"
+  paragraphs:
+    - "You withdrew your agreement for {student_first_name}. Their plan is paused."
+  footer: "If this was a mistake, ask {student_first_name} to send a new request."

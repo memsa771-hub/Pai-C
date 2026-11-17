@@ -14,6 +14,9 @@ import {
   type OsPackFile,
 } from '@/lib/os-packs';
 import { degreeMismatch } from '@/lib/os-profile';
+import { factLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { useMyPlan } from './my-plan-context';
 
 /** "Your application packs" (Slice 6a spec §5): one row per programme in the plan, with its status. */
 export function PackList({ packs, onOpen }: { packs: OsPack[]; onOpen: (p: OsPack) => void }) {
@@ -57,6 +60,7 @@ interface PackViewProps {
 export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onRebuild, onDetails, noun = 'pack',
                            profileDegree = null, profileHref,
                            notice = 'You submit and pay yourself. We never send anything for you.' }: PackViewProps) {
+  const { on } = useMyPlan();
   const [extra, setExtra] = useState('');
   // A tick shows at once and stays until the pack from the server agrees: saving a tick can rebuild the pack, and
   // until then the server still sends the old state, which made a saved tick look as if it had not taken.
@@ -94,7 +98,8 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
           {pack.instructions.map((s) => (
             <li key={s.n} className="break-words">
               {s.n}. {s.text}{' '}
-              {s.source_url && (
+              {on && <FactSource level={s.unconfirmed.length > 0 ? 'not_confirmed' : 'confirmed'} url={s.source_url} />}
+              {!on && s.source_url && (
                 <a href={s.source_url} target="_blank" rel="noopener noreferrer"
                    className="text-primary underline-offset-2 hover:underline">source</a>
               )}
@@ -108,7 +113,8 @@ export function PackView({ pack, busy, onTick, onAdd, onApprove, onDownload, onR
                 <dt className="text-muted-foreground">{f.label}:</dt>
                 <dd className="break-words">
                   {feeValue(f)}{' '}
-                  {f.source_url && (
+                  {on && <FactSource level={factLevel(f.status)} url={f.source_url} />}
+                  {!on && f.source_url && (
                     <a href={f.source_url} target="_blank" rel="noopener noreferrer"
                        className="text-primary underline-offset-2 hover:underline">source</a>
                   )}

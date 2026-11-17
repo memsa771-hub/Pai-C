@@ -1,0 +1,51 @@
+# H3, Balochistan part. Researched by Claude, 2026-11-07. Check 2 v2 recomputed the count.
+region: balochistan
+retrieved: 2026-11-07
+lists:
+  - id: hec-recognised-balochistan
+    body: HEC
+    name: Recognised Universities (Province = Balochistan)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 12   # 11 public, 1 private
+    count_quote: null
+    count_method: markup_count - counted list items with Province='Balochistan' in the HTML (unconfirmed on import)
+    check2: correct
+  # Added 2026-11-13 (local P2 completion): official lists cited by batch rows that had no list entry.
+  # Check 1: .local-ci research, check 2: independent re-download; counts and rows agree.
+  - id: bmc-prospectus-2025-26-govt-medical-dental-balochistan
+    body: Bolan Medical College, Quetta (Selection Committee, government medical & dental colleges of Balochistan)
+    name: Prospectus Academic Session 2025-26 for the Government Medical & Dental Colleges of Balochistan
+    url: https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf
+    institution_type: medical_dental_college
+    family: bachelor
+    date: 2025-12-17   # PDF metadata creation date; no date printed (both checks)
+    row_count: 4
+    count_quote: null
+    count_method: 'Clause 4 "applicable to following medical and dental institutions": lines a-d (Bolan, Jhalawan,
+      Loralai, Mekran Medical Colleges); line e ("Government of Balochistan (Goodwill & Reciprocal) seats in other
+      sister provinces") is not an institution and is not counted. Same 4 as the TOC section "Introduction Medical
+      Colleges of Balochistan". Bolan Dental Section is part of BMC, not a separate line'
+    read_method: curl + pdftotext (PDF text layer)
+    check2: correct
+    note: 'Local research 2026-11-13: check 1 and an independent check 2 (own download) agree on the decision, the
+      row count and every cited row.'
+not_found:
+  - what: Official list of Balochistan boards and of public colleges
+  - what: Intermediate college admission rules
+    url: https://hed.balochistan.gov.pk/
+    note: HTTP 500 on 2026-11-07
+  - what: 2026-27 MBBS/BDS prospectus (latest found is 2025-26)
+  - what: A-level schools in Balochistan (P2 §11 Q4)
+domains:
+  - body: BBISE Quetta
+    domains: [bbiseqta.edu.pk]
+    evidence: "page text: 'BBISE Quetta Board of Intermediate & Secondary Education Quetta'"
+  - body: Bolan Medical College (prospectus host)
+    domains: [bmc.edu.pk]
+    evidence: 2025-26 prospectus PDF fetched
+  - body: Government of Balochistan
+    domains: [balochistan.gov.pk]
+    status: candidate   # home page fetched, nothing on admissions read

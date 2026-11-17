@@ -1,0 +1,33 @@
+# P3-T1 fixture (ADR-001 D5): a fictional family playbook using every new generic unit: fan_out: system, anchor.of,
+# condition.of and the title placeholders. It loads; the compiler refuses it until P3-T4 resolves systems.
+key: fam_systems
+version: 1
+family: alphafam
+route: {origin: ZZ, destination: ZZ, level: intermediate}
+default_timezone: UTC
+tasks:
+  - template_key: register
+    task_type: student.act
+    title: Register with {system}
+    kind: student
+    inbox_kind: act
+    fan_out: system
+    condition: {fact: admission_mode, in: [mode_a], of: system}
+    anchor: {fact: registration_close, of: system_calendar}
+    duration_days: 1
+  - template_key: apply_place
+    task_type: student.act
+    title: Apply to {institution} through {system} ({body})
+    kind: student
+    inbox_kind: act
+    fan_out: programme
+    depends_on: [{key: register}]
+    anchor: {fact: apply_close, of: system}
+    duration_days: 1
+  - template_key: wait_list
+    task_type: student.act
+    title: Check the merit list
+    kind: student
+    inbox_kind: act
+    depends_on: [{key: apply_place}]
+    duration_days: 1

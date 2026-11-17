@@ -3,6 +3,7 @@ key: pakistan_bs
 version: 1
 route: {origin: PK, destination: PK, level: bachelor}
 default_timezone: Asia/Karachi
+intake_terms: [winter]
 # Slice 4: a merit aggregate, the third generic method (spec S4-D2). No language check on this route.
 eligibility:
   grade:

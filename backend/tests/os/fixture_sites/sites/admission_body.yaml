@@ -1,0 +1,12 @@
+# Fictional admission body: merit formula and a merit list. Invented for tests.
+host: admissions.north-region-board.test
+pages:
+  /robots.txt: {content_type: text/plain, body: "User-agent: *\nAllow: /\n"}
+  /merit-formula:
+    body: |
+      <html><body><h1>Merit formula, fall 2027</h1>
+      <p>Merit = 50% Part-I marks + 50% entry test marks.</p></body></html>
+  /merit-list-2:
+    body: |
+      <html><body><h1>Second merit list, fall 2026</h1>
+      <p>Second merit list: lowest 71.5. Further lists may follow.</p></body></html>

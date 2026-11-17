@@ -167,3 +167,51 @@ describe('admin token (final review I12)', () => {
     expect(signedOut).not.toHaveBeenCalled();
   });
 });
+
+// req: R-07
+describe('ProposalCard after a request to the Counsellor', () => {
+  const NOTE = 'Your change was sent to your counsellor. It will show here when it is done.';
+  const sent = (over: Partial<OsProposal> = {}) =>
+    renderToStaticMarkup(<ProposalCard proposal={proposal(over)} names={NAMES} busy={false} onAccept={noop} onDecline={noop} />);
+
+  it('ProposalCard requested hides buttons and shows note', () => {
+    const html = sent({ status: 'requested', status_note: NOTE });
+    expect(html).not.toContain('Accept');
+    expect(html).not.toContain('Decline');
+    expect(html).toContain(NOTE);
+  });
+
+  it('expired after request shows note', () => {
+    const html = sent({ status: 'expired', request_outcome: 'stale', status_note: 'This change ran out because your plan moved on.' });
+    expect(html).not.toContain('Accept');
+    expect(html).toContain('This change ran out because your plan moved on.');
+  });
+
+  it('shows no extra line when the server sends no note (and a student request has no reasons)', () => {
+    const html = sent({ status: 'requested', source: 'student', reasons: [] });
+    expect(html).not.toContain('role="status"');
+    expect(html).not.toContain('Why:');
+    expect(html).not.toContain('Accept');
+  });
+
+  it('a pending proposal is unchanged: buttons, no note line', () => {
+    const html = sent({ status_note: undefined });
+    expect(html).toContain('Accept');
+    expect(html).toContain('Decline');
+    expect(html).not.toContain('role="status"');
+  });
+});
+
+// req: R-07
+describe('proposals in the inbox call', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reads the proposals from the inbox, none when the key is missing', async () => {
+    const answers = [{ proposals: [proposal({ status: 'requested' })] }, { items: [] }];
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(answers.shift()),
+                                                          { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    workspaceApi.configure('ws-1', '', 'bearer-x');
+    expect((await workspaceApi.getOsInboxProposals()).map((p) => p.status)).toEqual(['requested']);
+    expect(await workspaceApi.getOsInboxProposals()).toEqual([]);
+  });
+});

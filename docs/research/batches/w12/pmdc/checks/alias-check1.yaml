@@ -1,0 +1,3068 @@
+# W12 D-PMDC alias check 1 (claude-w12-pmdc-alias-check-1). Judged from printed text only (names, city, address); no web.
+# Inputs: E1/pmdc-colleges-with-hospitals.csv (190 lines); Institutions sheets of Batch1..5 v4 and the 11 PAI-Research-W12-*.xlsx
+# workbooks (read with openpyxl in docker pai-ci-py). The W12 workbooks (BIEK colleges, HED Punjab colleges) hold no medical or
+# dental college row, so they give no candidates. Strings are JSON-quoted (valid YAML). Batch values are verbatim.
+check: {ref: claude-w12-pmdc-alias-check-1, date: "2026-11-15"}
+pmdc_file: ".local-ci/work/W12/PMDC/E1/pmdc-colleges-with-hospitals.csv"
+pmdc_file_sha256: 5d274708b77c3976f89184b12dea4ae85dea8d8933709d16cb613c3f966d7efb
+lines:
+  - key: 1
+    pmdc_name: "Mohiuddin Islamic Medical College"
+    pmdc_quote: "Mohiuddin Islamic Medical College D/4, Industrial Area, Mirpur-AJ&K."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 2
+    pmdc_name: "Quetta Institute of Medical Sciences"
+    pmdc_quote: "Quetta Institute of Medical Sciences Adjacent CMH,Shar-e-Chiltan, Quetta-Cantt."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 3
+    pmdc_name: "Abbottabad International Medical College Mansehra Road, Abbottabad."
+    pmdc_quote: "Abbottabad International Medical College Mansehra Road, Abbottabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 4
+    pmdc_name: "Muhammad College of Medicine, (Former Al-Razi Medical College), Budhni Road, Yaseenabad, Peshawar"
+    pmdc_quote: "Muhammad College of Medicine, (Former Al-Razi Medical College), Budhni Road, Yaseenabad, Peshawar"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 5
+    pmdc_name: "Frontier Medical College"
+    pmdc_quote: "Frontier Medical College P.O. Public School, Abbottabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 6
+    pmdc_name: "Jinnah Medical College"
+    pmdc_quote: "Jinnah Medical College Budhai, Near Peshawar Motorways Toll Plaza, Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 7
+    pmdc_name: "Kabir Medical College"
+    pmdc_quote: "Kabir Medical College 57-C, Gulmohar Lane, University Town, Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 8
+    pmdc_name: "Northwest School of Medicine"
+    pmdc_quote: "Northwest School of Medicine Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 9
+    pmdc_name: "Pak International Medical College"
+    pmdc_quote: "Pak International Medical College Plot-2, Sector B-2, Hayatabad, Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 10
+    pmdc_name: "Peshawar Medical College"
+    pmdc_quote: "Peshawar Medical College Warsak Road, Opposite PTCL Exchange, Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 11
+    pmdc_name: "Rehman Medical College"
+    pmdc_quote: "Rehman Medical College 5/B-2, Phase-5, Hayatabad, Peshawar."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 12
+    pmdc_name: "Women Medical College"
+    pmdc_quote: "Women Medical College Murree Road, Abbottabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 13
+    pmdc_name: "Swat Medical College"
+    pmdc_quote: "Swat Medical College, Swat. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 14
+    pmdc_name: "Abwa Medical College"
+    pmdc_quote: "Abwa Medical College, 1-KM Khurrianwala- Jaranwala Road, Faisalabad."
+    section: private_medical
+    alias_target: PB-MED-055
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-055
+        name: "Abwa Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 31 | Abwa Medical College, Faisalabad | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 15
+    pmdc_name: "Akhtar Saeed Medical & Dental College"
+    pmdc_quote: "Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulaverad Allama Iqbal Town, Lahore."
+    section: private_medical
+    alias_target: PB-MED-030
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-030
+        name: "Akhtar Saeed Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 6 | Akhtar Saeed Medical &amp; Dental College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-025
+        name: "Akhtar Saeed Medical College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_medical_college"
+        reason: "Rawalpindi institution; the PMDC line is the Lahore (Allama Iqbal Town) Medical & Dental College"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-063
+        name: "Dental Section, Akhtar Saeed Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 16
+    pmdc_name: "Al Aleem Medical College"
+    pmdc_quote: "Al Aleem Medical College, Gulab Devi Education Complex Ferozepur Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-032
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-032
+        name: "Al-Aleem Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 8 | Al-Aleem Medical College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 17
+    pmdc_name: "Al-Nafees Medical College"
+    pmdc_quote: "Al-Nafees Medical College, Near Farash Town, Zone-IV, Islamabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 18
+    pmdc_name: "Amna Inayat Medical College"
+    pmdc_quote: "Amna Inayat Medical College, Faizpur Interchange, M-2 Motorway, Lahore."
+    section: private_medical
+    alias_target: PB-MED-054
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-054
+        name: "Amna Inayat Medical College, Sheikhupura"
+        region: "Punjab"
+        city: "Sheikhupura"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 30 | Amna Inayat Medical College, Sheikhupura | 100 |"
+        reason: "name identical (Amna Inayat Medical College), the only such row; FLAG: PMDC address says \"Faizpur Interchange, M-2 Motorway, Lahore\", batch city is Sheikhupura; same province (Punjab)"
+  - key: 19
+    pmdc_name: "Avicenna Medical College"
+    pmdc_quote: "Avicenna Medical College, Link Bedian Road, DHA-IX, Ferozepur Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-040
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-040
+        name: "Avicenna Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 16 | Avicenna Medical College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-058
+        name: "Avicenna Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 20
+    pmdc_name: "Aziz Fatimah Medical & Dental College"
+    pmdc_quote: "Aziz Fatimah Medical & Dental College, West Canal Road, Old Ghafoor Bashir Children Hospital Building, Faisalabad."
+    section: private_medical
+    alias_target: PB-MED-043
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-043
+        name: "Aziz Fatima Medical & Dental College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 19 | Aziz Fatima Medical &amp; Dental College, Faisalabad | 150 |"
+        reason: "Aziz Fatimah / Aziz Fatima spelling variant; same city Faisalabad; the only such row"
+  - key: 21
+    pmdc_name: "Azra Naheed Medical College, Superior University, Main Raiwind Road, Lahore."
+    pmdc_quote: "Azra Naheed Medical College, Superior University, Main Raiwind Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-037
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-037
+        name: "Azra Naheed Medical College (Superior University), Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 13 | Azra Naheed Medical College (Superior University), Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-059
+        name: "Azra Naheed Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 22
+    pmdc_name: "Bakhtawar Amin Medical & Dental College"
+    pmdc_quote: "Bakhtawar Amin Medical & Dental College, Mattital Road, Northern Bypass, Multan."
+    section: private_medical
+    alias_target: PB-MED-041
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-041
+        name: "Bakhtawar Amin Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 17 | Bakhtawar Amin Medical &amp; Dental College, Multan | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-060
+        name: "Dental College, Bakhtawar Amin Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 23
+    pmdc_name: "Central Parks Medical College"
+    pmdc_quote: "Central Parks Medical College 21-KM Ferozepur Road, (Kahna Nou) Lahore."
+    section: private_medical
+    alias_target: PB-MED-034
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-034
+        name: "Central Park Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 10 | Central Park Medical College, Lahore | 150 |"
+        reason: "Central Parks / Central Park spelling variant; same city Lahore; the only such row"
+  - key: 24
+    pmdc_name: "CMH Institute of Medical Sciences"
+    pmdc_quote: "CMH Institute of Medical Sciences Bahawalpur"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 25
+    pmdc_name: "CMH Kharian Medical College"
+    pmdc_quote: "CMH Kharian Medical College Kharian Cantt"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 26
+    pmdc_name: "CMH Lahore Medical College"
+    pmdc_quote: "CMH Lahore Medical College Abdul Rehman Road, Lahore Cantt."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 27
+    pmdc_name: "CMH Multan Institute of Medical Sciences (CIMS)"
+    pmdc_quote: "CMH Multan Institute of Medical Sciences (CIMS) Multan Cantt."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 28
+    pmdc_name: "Continental Medical College"
+    pmdc_quote: "Continental Medical College 2-Civic Centre, Township, Lahore."
+    section: private_medical
+    alias_target: PB-MED-038
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-038
+        name: "Continental Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 14 | Continental Medical College, Lahore | 100 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 29
+    pmdc_name: "Fazaia Medical College Air University Sector E-9, Islamabad"
+    pmdc_quote: "Fazaia Medical College Air University Sector E-9, Islamabad"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-023
+        name: "Air University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch5-Universities-BS-v4.xlsx"
+        inst_id: UNI-AIR
+        name: "Air University"
+        region: "ICT (multi-campus)"
+        city: "Islamabad"
+        type: "university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 30
+    pmdc_name: "FMH College of Medicine & Dentistry"
+    pmdc_quote: "FMH College of Medicine & Dentistry Shadman, Lahore."
+    section: private_medical
+    alias_target: PB-MED-031
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-031
+        name: "FMH College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 7 | FMH College of Medicine &amp; Dentistry, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-064
+        name: "Dental Section, FMH College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 31
+    pmdc_name: "Foundation University Medical College"
+    pmdc_quote: "Foundation University Medical College Defence Avenue, DHA, Phase-I, Islamabad"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-030
+        name: "Foundation University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 32
+    pmdc_name: "HBS Medical & Dental College"
+    pmdc_quote: "HBS Medical & Dental College Lehtrar Road,Tarlai, Islamabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 33
+    pmdc_name: "HITEC Institute of Medical Sciences"
+    pmdc_quote: "HITEC Institute of Medical Sciences Taxila"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-119
+        name: "HITEC University"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 34
+    pmdc_name: "Independent Medical College"
+    pmdc_quote: "Independent Medical College Faisalabad."
+    section: private_medical
+    alias_target: PB-MED-052
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-052
+        name: "Independent Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 28 | Independent Medical College, Faisalabad | 100 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 35
+    pmdc_name: "Islam Medical College"
+    pmdc_quote: "Islam Medical College Pasrur Road, Sialkot."
+    section: private_medical
+    alias_target: PB-MED-053
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-053
+        name: "Islam Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 29 | Islam Medical College, Sialkot | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-042
+        name: "M. Islam Medical College, Gujranwala"
+        region: "Punjab"
+        city: "Gujranwala"
+        type: "private_medical_college"
+        reason: "M. Islam Medical College is in Gujranwala; the PMDC line is Islam Medical College, Sialkot"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-070
+        name: "Islam Dental College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 36
+    pmdc_name: "Islamabad Medical & Dental College"
+    pmdc_quote: "Islamabad Medical & Dental College Wadi-ul-Ilm Bharakahu, Main Murree Road, Islamabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 37
+    pmdc_name: "Islamic International Medical College"
+    pmdc_quote: "Islamic International Medical College Al-Mizan, IIMC Trust Medical Complex, Peshawar Road, Rawalpindi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 38
+    pmdc_name: "Lahore Medical & Dental College"
+    pmdc_quote: "Lahore Medical & Dental College Tulspura, Canal Bank North, Lahore."
+    section: private_medical
+    alias_target: PB-MED-028
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-028
+        name: "Lahore Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 4 | Lahore Medical &amp; Dental College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-065
+        name: "Dental Section, Lahore Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 39
+    pmdc_name: "M. Islam Medical College"
+    pmdc_quote: "M. Islam Medical College Gujranwala"
+    section: private_medical
+    alias_target: PB-MED-042
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-042
+        name: "M. Islam Medical College, Gujranwala"
+        region: "Punjab"
+        city: "Gujranwala"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 18 | M. Islam Medical College, Gujranwala | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-053
+        name: "Islam Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_medical_college"
+        reason: "Islam Medical College is in Sialkot; the PMDC line is M. Islam Medical College, Gujranwala"
+  - key: 40
+    pmdc_name: "Multan Medical & Dental College"
+    pmdc_quote: "Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."
+    section: private_medical
+    alias_target: PB-MED-046
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-046
+        name: "Multan Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 22 | Multan Medical &amp; Dental College, Multan | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-066
+        name: "Dental Section, Multan Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 41
+    pmdc_name: "Niazi Medical & Dental College"
+    pmdc_quote: "Niazi Medical & Dental College 10-KM Lahore, Sargodha."
+    section: private_medical
+    alias_target: PB-MED-047
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-047
+        name: "Niazi Medical & Dental College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 23 | Niazi Medical &amp; Dental College, Sargodha | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-061
+        name: "Dental College, Niazi Medical & Dental College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 42
+    pmdc_name: "Rahbar Medical & Dental College"
+    pmdc_quote: "Rahbar Medical & Dental College Lahore"
+    section: private_medical
+    alias_target: PB-MED-035
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-035
+        name: "Rahbar Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 11 | Rahbar Medical &amp; Dental College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-072
+        name: "Rahbar College of Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 43
+    pmdc_name: "Rai Medical College"
+    pmdc_quote: "Rai Medical College Sargodha"
+    section: private_medical
+    alias_target: PB-MED-049
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-049
+        name: "Rai Medical College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 25 | Rai Medical College, Sargodha | 100 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 44
+    pmdc_name: "Rashid Latif Medical College"
+    pmdc_quote: "Rashid Latif Medical College 14-Abu Bakar Block, New Garden Town, Lahore."
+    section: private_medical
+    alias_target: PB-MED-029
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-029
+        name: "Rashid Latif Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 5 | Rashid Latif Medical College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-033
+        name: "RLKU Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "RLKU Medical & Dental College is a separate UHS row with another name; the PMDC line is Rashid Latif Medical College (exact match PB-MED-029)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-073
+        name: "Rashid Latif Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 45
+    pmdc_name: "Rawal Institute of Health Sciences"
+    pmdc_quote: "Rawal Institute of Health Sciences Lehtrar Road, Near Ali Trust College, Khanna Dak,Islamabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 46
+    pmdc_name: "Sahara Medical College"
+    pmdc_quote: "Sahara Medical College Narowal"
+    section: private_medical
+    alias_target: PB-MED-050
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-050
+        name: "Sahara Medical College, Narowal"
+        region: "Punjab"
+        city: "Narowal"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 26 | Sahara Medical College, Narowal | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 47
+    pmdc_name: "Shahida Islam Medical College"
+    pmdc_quote: "Shahida Islam Medical College Lodhran"
+    section: private_medical
+    alias_target: PB-MED-051
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-051
+        name: "Shahida Islam Medical College, Lodhran"
+        region: "Punjab"
+        city: "Lodhran"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 27 | Shahida Islam Medical College, Lodhran | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-074
+        name: "Shahida Islam Dental College, Lodhran"
+        region: "Punjab"
+        city: "Lodhran"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 48
+    pmdc_name: "Shalamar Medical & Dental College"
+    pmdc_quote: "Shalamar Medical & Dental College Shalamar Link Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-026
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-026
+        name: "Shalamar Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 2 | Shalamar Medical &amp; Dental College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 49
+    pmdc_name: "Sharif Medical & Dental College"
+    pmdc_quote: "Sharif Medical & Dental College Jati Umra, Raiwind Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-027
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-027
+        name: "Sharif Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 3 | Sharif Medical &amp; Dental College, Lahore | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-067
+        name: "Dental Section, Sharif Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 50
+    pmdc_name: "Shifa College of Medicine"
+    pmdc_quote: "Shifa College of Medicine Pitrus Bukhari Road, Sector H-8/4, Islamabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-048
+        name: "Shifa Tameer-e-Millat University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 51
+    pmdc_name: "Sialkot Medical College"
+    pmdc_quote: "Sialkot Medical College Sialkot"
+    section: private_medical
+    alias_target: PB-MED-044
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-044
+        name: "Sialkot Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 20 | Sialkot Medical College, Sialkot | 100 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-053
+        name: "Islam Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_medical_college"
+        reason: "Islam Medical College, Sialkot is a different name from Sialkot Medical College"
+  - key: 52
+    pmdc_name: "University College of Medicine & Dentistry"
+    pmdc_quote: "University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."
+    section: private_medical
+    alias_target: PB-MED-036
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-036
+        name: "University College of Medicine & Dentistry, Lahore (University of Lahore)"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 12 | University College of Medicine &amp; Dentistry, Lahore (University of Lahore) | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-062
+        name: "Dental College, University College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 53
+    pmdc_name: "University Medical & Dental College"
+    pmdc_quote: "University Medical & Dental College 4-KM, Sargodha Road, Faisalabad."
+    section: private_medical
+    alias_target: PB-MED-045
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-045
+        name: "University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad)"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 21 | University Medical &amp; Dental College, Faisalabad (For Women Only) (University of Faisalabad) | 150 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-068
+        name: "Dental Section, University Medical & Dental College, Faisalabad (Female Only)"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 54
+    pmdc_name: "Wah Medical College"
+    pmdc_quote: "Wah Medical College P.O.F. Wah Hospital, Wah Cantt."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 55
+    pmdc_name: "Watim Medical College"
+    pmdc_quote: "Watim Medical College, T-Chowk, Rawat, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_medical
+    alias_target: PB-MED-056
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-056
+        name: "Watim Medical College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 32 | Watim Medical College, Rawalpindi | 100* |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-075
+        name: "Watim Dental College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 56
+    pmdc_name: "Pak Red Crescent Medical & Dental College"
+    pmdc_quote: "Pak Red Crescent Medical & Dental College 2-Shahra-e-Fatima Jinnah,Lahore."
+    section: private_medical
+    alias_target: PB-MED-048
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-048
+        name: "Pak Red Crescent Medical & Dental College, Kasur"
+        region: "Punjab"
+        city: "Kasur"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 24 | Pak Red Crescent Medical &amp; Dental College, Kasur | 100 |"
+        reason: "name identical (Pak Red Crescent Medical & Dental College), the only such row; FLAG: PMDC address says Lahore, batch city is Kasur; same province (Punjab)"
+  - key: 57
+    pmdc_name: "Aga Khan University Medical College"
+    pmdc_quote: "Aga Khan University Medical College Stadium Road, Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-203
+        name: "Aga Khan University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 58
+    pmdc_name: "Al-Tibri Medical College"
+    pmdc_quote: "Al-Tibri Medical College Near Al-Ibrahim Hospital, Old Thana Gadap Town,Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 59
+    pmdc_name: "Bahria University Medical College"
+    pmdc_quote: "Bahria University Medical College 13-National Stadium Road,Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-025
+        name: "Bahria University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch5-Universities-BS-v4.xlsx"
+        inst_id: UNI-BAHRIA
+        name: "Bahria University"
+        region: "ICT (multi-campus)"
+        city: "Islamabad"
+        type: "university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 60
+    pmdc_name: "Faculty of Medicine & Allied Medical Sciences/Isra University"
+    pmdc_quote: "Faculty of Medicine & Allied Medical Sciences/Isra University Hala Road, P.O. Box-313, Hyderabad."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-232
+        name: "Isra University"
+        region: "Sindh"
+        city: "Hyderabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 61
+    pmdc_name: "Indus Medical College"
+    pmdc_quote: "Indus Medical College Tando M.Khan"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-227
+        name: "Indus University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "Indus University (Karachi) vs Indus Medical College, Tando M. Khan: different name and city"
+  - key: 62
+    pmdc_name: "Jinnah Medical & Dental College"
+    pmdc_quote: "Jinnah Medical & Dental College 22-23 Shaheed-e-Millat Road,Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 63
+    pmdc_name: "Karachi Institute of Medical Sciences/ KIMS"
+    pmdc_quote: "Karachi Institute of Medical Sciences/ KIMS Malir Cantt. Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 64
+    pmdc_name: "Liaquat College of Medicine & Dentistry"
+    pmdc_quote: "Liaquat College of Medicine & Dentistry ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-240
+        name: "Liaquat University of Medical & Health Sciences"
+        region: "Sindh"
+        city: "Jamshoro"
+        type: "hec_recognised_university_or_dai"
+        reason: "different name and city (Karachi private college vs the Jamshoro university)"
+  - key: 65
+    pmdc_name: "Liaquat National Medical College"
+    pmdc_quote: "Liaquat National Medical College Liaquat National Hospital, Stadium Road, Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-240
+        name: "Liaquat University of Medical & Health Sciences"
+        region: "Sindh"
+        city: "Jamshoro"
+        type: "hec_recognised_university_or_dai"
+        reason: "different name and city (Karachi private college vs the Jamshoro university)"
+  - key: 66
+    pmdc_name: "Muhammad Medical College"
+    pmdc_quote: "Muhammad Medical College Hyderabad Road, Ratnabad, Mirpurkhas."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 67
+    pmdc_name: "Sir Syed College of Medical Sciences for Girls"
+    pmdc_quote: "Sir Syed College of Medical Sciences for Girls ST-32, Block-5, Boating Basin, Clifton,Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 68
+    pmdc_name: "United Medical & Dental College"
+    pmdc_quote: "United Medical & Dental College 43/7-B, Block 06, PECHS, Karachi"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 69
+    pmdc_name: "Ziauddin Medical College"
+    pmdc_quote: "Ziauddin Medical College Block-6, Shahra-e-Ghalib, Clifton, Karachi."
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-BRD-031
+        name: "Ziauddin University Examination Board"
+        region: "National (private)"
+        city: ""
+        type: "examination_board"
+        reason: "the batch row is the Ziauddin University Examination Board, not a college"
+  - key: 70
+    pmdc_name: "Fazaia Ruth Pfao Medical College"
+    pmdc_quote: "Fazaia Ruth Pfao Medical College Shahrah-e-Faisal, PAF Faisal Base, Karachi (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 71
+    pmdc_name: "Hamdard College of Medicine & Dentistry"
+    pmdc_quote: "Hamdard College of Medicine & Dentistry, Madinat-al-Hikmah, Mohammad Bin Qasim Avenue, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-222
+        name: "Hamdard University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 72
+    pmdc_name: "Baqai Medical College"
+    pmdc_quote: "Baqai Medical College 51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-207
+        name: "Baqai Medical University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 73
+    pmdc_name: "Suleman Roshan Medical College"
+    pmdc_quote: "Suleman Roshan Medical College, Tando Adam. (Provisionally recognized by erstwhile PMC)"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 74
+    pmdc_name: "Abu Umara Medical & Dental College"
+    pmdc_quote: "Abu Umara Medical & Dental College 9-Km, Main Raiwind Road, Bhobatian Chowk Lahore"
+    section: private_medical
+    alias_target: PB-MED-039
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-039
+        name: "Abu Umara Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 15 | Abu Umara Medical &amp; Dental College, Lahore | 100 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 75
+    pmdc_name: "Akhtar Saeed Medical College, Rawalpindi Campus Bahria Golf City, Murree Expressway Rawalpindi."
+    pmdc_quote: "Akhtar Saeed Medical College, Rawalpindi Campus Bahria Golf City, Murree Expressway Rawalpindi."
+    section: private_medical
+    alias_target: PB-MED-025
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-025
+        name: "Akhtar Saeed Medical College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_medical_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 1 | Akhtar Saeed Medical College, Rawalpindi | 100 |"
+        reason: "Akhtar Saeed Medical College, Rawalpindi Campus = batch \"Akhtar Saeed Medical College, Rawalpindi\" (the Rawalpindi institution itself, not the Lahore one)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-030
+        name: "Akhtar Saeed Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "Lahore institution; the PMDC line is the Rawalpindi campus"
+  - key: 76
+    pmdc_name: "NUST School of Health Sciences, National University of Sciences & Technology (NUST) Sector H-12 Islamabad"
+    pmdc_quote: "NUST School of Health Sciences, National University of Sciences & Technology (NUST) Sector H-12 Islamabad"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-041
+        name: "National University of Sciences & Technology"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 77
+    pmdc_name: "Bahria University College of Medicine"
+    pmdc_quote: "Bahria University College of Medicine, Islamabad"
+    section: private_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-025
+        name: "Bahria University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch5-Universities-BS-v4.xlsx"
+        inst_id: UNI-BAHRIA
+        name: "Bahria University"
+        region: "ICT (multi-campus)"
+        city: "Islamabad"
+        type: "university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 78
+    pmdc_name: "Dental Section Abbottabad International Medical College"
+    pmdc_quote: "Dental Section Abbottabad International Medical College Mansehra Road, Abbottabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 79
+    pmdc_name: "Dental Section Women Medical College"
+    pmdc_quote: "Dental Section Women Medical College Murree Road, Abbottabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 80
+    pmdc_name: "Peshawar Dental College"
+    pmdc_quote: "Peshawar Dental College Warsak Road, Opposite PTCL Exchange, Peshawar."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 81
+    pmdc_name: "Rehman College of Dentistry"
+    pmdc_quote: "Rehman College of Dentistry Peshawar"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 82
+    pmdc_name: "Dental Section, Frontier Medical College"
+    pmdc_quote: "Dental Section, Frontier Medical College P.O. Public School, Abbottabad. (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 83
+    pmdc_name: "Sardar Begum Dental College"
+    pmdc_quote: "Sardar Begum Dental College 46-E, Jamaluddin Afghani Road, University Town,Peshawar."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 84
+    pmdc_name: "Avicenna Dental College"
+    pmdc_quote: "Avicenna Dental College Lahore."
+    section: private_dental
+    alias_target: PB-MED-058
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-058
+        name: "Avicenna Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 1 | Avicenna Dental College, Lahore | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-040
+        name: "Avicenna Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 85
+    pmdc_name: "College of Dentistry, Bakhtawar Amin Medical & Dental College"
+    pmdc_quote: "College of Dentistry, Bakhtawar Amin Medical & Dental College Mattital Road, Northern Bypass, Multan."
+    section: private_dental
+    alias_target: PB-MED-060
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-060
+        name: "Dental College, Bakhtawar Amin Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 3 | Dental College, Bakhtawar Amin Medical &amp; Dental College, Multan | 75 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-041
+        name: "Bakhtawar Amin Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 86
+    pmdc_name: "College of Dentistry, Sharif Medical & Dental College"
+    pmdc_quote: "College of Dentistry, Sharif Medical & Dental College Jati Umra, Raiwind Road,Lahore."
+    section: private_dental
+    alias_target: PB-MED-067
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-067
+        name: "Dental Section, Sharif Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 10 | Dental Section, Sharif Medical &amp; Dental College, Lahore | 50 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-027
+        name: "Sharif Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 87
+    pmdc_name: "Dental College, Akhtar Saeed Medical & Dental College"
+    pmdc_quote: "Dental College, Akhtar Saeed Medical & Dental College Farooq Hospital, 2-3 Main Boulevard, Allama Iqbal Town, Lahore"
+    section: private_dental
+    alias_target: PB-MED-063
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-063
+        name: "Dental Section, Akhtar Saeed Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 6 | Dental Section, Akhtar Saeed Medical &amp; Dental College, Lahore | 75 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-030
+        name: "Akhtar Saeed Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 88
+    pmdc_name: "Dental Section, FMH College of Medicine & Dentistry"
+    pmdc_quote: "Dental Section, FMH College of Medicine & Dentistry Shadman,Lahore."
+    section: private_dental
+    alias_target: PB-MED-064
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-064
+        name: "Dental Section, FMH College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 7 | Dental Section, FMH College of Medicine &amp; Dentistry, Lahore | 75 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-031
+        name: "FMH College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 89
+    pmdc_name: "Dental College, HITEC Institute of Medical Sciences"
+    pmdc_quote: "Dental College, HITEC Institute of Medical Sciences Taxila Cantt."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-119
+        name: "HITEC University"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 90
+    pmdc_name: "Dental Section, Islamabad Medical & Dental College"
+    pmdc_quote: "Dental Section, Islamabad Medical & Dental College Wadi-ul-Ilm,Murree Road, Bahara Kahu, Islamabad"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 91
+    pmdc_name: "Dental College, Lahore Medical & Dental College"
+    pmdc_quote: "Dental College, Lahore Medical & Dental College Tulspura, Canal Bank North,Lahore."
+    section: private_dental
+    alias_target: PB-MED-065
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-065
+        name: "Dental Section, Lahore Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 8 | Dental Section, Lahore Medical &amp; Dental College, Lahore | 75 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-028
+        name: "Lahore Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 92
+    pmdc_name: "Dental College, Niazi Medical & Dental College Sargodha"
+    pmdc_quote: "Dental College, Niazi Medical & Dental College Sargodha"
+    section: private_dental
+    alias_target: PB-MED-061
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-061
+        name: "Dental College, Niazi Medical & Dental College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 4 | Dental College, Niazi Medical &amp; Dental College, Sargodha | 50 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-047
+        name: "Niazi Medical & Dental College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 93
+    pmdc_name: "Dental College, Rawal Institute of Health Sciences"
+    pmdc_quote: "Dental College, Rawal Institute of Health Sciences Lehtrar Road, Near Ali Trust College, Khanna Dak, Islamabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 94
+    pmdc_name: "Dental College, University College of Medicine & Dentistry"
+    pmdc_quote: "Dental College, University College of Medicine & Dentistry 1-KM, Raiwind Road, Lahore."
+    section: private_dental
+    alias_target: PB-MED-062
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-062
+        name: "Dental College, University College of Medicine & Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 5 | Dental College, University College of Medicine &amp; Dentistry, Lahore | 75 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-036
+        name: "University College of Medicine & Dentistry, Lahore (University of Lahore)"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 95
+    pmdc_name: "Dental College, University Medical & Dental College"
+    pmdc_quote: "Dental College, University Medical & Dental College 4-KM Sargodha Road, Faisalabad"
+    section: private_dental
+    alias_target: PB-MED-068
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-068
+        name: "Dental Section, University Medical & Dental College, Faisalabad (Female Only)"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 11 | Dental Section, University Medical &amp; Dental College, Faisalabad (Female Only) | 50 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-045
+        name: "University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad)"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 96
+    pmdc_name: "Dental Section, Multan Medical & Dental College"
+    pmdc_quote: "Dental Section, Multan Medical & Dental College Southern Bypass, Jehangir Abad, Multan."
+    section: private_dental
+    alias_target: PB-MED-066
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-066
+        name: "Dental Section, Multan Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 9 | Dental Section, Multan Medical &amp; Dental College, Multan | 50 |"
+        reason: "dental unit of the same named parent college in the same city; only the label differs (Dental College / Dental Section / College of Dentistry)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-046
+        name: "Multan Medical & Dental College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 97
+    pmdc_name: "Faryal Dental College"
+    pmdc_quote: "Faryal Dental College Sheikhupura."
+    section: private_dental
+    alias_target: PB-MED-069
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-069
+        name: "Faryal Dental College, Sheikhupura"
+        region: "Punjab"
+        city: "Sheikhupura"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 12 | Faryal Dental College, Sheikhupura | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 98
+    pmdc_name: "Foundation University College of Dentistry"
+    pmdc_quote: "Foundation University College of Dentistry Islamabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-030
+        name: "Foundation University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 99
+    pmdc_name: "HBS Dental College"
+    pmdc_quote: "HBS Dental College Lehtrar Road, Tarlai, Islamabad"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 100
+    pmdc_name: "Institute of Dentistry, CMH Lahore Medical College"
+    pmdc_quote: "Institute of Dentistry, CMH Lahore Medical College Abdur Rehman Road, Lahore."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 101
+    pmdc_name: "CMH Institute of Medical Sciences / CIMS Dental College"
+    pmdc_quote: "CMH Institute of Medical Sciences / CIMS Dental College, Multan"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 102
+    pmdc_name: "Islam Dental College"
+    pmdc_quote: "Islam Dental College Pasrur Road, Sialkot."
+    section: private_dental
+    alias_target: PB-MED-070
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-070
+        name: "Islam Dental College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 13 | Islam Dental College, Sialkot | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-053
+        name: "Islam Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 103
+    pmdc_name: "Islamic International Dental College"
+    pmdc_quote: "Islamic International Dental College Sector G-7/4, Islamabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 104
+    pmdc_name: "Margalla College of Dentistry"
+    pmdc_quote: "Margalla College of Dentistry Quaid-e-Azam Avenue, Gulrez Phase-III, Near High Court, Rawalpindi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-071
+        name: "Margalla Institute of Health Sciences, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_dental_college"
+        reason: "Margalla College of Dentistry (Gulrez, Rawalpindi) vs batch \"Margalla Institute of Health Sciences, Rawalpindi\" (typed private_dental_college): same city and brand but different names; an institute vs its college of dentistry cannot be settled from printed text"
+  - key: 105
+    pmdc_name: "Rashid Latif Dental College"
+    pmdc_quote: "Rashid Latif Dental College Lahore"
+    section: private_dental
+    alias_target: PB-MED-073
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-073
+        name: "Rashid Latif Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 16 | Rashid Latif Dental College, Lahore | 75 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-029
+        name: "Rashid Latif Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 106
+    pmdc_name: "Watim Dental College"
+    pmdc_quote: "Watim Dental College T Chowk, Rawat Rawalpindi."
+    section: private_dental
+    alias_target: PB-MED-075
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-075
+        name: "Watim Dental College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 18 | Watim Dental College, Rawalpindi | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-056
+        name: "Watim Medical College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 107
+    pmdc_name: "Shahida Islam Dental College"
+    pmdc_quote: "Shahida Islam Dental College Lodhran"
+    section: private_dental
+    alias_target: PB-MED-074
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-074
+        name: "Shahida Islam Dental College, Lodhran"
+        region: "Punjab"
+        city: "Lodhran"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 17 | Shahida Islam Dental College, Lodhran | 75 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-051
+        name: "Shahida Islam Medical College, Lodhran"
+        region: "Punjab"
+        city: "Lodhran"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 108
+    pmdc_name: "Azra Naheed Dental College"
+    pmdc_quote: "Azra Naheed Dental College, Lahore. (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    alias_target: PB-MED-059
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-059
+        name: "Azra Naheed Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 2 | Azra Naheed Dental College, Lahore | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-037
+        name: "Azra Naheed Medical College (Superior University), Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 109
+    pmdc_name: "Shifa College of Dentistry"
+    pmdc_quote: "Shifa College of Dentistry, Chaudhry Ghulam Abbas Road, 996 Service Rd W, Dhoke Kala Khan, Rawalpindi. (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-048
+        name: "Shifa Tameer-e-Millat University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 110
+    pmdc_name: "Altamash Institute of Dental Medicine"
+    pmdc_quote: "Altamash Institute of Dental Medicine 2-R, Sunset Boulovard Phase-IV, Defence Housing Authority, Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 111
+    pmdc_name: "Baqai Dental College"
+    pmdc_quote: "Baqai Dental College 51-Deh Tor, Toll Plaza, Super Highway, Gadap Road, Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-207
+        name: "Baqai Medical University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 112
+    pmdc_name: "Bhittai Dental & Medical College"
+    pmdc_quote: "Bhittai Dental & Medical College Umerkot Road, Mirpurkhas."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 113
+    pmdc_name: "Dental Section, Bahria University Medical & Dental College"
+    pmdc_quote: "Dental Section, Bahria University Medical & Dental College 13-National Stadium Road, Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-025
+        name: "Bahria University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch5-Universities-BS-v4.xlsx"
+        inst_id: UNI-BAHRIA
+        name: "Bahria University"
+        region: "ICT (multi-campus)"
+        city: "Islamabad"
+        type: "university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 114
+    pmdc_name: "Dental College, Sir Syed College of Medical Sciences for Girls"
+    pmdc_quote: "Dental College, Sir Syed College of Medical Sciences for Girls ST-32, Block-5, Boating Basin, Clifton, Karachi"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 115
+    pmdc_name: "Dental Section, Jinnah Medical & Dental College"
+    pmdc_quote: "Dental Section, Jinnah Medical & Dental College Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 116
+    pmdc_name: "Dental Section, Liaquat College of Medicine & Dentistry"
+    pmdc_quote: "Dental Section, Liaquat College of Medicine & Dentistry ST-19, Block-15, KDA Scheme-36, Gulistan-e-Jauhar, Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 117
+    pmdc_name: "Fatima Jinnah Dental College"
+    pmdc_quote: "Fatima Jinnah Dental College Block-D, Bhittai Colony, Korangi Greek,Karachi."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 118
+    pmdc_name: "Isra Dental College"
+    pmdc_quote: "Isra Dental College Hala Road, P.O. Box-313, Hyderabad."
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-232
+        name: "Isra University"
+        region: "Sindh"
+        city: "Hyderabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 119
+    pmdc_name: "Ziauddin Dental College"
+    pmdc_quote: "Ziauddin Dental College Karachi"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-BRD-031
+        name: "Ziauddin University Examination Board"
+        region: "National (private)"
+        city: ""
+        type: "examination_board"
+        reason: "the batch row is the Ziauddin University Examination Board, not a college"
+  - key: 120
+    pmdc_name: "Muhammad Dental College"
+    pmdc_quote: "Muhammad Dental College, Mirpurkhas (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 121
+    pmdc_name: "Dental Section, Hamdard College of Medicine & Dentistry"
+    pmdc_quote: "Dental Section, Hamdard College of Medicine & Dentistry, Madinat Al-Hikmah,Shahrah-e-Madinat ul Hikmah, Mohammad Bin Qasim Avenue, Karachi. (Provisionally recognized by erstwhile PMC)"
+    section: private_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-222
+        name: "Hamdard University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 122
+    pmdc_name: "Rahbar College of Dentistry"
+    pmdc_quote: "Rahbar College of Dentistry, Lahore"
+    section: private_dental
+    alias_target: PB-MED-072
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-072
+        name: "Rahbar College of Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_dental_college"
+        source_url: "https://www.uhs.edu.pk/images/Prospectus26.pdf"
+        source_quote: "| 15 | Rahbar College of Dentistry, Lahore | 50 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-035
+        name: "Rahbar Medical & Dental College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "private_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 123
+    pmdc_name: "Azad Jammu & Kashmir Medical College"
+    pmdc_quote: "Azad Jammu & Kashmir Medical College Jalalabad,Muzaffarabad (AJ&K)"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 124
+    pmdc_name: "Mohtarma Benazir Bhutto Shaheed Medical College"
+    pmdc_quote: "Mohtarma Benazir Bhutto Shaheed Medical College Chiterparri,Mirpur (AJ&K)"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-09
+        name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "the PMDC line is Mohtarma Benazir Bhutto Shaheed Medical College, Mirpur (AJ&K), not the Lyari college"
+  - key: 125
+    pmdc_name: "Poonch Medical College"
+    pmdc_quote: "Poonch Medical College Rawalakot"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-007
+        name: "University of Poonch"
+        region: "Azad Jammu & Kashmir"
+        city: "Poonch"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 126
+    pmdc_name: "Bolan Medical College"
+    pmdc_quote: "Bolan Medical College Quetta"
+    section: public_medical
+    alias_target: BL-MED-01
+    target_region: "Balochistan"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: BL-MED-01
+        name: "Bolan Medical College, Quetta"
+        region: "Balochistan"
+        city: "Quetta"
+        type: "public_medical_college"
+        source_url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf"
+        source_quote: "BOLAN MEDICAL COLLEGE, QUETTA"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-015
+        name: "The Bolan University of Medical and Health Sciences, Quetta"
+        region: "Balochistan"
+        city: "Quetta"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 127
+    pmdc_name: "Ayub Medical College"
+    pmdc_quote: "Ayub Medical College Abbottabad"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 128
+    pmdc_name: "Bacha Khan Medical College"
+    pmdc_quote: "Bacha Khan Medical College Mardan"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 129
+    pmdc_name: "Bannu Medical College"
+    pmdc_quote: "Bannu Medical College Bannu"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 130
+    pmdc_name: "Gajju Khan Medical College"
+    pmdc_quote: "Gajju Khan Medical College Swabi"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 131
+    pmdc_name: "Gomal Medical College"
+    pmdc_quote: "Gomal Medical College D. I. Khan"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-059
+        name: "Gomal University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Dera Ismail Khan"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 132
+    pmdc_name: "Khyber Girls Medical College"
+    pmdc_quote: "Khyber Girls Medical College PDA Building, Block IV, Phase V, Hayatabad, Peshawar."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-066
+        name: "Khyber Medical University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Peshawar"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: KP-ADM-001
+        name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS"
+        region: "KP"
+        city: "Peshawar"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 133
+    pmdc_name: "Khyber Medical College"
+    pmdc_quote: "Khyber Medical College Peshawar"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-066
+        name: "Khyber Medical University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Peshawar"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: KP-ADM-001
+        name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS"
+        region: "KP"
+        city: "Peshawar"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 134
+    pmdc_name: "KMU Institute of Medical Sciences/ KIMS"
+    pmdc_quote: "KMU Institute of Medical Sciences/ KIMS Divisional Headquarter Hospital, KDA, Kohat."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-066
+        name: "Khyber Medical University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Peshawar"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: KP-ADM-001
+        name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS"
+        region: "KP"
+        city: "Peshawar"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 135
+    pmdc_name: "Nowshera Medical College"
+    pmdc_quote: "Nowshera Medical College Nowshera"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 136
+    pmdc_name: "Saidu Medical College"
+    pmdc_quote: "Saidu Medical College, Swat."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 137
+    pmdc_name: "Allama Iqbal Medical College"
+    pmdc_quote: "Allama Iqbal Medical College Allama Shabbir Ahmad Usmani Road, Lahore."
+    section: public_medical
+    alias_target: PB-MED-002
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-002
+        name: "Allama Iqbal Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 2 | Allama Iqbal Medical College, Lahore | 314 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 138
+    pmdc_name: "Ameer-ud-Din (PGMI) Medical College"
+    pmdc_quote: "Ameer-ud-Din (PGMI) Medical College Lahore General Hospital,Lahore."
+    section: public_medical
+    alias_target: PB-MED-016
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-016
+        name: "Ameer-ud-Din Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 16 | Ameer-ud-Din Medical College, Lahore | 104 |"
+        reason: "Ameer-ud-Din (PGMI) Medical College, Lahore = batch \"Ameer-ud-Din Medical College, Lahore\"; the only such row"
+  - key: 139
+    pmdc_name: "Army Medical College"
+    pmdc_quote: "Army Medical College Abid Majeed Road, Rawalpindi."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 140
+    pmdc_name: "D.G. Khan Medical College"
+    pmdc_quote: "D.G. Khan Medical College Dera Ghazi Khan"
+    section: public_medical
+    alias_target: PB-MED-014
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-014
+        name: "D.G. Khan Medical College, Dera Ghazi Khan"
+        region: "Punjab"
+        city: "Dera Ghazi Khan"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 14 | D.G. Khan Medical College, Dera Ghazi Khan | 85 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 141
+    pmdc_name: "Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University)"
+    pmdc_quote: "Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University), Queens Road,Lahore."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-004
+        name: "Fatima Jinnah Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_medical_college"
+        reason: "the PMDC line \"Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University)\" names both the college and the university; the batches have both PB-MED-004 (college) and PK-UNI-106 (university); two candidates"
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-106
+        name: "Fatima Jinnah Medical University, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "hec_recognised_university_or_dai"
+        reason: "see PB-MED-004: the line also names the university; two candidates"
+  - key: 142
+    pmdc_name: "Federal Medical College"
+    pmdc_quote: "Federal Medical College, Al Farabi Centre, Hanna Road, G-8/4, Islamabad."
+    section: public_medical
+    alias_target: IC-MED-01
+    target_region: "ICT"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: IC-MED-01
+        name: "Federal Medical College, Islamabad"
+        region: "ICT"
+        city: "Islamabad"
+        type: "public_medical_college"
+        source_url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg"
+        source_quote: "1- Federal Medical College, Islamabad"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 143
+    pmdc_name: "Gujranwala Medical College"
+    pmdc_quote: "Gujranwala Medical College Satellite Town,Pasrur Road, Gujranwala."
+    section: public_medical
+    alias_target: PB-MED-013
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-013
+        name: "Gujranwala Medical College, Gujranwala"
+        region: "Punjab"
+        city: "Gujranwala"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 13 | Gujranwala Medical College, Gujranwala | 91 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 144
+    pmdc_name: "Khawaja Muhammad Safdar Medical College"
+    pmdc_quote: "Khawaja Muhammad Safdar Medical College Commissioner Road,Sialkot."
+    section: public_medical
+    alias_target: PB-MED-015
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-015
+        name: "Khawaja Muhammad Safdar Medical College, Sialkot"
+        region: "Punjab"
+        city: "Sialkot"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 15 | Khawaja Muhammad Safdar Medical College, Sialkot | 95 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 145
+    pmdc_name: "King Edward Medical University"
+    pmdc_quote: "King Edward Medical University Nila Gumbad, Lahore."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-001
+        name: "King Edward Medical College, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_medical_college"
+        reason: "the PMDC line names \"King Edward Medical University\"; batch 2 has the college \"King Edward Medical College, Lahore\" and batch 1 has the university; two rows could match, and a university is not its college"
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-128
+        name: "King Edward Medical University"
+        region: "Punjab"
+        city: "Lahore"
+        type: "hec_recognised_university_or_dai"
+        reason: "name identical to the university row, but the PMDC list is of colleges and a second row (PB-MED-001, the college) could also match; two candidates"
+  - key: 146
+    pmdc_name: "Narowal M.C, Narowal"
+    pmdc_quote: "Narowal M.C, Narowal"
+    section: public_medical
+    alias_target: PB-MED-017
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-017
+        name: "Narowal Medical College, Narowal"
+        region: "Punjab"
+        city: "Narowal"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 17 | Narowal Medical College, Narowal | 99 |"
+        reason: "\"Narowal M.C\" abbreviates Narowal Medical College; same city Narowal; the only such row"
+  - key: 147
+    pmdc_name: "Nawaz Sharif Medical College Hafiz Hayat Campus, University of Gujrat, Gujrat."
+    pmdc_quote: "Nawaz Sharif Medical College Hafiz Hayat Campus, University of Gujrat, Gujrat."
+    section: public_medical
+    alias_target: PB-MED-011
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-011
+        name: "Nawaz Sharif Medical College, Gujrat"
+        region: "Punjab"
+        city: "Gujrat"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 11 | Nawaz Sharif Medical College, Gujrat | 49 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 148
+    pmdc_name: "Nishtar Medical College"
+    pmdc_quote: "Nishtar Medical College Nishtar Road, Multan"
+    section: public_medical
+    alias_target: PB-MED-003
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-003
+        name: "Nishtar Medical College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 3 | Nishtar Medical College, Multan | 268 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-153
+        name: "Nishtar Medical University, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-019
+        name: "Nishtar Institute of Dentistry, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "public_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 149
+    pmdc_name: "Punjab Medical College"
+    pmdc_quote: "Punjab Medical College Sargodha Road, Faisalabad."
+    section: public_medical
+    alias_target: PB-MED-006
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-006
+        name: "Punjab Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 6 | Punjab Medical College, Faisalabad | 270 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-105
+        name: "Faisalabad Medical University, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-020
+        name: "Dental Institute, Punjab Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "public_dental_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 150
+    pmdc_name: "Quaid-e-Azam Medical College"
+    pmdc_quote: "Quaid-e-Azam Medical College Bahawal Victoria Hospital, Circular Road, Bahawalpur."
+    section: public_medical
+    alias_target: PB-MED-008
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-008
+        name: "Quaid-e-Azam Medical College, Bahawalpur"
+        region: "Punjab"
+        city: "Bahawalpur"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 8 | Quaid-e-Azam Medical College, Bahawalpur | 297 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-024
+        name: "Quaid-e-Azam Medical & Dental College Bahawalpur"
+        region: "Punjab"
+        city: "Bahawalpur"
+        type: "public_dental_college"
+        reason: "Quaid-e-Azam Medical & Dental College (typed public_dental_college, new 2026-27, marked *) is the dental row; the PMDC line is the medical college, exact match PB-MED-008"
+  - key: 151
+    pmdc_name: "Rawalpindi Medical College"
+    pmdc_quote: "Rawalpindi Medical College New Teaching Block, Holy Family Hospital, Rawalpindi."
+    section: public_medical
+    alias_target: PB-MED-007
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-007
+        name: "Rawalpindi Medical College, Rawalpindi"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 7 | Rawalpindi Medical College, Rawalpindi | 325 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-162
+        name: "Rawalpindi Medical University"
+        region: "Punjab"
+        city: "Rawalpindi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 152
+    pmdc_name: "Sahiwal Medical College"
+    pmdc_quote: "Sahiwal Medical College Civil Hospital, Sahiwal."
+    section: public_medical
+    alias_target: PB-MED-012
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-012
+        name: "Sahiwal Medical College, Sahiwal"
+        region: "Punjab"
+        city: "Sahiwal"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 12 | Sahiwal Medical College, Sahiwal | 91 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 153
+    pmdc_name: "Sargodha Medical College"
+    pmdc_quote: "Sargodha Medical College Johar Block, University Road, Sargodha."
+    section: public_medical
+    alias_target: PB-MED-010
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-010
+        name: "Sargodha Medical College, Sargodha"
+        region: "Punjab"
+        city: "Sargodha"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 10 | Sargodha Medical College, Sargodha | 95 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 154
+    pmdc_name: "Services Institute of Medical Sciences"
+    pmdc_quote: "Services Institute of Medical Sciences Services Hospital, Jail Road, Lahore."
+    section: public_medical
+    alias_target: PB-MED-005
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-005
+        name: "Services Institute of Medical Sciences, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 5 | Services Institute of Medical Sciences, Lahore | 211 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 155
+    pmdc_name: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College"
+    pmdc_quote: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College Shaikh Zayed Hospital, Lahore."
+    section: public_medical
+    alias_target: IC-MED-02
+    target_region: "Punjab (federal)"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: IC-MED-02
+        name: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore"
+        region: "Punjab (federal)"
+        city: "Lahore"
+        type: "public_medical_college"
+        source_url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg"
+        source_quote: "2- Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore"
+        reason: "Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore: same name, same city (PMDC \"Shaikh Zayed Hospital, Lahore\"); note the batch region is \"Punjab (federal)\""
+  - key: 156
+    pmdc_name: "Sheikh Zayed Medical College"
+    pmdc_quote: "Sheikh Zayed Medical College,Rahim Yar Khan."
+    section: public_medical
+    alias_target: PB-MED-009
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-009
+        name: "Sheikh Zayed Medical College, Rahim Yar Khan"
+        region: "Punjab"
+        city: "Rahim Yar Khan"
+        type: "public_medical_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 9 | Sheikh Zayed Medical College, Rahim Yar Khan | 130 |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 157
+    pmdc_name: "Bilawal Medical College"
+    pmdc_quote: "Bilawal Medical College Jamshoro."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 158
+    pmdc_name: "Chandka Medical College"
+    pmdc_quote: "Chandka Medical College Larkana"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 159
+    pmdc_name: "Dow International Medical College"
+    pmdc_quote: "Dow International Medical College KDA Scheme 35, Gulzar-e-Hijri, New Suparco, Karachi"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-02
+        name: "Dow University of Health Sciences, Karachi"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-213
+        name: "DOW University of Health Sciences"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 160
+    pmdc_name: "Dow Medical College"
+    pmdc_quote: "Dow Medical College Baba-e-Urdu Road, Karach."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-02
+        name: "Dow University of Health Sciences, Karachi"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-213
+        name: "DOW University of Health Sciences"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 161
+    pmdc_name: "Gambat Medical College"
+    pmdc_quote: "Gambat Medical College Gambat-Khairpur Mirs"
+    section: public_medical
+    alias_target: SD-MED-07
+    target_region: "Sindh"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-07
+        name: "Gambat Medical College, Gambat"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        source_url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf"
+        source_quote: "| 07 | Gambat Medical College, Gambat |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-218
+        name: "Gambat Institute of Medical Sciences"
+        region: "Sindh"
+        city: "Khairpur"
+        type: "hec_recognised_university_or_dai"
+        reason: "Gambat Institute of Medical Sciences (HEC institute) is a different name from Gambat Medical College; the exact college row is SD-MED-07"
+  - key: 162
+    pmdc_name: "Ghulam Muhammad Mahar Medical College"
+    pmdc_quote: "Ghulam Muhammad Mahar Medical College Sukkur"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 163
+    pmdc_name: "Karachi Medical & Dental College"
+    pmdc_quote: "Karachi Medical & Dental College Block M, North Nazimabad, Karachi."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-06
+        name: "Karachi Metropolitan University (KMDC)"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row \"Karachi Metropolitan University (KMDC)\" names a university, with KMDC in brackets; the PMDC line is the college \"Karachi Medical & Dental College\"; university vs college cannot be settled from printed text"
+  - key: 164
+    pmdc_name: "Liaquat University of Medical & Health Sciences"
+    pmdc_quote: "Liaquat University of Medical & Health Sciences Jamshoro"
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-03
+        name: "Liaquat University of Medical & Health Sciences, Jamshoro"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "name identical, but two batch rows carry it (SD-MED-03 and PK-UNI-240); two candidates"
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-240
+        name: "Liaquat University of Medical & Health Sciences"
+        region: "Sindh"
+        city: "Jamshoro"
+        type: "hec_recognised_university_or_dai"
+        reason: "name identical, but two batch rows carry it (SD-MED-03 and PK-UNI-240); two candidates"
+  - key: 165
+    pmdc_name: "Liaquat Institute of Medical & Health Sciences (LIMHS)"
+    pmdc_quote: "Liaquat Institute of Medical & Health Sciences (LIMHS)Thatta, Sindh, Pakistan."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-03
+        name: "Liaquat University of Medical & Health Sciences, Jamshoro"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "Liaquat Institute of Medical & Health Sciences, Thatta is a different institution (other name, other city) from the Jamshoro university"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-240
+        name: "Liaquat University of Medical & Health Sciences"
+        region: "Sindh"
+        city: "Jamshoro"
+        type: "hec_recognised_university_or_dai"
+        reason: "Liaquat Institute of Medical & Health Sciences, Thatta is a different institution (other name, other city) from the Jamshoro university"
+  - key: 166
+    pmdc_name: "Peoples University of Medical & Health Sciences for Women"
+    pmdc_quote: "Peoples University of Medical & Health Sciences for Women Shaheed Benazir-Abad, Nawab-shah."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-04
+        name: "Peoples University of Medical & Health Sciences for Women, SBA"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "name identical, but two batch rows carry it (SD-MED-04 and PK-UNI-250); two candidates"
+      - verdict: unclear
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-250
+        name: "Peoples University of Medical & Health Sciences for Women"
+        region: "Sindh"
+        city: "Nawabshah"
+        type: "hec_recognised_university_or_dai"
+        reason: "name identical, but two batch rows carry it (SD-MED-04 and PK-UNI-250); two candidates"
+  - key: 167
+    pmdc_name: "Shaheed Mohtarma Benazir Bhutto Medical College"
+    pmdc_quote: "Shaheed Mohtarma Benazir Bhutto Medical College, Behind Lyari General Hospital, Tamery Road, Lyari, Karachi."
+    section: public_medical
+    alias_target: SD-MED-09
+    target_region: "Sindh"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-09
+        name: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        source_url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf"
+        source_quote: "| 09 | Shaheed Mohtarma Benazir Bhutto Medical College, Lyari |"
+        reason: "Shaheed Mohtarma Benazir Bhutto Medical College, Lyari, Karachi = batch \"...Medical College, Lyari\"; the only such row"
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-05
+        name: "Shaheed Mohtarma Benazir Bhutto Medical University, Larkana"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "Shaheed Mohtarma Benazir Bhutto Medical University, Larkana is a university in another city"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-262
+        name: "Shaheed Mohtarma Benazir Bhutto Medical University"
+        region: "Sindh"
+        city: "Larkana"
+        type: "hec_recognised_university_or_dai"
+        reason: "university in Larkana; the PMDC line is the Lyari college"
+  - key: 168
+    pmdc_name: "Sindh Medical College"
+    pmdc_quote: "Sindh Medical College Sarfaraz Rafique Shaheed Road, Karachi."
+    section: public_medical
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 169
+    pmdc_name: "Khairpur Medical College"
+    pmdc_quote: "Khairpur Medical College Khairpur Mirs"
+    section: public_medical
+    alias_target: SD-MED-08
+    target_region: "Sindh"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-08
+        name: "Khairpur Medical College, Khairpur Mirs"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        source_url: "https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf"
+        source_quote: "| 08 | Khairpur Medical College, Khairpur Mirs |"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 170
+    pmdc_name: "Jhalawan Medical College"
+    pmdc_quote: "Jhalawan Medical College, Khuzdar - Baluchistan"
+    section: public_medical
+    alias_target: BL-MED-02
+    target_region: "Balochistan"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: BL-MED-02
+        name: "Jhalawan Medical College (JMC), Khuzdar"
+        region: "Balochistan"
+        city: "Khuzdar"
+        type: "public_medical_college"
+        source_url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf"
+        source_quote: "JHALAWAN MEDICAL COLLEGE (JMC), KHUZDAR"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 171
+    pmdc_name: "Loralai Medical College"
+    pmdc_quote: "Loralai Medical College, Loralai - Baluchistan"
+    section: public_medical
+    alias_target: BL-MED-03
+    target_region: "Balochistan"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: BL-MED-03
+        name: "Loralai Medical College (LMC), Loralai"
+        region: "Balochistan"
+        city: "Loralai"
+        type: "public_medical_college"
+        source_url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf"
+        source_quote: "LORALAI MEDICAL COLLEGE (LMC), LORALAI"
+        reason: "name identical apart from punctuation/city suffix; same city; only batch row with this name"
+  - key: 172
+    pmdc_name: "Makran Medical College"
+    pmdc_quote: "Makran Medical College, Turbat - Baluchistan"
+    section: public_medical
+    alias_target: BL-MED-04
+    target_region: "Balochistan"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: BL-MED-04
+        name: "Mekran Medical College (MMC), Turbat"
+        region: "Balochistan"
+        city: "Turbat"
+        type: "public_medical_college"
+        source_url: "https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf"
+        source_quote: "MEKRAN MEDICAL COLLEGE (MMC), TURBAT"
+        reason: "Makran / Mekran Medical College, Turbat: same name up to transliteration, same city, the only such row"
+  - key: 173
+    pmdc_name: "Dental Section, Bolan Medical College"
+    pmdc_quote: "Dental Section, Bolan Medical College Quetta."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: BL-MED-01
+        name: "Bolan Medical College, Quetta"
+        region: "Balochistan"
+        city: "Quetta"
+        type: "public_medical_college"
+        reason: "the dental section of Bolan Medical College is a different institution from the medical college (batch note: \"Bolan Dental Section is inside BMC\"); no batch row for the dental section"
+  - key: 174
+    pmdc_name: "Bacha Khan Dental College"
+    pmdc_quote: "Bacha Khan Dental College Mardan"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 175
+    pmdc_name: "Dental College, Ayub Medical College"
+    pmdc_quote: "Dental College, Ayub Medical College Abbottabad"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 176
+    pmdc_name: "Khyber College of Dentistry"
+    pmdc_quote: "Khyber College of Dentistry Peshawar"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-066
+        name: "Khyber Medical University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Peshawar"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: KP-ADM-001
+        name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS"
+        region: "KP"
+        city: "Peshawar"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 177
+    pmdc_name: "KMU Institute of Dental Sciences/ KIDS"
+    pmdc_quote: "KMU Institute of Dental Sciences/ KIDS Kohat."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-066
+        name: "Khyber Medical University"
+        region: "Khyber Pakhtunkhwa"
+        city: "Peshawar"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: KP-ADM-001
+        name: "Khyber Medical University (KMU) — admitting university for KP public MBBS/BDS"
+        region: "KP"
+        city: "Peshawar"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 178
+    pmdc_name: "De'montmorency College of Dentistry"
+    pmdc_quote: "De'montmorency College of Dentistry, Yakki Gate, Lahore."
+    section: public_dental
+    alias_target: PB-MED-018
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-018
+        name: "de' Montmorency College of Dentistry, Lahore"
+        region: "Punjab"
+        city: "Lahore"
+        type: "public_dental_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 1 | de' Montmorency College of Dentistry, Lahore | 96 |"
+        reason: "De'montmorency / de' Montmorency College of Dentistry, Lahore: same name, same city"
+  - key: 179
+    pmdc_name: "Dental Section, Army Medical College"
+    pmdc_quote: "Dental Section, Army Medical College Abid Majeed Road, Rawalpindi."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 180
+    pmdc_name: "Dental Section, Punjab Medical College"
+    pmdc_quote: "Dental Section, Punjab Medical College Sargodha Road, Faisalabad"
+    section: public_dental
+    alias_target: PB-MED-020
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-020
+        name: "Dental Institute, Punjab Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "public_dental_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 3 | Dental Institute, Punjab Medical College, Faisalabad | 49 |"
+        reason: "Dental Section, Punjab Medical College, Faisalabad = batch \"Dental Institute, Punjab Medical College, Faisalabad\": the dental unit of the same parent in the same city; only the label differs"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-006
+        name: "Punjab Medical College, Faisalabad"
+        region: "Punjab"
+        city: "Faisalabad"
+        type: "public_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 181
+    pmdc_name: "Institute of Dentistry, Nishtar Medical College"
+    pmdc_quote: "Institute of Dentistry, Nishtar Medical College Nishtar Road, Multan."
+    section: public_dental
+    alias_target: PB-MED-019
+    target_region: "Punjab"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-019
+        name: "Nishtar Institute of Dentistry, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "public_dental_college"
+        source_url: "https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf"
+        source_quote: "| 2 | Nishtar Institute of Dentistry, Multan | 40 |"
+        reason: "Institute of Dentistry, Nishtar Medical College, Multan = batch \"Nishtar Institute of Dentistry, Multan\": the same dental institute of Nishtar, same city"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-153
+        name: "Nishtar Medical University, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch2-Punjab-v4.xlsx"
+        inst_id: PB-MED-003
+        name: "Nishtar Medical College, Multan"
+        region: "Punjab"
+        city: "Multan"
+        type: "public_medical_college"
+        reason: "one is the medical college, the other its dental college/section: different institutions"
+  - key: 182
+    pmdc_name: "Bibi Assefa Dental College"
+    pmdc_quote: "Bibi Assefa Dental College Larkana"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 183
+    pmdc_name: "Dental College, Dow International Medical College"
+    pmdc_quote: "Dental College, Dow International Medical College Ojha Campus, Baba-e-Urdu Road, Karachi."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-02
+        name: "Dow University of Health Sciences, Karachi"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-213
+        name: "DOW University of Health Sciences"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 184
+    pmdc_name: "Dental Section, Karachi Medical & Dental College"
+    pmdc_quote: "Dental Section, Karachi Medical & Dental College Block M, North Nazimabad, Karachi."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-06
+        name: "Karachi Metropolitan University (KMDC)"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "the PMDC line is the Dental Section of KMDC; the batch row is the university / medical college: a different institution"
+  - key: 185
+    pmdc_name: "Dr. Ishratul Ebad Institute of Oral Health Sciences"
+    pmdc_quote: "Dr. Ishratul Ebad Institute of Oral Health Sciences Sarfaraz Rafique Shaheed Road, Karachi."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+  - key: 186
+    pmdc_name: "Faculty of Dentistry, Liaquat University of Medical & Health Sciences"
+    pmdc_quote: "Faculty of Dentistry, Liaquat University of Medical & Health Sciences, Jamshoro"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-03
+        name: "Liaquat University of Medical & Health Sciences, Jamshoro"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-240
+        name: "Liaquat University of Medical & Health Sciences"
+        region: "Sindh"
+        city: "Jamshoro"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 187
+    pmdc_name: "Sindh Institute of Oral Health Sciences/ JSMU"
+    pmdc_quote: "Sindh Institute of Oral Health Sciences/ JSMU Karachi."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-01
+        name: "Jinnah Sindh Medical University, Karachi"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-233
+        name: "Jinnah Sindh Medical University"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 188
+    pmdc_name: "Dow Dental College"
+    pmdc_quote: "Dow Dental College, Baba-e-Urdu Road, Karachi (Letter sent to M/o NHSR&C, Islamabad for notification but notification is still awaited)"
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates:
+      - verdict: different
+        batch_file: "PAI-Research-Batch3-Sindh-v4.xlsx"
+        inst_id: SD-MED-02
+        name: "Dow University of Health Sciences, Karachi"
+        region: "Sindh"
+        city: ""
+        type: "public_medical_university_or_college"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-213
+        name: "DOW University of Health Sciences"
+        region: "Sindh"
+        city: "Karachi"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 189
+    pmdc_name: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University"
+    pmdc_quote: "School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical University Islamabad"
+    section: public_dental
+    alias_target: IC-MED-03
+    target_region: "ICT"
+    candidates:
+      - verdict: same
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: IC-MED-03
+        name: "School of Dentistry, Islamabad"
+        region: "ICT"
+        city: "Islamabad"
+        type: "public_medical_college"
+        source_url: "https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg"
+        source_quote: "1- School of Dentistry, Islamabad"
+        reason: "School of Dentistry, (SZABMU) Islamabad = batch \"School of Dentistry, Islamabad\" (listed by SZABMU); same name, same city; note the batch type is public_medical_college (discipline Dental)"
+      - verdict: different
+        batch_file: "PAI-Research-Batch1-National-v4.xlsx"
+        inst_id: PK-UNI-047
+        name: "Shaheed Zulfiqar Ali Bhutto Medical University"
+        region: "Islamabad Capital Territory"
+        city: "Islamabad"
+        type: "hec_recognised_university_or_dai"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+      - verdict: different
+        batch_file: "PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx"
+        inst_id: IC-ADM-001
+        name: "Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) — admitting university for federal public medical/dental colleges"
+        region: "ICT"
+        city: "Islamabad"
+        type: "admitting_university"
+        reason: "batch row is the university/body; the PMDC line is a college/school/section/faculty of it (or a distinct institution under it): never the same"
+  - key: 190
+    pmdc_name: "Saidu College of Dentistry"
+    pmdc_quote: "Saidu College of Dentistry, Saidu Sharif, Sawat."
+    section: public_dental
+    alias_target: null
+    target_region: null
+    candidates: []   # no batch row names this institution
+summary:
+  pmdc_lines: 190
+  candidate_pairs: 195
+  same: 76
+  different: 109
+  unclear: 10
+  lines_with_alias_target: 76
+  lines_unclear: 6   # keys [104, 141, 145, 163, 164, 166]
+  lines_without_alias_target: 114
+  lines_with_no_candidate_at_all: 68
+  alias_target_regions: {"Punjab": 66, "ICT": 2, "Punjab (federal)": 1, "Balochistan": 4, "Sindh": 3}
+  each_target_used_once: true
+  flags:
+    - "key 18: city differs (PMDC address Lahore vs batch city Sheikhupura); judged same on the unique name"
+    - "key 56: city differs (PMDC address Lahore vs batch city Kasur); judged same on the unique name"
+    - "key 155: target region is written \"Punjab (federal)\" in batch 4"
+    - "key 189: target IC-MED-03 is typed public_medical_college for a dental school"
+    - "keys 145, 141, 164, 166: the batches hold both a college/listing row and an HEC university row with the same or overlapping name; until a reviewer decides which row (if any) is the PMDC institution, these lines get no alias target"

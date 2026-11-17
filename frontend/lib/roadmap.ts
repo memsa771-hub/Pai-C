@@ -45,6 +45,28 @@ export type RouteStep = {
   manual_done?: boolean;
   /** The student may tick it: set by the backend only where the Vault is silent. */
   tickable?: boolean;
+  /** OS plan steps only (PAI OS runs the route): the step's own title, who does it and when it is due. */
+  title?: string;
+  owner?: "student" | "pai";
+  due_at?: string | null;
+  due_tz?: string | null;
+  provisional?: boolean;
+  estimated?: boolean;
+  /** P1-T8: a step that waits for the student's data (it has no tick): what it needs, in the backend's words. */
+  request?: { kind: "provide" | "which_is_right" | "result_expected"; evidence?: "stated" | "shown" | "confirmed"; text: string };
+};
+
+/** The OS plan on a chosen route; absent when the plan view is off. "empty" means PAI is still preparing the plan. */
+export type RoutePlan = {
+  state: "empty" | "active" | "needs_student" | "paused" | "stopped" | "finished";
+  state_reason?: string | null;
+  revision?: number | null;
+  decision_version?: number | null;
+  proposals_waiting?: number;
+  changes?: unknown[];
+  /** P1-T6: the fixed sentence for a paused plan and the one button label that goes with it; absent unless sent. */
+  reason_text?: string | null;
+  reason_action?: string | null;
 };
 
 /** A dated calendar event behind the estimate; month null is "date not confirmed". */
@@ -86,6 +108,27 @@ export type EducationLine = {
   percent: number | null;
 };
 
+/** The student consent text as the API sends it (backend consent_texts.yaml `student`). */
+export type ConsentText = { title: string; body: string[] };
+
+/** Consent on a choice (backend routers/roadmap.py `_choice_view`). */
+export type ConsentState = { student: "given" | "missing"; guardian: "not_needed" | "given" | "missing" };
+
+/** The live choice: what was picked and who has agreed. Present only when the hand-off is on. */
+export type RouteChoice = {
+  version: number;
+  places: { programme_ref: string; rank: number }[];
+  intake: { term: string; year: number } | null;
+  destination: string | null;
+  level: string | null;
+  os_supported: boolean;
+  consent: ConsentState;
+  /** The consent text version the student agreed to; null while their consent is missing. */
+  consent_version?: string | null;
+  /** While the student's consent is missing: the text to read before giving it again (null while not approved). */
+  consent_offer?: { text: ConsentText | null; version: string };
+};
+
 export type ChosenRoute = {
   id: string;
   field_key: string;
@@ -101,7 +144,49 @@ export type ChosenRoute = {
   steps_done: string[];
   snapshot_verdict: Verdict | null;
   live_status: RoadmapStatus;
+  /** Consent state of the live choice; absent when the hand-off is off. */
+  choice?: RouteChoice | null;
+  /** The OS plan, when the plan view is on and PAI OS runs this route. */
+  plan?: RoutePlan;
 };
+
+/** One country on the choice screen: an ISO code, with a name only if the API sends one. */
+export type ChoiceDestination = { code: string; supported: boolean; route_key: string | null; name?: string };
+
+/** GET /v1/roadmap/choice-options. `handoff: false` means today's one-click choose. */
+export type ChoiceOptions =
+  | { handoff: false }
+  | {
+      handoff: true;
+      origin: string | null;
+      level: string;
+      destinations: ChoiceDestination[];
+      preselected_destination: string | null;
+      intake_terms: Record<string, string[]>;
+      years: number[];
+      /** The approved text, from the API. Null while it is not approved. */
+      consent_text: ConsentText | null;
+      consent_version: string | null;
+      needs_dob: boolean;
+      /** From the stored date of birth: true under 18 (or unreadable), false adult, null when none is stored. */
+      under_18: boolean | null;
+    };
+
+export type OfferedPlace = { ref: string; name: string };
+
+/** The body of POST /v1/roadmap/choose when the flow ran. */
+export type ChoiceDetails = {
+  destination: string;
+  places: { ref: string; rank: number }[];
+  intake: { term: string; year: number };
+  date_of_birth?: string;
+  consent: true;
+  /** The consent text version the screen showed; the API refuses a text changed since. */
+  consent_version: string;
+  guardian_email?: string;
+};
+
+export type ChooseAnswer = ChosenRoute & { guardian_email_sent?: boolean };
 
 export type RoadmapPage = {
   education_line: EducationLine | null;
@@ -112,3 +197,6 @@ export type RoadmapPage = {
   /** When the admission rules were last checked, "YYYY-MM". */
   rules_as_of?: string | null;
 };
+
+/** The answer of consent/withdraw and consent/give: the live choice with the new consent state. */
+export type ConsentAnswer = { choice: RouteChoice | null };

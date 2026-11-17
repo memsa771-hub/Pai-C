@@ -1,0 +1,12 @@
+# Fictional college whose notice page was defaced with injected gambling links (T3 integrity proof, master R-71).
+host: beta-college.test
+pages:
+  /robots.txt: {content_type: text/plain, body: "User-agent: *\nAllow: /\n"}
+  /admissions:
+    body: |
+      <html><body><h1>Admissions</h1><p>Merit is based on school marks.</p>
+      <div style="display:none">
+      <a href="https://lucky-casino-win.test/">online casino bonus</a>
+      <a href="https://best-slots-jackpot.test/">slot jackpot betting</a>
+      <a href="https://poker-free-spins.test/">free spins poker</a>
+      </div></body></html>

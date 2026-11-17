@@ -78,11 +78,13 @@ def load_statement_configs(directory: Path = CONFIG_DIR) -> dict[str, StatementC
 def check_config(cfg: StatementConfig, profile_keys: set[str], books) -> None:
     """Every profile key, the route and its documents task must exist. Raises StatementConfigError naming them."""
     where = f"statements for {cfg.route_key}"
-    routes = {key: b for (key, _), b in books.items()}
-    if cfg.route_key not in routes:
+    route_books = [b for (key, _), b in sorted(books.items()) if key == cfg.route_key]
+    if not route_books:
         raise StatementConfigError(f"{where}: unknown route '{cfg.route_key}'")
     unknown = sorted({k for kc in cfg.kinds.values() for k in kc.profile_keys} - profile_keys)
     if unknown:
         raise StatementConfigError(f"{where}: unknown profile keys {unknown}")
-    if cfg.documents_task and cfg.documents_task not in {t.template_key for t in routes[cfg.route_key].tasks}:
-        raise StatementConfigError(f"{where}: documents_task '{cfg.documents_task}' is not a task of the route")
+    for book in route_books:  # every version: a plan pinned to an older one still uses this config
+        if cfg.documents_task and cfg.documents_task not in {t.template_key for t in book.tasks}:
+            raise StatementConfigError(f"{where}: documents_task '{cfg.documents_task}' is not a task of the route "
+                                       f"(playbook version {book.version})")

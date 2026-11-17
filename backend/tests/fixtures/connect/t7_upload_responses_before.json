@@ -1,0 +1,166 @@
+{
+ "base64": {
+  "body": {
+   "code": 0,
+   "data": {
+    "content_type": "text/plain",
+    "created_at": "<time>",
+    "filename": "uploaded_files/<stamp>_notes.txt",
+    "id": "<id>",
+    "posted_to_channel": false,
+    "size": 5,
+    "uploaded_by": "human:<id>"
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "delete": {
+  "body": {
+   "code": 0,
+   "data": {
+    "id": "<id>",
+    "status": "deleted"
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "folder_plain": {
+  "body": {
+   "code": 0,
+   "data": {
+    "files": [
+     {
+      "channel_name": null,
+      "content_type": "application/pdf",
+      "created_at": "<time>",
+      "document": {
+       "document_type": "pdf",
+       "error_code": null,
+       "error_message": null,
+       "status": "queued"
+      },
+      "filename": "a.pdf",
+      "id": "<id>",
+      "kind": "pdf",
+      "name": "a.pdf",
+      "relative_name": "a.pdf",
+      "renamed_from": null,
+      "replaced": false,
+      "size": 1127,
+      "status": "active",
+      "type_group": "documents",
+      "uploaded_by": "human:<id>"
+     }
+    ],
+    "path": "",
+    "skipped": [],
+    "skipped_count": 0,
+    "uploaded_count": 1
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "folder_typed": {
+  "body": {
+   "code": 0,
+   "data": {
+    "files": [
+     {
+      "channel_name": null,
+      "content_type": "application/pdf",
+      "created_at": "<time>",
+      "document": {
+       "document_type": "pdf",
+       "error_code": null,
+       "error_message": null,
+       "status": "queued"
+      },
+      "filename": "b.pdf",
+      "id": "<id>",
+      "kind": "pdf",
+      "name": "b.pdf",
+      "relative_name": "b.pdf",
+      "renamed_from": null,
+      "replaced": false,
+      "size": 1127,
+      "status": "active",
+      "type_group": "documents",
+      "uploaded_by": "human:<id>"
+     }
+    ],
+    "path": "",
+    "skipped": [],
+    "skipped_count": 0,
+    "uploaded_count": 1
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "post_plain": {
+  "body": {
+   "code": 0,
+   "data": {
+    "content_type": "application/pdf",
+    "created_at": "<time>",
+    "document": {
+     "document_type": "pdf",
+     "error_code": null,
+     "error_message": null,
+     "status": "queued"
+    },
+    "filename": "uploaded_files/<stamp>_transcript.pdf",
+    "id": "<id>",
+    "size": 1127,
+    "uploaded_by": "human:<id>"
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "post_typed": {
+  "body": {
+   "code": 0,
+   "data": {
+    "content_type": "application/pdf",
+    "created_at": "<time>",
+    "document": {
+     "document_type": "pdf",
+     "error_code": null,
+     "error_message": null,
+     "status": "queued"
+    },
+    "filename": "uploaded_files/<stamp>_typed.pdf",
+    "id": "<id>",
+    "size": 1127,
+    "uploaded_by": "human:<id>"
+   },
+   "message": "ok"
+  },
+  "status": 200
+ },
+ "trash": {
+  "body": {
+   "code": 0,
+   "data": {
+    "entries": [
+     {
+      "file_count": 1,
+      "kind": "file",
+      "name": "<stamp>_trash.pdf",
+      "path": "uploaded_files/<stamp>_trash.pdf",
+      "size": 1127,
+      "trash_id": "<id>"
+     }
+    ],
+    "not_found": [],
+    "trashed_count": 1
+   },
+   "message": "ok"
+  },
+  "status": 200
+ }
+}

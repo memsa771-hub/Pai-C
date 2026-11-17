@@ -174,6 +174,10 @@ class PaiPossibility(Base):
     # "needs_group": [{"code", "label"}]}; {"outdated": true} marks a kept path
     # from before fields of study; null for the student's own and older rows.
     study_field = Column(JSONB, nullable=True)
+    # Why a path was dismissed for the student (migration 123): {"reason":
+    # "student_excluded", "item_id", "quote", "at", "restored_at"?}, the Vault
+    # option they ruled out in their own words; null otherwise.
+    dismissal = Column(JSONB, nullable=True)
     mentioned_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_now)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_now)
@@ -765,6 +769,12 @@ class RouteDecision(Base):
     route stay the snapshot the student chose, so a later Vault change shows as
     a live status beside it, not as a silently different choice. One active row
     (withdrawn_at null) per workspace.
+
+    Rule D-a (PAI OS hand-off): `withdrawn_at` and the partial index
+    `uq_route_decision_active` stay as they are. Every decision also has a
+    `decision_version` (unique per workspace); a withdrawal is its own version
+    row, inserted with `withdrawn_at = chosen_at` so it is never "active".
+    Rows are never rewritten except for `withdrawn_at` and `steps_done`.
     """
     __tablename__ = "pai_route_decisions"
 
@@ -782,12 +792,113 @@ class RouteDecision(Base):
     steps_done = Column(JSONB, nullable=False, default=list)
     chosen_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
     withdrawn_at = Column(DateTime(timezone=True), nullable=True)
+    decision_version = Column(Integer, nullable=False)
+    status = Column(Text, nullable=False, default="chosen", server_default=text("'chosen'"))  # chosen | withdrawn
+    origin_country = Column(Text, nullable=True)
+    destination_country = Column(Text, nullable=True)
+    level = Column(Text, nullable=True)
+    path_ref = Column(Text, nullable=True)
+    places = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))  # {programme_ref, rank}
+    intake = Column(JSONB, nullable=True)  # {term, year}
+    os_supported = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    authorized_at = Column(DateTime(timezone=True), nullable=True)
+    guardian_authorized_at = Column(DateTime(timezone=True), nullable=True)
+    guardian_required = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # The consent text version the student agreed to with `authorized_at` (R-10); None while consent is missing.
+    consent_version = Column(Text, nullable=True)
+    # The OS choice request that made this version (`choice_request:{proposal_id}`); None for every other version and
+    # never copied by a consent change (P1-T6, R-07).
+    request_key = Column(Text, nullable=True)
 
     __table_args__ = (
+        Index("uq_route_decision_version", "workspace_id", "decision_version", unique=True),
+        Index("uq_route_decision_request_key", "workspace_id", "request_key", unique=True,
+              postgresql_where=text("request_key IS NOT NULL"),
+              sqlite_where=text("request_key IS NOT NULL")),
         Index("uq_route_decision_active", "workspace_id", unique=True,
               postgresql_where=text("withdrawn_at IS NULL"),
               sqlite_where=text("withdrawn_at IS NULL")),
         Index("idx_route_decisions_workspace", "workspace_id", "chosen_at"),
+    )
+
+
+class OsOutbox(Base):
+    """What waits to be delivered to PAI OS: a decision or a Vault event.
+
+    `key` is unique, so the same hand-off is never queued twice. `last_error`
+    holds a code, never a message with student data.
+    """
+    __tablename__ = "pai_os_outbox"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    kind = Column(Text, nullable=False)  # decision | vault_event
+    key = Column(Text, nullable=False, unique=True)
+    payload = Column(JSONB, nullable=True)
+    status = Column(Text, nullable=False, default="pending", server_default=text("'pending'"))  # pending | delivered | not_sent
+    attempts = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("idx_os_outbox_status_created", "status", "created_at"),)
+
+
+class VaultVersion(Base):
+    """The student's Vault version (P1-T4, R-13): one row per workspace, raised by one for each accepted Vault write
+    that touches a StudentFacts key (only while CONNECT_STUDENT_FACTS is on). `key_versions` maps each such key to
+    the version that last changed it, so a fact can say when it changed."""
+    __tablename__ = "pai_vault_versions"
+
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True)
+    version = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    key_versions = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'"))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+
+class DocumentProposal(Base):
+    """A delivered fact proposal from a confirmed PAI OS document (P1-T7, R-16, D-y9): `key` is the proposal's key,
+    unique, so a repeat delivery proposes nothing. `candidate_ids` are the Vault candidates it made. No file bytes,
+    no values: IDs only."""
+    __tablename__ = "pai_document_proposals"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    key = Column(Text, nullable=False, unique=True)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    file_id = Column(Text, nullable=True)  # the Counsellor file; null for an OS-only document
+    candidate_ids = Column(JSONB, nullable=False, default=list, server_default=text("'[]'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+
+class GuardianConsent(Base):
+    """One guardian e-mail link (R-10) and what came of it: the audit of the under-18 consent.
+
+    Only the SHA-256 of the token is stored. `purpose` is `agree` or `withdraw` (the withdraw link comes in the
+    confirmation e-mail). `outcome` starts as `sent` and ends as `agreed`, `withdrawn`, `expired` or `stale`.
+    The e-mail is personal data: never log it unmasked, never send it to PAI OS.
+    """
+    __tablename__ = "pai_guardian_consents"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=_uuid)
+    workspace_id = Column(UUID(as_uuid=False), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    decision_id = Column(UUID(as_uuid=False), ForeignKey("pai_route_decisions.id", ondelete="SET NULL"),
+                         nullable=True)
+    decision_version = Column(Integer, nullable=False)
+    purpose = Column(Text, nullable=False, default="agree", server_default=text("'agree'"))  # agree | withdraw
+    email = Column(Text, nullable=False)
+    token_hash = Column(Text, nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # null: a withdraw link has no fixed end
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    text_version = Column(Text, nullable=False)
+    outcome = Column(Text, nullable=False, default="sent", server_default=text("'sent'"))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_now, server_default=text("NOW()"))
+
+    __table_args__ = (
+        CheckConstraint("purpose IN ('agree', 'withdraw')", name="ck_guardian_consent_purpose"),
+        CheckConstraint("outcome IN ('sent', 'agreed', 'withdrawn', 'expired', 'stale')",
+                        name="ck_guardian_consent_outcome"),
+        CheckConstraint("purpose <> 'agree' OR expires_at IS NOT NULL", name="ck_guardian_consent_agree_expires"),
+        Index("idx_guardian_consents_workspace", "workspace_id", "created_at"),
     )
 
 

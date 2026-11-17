@@ -1,0 +1,40 @@
+# The label test's word lists (P1-T9, D-z13, R-55). Test data, never code (R-58). Each word is one a student would see
+# only on its own route; each comment names the playbook line it comes from. A word may sit on several routes.
+# Words are matched whole, case-blind, and a hyphen and a space count as the same.
+germany_master:   # backend/app/os/playbooks/germany_master.v1.yaml
+  country:
+    - Germany      # line 5, `key: germany_master`, and the route's destination DE (line 7)
+    - German       # line 36, `language: german`
+  bodies:
+    - uni-assist   # line 178, "Submit the uni-assist application and pay the handling fee"
+    - HEC          # line 100, "Get your degree and transcripts attested by HEC (online e-Attestation)"
+    - Consular Services Portal  # line 272, "Apply for the student visa on the Consular Services Portal"
+  documents:
+    - blocked account   # line 241, "Open a blocked account (or arrange another proof of funds)"
+    - TestAS            # line 146, "Take the admission test this programme asks for (GRE / GATE / TestAS)"
+    - GRE               # line 146, the same title
+    - GATE              # line 146, the same title
+    - residence permit  # line 347, "Apply for your residence permit before the visa expires"
+    - HSSC              # line 110, "Upload your SSC and HSSC certificates with subjects and grades"
+ireland_master:   # backend/tests/os/playbooks/ireland_master.v1.yaml
+  country:
+    - Ireland      # line 2, `key: ireland_master`, and the route's destination IE (line 4)
+    - Irish        # the adjective of the same destination
+  bodies: []
+  documents: []
+pakistan_bs:      # backend/tests/os/playbooks/pakistan_bs.v1.yaml
+  country:
+    - Pakistan     # the route line (4), origin and destination PK
+    - Pakistani    # the adjective of the same country
+  bodies: []
+  documents:
+    - entry test   # line 20, "Sit the entry test"
+    - merit list   # line 26, "Choose from the merit-list offers"
+pakistan_inter:   # backend/tests/os/playbooks/pakistan_inter.v1.yaml
+  country:
+    - Pakistan     # the route line (4), origin and destination PK
+    - Pakistani    # the adjective of the same country
+  bodies: []
+  documents:
+    - admission form  # line 18, "Submit the admission form"
+    - merit list      # line 24, "Choose from the merit-list offers"

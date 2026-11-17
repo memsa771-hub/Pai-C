@@ -1,5 +1,5 @@
 """The Counsellor escalation adapter (Slice 8 spec §2.5, S8-D12). After the standalone support case, a route problem
-on a Counsellor plan is also written to the outbox (channel `counsellor`, key `escalation:{case_id}`, an EscalationV1
+on a Counsellor plan is also written to the outbox (channel `counsellor`, key `escalation:{case_id}`, an EscalationV2
 payload) for the host's glue to deliver. Only while the module is on; system problems stay in the support inbox.
 The note is a fixed sentence per reason from notes.yaml, never student, document or Supervisor text."""
 
@@ -7,19 +7,20 @@ from functools import cache
 from pathlib import Path
 
 import yaml
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, func, select, update
 
 from app.os import clock, models
 from app.os.adapters.counsellor import manifest
 from app.os.adapters.counsellor.store import Intake, IntakeStore
 from app.os.adapters.standalone.escalation import CompositeSink, StandaloneSink
-from app.os.contracts.escalation import EscalationV1
+from app.os.contracts.escalation_v2 import EscalationV2
 from app.os.outbox import Outbox
 from app.os.replan import events
 from app.os.replan.apply import BROKEN_REASON, LIMIT_REASON, REFUSED_REASON
 from app.os.replan.rules import REASONS
 from app.os.replan.run import BUDGET_REASON, INVALID_REASON
 from app.os.replan.store import SupportStore
+from app.os.requests.texts import text as request_text
 
 NOTES_PATH = Path(__file__).with_name("notes.yaml")
 REASON_CODES = ("not_eligible", "all_rejected", "deadline_passed", "blocking_gap", "other")
@@ -28,8 +29,12 @@ _SYSTEM = (LIMIT_REASON, REFUSED_REASON, REASONS["failed"], BUDGET_REASON, INVAL
 # A stale draft (ReplanFailed). A rules hand-over with no Supervisor (HANDOVER_PREFIX) is *not* here: the route
 # problem is still real, so the triggering event decides (final review I1).
 _SYSTEM_PREFIXES = ("The plan kept changing",)
+# The unanswered ladder's support cases (P1-T8, R-22, Ruling problem 11) are for a person at PAI: no Counsellor row,
+# so the plan is not paused and the student is not sent back to choosing.
+_OS_ONLY = (request_text("unanswered_all"), request_text("unanswered_proposed"))
 _BY_EVENT = {"route_invalid": "not_eligible", "admission_rejected": "all_rejected",
-             "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap"}
+             "deadline_at_risk": "deadline_passed", "escalate": "blocking_gap", "document_missing": "blocking_gap",
+             "student_fact_changed": "not_eligible"}  # every place fell below its bar (R-22): the route itself is in doubt
 
 
 @cache
@@ -49,7 +54,7 @@ def reason_for(event_type: str, reason: str) -> str | None:
     """The shared reason for a support case, or None for a system problem (spec §2.5 table)."""
     if reason.startswith(BROKEN_REASON):  # the plan no longer compiles: the route itself does not hold
         return "not_eligible"
-    if reason in _SYSTEM or reason.startswith(_SYSTEM_PREFIXES):
+    if reason in _OS_ONLY or reason in _SYSTEM or reason.startswith(_SYSTEM_PREFIXES):
         return None
     return _BY_EVENT.get(event_type)
 
@@ -60,9 +65,18 @@ def journey_of(external_ref: str) -> str:
 
 
 def _payload(key: str, case_id: int | None, journey_id: str, student_ref: str, reason: str,
-             notes: dict[str, str]) -> dict:
-    return EscalationV1(key=key, case_id=case_id, journey_id=journey_id, student_ref=student_ref, reason=reason,
-                        note=notes[reason], raised_at=clock.now()).model_dump(mode="json", by_alias=True)
+             notes: dict[str, str], decision_version: int | None) -> dict:
+    return EscalationV2(key=key, case_id=case_id, journey_id=journey_id, student_ref=student_ref,
+                        decision_version=decision_version, reason=reason, note=notes[reason],
+                        raised_at=clock.now()).model_dump(mode="json", by_alias=True)
+
+
+def applied_version(engine: Engine, tenant_id: str, plan_id: int) -> int | None:
+    """The plan's newest applied decision version: the same query as `ports.os_events.emit`."""
+    I = models.counsellor_intake
+    with engine.connect() as conn:
+        return conn.execute(select(func.max(I.c.decision_version)).where(
+            I.c.tenant_id == tenant_id, I.c.plan_id == plan_id)).scalar()
 
 
 class CounsellorSink:
@@ -87,7 +101,8 @@ class CounsellorSink:
             return 0
         key = f"escalation:{case.id}"
         self.outbox.add(key, CHANNEL, plan.student_ref, "escalation",
-                        _payload(key, case.id, journey_of(plan.external_ref), plan.student_ref, code, self.notes))
+                        _payload(key, case.id, journey_of(plan.external_ref), plan.student_ref, code, self.notes,
+                          applied_version(self.engine, self.tenant_id, plan_id)))
         C = models.support_cases
         with self.engine.begin() as conn:  # also on a repeat: the outbox row is the one written first
             conn.execute(update(C).where(C.c.tenant_id == self.tenant_id, C.c.id == case.id,
@@ -106,6 +121,7 @@ def intake_refused(engine: Engine, tenant_id: str, intake: Intake) -> None:
     """A refused decision of S8-D10's first four has no plan and no case: it is sent by journey as `other`."""
     key = f"escalation:intake:{intake.decision_id}"
     Outbox(engine, tenant_id).add(key, CHANNEL, intake.student_ref, "escalation",
-                                  _payload(key, None, intake.journey_id, intake.student_ref, "other", load_notes()))
+                                  _payload(key, None, intake.journey_id, intake.student_ref, "other", load_notes(),
+                                           intake.decision_version))
     if intake.counsellor_status is None:
         IntakeStore(engine, tenant_id).set_counsellor_status(intake.decision_id, "pending")

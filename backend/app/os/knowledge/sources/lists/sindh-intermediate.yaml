@@ -1,0 +1,58 @@
+# Reviewed allow-list, region sindh, family intermediate (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+region: sindh
+family: intermediate
+bodies:
+- body_ref: ''
+  tier: board
+  domains:
+  - biek.edu.pk
+  list_ref: https://ibcc.edu.pk/ibcc-forum-members/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: PK-BRD-010
+  name: Board of Intermediate Education Karachi (BIEK)
+  evidence:
+    url: https://ibcc.edu.pk/ibcc-forum-members/
+    quote: BIE Karachi https://www.biek.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://ibcc.edu.pk/ibcc-forum-members/
+    quote: 'ibcc.edu.pk/ibcc-forum-members: "BIE Karachi: https://www.biek.edu.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - ibcc.edu.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Inter Boards Coordination Commission (IBCC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Inter Boards Coordination Commission: https://ibcc.edu.pk/'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page: link "Inter Boards Coordination Commission" href "https://ibcc.edu.pk/"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - seccap.dgcs.gos.pk
+  list_ref: https://college.sindh.gov.pk/important-links
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: SD-ADM-002
+  name: SECCAP - Sindh Electronic Centralized College Admission Programme
+  evidence:
+    url: https://college.sindh.gov.pk/important-links
+    quote: Admission in Govt. Colleges https://seccap.dgcs.gos.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://college.sindh.gov.pk/important-links
+    quote: 'college.sindh.gov.pk/important-links ("College Education Department Government of Sindh"): link "Admission in
+      Govt. Colleges" href "https://seccap.dgcs.gos.pk"'
+    retrieved: '2026-11-14'

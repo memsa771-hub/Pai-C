@@ -55,8 +55,16 @@ class Rule:
 
 
 @lru_cache(maxsize=1)
-def _data() -> dict:
+def _file() -> dict:
     return load_data("admission_rules.json")
+
+
+def _data() -> dict:
+    """The rules file; with CONNECT_CALENDAR_FROM_KNOWLEDGE on, its linked values come from confirmed Knowledge facts
+    in the same shape (freeze exception 3, P2-D28). Off: the file itself."""
+    from app.pai_c.connect import policy_knowledge  # lazy: keeps this module import-light
+
+    return policy_knowledge.admission_rules(_file())
 
 
 def _rule(row: dict) -> Rule:
@@ -74,11 +82,21 @@ def _rule(row: dict) -> Rule:
         sources=list(row["sources"]), confidence=row["confidence"], years_by_field=row.get("years_by_field"))
 
 
-@lru_cache(maxsize=1)
 def _index() -> tuple[dict[str, Rule], dict[str, Rule]]:
+    data = _data()
+    if _INDEX and _INDEX[0] is data:
+        return _INDEX[1]
+    _INDEX[:] = [data, _build_index(data)]
+    return _INDEX[1]
+
+
+_INDEX: list = []  # [data, index]: rebuilt only when the rules data object changes
+
+
+def _build_index(data: dict) -> tuple[dict[str, Rule], dict[str, Rule]]:
     by_field: dict[str, Rule] = {}
     by_family: dict[str, Rule] = {}
-    for row in _data()["rules"]:
+    for row in data["rules"]:
         target = row["applies_to"]
         rule = _rule(row)
         by_field.update({key: rule for key in target.get("fields", [])})

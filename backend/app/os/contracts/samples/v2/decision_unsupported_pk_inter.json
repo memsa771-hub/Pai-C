@@ -1,0 +1,20 @@
+{
+  "schema": "pai.decision_record.v2",
+  "decision_id": "d-sample-3",
+  "journey_id": "j-sample-1",
+  "student_ref": "ws-sample-1",
+  "decision_version": 1,
+  "status": "chosen",
+  "chosen_at": "2027-01-10T09:00:00+05:00",
+  "authorized_at": "2027-01-10T09:00:05+05:00",
+  "guardian_required": false,
+  "guardian_authorized_at": null,
+  "origin_country": "PK",
+  "destination_country": "PK",
+  "nationality": "PK",
+  "level": "intermediate",
+  "path_ref": null,
+  "os_supported": false,
+  "target_intake": null,
+  "programmes": []
+}

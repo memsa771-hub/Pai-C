@@ -1,0 +1,179 @@
+"""Choice requests for the Counsellor (P1-T6, R-07). On a Counsellor plan PAI OS never changes the student's choice
+itself: a choice change the student accepts (or makes in the route builder) becomes one `choice_request.v1` row in the
+`counsellor` outbox channel, template `choice_request`, key `choice_request:{proposal_id}`, written in the same OS
+transaction as the proposal's new status `requested`. The host's glue reads the rows here and hands each to the
+decision service. IDs and codes only.
+
+The OS cannot read host flags and the worker has no host, so the gate is configured by the host: `enabled()` says
+whether the host part is on, `on_request(key)` is the post-commit hook (a nudge only; the host's sweep is the
+backup). An unconfigured port reads as off, and then every path takes today's behaviour."""
+
+import logging
+from collections.abc import Callable, Sequence
+from datetime import datetime
+
+from sqlalchemy import Connection, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from app.os import clock, models, ports
+from app.os.contracts.choice_request import ChoiceRequestV1
+from app.os.contracts.route_contract import ProgrammeChoice
+
+log = logging.getLogger("app.os.ports.choice_requests")
+
+CHANNEL = "counsellor"
+TEMPLATE = "choice_request"
+_SOURCE = "counsellor"  # adapters.counsellor.manifest.NAME (not imported: the replan code imports this port)
+
+_enabled: Callable[[], bool] | None = None
+_on_request: Callable[[str], None] | None = None
+
+
+def configure(enabled: Callable[[], bool] | None, on_request: Callable[[str], None] | None) -> None:
+    global _enabled, _on_request
+    _enabled, _on_request = enabled, on_request
+
+
+def enabled() -> bool:
+    """True only when the host configured the port and its part is on. Any exception reads as off."""
+    if _enabled is None:
+        return False
+    try:
+        return bool(_enabled())
+    except Exception:
+        return False
+
+
+def key_of(proposal_id: int) -> str:
+    return f"{TEMPLATE}:{proposal_id}"
+
+
+def applies(conn: Connection, tenant_id: str, plan_id: int) -> bool:
+    """Whether a choice change on this plan goes to the Counsellor: the host part is on, the `counsellor` module is
+    on, and the plan is a Counsellor plan."""
+    if not enabled():
+        return False
+    M, P = models.modules, models.plans
+    if conn.execute(select(M.c.enabled).where(M.c.module == _SOURCE, M.c.tenant_id == tenant_id)).scalar() is not True:
+        return False
+    return conn.execute(select(P.c.source).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar() == _SOURCE
+
+
+def decision_version_of(conn: Connection, tenant_id: str, plan_id: int) -> int | None:
+    """The newest decision version applied to a Counsellor plan (None for any other plan, or before the first)."""
+    P, I = models.plans, models.counsellor_intake
+    if conn.execute(select(P.c.source).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar() != _SOURCE:
+        return None
+    return conn.execute(select(func.max(I.c.decision_version)).where(
+        I.c.tenant_id == tenant_id, I.c.plan_id == plan_id)).scalar()
+
+
+_APPLIED = ("planned", "revised", "replaced")  # intake statuses that put a version on the plan (not paused, not refused)
+
+
+def _applied_version(conn: Connection, tenant_id: str, plan_id: int) -> int | None:
+    """The newest decision version the plan has actually applied."""
+    I = models.counsellor_intake
+    return conn.execute(select(func.max(I.c.decision_version)).where(
+        I.c.tenant_id == tenant_id, I.c.plan_id == plan_id, I.c.status.in_(_APPLIED))).scalar()
+
+
+def _refused(conn: Connection, tenant_id: str, plan_id: int, version: int) -> bool:
+    """Whether the request can never be applied: the student's intake refused exactly this version, or the newest
+    processed intake row at or above it is a refusal (n+1 went stale because n+2 was stored, and n+2 was refused).
+    A refusal may have no plan, so rows are found by student."""
+    P, I = models.plans, models.counsellor_intake
+    student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == tenant_id)).scalar()
+    if student is None:
+        return False
+    rows = conn.execute(select(I.c.decision_version, I.c.status).where(
+        I.c.tenant_id == tenant_id, I.c.student_ref == student, I.c.decision_version >= version,
+        I.c.status != "pending").order_by(I.c.decision_version.desc())).all()
+    exact = any(r.decision_version == version and r.status == "refused" for r in rows)
+    return exact or (bool(rows) and rows[0].status == "refused")
+
+
+def check_places(programmes: Sequence[ProgrammeChoice]) -> None:
+    """Raises ValueError (a pydantic ValidationError) when the places cannot be sent: too many, or ranks not 1..n."""
+    ChoiceRequestV1(key="check", student_ref="check", journey_id="check", proposal_id=0, based_on_version=1,
+                    programmes=list(programmes), requested_at=clock.now())
+
+
+def emit(conn: Connection, tenant_id: str, plan_id: int, proposal_id: int, base_version: int,
+         programmes: Sequence[ProgrammeChoice], at: datetime) -> bool:
+    """Writes the request row on `conn` (the caller's transaction). The key is the same on a repeat, so a repeat is
+    skipped. True if a new row was written."""
+    P, O = models.plans, models.outbox
+    plan = conn.execute(select(P.c.external_ref, P.c.student_ref).where(
+        P.c.id == plan_id, P.c.tenant_id == tenant_id)).one()
+    key = key_of(proposal_id)
+    journey_id = plan.external_ref.rsplit(":", 2)[0]  # `{journey_id}:{destination}:{level}` (S8-D8)
+    payload = ChoiceRequestV1(key=key, student_ref=plan.student_ref, journey_id=journey_id, proposal_id=proposal_id,
+                              based_on_version=base_version, programmes=list(programmes), requested_at=at
+                              ).model_dump(mode="json", by_alias=True)
+    return conn.execute(pg_insert(O).values(
+        tenant_id=tenant_id, idempotency_key=key, channel=CHANNEL, recipient=plan.student_ref, template=TEMPLATE,
+        payload=payload).on_conflict_do_nothing(constraint="uq_os_outbox_key").returning(O.c.id)
+    ).scalar_one_or_none() is not None
+
+
+def pending(limit: int = 100) -> list[ChoiceRequestV1]:
+    """Requests waiting for the glue to hand them to the Counsellor, oldest first."""
+    svc = ports.services()
+    O = models.outbox
+    with svc.engine.connect() as conn:
+        rows = conn.execute(select(O.c.payload).where(
+            O.c.tenant_id == svc.settings.tenant_id, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+            O.c.status == "pending").order_by(O.c.id).limit(limit)).scalars().all()
+    return [ChoiceRequestV1.model_validate(p) for p in rows]
+
+
+def notify(key: str) -> None:
+    """The post-commit nudge. Never raises: the request is already stored and the host's sweep delivers it anyway."""
+    if _on_request is None:
+        return
+    try:
+        _on_request(key)
+    except Exception as e:
+        log.warning("choice request hook failed (%s)", type(e).__name__)
+
+
+def is_open(key: str) -> bool:
+    """True while the request's proposal is still `requested`. A pending row whose proposal moved on (expired,
+    withdrawn plan) is not applied again."""
+    from app.os.replan.store import ProposalStore
+
+    svc = ports.services()
+    p = ProposalStore(svc.engine, svc.settings.tenant_id).get(int(key.rsplit(":", 1)[1]))
+    return p is not None and p.status == "requested"
+
+
+def mark_delivery(key: str, outcome: str, version: int | None = None) -> None:
+    """Records the decision service's answer (D-x3), the proposal and the outbox row in ONE OS transaction.
+    `written` / `duplicate` give the proposal its `requested_version`, and it is settled (`accepted`) at once if the
+    plan has already applied that version; `stale` / `refused` expire it; `skipped` (its proposal is no longer
+    `requested`) touches no proposal. The outbox row is set to `sent` in every case. Safe to repeat."""
+    from app.os.replan.store import ProposalStore  # late: the replan code imports this port
+
+    if outcome in ("written", "duplicate") and version is None:
+        raise ValueError("a written or duplicate request names its version")
+    svc = ports.services()
+    tenant = svc.settings.tenant_id
+    store = ProposalStore(svc.engine, tenant)
+    proposal = store.get(int(key.rsplit(":", 1)[1]))
+    O = models.outbox
+    with svc.engine.begin() as conn:
+        if proposal is not None and outcome != "skipped":
+            if outcome in ("written", "duplicate"):
+                store.set_requested_version(proposal.id, version, outcome, conn=conn)
+                if _refused(conn, tenant, proposal.plan_id, version):  # never applied, and a later copy cannot settle it
+                    store.expire_requested(proposal.id, None, conn=conn)
+                else:
+                    applied = _applied_version(conn, tenant, proposal.plan_id)
+                    if applied is not None and applied >= version:
+                        store.settle_requested(proposal.plan_id, applied, None, conn=conn)
+            else:
+                store.expire_requested(proposal.id, outcome, conn=conn)
+        conn.execute(update(O).where(O.c.tenant_id == tenant, O.c.channel == CHANNEL, O.c.template == TEMPLATE,
+                                     O.c.idempotency_key == key)
+                     .values(status="sent", sent_at=func.now(), attempts=O.c.attempts + 1))

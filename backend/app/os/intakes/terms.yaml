@@ -1,0 +1,7 @@
+# Intake term codes (P2-D5, R-62): the terms an intake row may carry besides the ones a playbook declares in its
+# `intake_terms`. A code is lowercase letters and underscores. Add a term here; never in code.
+terms:
+  - {code: spring, label: Spring}
+  - {code: summer, label: Summer}
+  - {code: fall, label: Fall}
+  - {code: winter, label: Winter}

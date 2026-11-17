@@ -1,0 +1,11 @@
+{
+  "schema": "pai.vault_event.v1",
+  "key": "vault:3",
+  "student_ref": "ws-sample-1",
+  "vault_version": 3,
+  "kind": "student_fact_changed",
+  "keys": [
+    "marks.total"
+  ],
+  "at": "2027-01-10T08:59:00+00:00"
+}

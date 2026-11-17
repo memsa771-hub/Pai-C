@@ -38,7 +38,7 @@ def test_export_order_redaction_isolation_and_no_writes(tmp_path):
         db.add(journey)
         db.flush()
         db.add(RouteDecision(workspace_id=workspace, field_key="computer_science", title="Computer Science",
-            verdict={"status": "open"}, route={"needs": []}, steps=[{"key": "step_apply"}], steps_done=[False]))
+            verdict={"status": "open"}, route={"needs": []}, steps=[{"key": "step_apply"}], steps_done=[False], decision_version=1))
         db.add(CounselorNotedQuestion(workspace_id=workspace, source_event_id="earlier",
                                     question_to_research="What are the entry requirements?"))
         db.commit()

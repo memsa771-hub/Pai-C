@@ -9,7 +9,8 @@ at workflow level, so each model request is its own step (DBOSDurability). Step 
 (run, reading), facts by their key, and an event is written only when the stored value or status changes.
 """
 
-from collections.abc import Callable, Mapping
+import re
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import date, datetime
 
@@ -26,6 +27,12 @@ from app.os.knowledge.profile import ResearchProfile, reading_model
 from app.os.knowledge.programmes import ProgrammeStore
 from app.os.knowledge.research.links import rank_links
 from app.os.knowledge.research.pages import PageGateway
+from app.os.knowledge.research.readability import (
+    NotReadableStore,
+    is_not_readable,
+    machine_status_ceiling,
+    merge_read_info,
+)
 from app.os.knowledge.research.readings import AgentRuns, cost, run_reading, user_prompt
 from app.os.knowledge.research.trust import judge
 from app.os.knowledge.store import SqlKnowledge
@@ -95,10 +102,17 @@ def _event(conn, kind: str, payload: dict) -> None:
 
 
 def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: str, intake_year: int,
-                   profile: ResearchProfile, verdicts: Mapping[str, dict], now: datetime) -> dict:
+                   profile: ResearchProfile, verdicts: Mapping[str, dict], now: datetime,
+                   read_info: Mapping[str, Mapping] | None = None, unreadable: Sequence[Mapping] = (),
+                   not_readable: NotReadableStore | None = None) -> dict:
     """Upserts each researched field. Never downgrades a confirmed fact: a different value from research is a
     conflict note and a `fact_conflict` event, and the value stays. Changed facts write `fact_changed` and
-    revise the plans that use them; confirmed facts also complete their waiting confirm tasks."""
+    revise the plans that use them; confirmed facts also complete their waiting confirm tasks.
+
+    P2-T4: `read_info` maps a page URL to how it was read ({read_method, language}). A fact read by OCR is capped at
+    `unconfirmed` (R-72); a fact read by render or OCR, or in a language the data names, records both on the fact.
+    With a `not_readable` store, each page in `unreadable` ({url, reason}) is marked with the fields still without a
+    confirmed fact, for a person to collect."""
     tenant = kernel.tenant_id
     knowledge = SqlKnowledge(engine, tenant)
     counts = {"confirmed": 0, "unconfirmed": 0, "conflicts": 0, "skipped": 0}
@@ -115,6 +129,9 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
             continue  # stays as it is (a missing fact stays fact_missing for an admin, spec §4.6 step 5)
         if requested and v["status"] == "confirmed":
             v = {**v, "status": "unconfirmed"}
+        info = (read_info or {}).get(v["url"] or "", {})
+        if v["status"] == "confirmed" and machine_status_ceiling(info.get("read_method")) == "unconfirmed":
+            v = {**v, "status": "unconfirmed"}  # machine-read text from an image: a checker compares it first (R-72)
         counts[v["status"]] += 1
         new_value = fact_value(spec, v["value"], intake_year)
         old = existing.get((programme_ref, spec.name))
@@ -134,7 +151,9 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
         try:
             service.check_fact_value(spec.name, new_value)
             fact = Fact(value=new_value, quote=v["quote"] or "", url=v["url"] or "", checked_at=now,
-                        intake_year=intake_year, status=v["status"], conflict_note=v["conflict_note"])
+                        intake_year=intake_year, status=v["status"], conflict_note=v["conflict_note"],
+                        read_method=info.get("read_method") if info.get("read_method") not in (None, "fetch") else None,
+                        language=info.get("language") if re.fullmatch(r"[a-z]{2,3}", info.get("language") or "") else None)
         except (CompileError, ValueError):
             counts["skipped"] += 1  # e.g. a day that is not a date; the evidence is in the run's agent rows
             continue
@@ -150,6 +169,18 @@ def store_research(engine: Engine, service, kernel, run_id: int, programme_ref: 
         if changed or v["status"] == "confirmed":
             after_fact_change(service, kernel, "programme", programme_ref, spec.name, fact_id, v["status"],
                               intake_year, complete=v["status"] == "confirmed")
+    if not_readable is not None:
+        names = [f.name for f in profile.fields]
+        stored = knowledge.programme_facts([programme_ref], names, intake_year)  # what is stored now, after the cap
+        open_fields = [n for n in names if (programme_ref, n) not in stored or stored[(programme_ref, n)].status != "confirmed"]
+        for page in unreadable:
+            not_readable.mark(page["url"], page["reason"], programme_ref=programme_ref, fields=open_fields,
+                              intake_year=intake_year)
+        for url in read_info or {}:  # a later successful read closes the source's row (R-72)
+            not_readable.set_state(url, "readable", programme_ref=programme_ref, field="")
+        for n in names:  # ... and each field once a CONFIRMED fact exists; an unconfirmed one still waits for a checker
+            if n not in open_fields:
+                not_readable.close_field(programme_ref, n, intake_year)
     return counts
 
 
@@ -163,11 +194,14 @@ def _needs_third(verdicts: Mapping[str, dict]) -> bool:
 
 def register_research(engine: Engine, settings: OsSettings, kernel, service, gateway: PageGateway,
                       readers: Mapping[str, Mapping[str, object]], spec: AgentSpec,
-                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = shared_clock.now) -> None:
+                      profiles: Mapping[str, ResearchProfile], clock: Callable[[], datetime] = shared_clock.now,
+                      not_readable: NotReadableStore | None = None) -> None:
     """Registers os.research and its steps. Must run before DBOS.launch(), with readers built once per process.
 
     `readers` maps a route key to its readers A, B and C (readings.build_readers)."""
-    from app.os.runner.workflow import STEP_CONFIG  # imported here: the runner imports knowledge
+    from app.os.runner.workflow import (
+        STEP_CONFIG,  # imported here: the runner imports knowledge
+    )
 
     tenant = kernel.tenant_id
     runs, programmes = AgentRuns(engine, tenant), ProgrammeStore(engine, tenant)
@@ -212,9 +246,10 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
                                      profile, intake_year))
                 for f in profile.fields}
 
-    def store(run_id: int, programme_ref: str, intake_year: int, route_key: str, verdicts: dict) -> dict:
+    def store(run_id: int, programme_ref: str, intake_year: int, route_key: str, verdicts: dict,
+              read_info: dict | None = None, unreadable: list | None = None) -> dict:
         return store_research(engine, service, kernel, run_id, programme_ref, intake_year, profiles[route_key],
-                              verdicts, clock())
+                              verdicts, clock(), read_info, unreadable or (), not_readable)
 
     def finish(run_id: int, status: str, pages: int, counts: dict, cost_usd: float) -> None:
         with engine.begin() as conn:
@@ -222,7 +257,7 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
                 status=status, ended_at=clock(), pages=pages, confirmed=counts.get("confirmed", 0),
                 unconfirmed=counts.get("unconfirmed", 0), cost_usd=cost_usd))
 
-    step = lambda name, fn: DBOS.step(name=f"os.research.{name}", **STEP_CONFIG)(fn)  # noqa: E731
+    step = lambda name, fn: DBOS.step(name=f"os.research.{name}", **STEP_CONFIG)(fn)
     start_step, programme_step = step("start", start), step("programme", load_programme)
     fetch_step, failed_step, record_step = step("fetch", fetch), step("fetch_failed", fetch_failed), step("record", record)
     judge_step, store_step, finish_step = step("judge", judge_all), step("store", store), step("finish", finish)
@@ -270,7 +305,9 @@ def register_research(engine: Engine, settings: OsSettings, kernel, service, gat
             readings["C"], c = read("C", agents, run_id, prompt)
             spent += c
             verdicts = judge_step(programme.route_key, programme, intake_year, readings, pages)
-        counts = store_step(run_id, programme_ref, intake_year, programme.route_key, verdicts)
+        read_info = merge_read_info(pages)
+        unreadable = [{"url": p.url, "reason": p.blocked} for p in pages if is_not_readable(p.blocked)]
+        counts = store_step(run_id, programme_ref, intake_year, programme.route_key, verdicts, read_info, unreadable)
         finish_step(run_id, "done", sum(p.ok for p in pages), counts, spent)
         return {"run_id": run_id, "status": "done", **counts}
 

@@ -225,14 +225,15 @@ def load_checked_pack_configs(directory: Path, doc_types, books, profiles, kind:
     from app.os.eligibility.rules import profile_keys  # imported here: eligibility is a sibling module
 
     keys = profile_keys(doc_types)
-    newest = {}
-    for (key, version), b in books.items():
-        if key not in newest or version > newest[key].version:
-            newest[key] = b
     configs = load_pack_configs(directory, kind)
     for cfg in configs.values():
-        if cfg.route_key not in newest:
+        route_books = [b for (key, _), b in sorted(books.items()) if key == cfg.route_key]
+        if not route_books:
             raise PackConfigError(f"pack for {cfg.route_key}: no playbook for this route")
         profile = next((p for p in profiles.values() if p.route_key == cfg.route_key), None)
-        check_pack_config(cfg, keys, set(doc_types), newest[cfg.route_key], profile)
+        for book in route_books:  # every version: a plan pinned to an older one still builds its pack from this config
+            try:
+                check_pack_config(cfg, keys, set(doc_types), book, profile)
+            except PackConfigError as e:
+                raise PackConfigError(f"{e} (playbook version {book.version})") from None
     return configs

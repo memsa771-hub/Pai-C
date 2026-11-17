@@ -1,0 +1,72 @@
+# Check 2 (independent) for batch 4 aliases and FDE institution lists. Pages saved in docs/.
+# Quotes with " | " join separate text nodes from the same page, in page order.
+aliases:
+  - from: KP-ADM-001
+    to: PK-UNI-066
+    evidence:
+      url: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+      quote: "Visit Website | http://www.kmu.edu.pk | PDA building Block-4 Phase-5 Hayatabad Peshawar"
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: >-
+      Batch 1 PK-UNI-066 "Khyber Medical University", Peshawar, Government of Khyber Pakhtunkhwa. Its HEC profile
+      (fetched with curl 2026-11-13, docs/hec-kmu.html) links to http://www.kmu.edu.pk and gives a Hayatabad, Peshawar
+      address. Batch 4 KP-ADM-001 uses cas.kmu.edu.pk, a subdomain of kmu.edu.pk, city Peshawar, same chartering
+      government. Same entity; KP-ADM-001 describes KMU's role as admitting university (CAS), not a different body.
+      No other batch 1 row matches "Khyber Medical", "KMU" or "kmu.edu.pk", so there is no look-alike.
+  - from: GB-UNI-001
+    to: PK-UNI-021
+    evidence:
+      url: https://www.hec.gov.pk/english/universities/Pages/Gilgit%20Baltistan/Karakurum-International-University.aspx
+      quote: "Visit Website | http://www.kiu.edu.pk/ | University Road Gilgit, Gilgit Baltistan."
+    check2: yes
+    check2_name: "Claude local - check 2 (independent)"
+    check2_date: 2026-11-13
+    note: >-
+      Batch 1 PK-UNI-021 "Karakurum International University" (HEC spelling; batch 4 writes Karakoram), Gilgit, Public.
+      HEC profile (curl 2026-11-13, docs/hec-kiu.html) links to http://www.kiu.edu.pk/ and gives a Gilgit address,
+      matching batch 4's www.kiu.edu.pk and Gilgit. Look-alike: PK-BRD-033 "Karakoram International University (KIU)",
+      type examination_board, same kiu.edu.pk URL, sourced from the IBCC forum-members page. That row stands for KIU in
+      its role as an examination board (IBCC member), not as the university. GB-UNI-001 is typed university and is
+      about BS seat quotas, so it maps to the university row PK-UNI-021, not the board row.
+lists:
+  - url: https://eadmissions.fde.gov.pk/hssc/institutes.php?per=200&page=1
+    publisher: Federal Directorate of Education, Islamabad (FDE e-Admissions portal, HSSC Admissions)
+    row_count: 82
+    count_method: >-
+      Fetched with per=200 so all rows are on one page (docs/eadm-hssc-institutes-per200.html). Parsed the HTML table
+      with Python: 83 <tr> = 1 header + 82 rows; serial numbers run 1-82 with no gaps or duplicates; the page itself
+      says "Showing 1–82 of 82". The default URL https://eadmissions.fde.gov.pk/hssc/institutes shows 50 per page
+      ("Showing 1–50 of 82", 2 pages). Colleges/HSSC institutes only, no schools (includes the Govt. Polytechnic
+      Institute for Women H-8/1 and IHEAD F-11/1, which are also post-SSC institutes).
+    date: null
+    read_method: "curl (live, 2026-11-13); HTML table parsed with Python; not archived"
+    line: "78 | IMCGPG-F7/2 | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD F7 MARKAZ | 0519102528"
+    better: true
+    note: >-
+      Title "Participating institutes". No printed date on the page; the portal's admission page
+      (https://eadmissions.fde.gov.pk/hssc/admission) is headed "FDE Islamabad · Session 2026-2027" and
+      "FDE HSSC Admissions-2026", which dates the cycle but is not printed on the list itself. Better official list of
+      colleges: it lists only HSSC-admitting colleges with institute codes, is tied to the current admission cycle,
+      and has no individuals' names. Store the per=200 URL; the bare /hssc/institutes URL pages at 50.
+  - url: https://fde.gov.pk/our-institutions/
+    publisher: Federal Directorate of Education, Islamabad (fde.gov.pk)
+    row_count: 432
+    count_method: >-
+      Saved docs/fde-our-institutions.html; one <table>, 433 <tr> = 1 header (SR., INSTITUTE, SECTOR, HEAD NAME,
+      Head Phone) + 432 rows; SR. runs 1-432 with no gaps or duplicates; single page, no paging. Institute codes run
+      201-926 and are not contiguous (grouped by sector). Schools and colleges are mixed: about 344 rows are schools
+      (IMS/IMSG/IMSB) and about 87 colleges by name pattern (rough regex count); sector FGC has 13 rows and MC 26 rows,
+      the rest are by area (URBAN 1/2, BHARA KAU, SIHALA, NILORE, TARNOL). One row (SR. 227, code 531) has a person's
+      name in the INSTITUTE cell instead of an institution name.
+    date: null
+    read_method: "curl (live, 2026-11-13); HTML table parsed with Python; not archived"
+    line: "399 | 806 – ISLAMABAD MODEL COLLEGE FOR GIRLS (POST GRADUATE), F-7/2, ISLAMABAD | FGC"
+    better: false
+    note: >-
+      Official and fuller (all FDE institutions), but it mixes ~344 schools with colleges, carries heads' names and
+      phones (personal data; not copied here), has one malformed row, and no list date (footer only
+      "Copyright © 2023 Federal Directorate of Education"). Use it for cross-checking, not as the college list.
+      Look-alikes on this page: 223 "IMSG(VI-X) F-7/2" and 231 "ISLAMABAD MODEL SCHOOL (I-V), F-7/2" are schools in the
+      same sector, not the college.

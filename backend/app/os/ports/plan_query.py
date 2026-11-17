@@ -1,14 +1,30 @@
 """The PlanQuery port (Slice 8 spec §2.2, S8-D13, S8-D14): read-only answers for the Counsellor, in process, no
 HTTP endpoint. They answer even while the `counsellor` module is off (for tests)."""
 
+import logging
 
-from app.os import clock, ports
+from sqlalchemy import select
+
+from app.os import clock, models, ports
 from app.os.compiler.compile import needed_fields
+from app.os.contracts.merit_check import MeritCheckV1
 from app.os.contracts.plan_summary import PlanSummaryV1
+from app.os.contracts.plan_view import PlanViewV1
+from app.os.contracts.programme_facts import ProgrammeFactsV1
 from app.os.contracts.programme_list import ProgrammeEntry, ProgrammeListV1
+from app.os.contracts.programme_list_v2 import ProgrammeListV2
 from app.os.contracts.route_contract import IntakeRef
+from app.os.kernel.states import PLAN_OPEN
+from app.os.playbooks import newest_plain
 from app.os.knowledge.programmes import ProgrammeStore
+from app.os.replan.store import OverrideStore
+from app.os.merit_check import build as build_merit
+from app.os.plan_view import build_plan_view
+from app.os.programme_facts import build as build_programme_facts
+from app.os.programme_list_v2 import build as build_list_v2
 from app.os.summary import build_summary
+
+log = logging.getLogger("app.os.ports.plan_query")
 
 
 def plan_summary(student_ref: str) -> PlanSummaryV1 | None:
@@ -16,17 +32,141 @@ def plan_summary(student_ref: str) -> PlanSummaryV1 | None:
     return build_summary(svc.engine, svc.settings.tenant_id, student_ref, clock.now())
 
 
-def programme_list(route_key: str, intake: IntakeRef) -> ProgrammeListV1:
+def plan_view(student_ref: str) -> PlanViewV1:
+    """The student's plan as the Counsellor shows it (P1-T5): chosen through the Counsellor intake, `empty` when no
+    applied decision maps to a plan."""
+    return build_plan_view(ports.services(), student_ref)
+
+
+def _excluded(svc, student_ref: str | None) -> frozenset[str]:
+    """The student's excluded field codes, read now through StudentFacts (R-15); none without a student."""
+    if student_ref is None:
+        return frozenset()
+    from app.os.knowledge.fields import excluded_for
+
+    try:
+        return excluded_for(student_ref, engine=svc.engine, tenant_id=svc.settings.tenant_id)
+    except Exception as e:  # noqa: BLE001  (logged by type: the unfiltered list, rule 8 opens a case if needed)
+        log.error("excluded fields could not be read (%s); the programme list is not filtered", type(e).__name__)
+        return frozenset()
+
+
+def programme_list(route_key: str, intake: IntakeRef, student_ref: str | None = None) -> ProgrammeListV1:
     """The route's active programmes. `facts_confirmed`: every programme fact the route's newest playbook needs is
-    confirmed for that intake year. An unknown route has no programmes."""
+    confirmed for that intake year. An unknown route has no programmes. With `student_ref`, a programme in a field the
+    student excluded is left out (R-15, P2-T24); one with an empty field stays."""
+    from app.os.knowledge.fields import is_excluded
+
     svc = ports.services()
-    books = [b for (key, _), b in svc.plans.playbooks.items() if key == route_key]
-    if not books:
+    book = newest_plain(svc.plans.playbooks.values()).get(route_key)
+    if book is None:
         return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[])
-    _, fields = needed_fields(max(books, key=lambda b: b.version))
-    programmes = ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
+    _, fields = needed_fields(book)
+    excluded = _excluded(svc, student_ref)
+    programmes = [p for p in ProgrammeStore(svc.engine, svc.settings.tenant_id).active(route_key)
+                  if not is_excluded(p.field, excluded)]
     facts = svc.knowledge.programme_facts([p.ref for p in programmes], sorted(fields), intake.year)
     return ProgrammeListV1(route_key=route_key, intake=intake, programmes=[
         ProgrammeEntry(programme_ref=p.ref, university=p.university, name=p.name,
                        facts_confirmed=all((p.ref, f) in facts and facts[(p.ref, f)].confirmed for f in fields))
         for p in programmes])
+
+
+def programme_facts(programme_ref: str, intake: IntakeRef) -> ProgrammeFactsV1 | None:
+    """A programme's facts for an intake with their level, source and intake (P2-D27, R-23, R-26, R-48). Another
+    intake's fact is labelled with its own. None when the programme is unknown."""
+    svc = ports.services()
+    return build_programme_facts(svc.engine, svc.settings.tenant_id, svc.knowledge, svc.plans.playbooks,
+                                 programme_ref, intake)
+
+
+def merit_check(student_ref: str, programme_ref: str, intake: IntakeRef, category: str | None = None) -> MeritCheckV1:
+    """The student's merit aggregate from the Vault's marks and a verified formula, or "not confirmed" / "missing"
+    (P2-D26, R-31, R-48). It never predicts a chance."""
+    from app.os.eligibility.facts import current_types
+    from app.os.ports import student_facts
+    from app.os.requests.state import scale_pairs
+
+    svc = ports.services()
+    facts = student_facts.get(student_ref, engine=svc.engine, tenant_id=svc.settings.tenant_id)
+    return build_merit(svc.knowledge, facts, programme_ref, intake, category, scale_pairs(current_types()))
+
+
+def programme_list_v2(route_key: str, intake: IntakeRef, student_ref: str | None = None) -> ProgrammeListV2:
+    """`programme_list` plus each place's coverage level, region and whether PAI can run it yet (P2-D27, R-34). With
+    `student_ref`, a programme in a field the student excluded is left out (R-15); the contract is unchanged."""
+    svc = ports.services()
+    return build_list_v2(svc.engine, svc.settings.tenant_id, svc.plans.playbooks, route_key, intake,
+                         excluded=_excluded(svc, student_ref))
+
+
+def routes() -> list[dict]:
+    """The routes the loaded playbooks serve (the newest version of each key), for the Counsellor's choice screen:
+    `{key, origin, destination, level, intake_terms}`, ordered by key. Raises OsUnavailable when PAI OS is not mounted.
+    A family playbook is listed only while its release flag is on (P3-T1, ADR-001 D14)."""
+    from app.os.settings import released_families
+
+    svc = ports.services()
+    newest = newest_plain(svc.plans.playbooks.values(), released=released_families(svc.settings))
+    return [{"key": k, "origin": b.route.origin, "destination": b.route.destination, "level": b.route.level,
+             "intake_terms": list(b.intake_terms)} for k, b in sorted(newest.items())]
+
+
+def self_serve_plan(student_ref: str, journey_id: str | None = None) -> dict | None:
+    """The student's open self-serve plan (the newest one), for the adoption offer (P1-T6, R-08): `{plan_id, route_key,
+    origin, destination, level, intake, programmes, contract_sha256, open_plans, identity_taken}` (`open_plans`: how many open self-serve
+    plans the student has; the offer is made only for one; `identity_taken`: a Counsellor plan, open or closed, already
+    holds `{journey_id}:{destination}:{level}` for the student's active `journey_id`, so this plan could not take that
+    identity; never true without a `journey_id`), programmes as
+    `{programme_ref, rank}` in order: the live places only (the contract's minus those an active `cancel_programme` override dropped), ranked 1..n.
+    None when there is none."""
+    svc = ports.services()
+    P = models.plans
+    with svc.engine.connect() as conn:
+        rows = conn.execute(select(P.c.id, P.c.contract, P.c.contract_sha256).where(
+            P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "self_serve",
+            P.c.status.in_(PLAN_OPEN)).order_by(P.c.id.desc())).all()
+        if not rows:
+            return None
+        row = rows[0]
+        route_key = conn.execute(select(models.playbook_pins.c.playbook_key).where(
+            models.playbook_pins.c.plan_id == row.id)).scalar()
+        held = conn.execute(select(P.c.external_ref).where(
+            P.c.tenant_id == svc.settings.tenant_id, P.c.student_ref == student_ref, P.c.source == "counsellor")
+        ).scalars().all()
+    contract = row.contract
+    wanted = f"{journey_id}:{contract['destination_country']}:{contract['level']}"  # S8-D8, as intake reads it
+    taken = journey_id is not None and wanted in held
+    cancelled = OverrideStore(svc.engine, svc.settings.tenant_id).cancelled(row.id)
+    live = [p for p in sorted(contract["programmes"], key=lambda p: p["rank"]) if p["programme_ref"] not in cancelled]
+    intake = contract.get("target_intake")
+    return {"plan_id": row.id, "route_key": route_key, "origin": contract["origin_country"],
+            "destination": contract["destination_country"], "level": contract["level"],
+            "intake": None if intake is None else {"term": intake["term"], "year": intake["year"]},
+            "programmes": [{"programme_ref": p["programme_ref"], "rank": i + 1} for i, p in enumerate(live)],
+            "contract_sha256": row.contract_sha256, "open_plans": len(rows), "identity_taken": taken}
+
+
+_FACT_READERS = {"programme": "programme_facts", "registry": "registry_facts"}
+
+
+def confirmed_facts(keys, intake_year: int) -> dict[tuple[str, str, str], dict]:
+    """Confirmed (or verified) facts by `(scope, ref, field)`, for the Counsellor's policy adapter (P2-D28, freeze
+    exception 3). Each is `{value, url, status, intake_year}`; a key with no fact for `intake_year` gets the newest
+    earlier year's fact, labelled by its own year (P2-D24). Unconfirmed, stale and missing facts are left out, and so
+    is a scope other than programme and registry."""
+    svc = ports.services()
+    wanted = {tuple(k) for k in keys}
+    out: dict[tuple[str, str, str], dict] = {}
+    for scope, reader in _FACT_READERS.items():
+        mine = [k for k in wanted if k[0] == scope]
+        if not mine:
+            continue
+        facts = getattr(svc.knowledge, reader)(sorted({k[1] for k in mine}), sorted({k[2] for k in mine}),
+                                               intake_year, fallback_previous=True)
+        for _, ref, field in mine:
+            fact = facts.get((ref, field))
+            if fact is not None and fact.confirmed:
+                out[(scope, ref, field)] = {"value": fact.value, "url": fact.url, "status": fact.status,
+                                            "intake_year": fact.intake_year}
+    return out

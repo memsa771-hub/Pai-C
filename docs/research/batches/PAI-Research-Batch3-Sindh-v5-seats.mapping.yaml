@@ -1,0 +1,23 @@
+# How the re-entered Sindh seat values and their two AI checks become a batch file in the one format (P2 spec §11.3:
+# "research re-enters each value from its quote and both AI checks re-check those rows"). Data, read by
+# `python -m scripts.os_values_sheet`; see the command in the "Derived from" sheet of PAI-Research-Batch3-Sindh-v5-seats.xlsx.
+sheet: Programmes
+key: programme_id
+# PAI-Research-Batch3-Sindh-v5-seats.csv column -> canonical Programmes column
+values:
+  seat_category: seat_category
+  seats: seats
+  quote_verbatim: quote_verbatim
+  source_url: source_url
+# one entry per --check file, in the order given on the command line
+checks:
+  - checker: 1  # PAI-Research-Batch3-Sindh-v5-seats-check1.csv
+    columns: {check1: checker1_result, note: checker_note}
+  - checker: 2  # PAI-Research-Batch3-Sindh-v5-seats-check2.csv
+    columns: {check2_result: checker2_approved, check2_note: checker_note}
+    # check 2 wrote check-1 words. `correct` is its approval (the P2 handoff ledger: "Sindh seats: 74 rows accepted by
+    # both checks", the 74 rows where both say `correct`); `n/a` stays outside the vocabulary (not checked).
+    translate: {correct: "yes"}
+    # owner/controller ruling (T14 fix round 1): a check-2 `unclear` is a doubt, not an absent check. Those rows are not
+    # written to this file; they are reported `held_for_review` and stay for review.
+    skip_results: [unclear]

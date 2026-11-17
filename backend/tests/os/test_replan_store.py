@@ -19,7 +19,8 @@ def plan(engine, tenant: str = "pai", student: str = "stu-1") -> int:
             contract={}, contract_sha256="0" * 64).returning(models.plans.c.id)).scalar_one()
 
 
-def test_migration_up_down_up(os_db):
+def test_migration_up_down_up(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     from tests.os.conftest import run_alembic
 
     run_alembic(["downgrade", "os_0011"], os_db)

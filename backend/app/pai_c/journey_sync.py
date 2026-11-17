@@ -46,7 +46,7 @@ def _journey(db, workspace_id: str) -> StudentJourney | None:
 
 def _live_paths(db, workspace_id: str) -> bool:
     from app.pai_c.possibilities import PossibilityService
-    return any(row.status != "dismissed" for row in PossibilityService(db).list(workspace_id))
+    return bool(PossibilityService(db).current(workspace_id))
 
 
 def _propose(db, journey: StudentJourney, actor: str) -> None:

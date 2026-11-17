@@ -317,3 +317,41 @@ def test_every_finance_fact_is_a_money_kind():
         VaultCatalog.from_dict({"choices": {}, "types": [
             {"key": "finance.extra", "storage": "fact", "shown_on": "details", "inputs": ["chat"],
              "sensitivity": "sensitive", "conflict": "latest_wins", "freshness_days": None, "version": 1}]})
+
+
+# -- P1-T4 task 2: field order and place preference come from chat -------------
+
+@pytest.mark.req("R-16")
+@pytest.mark.asyncio
+async def test_field_order_and_place_preference_are_extracted_from_chat():
+    text = "Pehle computer science, phir MBBS. Pakistan mein pehle, nahi to bahar. Punjab ya Islamabad."
+    outputs = [[
+        _item("field_order", {"fields": ["computer science", "MBBS"]}, "Pehle computer science, phir MBBS"),
+        _item("place_preference", {"scope": "either", "fallback": "local_first", "regions": ["punjab", "islamabad"]},
+              "Pakistan mein pehle, nahi to bahar. Punjab ya Islamabad."),
+    ]]
+    state = await _run_turns([text], outputs)
+    [order] = _by_type(state, "field_order")
+    [place] = _by_type(state, "place_preference")
+    assert order.value == {"fields": ["computer science", "MBBS"]} and order.level == "stated"
+    assert place.value["scope"] == "either" and place.value["regions"] == ["punjab", "islamabad"]
+    assert state.drops == []
+
+
+@pytest.mark.req("R-16")
+@pytest.mark.asyncio
+async def test_a_region_outside_the_province_list_is_dropped_not_stored():
+    text = "Mujhe Atlantis mein parhna hai"
+    outputs = [[_item("place_preference", {"scope": "abroad", "regions": ["atlantis"]}, "Atlantis mein parhna hai")]]
+    state = await _run_turns([text], outputs)
+    assert _by_type(state, "place_preference") == [] and len(state.drops) == 1
+
+
+@pytest.mark.req("R-16")
+@pytest.mark.asyncio
+async def test_field_order_with_plain_names_is_stored_not_dropped():
+    text = "Meri pehli pasand astrophysics, phir doctor banna"
+    outputs = [[_item("field_order", {"fields": ["astrophysics", "doctor"]}, "pehli pasand astrophysics, phir doctor")]]
+    state = await _run_turns([text], outputs)
+    [order] = _by_type(state, "field_order")
+    assert order.value == {"fields": ["astrophysics", "doctor"]} and state.drops == []

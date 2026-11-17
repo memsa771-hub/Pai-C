@@ -116,3 +116,14 @@ def test_no_country_terms_in_packs_python():
     hits = [f"{p.name}:{n}" for p in Path(PACK_DIR).glob("*.py")
             for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1) if words.search(line)]
     assert hits == []
+
+
+def test_startup_checks_every_version_of_a_route():
+    from app.os.packs.config import load_checked_pack_configs
+
+    books = dict(load_playbook_dir())
+    assert len(load_checked_pack_configs(PACK_DIR, TYPES, books, PROFILES)) == 1  # both versions pass
+    older = books[("germany_master", 1)]
+    books[("germany_master", 1)] = older.model_copy(update={"constants": {}})  # only the older version is broken
+    with pytest.raises(PackConfigError, match=r"germany_master.*version 1"):
+        load_checked_pack_configs(PACK_DIR, TYPES, books, PROFILES)

@@ -11,6 +11,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, create_model, model_validator
 
+from app.os.contracts.student_facts import FACT_KEY
+
 TYPES_DIR = Path(__file__).parent / "types"
 
 GenericType = Literal["text", "name", "date", "number", "grade", "band", "code", "mrz_line", "enum"]
@@ -35,6 +37,11 @@ class FieldSpec(_Model):
     pattern: str | None = None  # `code`: the value must match
     values: list[str] = []  # `enum`: the allowed values
     cross_check: CrossCheck | None = None
+    # P1-T4: the StudentFacts key this field's value is read from (data; the startup check is this pattern)
+    fact: str | None = Field(None, pattern=FACT_KEY)
+    # P1-T7: the sibling field that holds the scale or total this value is read against (a value is comparable with
+    # another source only when both sides have their scale)
+    scale_of: str | None = None
 
     @model_validator(mode="after")
     def _type_needs(self) -> "FieldSpec":
@@ -74,6 +81,9 @@ class DocumentType(_Model):
         for n in names:
             if names.count(n) > 1:
                 raise ValueError(f"duplicate field '{n}'")
+        for f in self.fields:
+            if f.scale_of is not None and (f.scale_of not in names or f.scale_of == f.name):
+                raise ValueError(f"field '{f.name}': unknown scale field '{f.scale_of}'")
         for ref in [f for r in self.rules for f in r.fields] + self.full_name_from:
             if ref not in names:
                 raise ValueError(f"unknown field '{ref}'")

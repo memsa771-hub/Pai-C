@@ -77,6 +77,19 @@
         "group": "interest"
       },
       {
+        "path": "self",
+        "key_prefixes": [
+          "strength."
+        ],
+        "group": "strength"
+      },
+      {
+        "vault_items": [
+          "strength"
+        ],
+        "group": "strength"
+      },
+      {
         "path": "world.daily_life",
         "group": "daily_life"
       },

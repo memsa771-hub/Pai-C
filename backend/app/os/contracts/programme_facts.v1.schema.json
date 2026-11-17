@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "FactEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Field",
+          "type": "string"
+        },
+        "fact_class": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Fact Class",
+          "type": "string"
+        },
+        "high_stakes": {
+          "title": "High Stakes",
+          "type": "boolean"
+        },
+        "level": {
+          "enum": [
+            "verified",
+            "confirmed",
+            "not_confirmed",
+            "estimated",
+            "missing"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "value": {
+          "default": null,
+          "title": "Value"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fact_intake": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntakeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "other_intake": {
+          "default": false,
+          "title": "Other Intake",
+          "type": "boolean"
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Ref"
+        },
+        "read_method": {
+          "anyOf": [
+            {
+              "enum": [
+                "fetch",
+                "render",
+                "ocr",
+                "human",
+                "model"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Read Method"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z]{2,3}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        }
+      },
+      "required": [
+        "field",
+        "fact_class",
+        "high_stakes",
+        "level"
+      ],
+      "title": "FactEntry",
+      "type": "object"
+    },
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "checked_at": {
+          "format": "date-time",
+          "title": "Checked At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "quote",
+        "checked_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.programme_facts.v1",
+      "default": "pai.programme_facts.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "programme_ref": {
+      "minLength": 1,
+      "title": "Programme Ref",
+      "type": "string"
+    },
+    "route_key": {
+      "minLength": 1,
+      "title": "Route Key",
+      "type": "string"
+    },
+    "intake": {
+      "$ref": "#/$defs/IntakeRef"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/FactEntry"
+      },
+      "title": "Facts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "programme_ref",
+    "route_key",
+    "intake",
+    "facts"
+  ],
+  "title": "ProgrammeFactsV1",
+  "type": "object"
+}

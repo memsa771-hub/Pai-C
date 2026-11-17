@@ -1,0 +1,66 @@
+# H3, Islamabad Capital Territory part. Researched by Claude, 2026-11-07. Check 2 v2 recomputed the count.
+region: islamabad_capital_territory
+retrieved: 2026-11-07
+lists:
+  - id: hec-recognised-ict
+    body: HEC
+    name: Recognised Universities (Province = Islamabad Capital Territory)
+    url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    institution_type: university_or_dai
+    family: bachelor
+    date: null
+    row_count: 27   # 17 public, 10 private
+    count_quote: null
+    count_method: markup_count - counted list items with Province='Islamabad Capital Territory' in the HTML (unconfirmed on import)
+    check2: correct
+  # Added 2026-11-13 (local P2 completion): official lists cited by batch rows that had no list entry.
+  # Check 1: .local-ci research, check 2: independent re-download; counts and rows agree.
+  - id: szabmu-admission-notice-2026-27
+    body: SZABMU Islamabad (admitting university, federal public medical & dental colleges)
+    name: Admission Notice, Public Sector Medical and Dental Colleges Session 2026-27
+    url: https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg
+    institution_type: medical_dental_college
+    family: bachelor
+    date: null
+    row_count: 3
+    count_quote: null
+    count_method: 'Table "Medical Institutes | Dental Institute": 2 medical lines (1- Federal Medical College, Islamabad;
+      2- Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore) + 1 dental line (1- School of Dentistry,
+      Islamabad)'
+    read_method: curl + image read by model (Read tool, JPEG 1500x1283); no OCR cross-check
+    check2: correct
+    note: 'Local research 2026-11-13: check 1 and an independent check 2 (own download) agree on the decision, the
+      row count and every cited row. Part of the list was read from images (scanned pages or a JPEG) by a model, so
+      a person should confirm those lines (R-72).'
+  - id: fde-hssc-participating-colleges
+    body: Federal Directorate of Education (FDE)
+    name: Participating institutes (HSSC Admissions, FDE Islamabad)
+    url: https://eadmissions.fde.gov.pk/hssc/institutes
+    institution_type: public_college
+    family: intermediate
+    date: null   # no date printed; the portal's admission page names Session 2026-2027
+    row_count: 82
+    count_quote: "Showing 1–82 of 82"
+    count_method: stated on the page (pager at ?per=200&page=1; the default view shows 50 per page); recounted S# 1-82, no gaps
+    read_method: curl + HTML table (https://eadmissions.fde.gov.pk/hssc/institutes.php?per=200&page=1 shows all rows)
+    check2: correct
+    note: "Local research 2026-11-13: check 1 and an independent check 2 agree on the count (82) and the line naming Islamabad Model College for Girls F-7/2 (S# 78). Chosen over fde.gov.pk/our-institutions (432 rows, schools and colleges mixed, staff names and phones)."
+not_found:
+  - what: FDE list of Islamabad Model Colleges
+    url: https://www.fde.gov.pk/
+    note: not_readable (Cloudflare 403) on 2026-11-07
+  - what: Private colleges and A-level schools in ICT (P2 §11 Q4)
+    note: FBISE 'Institutions' page not opened in this pass
+domains:
+  - body: Federal Directorate of Education
+    domains: [fde.gov.pk, www.fde.gov.pk, eadmissions.fde.gov.pk]
+    status: candidate   # blocked automated reading
+  - body: Islamabad Model College for Girls (PG) F-7/2
+    domains: [imcgf72.edu.pk, www.imcgf72.edu.pk]
+    evidence: admission policy page fetched; it says the policy applies to all Islamabad Model Colleges under FDE
+  - body: FBISE
+    domains: [fbise.edu.pk, www.fbise.edu.pk]
+    evidence: "page text: 'Federal Board of Intermediate and Secondary Education Islamabad,PAKISTAN.'"
+  - body: SZABMU (federal MBBS/BDS admitting university)
+    domains: [szabmu.edu.pk, www.szabmu.edu.pk, admission.szabmu.edu.pk]
+    evidence: MBBS admission page fetched from www.szabmu.edu.pk; admission.szabmu.edu.pk from batch 4 (not re-read)

@@ -1,0 +1,17 @@
+# Fictional regulator. Every name, value and date here is invented for tests (no data from memory).
+host: www.higher-ed-regulator.test
+pages:
+  /robots.txt: {content_type: text/plain, body: "User-agent: *\nAllow: /\n"}
+  /:
+    body: |
+      <html><head><title>Higher Education Regulator (fictional)</title></head><body>
+      <h1>Higher Education Regulator</h1>
+      <p><a href="/recognised-institutions">Recognised institutions</a></p>
+      </body></html>
+  /recognised-institutions:
+    body: |
+      <html><body><h1>Recognised institutions list, 1 March 2027</h1>
+      <table><tr><th>No.</th><th>Institution</th><th>Region</th><th>Website</th></tr>
+      <tr><td>1</td><td>Alpha University</td><td>North Region</td><td>www.alpha-university.test</td></tr>
+      <tr><td>2</td><td>Beta College</td><td>South Region</td><td>beta-college.test</td></tr>
+      </table><p>Total recognised institutions: 2</p></body></html>

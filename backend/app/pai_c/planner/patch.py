@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import re
 from typing import Any, Literal, Annotated
 from uuid import uuid4
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from app.pai_c.deep.notebook_schema import CounselorNotebookData, Item, SourceItem, Rating
 from app.pai_c.deep.notebook_sanitize import sanitize_notebook
 from app.pai_c.deep.coverage import enforce_mirror_readiness, requirements
@@ -99,18 +99,52 @@ class SetCoverage(Contract):
     value: bool
 
 
+OPERATION_NAMES = frozenset({"add", "update", "confirm", "retire", "upsert_person", "set_sure", "set_private", "set_coverage"})
+PART_NAMES = frozenset({*Add.model_fields["part"].annotation.__args__, *SetCoverage.model_fields["part"].annotation.__args__})
+PRIVATE_FIELDS = frozenset(SetPrivate.model_fields["field"].annotation.__args__)
 OPERATION = TypeAdapter(Annotated[Add | Update | Confirm | Retire | UpsertPerson | SetSure | SetPrivate | SetCoverage, Field(discriminator="op")])
 
 
 class PatchRejected(ValueError):
-    def __init__(self, index, error_type):
+    """A rejected patch. The message carries only fixed codes and schema names
+    (op index, reason code, part or field), never student text or values, so it
+    is safe to log and to give back to the Planner as retry feedback."""
+    def __init__(self, index, error_type, reason=None, detail=None):
         self.index, self.error_type = index, error_type
-        super().__init__(f"op_index={index} error_type={error_type}")
+        self.reason, self.detail = reason, dict(detail or {})
+        message = f"op_index={index} error_type={error_type}"
+        if reason:
+            message += f" reason={reason}"
+        message += "".join(f" {key}={value}" for key, value in self.detail.items())
+        super().__init__(message)
+
+
+class _Reject(ValueError):
+    """A rule failure with a fixed reason code (internal to apply_patch)."""
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
+
+
+_SAFE_NAME = re.compile(r"^[a-z_.]{1,40}$")
+
+
+def _rejection_detail(raw):
+    # Only schema names, and only when they are one of the declared literals.
+    if not isinstance(raw, dict):
+        return {}
+    detail = {}
+    names = {"op": OPERATION_NAMES, "part": PART_NAMES, "field": PRIVATE_FIELDS}
+    for key, allowed in names.items():
+        value = raw.get(key)
+        if isinstance(value, str) and value in allowed and _SAFE_NAME.match(value):
+            detail[key] = value
+    return detail
 
 
 def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=None, evidence_refs=()):
     if not isinstance(operations, list):
-        raise PatchRejected(-1, "InvalidPatchShape")
+        raise PatchRejected(-1, "InvalidPatchShape", "patch_not_a_list")
     data = deepcopy(notebook.model_dump(mode="json"))
     now = now or datetime.now(timezone.utc)
     stamp = now.isoformat()
@@ -120,12 +154,12 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
         return at_path(data, part)
     def find(item_id):
         if item_id not in visible_ids:
-            raise ValueError("id not present in Planner view")
+            raise _Reject("id_not_visible")
         matches = [row for part in parts for row in items(part) if row["id"] == item_id]
         if len(matches) != 1:
-            raise ValueError("id must identify exactly one stored item")
+            raise _Reject("id_not_unique")
         return matches[0]
-    index = -1
+    index, raw = -1, None
     try:
         for index, raw in enumerate(operations):
             operation = OPERATION.validate_python(raw)
@@ -133,9 +167,9 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                 entry = operation.item.model_dump(exclude_unset=True)
                 # A model cannot promote a report into independent evidence.
                 if (entry.get("kind") != "said" or entry.get("capability_status") == "demonstrated" or entry.get("level") == "proven") and entry.get("vault_fact_ref") not in evidence_refs:
-                    raise ValueError("independent evidence requires a supported profile reference")
+                    raise _Reject("evidence_needs_profile_ref")
                 if operation.part != "source" and "category" in entry:
-                    raise ValueError("category is source-only")
+                    raise _Reject("category_source_only")
                 if operation.part == "source" and entry.get("category") is None:
                     entry.pop("category", None)
                 entry.update(id=str(uuid4()), first_seen=stamp, last_confirmed=stamp)
@@ -144,7 +178,7 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
             elif isinstance(operation, Update):
                 target = find(operation.id)
                 if (getattr(operation.fields, "capability_status", None) == "demonstrated" or getattr(operation.fields, "level", None) == "proven") and target.get("vault_fact_ref") not in evidence_refs:
-                    raise ValueError("demonstrated capability requires a supported profile reference")
+                    raise _Reject("evidence_needs_profile_ref")
                 target.update(**operation.fields.model_dump(exclude_unset=True), last_confirmed=stamp)
             elif isinstance(operation, Confirm):
                 find(operation.id).update(evidence=operation.evidence, last_confirmed=stamp)
@@ -160,11 +194,11 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                     people.append({**values, "id": person_id, "first_seen": stamp, "last_confirmed": stamp})
                 else:
                     if person["id"] not in visible_ids and person["id"] not in added_people:
-                        raise ValueError("person not present in Planner view")
+                        raise _Reject("person_not_visible")
                     person.update(**values, last_confirmed=stamp)
             elif isinstance(operation, SetSure):
                 if not re.search(r"(?<![\w.+-])" + str(operation.score) + r"(?![\w.]|\s*\.\d)", latest_student_text):
-                    raise ValueError("rating not present in latest student message")
+                    raise _Reject("rating_not_in_student_text")
                 sure = data["sure"]
                 if sure["score"] is not None:
                     sure["history"].append(Rating.model_validate({key: sure[key] for key in ("score", "reason", "asked_at")}).model_dump(mode="json"))
@@ -173,7 +207,7 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                 caps = {"hypotheses": 8, "tensions": 6, "decision_difficulties": 6, "open_questions": 3}
                 if (operation.field in caps and isinstance(operation.value, list)
                         and len(operation.value) > caps[operation.field]):
-                    raise ValueError("private list exceeds write cap")
+                    raise _Reject("private_list_over_cap")
                 data[operation.field] = deepcopy(operation.value)
             elif isinstance(operation, SetCoverage):
                 if operation.value:
@@ -184,14 +218,18 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
                     else:
                         supported = any(row["status"] == "active" for row in items(operation.part))
                     if not supported:
-                        raise ValueError("coverage has no active evidence")
+                        raise _Reject("coverage_without_evidence")
                 data["coverage"][operation.part] = operation.value
             # Detect invalid intermediate ops before a later op can hide them.
-            CounselorNotebookData.model_validate(data)
+            try:
+                CounselorNotebookData.model_validate(data)
+            except ValidationError:
+                raise _Reject("invalid_notebook_state") from None
+        raw = None  # whole-patch checks below: no single op to name
         validated = CounselorNotebookData.model_validate(data)
         cleaned, issues = sanitize_notebook(validated.model_dump(mode="json"))
         if issues:
-            raise ValueError("patch required sanitization")
+            raise _Reject("sanitization_required")
         # The Planner writes coverage, not mirror_ready. Recompute readiness so
         # new workspaces can become reviewable and retired evidence cannot keep
         # an old readiness flag alive indefinitely.
@@ -202,5 +240,9 @@ def apply_patch(notebook, operations, visible_ids, latest_student_text, *, now=N
         ready = all(getattr(cleaned.coverage, key) and support[key]
                     for key in requirements()[cleaned.depth_mode])
         return enforce_mirror_readiness(cleaned.model_copy(update={"mirror_ready": ready}))
+    except _Reject as exc:
+        raise PatchRejected(index, "ValueError", exc.reason, _rejection_detail(raw)) from None
+    except ValidationError:
+        raise PatchRejected(index, "ValidationError", "invalid_operation", _rejection_detail(raw)) from None
     except Exception as exc:
-        raise PatchRejected(index, type(exc).__name__) from None
+        raise PatchRejected(index, type(exc).__name__, "unexpected_error", _rejection_detail(raw)) from None

@@ -1,0 +1,18 @@
+main sha256 20331e1e0dfd9e17e48b68224d0318f5626ee1186a652b7e2c0d243b6e418f81
+tables 1 headers ['S#', 'Code', 'College', 'Phone', 'Location'] summary 'Showing 1–82 of 82'
+hidden-styled elements: []
+scripts: ['/hssc/assets/js/main.js?v=1788929018']
+iframes: 0 inline style tags: 0
+comments: ['<a class="c-masthead__staff" href="/hssc/login">Staff sign in</a>']
+tbody non-blank text nodes: 462
+wrote 82 rows
+rows with address line: 52
+rows without link: ['5', '6', '11', '14', '15', '16', '17', '18', '20', '22', '24', '25', '26', '27', '28', '29', '30', '31', '32', '34', '37', '38', '40', '41', '43', '49', '50', '51', '52', '53', '55', '56', '57', '58', '60', '61', '62', '63', '64', '65', '66', '67', '68', '71', '72', '73', '74', '75', '76', '79']
+crosscheck /raw/default.html cb1a23057a16e585c6c3abe8323db86ba82f53dfb70b6849d131ebeb1903be5d rows 50 summary 'Showing 1–50 of 82'
+crosscheck /raw/default_p2.html 3236a0c34561393557d98309a56b37e29f00d2f188303417a2823c62de294a45 rows 32 summary 'Showing 51–82 of 82'
+default pages 1+2 identical to per=200 (key,name,addr): True
+addr equals name at key 2
+addr equals name at key 34
+addr equals name at key 42
+addr equals name at key 59
+PROBLEMS: none

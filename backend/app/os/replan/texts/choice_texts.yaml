@@ -1,0 +1,10 @@
+# The sentences a student sees next to a choice change that went to their counsellor (P1-T6, R-07).
+# Approved by the owner in chat (2026-11-06). If `approved` is set back to false, the API returns these only in rehearsal mode (null otherwise).
+version: 1
+approved: true  # approved by the owner in chat, 2026-11-06
+requested: Your change is with your counsellor. It is not in your plan yet; we will tell you when it is.
+expired: This change was not made, because your choice has moved on. Look at your plan and ask again if you still want it.
+preparing: Your choice is with your counsellor. Your plan is being prepared and will appear here soon.
+choose_field_first: Choose your field with PAI first. Your plan is built from that choice.
+too_many_places: You have chosen too many places. Remove some and try again.
+adopt_first: You already have a plan of your own. Ask to move it to your counsellor first; then you can change it here.

@@ -1,4 +1,4 @@
-import {picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
+import {osPlanRoute,picture,vault,vaultCatalog,possibilities,pathResult,programs,roadmapPage,chosenRoute,mirrorCard,mirrorEmpty} from '../fixtures/counselor';
 import type {ChosenRoute} from '@/lib/roadmap';
 export const calls:{method:string;args:unknown[]}[]=[];
 // ?mirror=empty: the Mirror before it is ready (onboarding only).
@@ -21,7 +21,7 @@ const richPrograms={status:'completed',missing:[],programs:[
 ]};
 let searched=new URLSearchParams(location.search).has('programs');
 // The Roadmap page (GET /v1/roadmap): ?chosen=1 starts with a chosen route.
-let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(chosenRoute):null;
+let route:ChosenRoute|null=new URLSearchParams(location.search).has('chosen')?structuredClone(new URLSearchParams(location.search).has('osplan')?osPlanRoute:chosenRoute):null;
 const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_key===fieldKey)!;
   const steps=structuredClone(card.steps||[]);
   route={id:'route-offline',field_key:fieldKey,possibility_id:card.possibility_id,title:card.title,chosen_at:'2026-10-26T09:00:00Z',
@@ -31,7 +31,7 @@ const choose=(fieldKey:string)=>{const card=roadmapPage.fields.find(c=>c.field_k
 const tick=(key:string,done:boolean)=>{const r=route!;r.steps_done=done?[...r.steps_done.filter(k=>k!==key),key]:r.steps_done.filter(k=>k!==key);
   r.steps=r.steps.map(s=>s.key!==key?s:{...s,manual_done:done,status:done?'done':'not',
     evidence:done?(s.evidence||{id:null,level:'stated',source_label:'You marked it'}):(s.evidence?.id?s.evidence:null)});return structuredClone(r);};
-const api={getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVaultCatalog:async()=>vaultCatalog,getPossibilities:async()=>possibilities,
+const api={getUploadOptions:async()=>({one_upload:false as const}),getMyPlan:async():Promise<never>=>{throw new Error('API 404: Not Found');},getOsRequests:async()=>null,answerOsRequest:async()=>({status:'answered' as const}),getCounselorWorkspace:async()=>picture,getVault:async()=>vault,getVaultCatalog:async()=>vaultCatalog,getPossibilities:async()=>possibilities,
   getFamilyTalk:async()=>({ready:true,path_id:'path-one',path:'Practical design',message:'Prepare around what you know, without assuming that a concern has been resolved.',family:[{id:'person-one',role:'Parent',wish:'A dependable career',worry:'Whether the work will be stable',evidence:'My parent wants me to have dependable work.'}],evidence:[{id:'quote-one',quote:'I fixed a broken lamp with my friend.'}]}),
   prepareFamilyTalk:async()=>({event_id:'offline-family',script:'I understand that dependable work matters to you. I want to explore practical design. I fixed a broken lamp with my friend. I would like us to look at the evidence together before deciding.'}),
   acceptPathActivity:async()=>({scheduled:true}),

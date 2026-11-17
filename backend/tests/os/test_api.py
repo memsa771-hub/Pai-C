@@ -124,6 +124,26 @@ def test_complete_inbox_twice_200(client):
     assert [i["instance_key"] for i in client.get("/v1/os/inbox", headers=as_student()).json()["items"]] == ["visa"]
 
 
+@pytest.mark.req("R-18")
+def test_request_step_in_the_inbox_cannot_be_completed_by_hand(client, engine):
+    from sqlalchemy import insert
+
+    from app.os import models
+    from app.os.requests import texts
+
+    plan_id = client.post("/v1/os/plans", json=contract(), headers=ADMIN).json()["plan_id"]
+    with engine.begin() as conn:
+        task_id = conn.execute(insert(models.tasks).values(
+            tenant_id="pai", plan_id=plan_id, instance_key="provide@fact:education.matric.marks_obtained:stated",
+            template_key="provide", task_type="student.provide", kind="student", inbox_kind="provide",
+            title="Tell us your marks", state="waiting_student", due_tz="UTC", playbook_version=1,
+        ).returning(models.tasks.c.id)).scalar_one()
+    asked = client.post(f"/v1/os/inbox/{task_id}/complete", json={}, headers=as_student())
+    assert asked.status_code == 409 and asked.json() == {"detail": texts.text("answer_required")}
+    ids = [i["id"] for i in client.get("/v1/os/inbox", headers=as_student()).json()["items"]]
+    assert task_id in ids  # still waiting for the answer
+
+
 def test_other_student_cannot_complete(client):
     client.post("/v1/os/plans", json=contract(), headers=ADMIN)
     item = client.get("/v1/os/inbox", headers=as_student()).json()["items"][0]

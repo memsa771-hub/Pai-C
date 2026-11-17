@@ -1,0 +1,109 @@
+# B4 research check 1: rows whose source_url is not an official-list URL.
+# Pages fetched 2026-11-13 with curl (browser user agent) into .local-ci/work/B4/docs/. No Firecrawl, no paid API.
+file: PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+sha256: 9410984a619eaeda85b2847be35122a764ab6a00a257cbb35fe9c7229987cc3f
+aliases:
+- from: KP-ADM-001
+  to: PK-UNI-066
+  batch4:
+    name: Khyber Medical University (KMU) – admitting university for KP public MBBS/BDS
+    city: Peshawar
+    official_url: https://cas.kmu.edu.pk/
+    source_url: https://cas.kmu.edu.pk/
+  batch1:
+    name: Khyber Medical University
+    city: Peshawar
+    official_url: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Khyber Medical University" … charteredby="Government of Khyber Pakhtunkhwa" city="Peshawar" discipline="General" sector="Public" province="Khyber Pakhtunkhwa"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+    quote: <a href="http://www.kmu.edu.pk">http://www.kmu.edu.pk</a>
+    address_quote: PDA building Block-4 Phase-5 Hayatabad Peshawar
+    saved: .local-ci/work/B4/docs/hec-kmu.html
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: 2026-11-13
+  note: HEC profile website is kmu.edu.pk; batch 4 host cas.kmu.edu.pk is a subdomain of it. City Peshawar on both rows, address in Peshawar. Same entity; batch 4 row records its admitting-university role (type admitting_university), batch 1 records it as an HEC-recognised university.
+- from: GB-UNI-001
+  to: PK-UNI-021
+  batch4:
+    name: Karakoram International University (KIU), Gilgit
+    city: Gilgit
+    official_url: https://www.kiu.edu.pk
+    source_url: https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/
+  batch1:
+    name: Karakurum International University
+    city: Gilgit
+    official_url: https://www.hec.gov.pk/english/universities/Pages/Gilgit%20Baltistan/Karakurum-International-University.aspx
+    source_url: https://www.hec.gov.pk/english/universities/pages/recognised.aspx
+    source_quote: data-position="Karakurum International University" … charteredby="Government of Pakistan" city="Gilgit" discipline="General" sector="Public" province="Gilgit Baltistan"
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/Gilgit%20Baltistan/Karakurum-International-University.aspx
+    quote: <a href="http://www.kiu.edu.pk/">http://www.kiu.edu.pk/</a>
+    address_quote: University Road Gilgit, Gilgit Baltistan.
+    saved: .local-ci/work/B4/docs/hec-kiu.html
+  basis: domain+city
+  check1: correct
+  check1_name: Claude local - check 1
+  check1_date: 2026-11-13
+  note: HEC spells it 'Karakurum'; website kiu.edu.pk equals batch 4 official_url host and is the parent of dapr.kiu.edu.pk. City Gilgit on both. Batch 1 also has PK-BRD-033 'Karakoram International University (KIU)' (type examination_board, from the IBCC forum list, official_url https://www.kiu.edu.pk/); PK-UNI-021 is chosen because GB-UNI-001 is a university row. The HEC profile lists campuses 'Mian Campus; Diamir; Ghizer'; batch 4 lists Main, Hunza, Ghizer, Diamer (Hunza not on the HEC profile; does not affect the alias).
+list_entries:
+- region_file: docs/research/lists/ict.yaml
+  entry:
+    id: fde-hssc-participating-colleges
+    body: Federal Directorate of Education (FDE)
+    name: Participating institutes (HSSC Admissions, FDE Islamabad)
+    url: https://eadmissions.fde.gov.pk/hssc/institutes
+    institution_type: public_college
+    family: intermediate
+    date: null
+    row_count: 82
+    count_quote: "Showing 1–82 of 82"
+    count_method: "stated on page (pager summary at ?per=200&page=1; the default view says 'Showing 1–50 of 82'); recounted 82 table rows, S# 1-82, no gaps, no duplicates"
+    read_method: curl + HTML table parse (https://eadmissions.fde.gov.pk/hssc/institutes.php?per=200&page=1 for all rows on one page)
+    check2: null
+  rows:
+  - inst_id: IC-COL-001
+    on_list: true
+    line: "78 | IMCGPG-F7/2 | ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD | 0519102528"
+  notes: >-
+    Preferred list: colleges only (82 HSSC-admitting institutions: 42 IMCG, 30 IMCB, 3 IMCGPG, plus ICB, ICG, IHEAD,
+    GPIW, IMCCG, IMPCC, IMPCH8), page meta 'Participating FDE Islamabad colleges offering HSSC programmes.'
+    The F-7/2 name links to https://Imcgf72.edu.pk, the same host as IC-COL-001 official_url; address cell
+    'ISLAMABAD MODEL COLLEGE FOR GIRLS (POSTGRADUATE)F-7/2,ISLAMABAD F7 MARKAZ'. The list is paginated by default
+    (50 per page); without ?per=200 the F-7/2 row is on page 2. No printed date on the page (the sibling
+    /hssc/admission page shows 'Session 2026-2027'). Host eadmissions.fde.gov.pk is linked from the fde.gov.pk menu
+    ('HSSC Admissions', 'Institute Login'); ict.yaml lists only fde.gov.pk and www.fde.gov.pk as FDE domains, so
+    eadmissions.fde.gov.pk should be added. Saved: docs/fde-hssc-institutes-per200.html, docs/fde-eadmissions-hssc-institutes.html.
+- region_file: docs/research/lists/ict.yaml
+  entry:
+    id: fde-our-institutions
+    body: Federal Directorate of Education (FDE)
+    name: Our Institutions
+    url: https://www.fde.gov.pk/our-institutions
+    institution_type: public_school_or_college
+    family: intermediate
+    date: null
+    row_count: 432
+    count_quote: null
+    count_method: "counted table rows with a numeric SR. cell (433 <tr> incl. header); SR. 1-432, no gaps, no duplicates"
+    read_method: curl + HTML table parse (single <table>, columns SR. | INSTITUTE | SECTOR | HEAD NAME | Head Phone)
+    check2: null
+  rows:
+  - inst_id: IC-COL-001
+    on_list: true
+    line: "399 | 806 – ISLAMABAD MODEL COLLEGE FOR GIRLS (POST GRADUATE), F-7/2, ISLAMABAD | FGC | PROF. DR. FAUZIA TANVEER SHEIKH | 051-9102528"
+  notes: >-
+    Alternative, not preferred: schools and colleges mixed (IMS/IMSG schools and IMCG/IMCB colleges) in sectors
+    BHARA KAU 79, SIHALA 75, URBAN 1 67, NILORE 66, TARNOL 56, URBAN 2 50, MC 26, FGC 13; colleges also appear in the
+    rural/urban sectors (e.g. '201 – IMCG G-6/1-4 IBD', URBAN 1), so no column isolates colleges. The second column
+    carries an institution code (201-926) besides the serial. No date printed (footer 'Copyright © 2023' only). The
+    page was readable on 2026-11-13 (ict.yaml not_found recorded Cloudflare 403 on 2026-11-07). Phone 051-9102528
+    matches row 78 of the HSSC list. The FDE 'Colleges' menu page (https://fde.gov.pk/model-colleges/) is a
+    directorate roles page with no list. Saved: docs/fde-our-institutions.html, docs/fde-our-institutions-rows.tsv.
+    Other batch 4 Islamabad college rows: none. Batch 4 ICT rows are IC-ADM-001, IC-ADM-002 (FDE admission body,
+    also cites the imcgf72 page but is an admission_body, not an institution on either list), IC-MED-01, IC-MED-02,
+    IC-MED-03 (federal medical/dental colleges cited from the SZABMU notice) and IC-COL-001; only IC-COL-001 would cite
+    an FDE list.

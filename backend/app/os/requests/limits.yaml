@@ -1,0 +1,7 @@
+# Pairs of Vault fact keys where the first (a value) can never be more than the second (its total): a value above its
+# total is impossible and becomes a "which is right" question (P1-T8, R-21). The pairs a document type already declares
+# (`scale_of` on a field that names a fact) are added by the code; these are the ones no document type has.
+version: 1
+pairs:
+  - {value: education.intermediate.part1.marks_obtained, total: education.intermediate.part1.marks_total}
+  - {value: education.intermediate.part2.marks_obtained, total: education.intermediate.part2.marks_total}

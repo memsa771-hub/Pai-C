@@ -36,6 +36,7 @@ from app.models import FileRecord, MemoryCandidate, ProfileIssue, VaultFact, Vau
 
 from .catalog import TypeSpec, vault_catalog
 from .evidence import evidence_level, page_of
+from .issue_answers import answers_of, drop
 from .student_records import ENTITY_MODELS, StudentRecordService
 from .vault import _unwrap, is_guess
 from .vault_items import VaultItemService
@@ -145,6 +146,19 @@ def _result_text(result: dict) -> str:
     return ""
 
 
+def _part_texts(result: dict) -> list[str]:
+    """Part-I and Part-II marks of an education result ("Part I 400/550"), only
+    for the parts that carry both numbers."""
+    words = view_copy()["display"]["result"]
+    out = []
+    for part in ("part1", "part2"):
+        marks = result.get(part)
+        got, total = (marks or {}).get("marks_obtained"), (marks or {}).get("marks_total")
+        if isinstance(got, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            out.append(words[part].format(obtained=_number(got), total=_number(total)))
+    return out
+
+
 def _budget_amount(value: dict) -> str:
     """The budget as its band label; a range or amount the student gave reads
     as the band it falls in, else in lakh ("3-8 lakh"), never as 600000."""
@@ -215,7 +229,7 @@ def _display(spec: Optional[TypeSpec], value: Any, type_key: Optional[str] = Non
         if node is None or node == "" or (path and (_skip_in_display(name) or name in hidden)):
             return []
         if name == "result" and isinstance(node, dict):
-            parts = [_result_text(node)]
+            parts = [_result_text(node), *_part_texts(node)]
         elif isinstance(node, bool):
             parts = [rules["yes"] if node else rules["no"]]
         elif isinstance(node, dict):
@@ -568,6 +582,8 @@ class VaultView:
         elif evidence.get("record_type"):
             form, type_key = "record", evidence.get("record_type")
             current, proposed = evidence.get("current"), evidence.get("proposed")
+            settled = answers_of(issue)  # values answered one by one elsewhere are settled: only the rest is shown
+            current, proposed = drop(current, settled), drop(proposed, settled)
         else:
             form, type_key, current, proposed = "other", None, None, None
 

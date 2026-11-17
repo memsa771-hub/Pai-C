@@ -1,0 +1,31 @@
+# Display data for germany_master v1, joined by the loader on (key, version). Kept beside the playbook, not in it,
+# so the file a running plan pins stays as it was (invariant 10). Labels and titles are today's menu and headings.
+pages:
+  - {key: start, label: Start, title: "Start your plan"}
+  - {key: inbox, label: Inbox, title: "Your next steps"}
+  - {key: documents, label: Documents, title: "Your documents"}
+  - {key: programmes, label: Programmes, title: "Your programmes"}
+  - {key: statements, label: Statements, title: "Your statement and CV"}
+  - {key: pack, label: Pack, title: "Your application packs", noun: "pack"}
+  - {key: visa, label: Visa, title: "Your visa file", noun: "visa file"}
+# Dates the sources were checked: docs/os/spikes/spike5-germany-playbook.md section 5, "Checked 2026-10-17" (S1..S18).
+# confirmed: false where the walkthrough reviewer did not tick the source (section 6 sign-off: S8, S13, S14, S17, S18).
+sources:
+  S1: {checked: 2026-10-17}
+  S2: {checked: 2026-10-17}
+  S3: {checked: 2026-10-17}
+  S4: {checked: 2026-10-17}
+  S5: {checked: 2026-10-17}
+  S6: {checked: 2026-10-17}
+  S7: {checked: 2026-10-17}
+  S8: {checked: 2026-10-17, confirmed: false}
+  S9: {checked: 2026-10-17}
+  S10: {checked: 2026-10-17}
+  S11: {checked: 2026-10-17}
+  S12: {checked: 2026-10-17}
+  S13: {checked: 2026-10-17, confirmed: false}
+  S14: {checked: 2026-10-17, confirmed: false}
+  S15: {checked: 2026-10-17}
+  S16: {checked: 2026-10-17}
+  S17: {checked: 2026-10-17, confirmed: false}
+  S18: {checked: 2026-10-17, confirmed: false}

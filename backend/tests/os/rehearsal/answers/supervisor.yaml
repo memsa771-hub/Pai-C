@@ -31,6 +31,10 @@ route_invalid:
   ops:
     - {op: escalate, reason: "The plan's route no longer fits; a person will check it."}
   summary: "Offline answer: escalated the route change to support."
+student_fact_changed:
+  ops:
+    - {op: escalate, reason: "The student's details changed; a person will check the plan."}
+  summary: "Offline answer: escalated the changed student details to support."
 task_failed:
   ops:
     - {op: escalate, reason: "A step failed; a person will look at it."}

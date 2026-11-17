@@ -16,3 +16,12 @@ def is_enabled(engine: Engine, tenant_id: str) -> bool:
     with engine.connect() as conn:
         enabled = conn.execute(select(M.c.enabled).where(M.c.module == NAME, M.c.tenant_id == tenant_id)).scalar()
     return enabled is True
+
+
+def set_enabled(engine: Engine, tenant_id: str, enabled: bool) -> None:
+    """Switch the module on or off for a tenant: insert its `os_modules` row, or update it."""
+    M = models.modules
+    with engine.begin() as conn:
+        done = conn.execute(M.update().where(M.c.module == NAME, M.c.tenant_id == tenant_id).values(enabled=enabled))
+        if done.rowcount == 0:
+            conn.execute(M.insert().values(module=NAME, tenant_id=tenant_id, enabled=enabled))

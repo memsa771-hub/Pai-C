@@ -21,8 +21,12 @@ from tests.test_path_fields import FA, again, by_title, run, reply_with, set_edu
 
 BACKEND = Path(__file__).resolve().parents[1]
 ROOT = BACKEND.parent
+# The prior record's marks onboarding requires of an Intermediate or DAE
+# student (Matric) and an A-level student (O-level), R-47 C7; hidden, and so
+# dropped, for every other level. Each is written as its own completed record.
+PRIOR = {"matricMarksObtained": "900", "matricMarksTotal": "1100", "oLevelGrades": "A B"}
 PERSON = {"firstName": "Sam", "lastName": "Taylor", "dateOfBirth": "2008-03-12", "gender": "female",
-          "currentCountry": "Pakistan", "currentCity": "My city"}
+          "currentCountry": "Pakistan", "currentCity": "My city", **PRIOR}
 
 
 def _jobs(db, workspace_id):
@@ -245,7 +249,8 @@ def test_a_downward_correction_reads_as_the_latest_answer():
                    "academic_status": r.academic_status} for r in rows]
         # A higher level is never marked completed: that would claim a degree
         # the student never stated. The latest current record still wins.
-        assert [v["academic_status"] for v in values] == ["current", "current"]
+        assert {v["qualification_name"]: v["academic_status"] for v in values} == {
+            "bachelor": "current", "fsc": "current", "matric": "completed"}
         assert current_education(values)["qualification_name"] == "fsc"
         prefill = _onboarding(db).state(workspace)["prefill"]
         assert prefill["level"] == "intermediate" and prefill["group"] == "pre_engineering"
@@ -368,7 +373,8 @@ def test_a_step_up_completes_the_lower_current_record():
         workspace = db.get(Workspace, student.workspace_id)
         _onboard(db, workspace, level="intermediate", group="pre_engineering", year="year_2")
         _onboard(db, workspace, level="bachelor", field="computer_science", year="semester_1")
-        assert _statuses(db, student.workspace_id) == {"fsc": "completed", "bachelor": "current"}
+        assert _statuses(db, student.workspace_id) == {"matric": "completed", "fsc": "completed",
+                                                       "bachelor": "current"}
 
 
 def test_another_track_at_the_same_rank_is_left_alone():
@@ -376,7 +382,8 @@ def test_another_track_at_the_same_rank_is_left_alone():
         workspace = db.get(Workspace, student.workspace_id)
         _onboard(db, workspace, level="dae", technology="electrical", year="year_2")
         _onboard(db, workspace, level="a_level", subjects=["physics", "mathematics"], year="year_1")
-        assert _statuses(db, student.workspace_id) == {"dae": "current", "a_level": "current"}
+        assert _statuses(db, student.workspace_id) == {"matric": "completed", "dae": "current",
+                                                       "o_level": "completed", "a_level": "current"}
 
 
 def test_a_higher_record_is_never_marked_completed():
@@ -384,4 +391,5 @@ def test_a_higher_record_is_never_marked_completed():
         workspace = db.get(Workspace, student.workspace_id)
         _onboard(db, workspace, level="bachelor", field="computer_science", year="semester_1")
         _onboard(db, workspace, level="intermediate", group="pre_engineering", year="year_2")
-        assert _statuses(db, student.workspace_id) == {"bachelor": "current", "fsc": "current"}
+        assert _statuses(db, student.workspace_id) == {"bachelor": "current", "fsc": "current",
+                                                       "matric": "completed"}

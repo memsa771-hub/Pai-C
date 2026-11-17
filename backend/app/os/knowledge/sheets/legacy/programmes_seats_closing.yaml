@@ -1,0 +1,15 @@
+# Batch 2 layout: one row per programme with open-merit seats, total seats and the closing aggregate, each with its own
+# source. Becomes up to three canonical rows (the seats row carries the seats quote; the total and the closing value
+# have no quote of their own, so they cannot be confirmed).
+layout: programmes_seats_closing
+sheet: Programmes
+detect: [open_merit_seats, total_seats, closing_open_merit_aggregate]
+emit:
+  - when: open_merit_seats
+    set: {seat_category: {const: open_merit}, seats: open_merit_seats, source_url: seats_source_url,
+          quote_verbatim: seats_quote}
+  - when: total_seats
+    set: {seat_category: {const: total}, seats: total_seats, source_url: seats_source_url}
+  - when: closing_open_merit_aggregate
+    set: {seat_category: {const: open_merit}, closing_merit: closing_open_merit_aggregate,
+          source_url: closing_source_url}

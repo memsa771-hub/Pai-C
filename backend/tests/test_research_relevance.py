@@ -53,7 +53,9 @@ def city(db, ws, value="Lahore"):
 # ---- the daily research budget -------------------------------------------------------
 
 def test_two_vault_versions_on_one_day_share_one_allowance_and_a_new_day_starts_another():
-    day = datetime(2026, 10, 29, 9, tzinfo=timezone.utc)
+    # Today at 01:00 UTC: the budget prunes keys more than KEEP_DAYS older than the real day,
+    # so a fixed calendar date would expire this test; +5 h stays on the same UTC day.
+    day = datetime.now(timezone.utc).replace(hour=1, minute=0, second=0, microsecond=0)
     with StudentSession() as student, student.factory() as db, \
             patch.object(config, "PAI_RESEARCH_MAX_CALLS_PER_STUDENT", 1):
         def attempt(now):

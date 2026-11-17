@@ -1,0 +1,127 @@
+{
+ "deadline_passed": {
+  "body": {
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "deadline_passed",
+   "workspace_id": "w"
+  },
+  "detail": [
+   {
+    "loc": [
+     "body",
+     "reason_type"
+    ],
+    "msg": "Input should be 'route_not_possible', 'all_rejected' or 'blocking_gap'",
+    "type": "literal_error"
+   }
+  ],
+  "status": 422
+ },
+ "dv0": {
+  "body": {
+   "decision_version": 0,
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "blocking_gap",
+   "workspace_id": "w"
+  },
+  "detail": "OS hand-off is not configured",
+  "status": 503
+ },
+ "dv_str": {
+  "body": {
+   "decision_version": "zz",
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "blocking_gap",
+   "workspace_id": "w"
+  },
+  "detail": "OS hand-off is not configured",
+  "status": 503
+ },
+ "foo": {
+  "body": {
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "foo",
+   "workspace_id": "w"
+  },
+  "detail": [
+   {
+    "loc": [
+     "body",
+     "reason_type"
+    ],
+    "msg": "Input should be 'route_not_possible', 'all_rejected' or 'blocking_gap'",
+    "type": "literal_error"
+   }
+  ],
+  "status": 422
+ },
+ "not_eligible": {
+  "body": {
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "not_eligible",
+   "workspace_id": "w"
+  },
+  "detail": [
+   {
+    "loc": [
+     "body",
+     "reason_type"
+    ],
+    "msg": "Input should be 'route_not_possible', 'all_rejected' or 'blocking_gap'",
+    "type": "literal_error"
+   }
+  ],
+  "status": 422
+ },
+ "not_eligible_short": {
+  "body": {
+   "details": "x",
+   "journey_id": "j",
+   "reason_type": "not_eligible",
+   "workspace_id": "w"
+  },
+  "detail": [
+   {
+    "loc": [
+     "body",
+     "reason_type"
+    ],
+    "msg": "Input should be 'route_not_possible', 'all_rejected' or 'blocking_gap'",
+    "type": "literal_error"
+   },
+   {
+    "loc": [
+     "body",
+     "details"
+    ],
+    "msg": "String should have at least 3 characters",
+    "type": "string_too_short"
+   }
+  ],
+  "status": 422
+ },
+ "other": {
+  "body": {
+   "details": "A fixed note",
+   "journey_id": "j",
+   "reason_type": "other",
+   "workspace_id": "w"
+  },
+  "detail": [
+   {
+    "loc": [
+     "body",
+     "reason_type"
+    ],
+    "msg": "Input should be 'route_not_possible', 'all_rejected' or 'blocking_gap'",
+    "type": "literal_error"
+   }
+  ],
+  "status": 422
+ }
+}

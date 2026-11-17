@@ -3,6 +3,11 @@
  * Data comes from GET /v1/os/inbox (backend/app/os/api). Kept free of React so it is easy to test.
  */
 
+import copy from '@/components/counselor/workspace/copy.json';
+import { isRequestItem, type RequestWords } from './os-requests';
+
+const words = copy.connect.requests as RequestWords;
+
 export type InboxKind = 'provide' | 'approve' | 'act' | 'choose';
 
 export interface OsCitation {
@@ -35,6 +40,8 @@ export interface OsInboxItem {
   changes?: OsPlanChange[];
   /** A step blocked on a fact nobody has given yet (state "blocked"): what it waits for, in the playbook's words. */
   waiting_for?: string | null;
+  /** P1-T8: the open request this step makes of the student (set by the page from GET /v1/os/requests). */
+  request?: import('./os-requests').OsRequest;
 }
 
 export interface OsPlanChange {
@@ -182,8 +189,10 @@ export function reviewPage(item: OsInboxItem): { page: 'os-pack' | 'os-visa'; la
 
 /** The buttons an item offers and what each sends: an admission result says admitted or not (the visa page
  * pre-selects the admitted programme); "Not admitted" names the programme and asks first, since it starts removing
- * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. */
+ * that programme. Other choices confirm; a plan update is acknowledged; the rest are marked done. A step with a request
+ * (P1-T8) has no button: it closes by itself when PAI has what it asked for. */
 export function completeActions(item: OsInboxItem, names: Record<string, string> = {}): CompleteAction[] {
+  if (isRequestItem(item)) return [];  // a request closes by itself when PAI has what it asked for (D-w11)
   if (item.instance_key.startsWith(ADMISSION_PREFIX)) {
     const name = programmeName(item, names) ?? 'this programme';
     return [{ label: 'Admitted', payload: { choice: 'admitted' } },
@@ -199,6 +208,8 @@ export function completeActions(item: OsInboxItem, names: Record<string, string>
 
 /** What a step's button means, when it is not plain: a "provide" step is not closed by an upload alone. */
 export function actionHint(item: OsInboxItem): string | null {
+  if (item.request) return item.request.how;
+  if (isRequestItem(item)) return words.pending;  // the requests could not be loaded: a neutral line
   if (item.inbox_kind === 'provide') return 'Uploading alone does not close this step: tap Mark as done when it is all done.';
   return null;
 }

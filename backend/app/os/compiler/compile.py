@@ -11,8 +11,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.os.compiler.conditions import evaluate
 from app.os.compiler.schedule import Node, end_of_day, schedule
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.knowledge import Fact
 from app.os.playbooks import Playbook, TaskTemplate
+from app.os.requests.state import StudentState
 
 CONFIRM_TYPE = "knowledge.confirm_fact"
 # A derived date's note names its month in English whatever the process locale (strftime's %B follows it).
@@ -26,6 +28,12 @@ def _day(d: date) -> str:
 
 class CompileError(ValueError):
     pass
+
+
+class SystemsNotResolved(CompileError, NotImplementedError):
+    """P3-T1 (ADR-001 D5): the playbook has a step that fans out per admission system, reads a fact or date of its
+    system, or names a registry name in its title. Resolving a place to its system from the registry is P3-T4; until
+    then such a step is refused loudly, never compiled without its system and never dropped."""
 
 
 @dataclass(frozen=True)
@@ -59,6 +67,9 @@ class PlanDraft:
     playbook_version: int
     tasks: tuple[DraftTask, ...]
     at_risk: bool
+    # P1-T8: the request keys (`provide@...`, `which_is_right@...`) this draft considers answered, so the kernel closes
+    # a waiting one as done instead of cancelled. Empty for every plan compiled without the student's state.
+    answered: tuple[str, ...] = ()
 
 
 @dataclass
@@ -78,6 +89,10 @@ class _Inst:
     tz: str = ""
     citations: list[dict] = field(default_factory=list)
     fact_refs: list[tuple[str, str, str]] = field(default_factory=list)
+    # a step PAI adds for a missing fact has no template (P1-T8): its words, its template key and its own duration
+    title: str | None = None
+    template: str | None = None
+    days: int | None = None
 
 
 def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
@@ -85,13 +100,31 @@ def needed_fields(playbook: Playbook) -> tuple[set[str], set[str]]:
     route, programme = set(), set()
     for t in playbook.tasks:
         target = programme if t.fan_out == "programme" else route
-        for name in (t.condition.fact if t.condition else None, t.citation_from_fact):
+        # a fact `of` the step's system (P3-T1, D5) is read from the registry, never as a route or programme fact
+        for name in (t.condition.fact if t.condition and not t.condition.of else None, t.citation_from_fact):
             if name:
                 target.add(name)
-        if t.anchor:  # an anchor on a chosen programme reads that programme's fact (Slice 9 Task 11, F1)
+        if t.anchor and not t.anchor.of:  # on a chosen programme: that programme's fact (Slice 9 Task 11, F1)
             (programme if t.anchor.programme else target).add(t.anchor.fact)
+    for ask in playbook.asks.values():  # P1-T8: the calendar fact of a result still to come (R-20)
+        if ask.expected and not ask.expected.calendar:  # an official calendar is read by its registry id instead
+            route.add(ask.expected.fact)
     return route, programme
 
+
+def needed_calendars(playbook: Playbook) -> set[tuple[str, str]]:
+    """(calendar id, date field) of every ask whose result date is read from an official calendar of the registry
+    (P2-T11, R-20). Empty for a playbook that names none, which then compiles exactly as before."""
+    return {(a.expected.calendar, a.expected.fact) for a in playbook.asks.values()
+            if a.expected and a.expected.calendar}
+
+
+def _being_rechecked(fact: Fact, field: str) -> bool:
+    """A high-stakes fact that went back to unconfirmed because a page changed or a student reported it (P2-D20): the
+    steps it dates wait (blocked `fact_rechecking`) instead of running on a date nobody stands behind."""
+    from app.os.knowledge.fact_classes import fact_class, is_high_stakes
+
+    return fact.recheck is not None and fact.status == "unconfirmed" and is_high_stakes(fact_class(field, fact.fact_class))
 
 def date_of(value, label: str) -> tuple[date, str | None]:
     """A date fact: "YYYY-MM-DD", or {"date": "YYYY-MM-DD", "tz": "Area/City"}. CompileError otherwise."""
@@ -162,7 +195,7 @@ def _waits_for(insts: dict[str, _Inst], key: str) -> set[str]:
     return seen
 
 
-def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str]], overrides: Sequence) -> None:
+def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str, str]], overrides: Sequence) -> None:
     def drop(keys: set[str]) -> None:
         for k in keys:
             insts.pop(k, None)
@@ -174,7 +207,7 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
             drop({o.target} & set(insts))
         elif o.op == "cancel_programme":
             drop({k for k, i in insts.items() if i.ref == o.target})
-            for k in [k for k, (ref, _) in confirms.items() if ref == o.target]:
+            for k in [k for k, (ref, _, _) in confirms.items() if ref == o.target]:
                 del confirms[k]
         elif o.op == "add":
             ref = o.payload.get("programme_ref")
@@ -203,7 +236,7 @@ def _apply_overrides(insts: dict[str, _Inst], confirms: dict[str, tuple[str, str
 
 
 def compile_plan(
-    contract: RouteContract,
+    contract: RouteContract | RouteContractV2,
     playbook: Playbook,
     route_facts: Mapping[str, Fact],
     programme_facts: Mapping[tuple[str, str], Fact],
@@ -212,29 +245,50 @@ def compile_plan(
     overrides: Sequence = (),
     chosen: Mapping[str, str | None] | None = None,
     excluded: Mapping[str, Collection[str]] | None = None,
+    student: StudentState | None = None,
+    calendar_facts: Mapping[tuple[str, str], Fact] | None = None,
 ) -> PlanDraft:
     """`overrides`: a replan's plan overrides (Slice 7 S7-D5), each with `op`, `target` and `payload`, applied after
     the playbook is expanded, so every recompile keeps them. An override whose target is gone is ignored.
     `chosen`: the programme the student chose for a purpose, by the name an `anchor.programme` uses ("visa": the
     programme the visa file is for), or None while there is none (Slice 9 Task 11, F1). `excluded`: by the same name,
     programmes that are never the source while nothing is chosen (e.g. one that said "not admitted" while others
-    did not, or one that did not admit the student while others did)."""
+    did not, or one that did not admit the student while others did).
+    `student`: what the Vault and the documents hold (P1-T8). With it, a playbook's `needs` add the steps that ask for
+    a missing fact or document and block the steps that need it; without it (the default) `needs` are ignored and the
+    draft is exactly what it was before.
+    `calendar_facts`: the date facts of the registry calendars the playbook's asks name, by (calendar id, field)
+    (P2-T11); read only by the result-expected step of an ask that names a calendar."""
+    if playbook.uses_systems:  # P3-T1: never compiled without its systems, never silently dropped
+        steps = sorted(t.template_key for t in playbook.tasks if t.uses_systems)
+        raise SystemsNotResolved(f"playbook {playbook.key} v{playbook.version}: step(s) {steps} need the registry's "
+                                 f"admission systems, which the compiler does not resolve yet (P3-T4)")
     chosen, excluded = chosen or {}, excluded or {}
     refs = [p.programme_ref for p in sorted(contract.programmes, key=lambda p: p.rank)]
     removed = {o.target for o in overrides if o.op == "cancel_programme"}
     route_key = playbook.key
     insts: dict[str, _Inst] = {}
     by_template: dict[str, list[_Inst]] = {}
-    confirms: dict[str, tuple[str, str]] = {}  # instance key -> (ref, field)
+    confirms: dict[str, tuple[str, str, str]] = {}  # instance key -> (ref, field, scope)
 
     def lookup(ref: str | None, name: str) -> tuple[Fact | None, tuple[str, str, str]]:
         if ref is None:
             return route_facts.get(name), ("route", route_key, name)
         return programme_facts.get((ref, name)), ("programme", ref, name)
 
+    year = contract.target_intake.year
+
+    def firm(fact: Fact | None) -> bool:
+        """Confirmed, and for this plan's own intake: a fact of another year (the labelled previous-year read, P2-D24,
+        R-26) is never firm, so what it dates stays provisional and its value is checked again."""
+        return fact is not None and fact.confirmed and fact.intake_year == year
+
+    def other_year(fact: Fact | None) -> bool:
+        return fact is not None and fact.intake_year != year
+
     def need_confirm(fref: tuple[str, str, str]) -> None:
-        _, ref, name = fref
-        confirms[f"confirm_fact@{ref}:{name}"] = (ref, name)
+        scope, ref, name = fref
+        confirms[f"confirm_fact@{ref}:{name}"] = (ref, name, scope)
 
     for t in playbook.tasks:
         task_type, kind, inbox_kind = t.task_type, t.kind, t.inbox_kind
@@ -249,13 +303,13 @@ def compile_plan(
             if t.condition:
                 fact, fref = lookup(ref, t.condition.fact)
                 result = evaluate(t.condition, fact)
-                if result is False and fact is not None and fact.confirmed:
+                if result is False and firm(fact):
                     continue
                 if result is False:  # decided by an unconfirmed fact: drop, but keep the decision checkable
                     need_confirm(fref)
                     continue
                 inst.fact_refs.append(fref)
-                if fact is None or not fact.confirmed:
+                if not firm(fact):
                     inst.provisional = True
                     need_confirm(fref)
             lead_days = 0
@@ -275,19 +329,27 @@ def compile_plan(
                 else:
                     sources = [ref]
                 usable = []
+                rechecking = False
                 for src in sources:
                     fact, fref = lookup(src, t.anchor.fact)
                     inst.fact_refs.append(fref)
                     if fact is None or fact.value is None:
                         need_confirm(fref)
                         continue
-                    if not fact.confirmed:
+                    if _being_rechecked(fact, fref[2]):  # P2-D20: a page changed or a student reported it
                         need_confirm(fref)
+                        rechecking = True
+                        continue
+                    if not firm(fact):
+                        need_confirm(fref)
+                    if other_year(fact) and date_of(fact.value, f"{fref[1]}:{fref[2]}")[0] < today:
+                        continue  # last year's date is already past: it dates nothing for this intake
                     usable.append((date_of(fact.value, f"{fref[1]}:{fref[2]}"), fact))
                 if not sources:  # every programme is out (none admitted the student): nothing to date it from
                     inst.blocked_reason = f"no_candidate:{t.anchor.programme}"
                 elif not usable:
-                    inst.blocked_reason = f"fact_missing:{t.anchor.fact}"
+                    inst.blocked_reason = (f"fact_rechecking:{t.anchor.fact}" if rechecking
+                                           else f"fact_missing:{t.anchor.fact}")
                 else:
                     (d, tz), fact = min(usable, key=lambda u: u[0][0])
                     inst.tz = tz or playbook.default_timezone
@@ -298,6 +360,8 @@ def compile_plan(
                     passed = lead_date < today and bool(t.anchor.note_passed or t.anchor.note_passed_earliest)
                     if fact.url:  # the date comes from this page: cite it first (invariant 3, review I5)
                         cite = {"source": f"fact:{t.anchor.fact}", "url": fact.url}
+                        if other_year(fact):
+                            cite["intake_year"] = fact.intake_year  # R-26: another year's fact always says so
                         if passed:
                             note = t.anchor.note_passed_earliest if several and t.anchor.note_passed_earliest \
                                 else t.anchor.note_passed
@@ -310,13 +374,18 @@ def compile_plan(
                                 days_left=max((d - today).days, 0))
                         inst.citations.insert(0, cite)
                     inst.deadline = end_of_day(d, inst.tz) - timedelta(days=0 if passed else lead_days)
-                    if not fact.confirmed or len(sources) > 1:  # several: it may move once one is chosen
+                    if not firm(fact) or len(sources) > 1:  # several: it may move once one is chosen
                         inst.provisional = True
             if t.citation_from_fact:
                 fact, fref = lookup(ref, t.citation_from_fact)
                 inst.fact_refs.append(fref)
                 if fact is not None and fact.url:
-                    inst.citations.append({"source": f"fact:{t.citation_from_fact}", "url": fact.url})
+                    cite = {"source": f"fact:{t.citation_from_fact}", "url": fact.url}
+                    if other_year(fact):
+                        cite["intake_year"] = fact.intake_year
+                    inst.citations.append(cite)
+                    if other_year(fact):
+                        need_confirm(fref)
                 else:
                     need_confirm(fref)
             insts[inst.key] = inst
@@ -334,15 +403,24 @@ def compile_plan(
 
     _apply_overrides(insts, confirms, overrides)
 
-    for key, (ref, name) in confirms.items():
-        insts[key] = _Inst(key=key, tmpl=None, ref=None if ref == route_key else ref, task_type=CONFIRM_TYPE,
+    answered: tuple[str, ...] = ()
+    if student is not None and playbook.declares_needs:
+        from app.os.compiler import needs  # late: needs reads this module's _Inst
+
+        answered = needs.expand(insts, playbook, student, route_facts, today, playbook.default_timezone,
+                                need_confirm=need_confirm, calendar_facts=calendar_facts or {}, year=year)
+
+    for key, (ref, name, scope) in confirms.items():
+        insts[key] = _Inst(key=key, tmpl=None, ref=ref if scope == "programme" else None, task_type=CONFIRM_TYPE,
                            kind="work", inbox_kind=None, tz=playbook.default_timezone)
-        insts[key].fact_refs.append(("route" if ref == route_key else "programme", ref, name))
+        insts[key].fact_refs.append((scope, ref, name))
 
     keys = sorted(insts)
     order = _topological(keys, {k: insts[k].deps for k in keys})
 
     def duration(inst: _Inst) -> int:
+        if inst.days is not None:
+            return inst.days
         if inst.tmpl is None:
             return 0
         if inst.tmpl.duration_constant:
@@ -365,9 +443,10 @@ def compile_plan(
     for k in keys:
         inst, n = insts[k], nodes[k]
         t = inst.tmpl
-        title = t.title if t else f"Confirm {inst.fact_refs[0][2]} for {inst.fact_refs[0][1]}"
+        title = t.title if t else inst.title or f"Confirm {inst.fact_refs[0][2]} for {inst.fact_refs[0][1]}"
         tasks.append(DraftTask(
-            instance_key=k, template_key=t.template_key if t else "confirm_fact", task_type=inst.task_type,
+            instance_key=k, template_key=t.template_key if t else inst.template or "confirm_fact",
+            task_type=inst.task_type,
             kind=inst.kind, inbox_kind=inst.inbox_kind, programme_ref=inst.ref, title=title,
             depends_on=tuple(inst.deps), duration_days=n.duration_days, earliest_start=n.earliest_start,
             latest_start=n.latest_start, latest_finish=n.latest_finish, due_tz=inst.tz,
@@ -377,4 +456,4 @@ def compile_plan(
             fact_refs=tuple(dict.fromkeys(inst.fact_refs)),
         ))
     return PlanDraft(playbook_key=playbook.key, playbook_version=playbook.version, tasks=tuple(tasks),
-                     at_risk=any(s < 0 for s in slacks))
+                     at_risk=any(s < 0 for s in slacks), answered=answered)

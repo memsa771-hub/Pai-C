@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
+import { documentNote } from '@/lib/os-documents';
 
 /**
  * A file on its way up, as the grid draws it.
@@ -37,7 +38,7 @@ let uploadSeq = 0;
 export interface UploadQueue {
   uploads: PendingUpload[];
   /** Queue a batch into `folder`; returns as soon as they're on screen. */
-  enqueueUploads: (files: File[], folder: string) => void;
+  enqueueUploads: (files: File[], folder: string, docType?: string) => void;
   retryUpload: (id: string) => void;
   /** Abort if it's in flight, and drop the tile either way. */
   cancelUpload: (id: string) => void;
@@ -61,6 +62,7 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
   // every step of it would just be noise.
   const queueRef = useRef<string[]>([]);
   const filesRef = useRef(new Map<string, File>());
+  const typesRef = useRef(new Map<string, string>());
   const previewsRef = useRef(new Map<string, string>());
   const abortsRef = useRef(new Map<string, AbortController>());
   const runningRef = useRef(false);
@@ -78,6 +80,7 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
       previewsRef.current.delete(id);
     }
     filesRef.current.delete(id);
+    typesRef.current.delete(id);
     abortsRef.current.delete(id);
     queueRef.current = queueRef.current.filter((queued) => queued !== id);
   }, []);
@@ -99,10 +102,14 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
           patch(id, { status: 'uploading', progress: 0, error: undefined });
 
           try {
-            await workspaceApi.uploadFile(file, undefined, {
+            const saved = await workspaceApi.uploadFile(file, undefined, {
               signal: controller.signal,
               onProgress: (fraction) => patch(id, { progress: fraction }),
+              docType: typesRef.current.get(id),
             });
+            // The server's own words about the study document, whether it was made or refused.
+            const note = documentNote(saved?.os_document);
+            if (note) toast.message(note);
             // Held at 'done' rather than removed: the real row isn't listed
             // until the refetch below, and the tile shouldn't blink out
             // in between.
@@ -136,7 +143,7 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
     }
   }, [patch, forget]);
 
-  const enqueueUploads = useCallback((files: File[], folder: string) => {
+  const enqueueUploads = useCallback((files: File[], folder: string, docType?: string) => {
     if (files.length === 0) return;
 
     const records = files.map((file): PendingUpload => {
@@ -147,6 +154,7 @@ export function useUploadQueue(onUploaded: () => Promise<void>): UploadQueue {
         id,
         folder ? new File([file], `${folder}/${file.name}`, { type: file.type }) : file,
       );
+      if (docType) typesRef.current.set(id, docType);
       const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
       if (previewUrl) previewsRef.current.set(id, previewUrl);
       return {

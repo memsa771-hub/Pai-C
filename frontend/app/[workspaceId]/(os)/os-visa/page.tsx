@@ -3,6 +3,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { OsHeader } from '@/components/os/os-header';
+import { useMyPlan } from '@/components/os/my-plan-context';
+import { NotInPlan } from '@/components/os/not-in-plan';
+import { inPlan, pageNoun, pageTitle } from '@/lib/os-my-plan';
 import { PackView } from '@/components/os/pack';
 import { PackDetails } from '@/components/os/pack-details';
 import { VisaChoice, VisaFunds } from '@/components/os/visa-funds';
@@ -41,6 +44,8 @@ function save(blob: Blob, filename: string) {
 /** PAI OS visa file: /<workspace>/os-visa (Slice 6b spec §5). Hidden unless NEXT_PUBLIC_OS_ENABLED=true. */
 export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
+  const { on, plan } = useMyPlan();  // P1-T9: the route's own page words; off, today's
+  const outOfPlan = on && !inPlan(plan, 'visa');  // a page the route does not have makes none of its own calls
   const { user, idToken, loading } = usePaiAuth();
   const [visa, setVisa] = useState<OsVisa | null>(null);
   const [details, setDetails] = useState(false);
@@ -54,7 +59,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
   ), []);
 
   useEffect(() => {
-    if (!OS_UI_ENABLED || loading) return;
+    if (!OS_UI_ENABLED || loading || outOfPlan) return;
     if (!user) {
       goToSignIn();
       return;
@@ -63,7 +68,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
     workspaceApi.configure(workspaceId, '', idToken || undefined);
     load();
     workspaceApi.getVault().then(setProfile, () => setProfile(null));
-  }, [loading, user, idToken, workspaceId, load]);
+  }, [outOfPlan, loading, user, idToken, workspaceId, load]);
 
   const building = visa?.status === 'building';
   useEffect(() => {
@@ -89,9 +94,11 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
     }
   }
 
+  if (outOfPlan) return <NotInPlan workspaceId={workspaceId} />;
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <OsHeader workspaceId={workspaceId} current="os-visa" title="Your visa file" />
+      <OsHeader workspaceId={workspaceId} current="os-visa" title={pageTitle(plan, 'visa', 'Your visa file')} />
       {error && <p role="alert" className="break-words text-sm text-destructive">{error}</p>}
       {visa === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -111,7 +118,7 @@ export default function OsVisaPage({ params }: { params: Promise<{ workspaceId: 
                      onReduction={(amount) => act(() => workspaceApi.saveOsVisaChoice({ reduction: amount }),
                                                   'Could not save the amount. Please try again.')} />
           {visa.status !== 'no_choice' && (
-            <PackView pack={asPack(visa)} busy={busy} noun="visa file"
+            <PackView pack={asPack(visa)} busy={busy} noun={pageNoun(plan, 'visa', 'visa file')}
                     profileDegree={profileDegreeField(profile)} profileHref={`/${workspaceId}?view=profile`}
                       notice="You apply and pay yourself. We never send anything for you."
                       onTick={(key, ticked) => act(() => workspaceApi.updateOsVisaItems(

@@ -5,6 +5,7 @@ emails are captured instead of sent. Skipped when the emulator is not running:
     firebase emulators:start --only auth --project demo-pai
 """
 
+from datetime import datetime, timezone
 import os
 import re
 import time
@@ -221,9 +222,10 @@ def test_account_deletion_needs_a_recent_sign_in(client, mail, monkeypatch):
     assert mail == []
 
 
+@pytest.mark.req("R-10")
 def test_account_deletion_erases_the_data_disables_firebase_and_emails(client, mail):
     from firebase_admin import auth as firebase_admin_auth
-    from app.models import VaultFact, Workspace
+    from app.models import GuardianConsent, VaultFact, Workspace
     from app.security import firebase_auth
 
     Base.metadata.create_all(client.student.engine)  # every table a deleted workspace cascades into
@@ -231,6 +233,9 @@ def test_account_deletion_erases_the_data_disables_firebase_and_emails(client, m
     with client.student.factory() as db:
         db.add(VaultFact(workspace_id=workspace_id, field_key="objective", value={"value": "nursing"},
                          source_type="conversation"))
+        db.add(GuardianConsent(workspace_id=workspace_id, decision_version=1, email="parent@example.test",
+                               token_hash="deletion-test-hash", text_version="v1",
+                               expires_at=datetime(2026, 11, 8, tzinfo=timezone.utc)))
         db.commit()
         uid = db.scalar(select(User.firebase_uid).where(User.email == "leave.me@example.test"))
 
@@ -242,6 +247,7 @@ def test_account_deletion_erases_the_data_disables_firebase_and_emails(client, m
         assert db.get(Workspace, workspace_id) is None
         assert db.scalars(select(VaultFact).where(VaultFact.workspace_id == workspace_id)).all() == []
         assert db.scalars(select(AuthDevice)).all() == []
+        assert db.scalars(select(GuardianConsent).where(GuardianConsent.workspace_id == workspace_id)).all() == []
     # Firebase keeps the account, turned off; it cannot sign in and its token is dead.
     assert firebase_admin_auth.get_user(uid, app=firebase_auth._app()).disabled
     assert sign_in("leave.me@example.test")["error"]["message"] == "USER_DISABLED"

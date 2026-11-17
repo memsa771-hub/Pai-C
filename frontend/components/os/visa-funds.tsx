@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { factLevel } from '@/lib/os-my-plan';
+import { FactSource } from './fact-source';
+import { useMyPlan } from './my-plan-context';
 import { admittedRefs, fundsLine, programmeLabel, type OsFunds, type OsVisa } from '@/lib/os-visa';
 
 /** Which programme the visa file is for (Slice 6b spec S6b-D8): one from the plan, pre-selected if only one admitted
@@ -41,15 +44,17 @@ export function VisaChoice({ visa, busy, onChoose }: { visa: OsVisa; busy: boole
 /** What the student must show for the visa (S6b-D4): the amount, its status and source, and other proof. */
 export function VisaFunds({ funds, busy, onReduction }: { funds: OsFunds | null; busy: boolean;
                                                          onReduction: (amount: number) => void }) {
+  const { on } = useMyPlan();
   const [amount, setAmount] = useState(String(funds?.reduction ?? 0));
   return (
     <section aria-label="Funds" className="rounded-2xl border bg-card p-4 shadow-card text-sm">
       <h2 className="mb-1 font-semibold">Funds you need: {fundsLine(funds)}</h2>
       {funds && funds.required !== null && (
         <p className="break-words text-muted-foreground">
-          {funds.status !== 'confirmed' && <span className="text-amber-900">⚠ {funds.status} </span>}
+          {!on && funds.status !== 'confirmed' && funds.status !== 'verified' && <span className="text-amber-900">⚠ {funds.status} </span>}
           {funds.reduction > 0 && <>after {funds.reduction.toLocaleString('en-US')} {funds.currency_label} of other proof </>}
-          {funds.url && (
+          {on && <FactSource level={factLevel(funds.status)} url={funds.url} />}
+          {!on && funds.url && (
             <a href={funds.url} target="_blank" rel="noopener noreferrer"
                className="text-primary underline-offset-2 hover:underline">source</a>
           )}

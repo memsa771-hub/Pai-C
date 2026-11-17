@@ -1,11 +1,21 @@
 """Playbook schema: a versioned route template, validated at load time (spec §4.1)."""
 
+import re
+from datetime import date
 from string import Formatter
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
+from app.os.contracts.student_facts import FACT_KEY
 from app.os.eligibility.rules import EligibilityRules, SelfServe
 
 
@@ -28,9 +38,13 @@ class Dependency(_Model):
 
 
 class Condition(_Model):
+    """`of: system` (P3-T1, ADR-001 D5): the fact is read from the step's admission system (resolved from the registry
+    by the compiler, P3-T4), not from the route or the programme. Only in a family playbook, on a step that has a
+    system in scope."""
     fact: str
     in_: list[str] | None = Field(None, alias="in")
     present: bool | None = None
+    of: Literal["system"] | None = None
 
     @model_validator(mode="after")
     def _one_test(self) -> "Condition":
@@ -44,6 +58,12 @@ NOTE_FIELDS = frozenset({"date", "due", "days", "weeks", "days_left"})
 
 def placeholders(note: str) -> set[str]:
     return {name for _, name, _, _ in Formatter().parse(note) if name is not None}
+
+
+def formatted_placeholders(text: str) -> list[str]:
+    """Placeholders with a conversion or a format spec (`{system!r}`, `{body:>10}`): never allowed in a title."""
+    return [f"{{{name}{'!' + conv if conv else ''}{':' + spec if spec else ''}}}"
+            for _, name, spec, conv in Formatter().parse(text) if name is not None and (spec or conv)]
 
 
 class Anchor(_Model):
@@ -60,6 +80,9 @@ class Anchor(_Model):
     date); `note_passed_earliest`: the same when the date is the earliest of several programmes'."""
     fact: str
     programme: Literal["visa"] | None = None
+    # P3-T1 (ADR-001 D5): the date comes from the step's admission system, or from that system's calendar, both
+    # resolved from the registry (P3-T4). Only in a family playbook, on a step that has a system in scope.
+    of: Literal["system", "system_calendar"] | None = None
     note: str | None = None
     note_earliest: str | None = None  # the note when the date is the earliest of several programmes' (provisional)
     waiting: str | None = None
@@ -92,6 +115,66 @@ class LeadTime(_Model):
         return self
 
 
+# P3-T1 (ADR-001 D5): names a step title may hold, filled from registry names at compile time (P3-T4), by the fan-out
+# that brings them into scope. A step per programme has one place, so its system, body and institution; a step per
+# system has its system and that system's body, but no single institution. A step that does not fan out has none.
+TITLE_FIELDS: dict[str, frozenset[str]] = {
+    "none": frozenset(),
+    "programme": frozenset({"system", "body", "institution"}),
+    "system": frozenset({"system", "body"}),
+}
+FAMILY_CODE = r"^[a-z][a-z0-9_]*$"  # a registry / allow-list family code; its release flag is derived from it (D14)
+
+REQUEST_TEMPLATES = ("provide", "which_is_right", "result_expected")  # template keys of the compiler's request steps
+Evidence = Literal["stated", "shown", "confirmed"]
+
+
+class Need(_Model):
+    """What a step needs before it can run (R-17, R-18): a student fact (a StudentFacts key) or a document (a document
+    type), held at least at `evidence`. A document is never merely `stated`, and no reviewer confirms one in P1, so a
+    document need is `shown` (checked by the playbook)."""
+    fact: str | None = Field(None, pattern=FACT_KEY)
+    document: str | None = Field(None, pattern=r"^[a-z_][a-z0-9_]*$")
+    evidence: Evidence
+
+    @model_validator(mode="after")
+    def _one_ref(self) -> "Need":
+        if (self.fact is None) == (self.document is None):
+            raise ValueError("a need names exactly one of 'fact' or 'document'")
+        return self
+
+    @property
+    def ref(self) -> str:
+        return self.fact or self.document or ""
+
+    @property
+    def kind(self) -> Literal["fact", "document"]:
+        return "fact" if self.fact is not None else "document"
+
+
+class Expected(_Model):
+    """`fact`: a route Knowledge fact holding the date the result comes out (the calendar); `title`: the step shown
+    until then (R-20). With `calendar` (a registry calendar id, `cal:<slug>`), `fact` is instead the date field of that
+    official calendar, read by its registry id (P2-T11); without it the ask reads the route fact exactly as before."""
+    fact: str
+    title: str = Field(min_length=1)
+    calendar: str | None = Field(default=None, pattern=r"^cal:[a-z0-9][a-z0-9_-]*$")
+
+
+class Ask(_Model):
+    """The route's words for one request, keyed in `Playbook.asks` by the fact key or the document type: the title of
+    the provide step per evidence level (`stated`, `shown`, `confirmed`), of the which-is-right step, and the
+    provide step's own duration. `expected`: the result-expected step, on a fact only. `citations`: where the route
+    says this is required; with `require_citations` every ask a need uses has one (never an invented requirement)."""
+    stated: str | None = None
+    shown: str | None = None
+    confirmed: str | None = None
+    which_is_right: str | None = None
+    duration_days: int = Field(1, ge=0)
+    expected: Expected | None = None
+    citations: list[Citation] = []
+
+
 class TaskTemplate(_Model):
     template_key: str
     task_type: str
@@ -99,7 +182,7 @@ class TaskTemplate(_Model):
     kind: Literal["work", "student"]
     inbox_kind: Literal["provide", "approve", "act", "choose"] | None = None
     depends_on: list[Dependency] = []
-    fan_out: Literal["none", "programme"] = "none"
+    fan_out: Literal["none", "programme", "system"] = "none"  # `system`: P3-T1, a family playbook only (D5)
     condition: Condition | None = None
     anchor: Anchor | None = None
     lead_time: LeadTime | None = None
@@ -109,6 +192,7 @@ class TaskTemplate(_Model):
     protected: bool = False
     citations: list[Citation] = []
     citation_from_fact: str | None = None
+    needs: list[Need] = []  # P1-T8: the facts and documents this step needs, each at an evidence level (R-18)
 
     @model_validator(mode="after")
     def _inbox_kind_matches_kind(self) -> "TaskTemplate":
@@ -122,7 +206,50 @@ class TaskTemplate(_Model):
         if self.anchor and (self.anchor.note_passed or self.anchor.note_passed_earliest) and not self.lead_time:
             raise ValueError(f"anchor.note_passed needs a lead_time: without one the date cannot pass early "
                              f"({self.template_key})")
+        self._check_system_scope()
         return self
+
+    @property
+    def title_placeholders(self) -> set[str]:
+        return placeholders(self.title)
+
+    @property
+    def uses_systems(self) -> bool:
+        """The step needs the registry's admission systems resolved (P3-T1, D5): it fans out per system, reads a fact
+        or a date `of` its system, or names a registry name in its title."""
+        return (self.fan_out == "system" or bool(self.condition and self.condition.of)
+                or bool(self.anchor and self.anchor.of) or bool(self.title_placeholders))
+
+    def _check_system_scope(self) -> None:
+        """A system is in scope only on a step that fans out per system, or per programme (a place resolves to the one
+        system that admits it). Without one, `of: system`, `of: system_calendar` and title names are misuse."""
+        key = self.template_key
+        in_scope = self.fan_out in ("system", "programme")
+        if self.anchor and self.anchor.of and self.anchor.programme:
+            raise ValueError(f"anchor.of and anchor.programme name two sources for one date; keep one ({key})")
+        if self.anchor and self.anchor.of and not in_scope:
+            raise ValueError(f"anchor.of: {self.anchor.of} needs a system in scope: fan the step out per system or "
+                             f"per programme ({key})")
+        if self.condition and self.condition.of and not in_scope:
+            raise ValueError(f"condition.of: {self.condition.of} needs a system in scope: fan the step out per system "
+                             f"or per programme ({key})")
+        try:
+            names = self.title_placeholders
+            formatted = formatted_placeholders(self.title)
+        except ValueError as e:
+            raise ValueError(f"title of {key} is not a valid template ({e})") from None
+        if formatted:
+            raise ValueError(f"title placeholder {formatted} of {key} has a conversion or format spec; write the plain "
+                             f"name only")
+        for name in sorted(names):
+            if name not in TITLE_FIELDS["programme"]:
+                raise ValueError(f"unknown title placeholder {{{name}}} in {key} (known: "
+                                 f"{sorted(TITLE_FIELDS['programme'])})")
+        allowed = TITLE_FIELDS[self.fan_out]
+        outside = sorted(names - allowed)
+        if outside:
+            raise ValueError(f"title placeholder {outside} of {key} is not in scope on a step with fan_out: "
+                             f"{self.fan_out} (in scope: {sorted(allowed) or 'none'})")
 
 
 class Constant(_Model):
@@ -137,16 +264,78 @@ class Route(_Model):
     level: str
 
 
+PAGE_KEYS = ("start", "inbox", "documents", "programmes", "statements", "pack", "visa")  # the OS's own pages
+
+
+class Page(_Model):
+    """One page of the student's plan on this route: the OS page `key` (route `os-<key>`), its menu `label`, its
+    heading `title` and, on `pack`/`visa`, the `noun` the page uses for what it builds (R-52)."""
+    key: Literal["start", "inbox", "documents", "programmes", "statements", "pack", "visa"]
+    label: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    noun: str | None = None
+
+
+class SourceCheck(_Model):
+    """The day a playbook source (`S<n>`) was last read against its page (R-54), and whether the reviewer of that
+    reading confirmed it. An unconfirmed source is shown as "not confirmed", never as checked and settled."""
+    checked: date
+    confirmed: bool = True
+
+
+_SOURCE_ID = re.compile(r"S\d+")
+
+
+class AppliesTo(_Model):
+    """P2-D25 / R-65: the intakes a playbook version is for. `term` (any term when left out) and `from_year`: the first
+    intake year it applies to. A version with no `applies_to` applies to every intake. Pinned plans do not move."""
+    term: str | None = None
+    from_year: int = Field(ge=2000)
+
+    @field_validator("term")
+    @classmethod
+    def _plain_term(cls, term: str | None) -> str | None:
+        if term is not None and not re.fullmatch(r"[a-z_]+", term):
+            raise ValueError(f"intake term '{term}' must be lowercase letters and underscores")
+        return term
+
+    def covers(self, term: str, year: int) -> bool:
+        return (self.term is None or self.term == term) and year >= self.from_year
+
+
 class Playbook(_Model):
     key: str
     version: int = Field(ge=1)
     route: Route
+    # P3-T1 (ADR-001 D1): the registry and allow-list family code this playbook serves. Code maps a playbook to a family
+    # only through this field. A playbook with it is offered for new plans only while its release flag is on (D14).
+    family: str | None = Field(None, pattern=FAMILY_CODE)
     default_timezone: str
     require_citations: bool = False
+    applies_to: AppliesTo | None = None  # P2-D25: the intakes this version is for; None = all
+    intake_terms: list[str] = []  # the intake terms the route offers (D-g), e.g. one lowercase word per term
     constants: dict[str, Constant] = {}
     tasks: list[TaskTemplate]
     eligibility: EligibilityRules | None = None  # Slice 4: the route's eligibility checks (S4-D2)
     self_serve: SelfServe | None = None  # Slice 4: what the route builder completes (S4-D9)
+    asks: dict[str, Ask] = {}  # P1-T8: the route's words for each request, by fact key or document type
+    # Display data (P1-T9). Never in the playbook file itself: the loader joins it from `pages/<key>.v<n>.yaml`
+    # so a file a running plan pins stays as it was (invariant 10). Compile ignores both.
+    pages: list[Page] | None = None  # None: not declared
+    sources: dict[str, SourceCheck] = {}
+
+    @property
+    def declares_needs(self) -> bool:
+        """A v2 playbook: some step needs a student fact or document. Chosen only while the student's needs gate is on."""
+        return any(t.needs for t in self.tasks)
+
+    @field_validator("intake_terms")
+    @classmethod
+    def _plain_terms(cls, terms: list[str]) -> list[str]:
+        for term in terms:
+            if not re.fullmatch(r"[a-z_]+", term):  # the same shape as IntakeRef.term
+                raise ValueError(f"intake term '{term}' must be lowercase letters and underscores")
+        return terms
 
     @field_validator("default_timezone")
     @classmethod
@@ -156,6 +345,13 @@ class Playbook(_Model):
         except (ZoneInfoNotFoundError, ValueError):
             raise ValueError(f"unknown timezone '{tz}'") from None
         return tz
+
+    @model_validator(mode="after")
+    def _applies_to_a_declared_term(self) -> "Playbook":
+        if self.applies_to and self.applies_to.term and self.intake_terms \
+                and self.applies_to.term not in self.intake_terms:
+            raise ValueError(f"applies_to term '{self.applies_to.term}' is not one of intake_terms")
+        return self
 
     @model_validator(mode="after")
     def _references_resolve(self) -> "Playbook":
@@ -184,7 +380,96 @@ class Playbook(_Model):
                                          f"be in whole weeks (a multiple of 7), or the note must say {{days}}")
             if self.require_citations and not t.citations and not t.citation_from_fact:
                 raise ValueError(f"task {t.template_key} needs a citation (require_citations is on)")
+        self._check_family_units()
+        self._durations_are_sourced_or_estimated()
+        self._check_needs()
+        self._check_pages()
+        self._check_sources()
         return self
+
+    @property
+    def uses_systems(self) -> bool:
+        """Some step needs the registry's admission systems resolved (P3-T1, D5)."""
+        return any(t.uses_systems for t in self.tasks)
+
+    def _check_family_units(self) -> None:
+        """P3-T1 (D5): systems, their calendars and registry names in titles come from the registry by the playbook's
+        family; a playbook without `family` cannot use them."""
+        if self.family is not None:
+            return
+        misuse = sorted(t.template_key for t in self.tasks if t.uses_systems)
+        if misuse:
+            raise ValueError(f"{misuse} use fan_out: system, anchor.of, condition.of or a title placeholder: these "
+                             f"need the playbook's 'family' (the registry family whose systems they read)")
+
+    def _durations_are_sourced_or_estimated(self) -> None:
+        """R-30: a duration without an official figure is marked `estimate: true`. A constant a step uses as its
+        duration or lead time, or that a note names, must carry a citation or the estimate flag; one with neither is
+        refused, so an unsourced figure can never reach the student as if it were official."""
+        used: set[str] = set()
+        for t in self.tasks:
+            used |= {n for n in (t.lead_time.constant if t.lead_time else None, t.duration_constant) if n}
+            for note in t.anchor.notes() if t.anchor else ():
+                used |= placeholders(note or "") & set(self.constants)
+        bare = sorted(n for n in used if not self.constants[n].estimate and not self.constants[n].citations)
+        if bare:
+            raise ValueError(f"constant(s) {bare} are durations or named in a note: cite the source or mark "
+                             f"them `estimate: true` (R-30)")
+
+    def _check_needs(self) -> None:
+        reserved = sorted(t.template_key for t in self.tasks if t.template_key in REQUEST_TEMPLATES)
+        if reserved:
+            raise ValueError(f"template_key {reserved} is reserved for the steps PAI adds for a missing fact")
+        documents = {n.document for t in self.tasks for n in t.needs if n.document}
+        used = {n.ref for t in self.tasks for n in t.needs}
+        unused = sorted(set(self.asks) - used)
+        if unused:
+            raise ValueError(f"'asks' entry {unused} is not needed by any step")
+        for t in self.tasks:
+            refs = [n.ref for n in t.needs]
+            twice = sorted({r for r in refs if refs.count(r) > 1})
+            if twice:
+                raise ValueError(f"{t.template_key} lists the need {twice} more than once")
+            for need in t.needs:
+                ask = self.asks.get(need.ref)
+                if ask is None:
+                    raise ValueError(f"{t.template_key} needs {need.ref} but it has no entry in 'asks'")
+                if need.kind == "document" and need.evidence != "shown":
+                    raise ValueError(f"a document need must be 'shown' ({t.template_key}: {need.ref}): a paper is "
+                                     f"never merely stated, and no reviewer confirms a document")
+                if getattr(ask, need.evidence) is None:
+                    raise ValueError(f"{t.template_key} needs {need.ref} '{need.evidence}' but its 'asks' entry has "
+                                     f"no '{need.evidence}' title")
+                if self.require_citations and not ask.citations:
+                    raise ValueError(f"the 'asks' entry of {need.ref} needs a citation (require_citations is on)")
+                if need.kind == "fact" and not ask.which_is_right:
+                    raise ValueError(f"the 'asks' entry of {need.ref} needs a which_is_right title (two sources may "
+                                     f"disagree)")
+        for ref, ask in self.asks.items():
+            if ask.expected is not None and ref in documents:
+                raise ValueError(f"'asks' entry {ref}: 'expected' (a result still to come) belongs on a fact, not a "
+                                 f"document")
+
+    def _check_pages(self) -> None:
+        keys = [p.key for p in self.pages or []]
+        dupes = sorted({k for k in keys if keys.count(k) > 1})
+        if dupes:
+            raise ValueError(f"duplicate page key {dupes}")
+        if "visa" in keys and self.route.destination == self.route.origin:
+            raise ValueError("a visa page needs a route that leaves the country (destination differs from origin)")
+        for p in self.pages or []:
+            if p.noun is not None and p.key not in ("pack", "visa"):
+                raise ValueError(f"page '{p.key}' cannot have a noun (only pack and visa)")
+
+    def _check_sources(self) -> None:
+        if not self.sources:
+            return
+        cited = {c.source for t in self.tasks for c in t.citations} | \
+                {c.source for k in self.constants.values() for c in k.citations} | \
+                {c.source for a in self.asks.values() for c in a.citations}
+        missing = sorted(s for s in cited if _SOURCE_ID.fullmatch(s) and s not in self.sources)
+        if missing:
+            raise ValueError(f"source {missing} is cited but has no checked date in 'sources'")
 
     def task(self, template_key: str) -> TaskTemplate:
         return next(t for t in self.tasks if t.template_key == template_key)

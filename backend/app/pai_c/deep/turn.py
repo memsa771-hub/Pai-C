@@ -8,7 +8,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from app.config import config
-from app.pai_c.deep.context import DeepContext, build_context
+from app.pai_c.deep.context import DeepContext, _json, build_context
 from app.pai_c.deep.polish import contains_blocked_script, polish_reply
 from app.pai_c.deep.prompts import load_prompt
 from app.pai_c.deep.turn_input import CounselorTurnInput
@@ -99,7 +99,8 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
     polish_ms = 0
     violations = []
     retry_line = ""
-    from app.pai_c.voice.guards import repeated_questions, remove_repeated, question_sentences, repeats_previous_reply
+    from app.pai_c.voice.guards import (repeated_questions, remove_repeated, question_sentences,
+                                        repeats_previous_reply, drop_repeat_greeting)
     for attempt in range(2):
         started = time.monotonic()
         raw = await chat_completion(role="counselor",
@@ -116,7 +117,9 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
             break
         if contains_blocked_script(reply, config.PAI_LANGUAGE_BLOCKED_SCRIPTS):
             if attempt == 0:
-                retry_line = load_prompt("language_retry")
+                retry_line = (load_prompt("language_retry") + "\n<language_replacement>"
+                              + _json({"replacement": config.PAI_LANGUAGE_BLOCKED_SCRIPT_REPLACEMENT})
+                              + "</language_replacement>")
                 polish_ms += int((time.monotonic() - started) * 1000)
                 continue
             reply, action, moves = config.PAI_COUNSELOR_FALLBACK_REPLY, {"type": "none"}, []
@@ -146,6 +149,10 @@ async def run_deep_turn(db, turn: CounselorTurnInput, *,
         reply, grounding_violations = guard_reply(reply, raw, context.world_facts, student_sections + turn.student_text)
         violations.extend(grounding_violations)
         reply = polish_reply(reply)
+        greeted = drop_repeat_greeting(reply, history, student_text=turn.student_text)
+        if greeted != reply:
+            reply = greeted
+            violations.append("greeting_removed")
         avoid = context.plan.avoid_questions if context.plan is not None else []
         repeated = repeated_questions(reply, history, avoid)
         if repeated:

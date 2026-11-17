@@ -197,7 +197,8 @@ def test_store_is_per_tenant(engine, clean):
     assert a.has("stu-1", 1) and not a.has("stu-1", 2) and not b.has("stu-1", 1) and not a.has("stu-2", 1)
 
 
-def test_migration_up_down_up(os_db):
+def test_migration_up_down_up(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     from sqlalchemy import create_engine, inspect
 
     from app.os.db import OS_SCHEMA

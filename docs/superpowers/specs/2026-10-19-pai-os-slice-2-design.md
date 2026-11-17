@@ -237,6 +237,10 @@ A daily DBOS scheduled job, `os.freshness`:
 | Worker crash | DBOS resumes the research workflow | no duplicate facts or agent-run rows |
 | Research contradicts a confirmed fact | value kept; `conflict_note` + `fact_conflict` event | admin decides |
 
+> **Note (2026-11-14, P2-T22):** with a source guard, `not_official` is checked for the asked scope before the cache and
+> is not stored in `os_pages`: the refusal depends on the scope, `os_pages` is keyed by URL only, and a stored refusal
+> would block (or overwrite the cached page of) a scope that lists the host. Without a guard, the row above still holds.
+
 ## 7. Invariants touched
 
 - 1: research writes facts, never plan state. Plans change only through `kernel.revise` from `_after_fact_change`.

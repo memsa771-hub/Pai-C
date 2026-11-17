@@ -1,0 +1,226 @@
+# W1 check 2: independent review of the 8 unlisted source URLs (95 cited rows).
+# All documents downloaded in this session with curl into .local-ci/work/W1c2/docs/ (2026-11-13).
+# Text: pdftotext -layout (poppler, Docker debian:bookworm-slim); HTML stripped of tags with Python.
+# Image pages: pdftoppm render + tesseract OCR (OCR was poor because of watermark), then read by
+# viewing the rendered PNG with the Read tool. Lines below are copied from the text layer (whitespace
+# collapsed) or transcribed from the viewed image where read_method says so.
+checker: check2
+checked: 2026-11-13
+urls:
+  - url: https://www.uhs.edu.pk/downloads/Prospectus25-26.pdf
+    is_official_list: yes
+    publisher: University of Health Sciences (UHS) Lahore, admitting university for Punjab; admission policy annex is a Govt of Punjab SHC&ME Department notification
+    name_on_document: "Prospectus, Public Sector Medical and Dental Colleges in Punjab, Session 2025-26"
+    row_count: 71   # 21 public + 50 private
+    count_method: >-
+      Counted serial-numbered college lines in the four seat tables: "Seat Allocation for Session 2025-2026"
+      (text layer, PDF p.37 printed) Medical Colleges 1-17 + Dental Colleges 1-4 = 21 public (matches the
+      21-item alphabetical list i.-xxi. in clause 3); Annex-C PRIVATE SECTOR MBBS SEATS serials 1-32 and
+      Annex-D PRIAVTE BDS SEATS serials 1-18 (image pages, PDF pages 76-77) = 50 private. Private dental
+      sections of colleges already in Annex-C are counted again as separate BDS lines. Public-only count = 21.
+    date: 2025-10-22   # printed on cover: "notified vide No. SO(ME-II)2-1/2025 dated 22nd October 2025" (policy notification date). PDF metadata: ModDate 2025-11-10, no CreationDate.
+    read_method: "public tables: curl + pdftotext -layout (text layer); private Annex-C/D: pdftoppm 130 dpi + tesseract (unreadable) + visual reading of PNG with Read tool"
+    rows:
+      - {inst_id: PB-MED-001, on_list: yes, line: "1 King Edward Medical College, Lahore 313 2 - - 4 - 1 3 - - 2 - 325"}
+      - {inst_id: PB-MED-002, on_list: yes, line: "2 Allama Iqbal Medical College, Lahore 314 2 - - 4 - 1 3 - - 1 - 325"}
+      - {inst_id: PB-MED-003, on_list: yes, line: "3 Nishtar Medical College, Multan 268 2 - 18 4 - 3 3 1 (KPK) - 1 - 300"}
+      - {inst_id: PB-MED-004, on_list: yes, line: "4 Fatima Jinnah Medical College, Lahore 284 2 - - 4 - 3 3 1 (Balochistan) 2 1 - 300"}
+      - {inst_id: PB-MED-005, on_list: yes, line: "5 Services Institute of Medical Sciences, Lahore 211 2 - - 2 - 1 2 - - 2 - 220"}
+      - {inst_id: PB-MED-006, on_list: yes, line: "6 Punjab Medical College, Faisalabad 270 2 - 10 4 4 3 3 1 (Balochistan) 2 1 - 300"}
+      - {inst_id: PB-MED-007, on_list: yes, line: "7 Rawalpindi Medical College, Rawalpindi 325 2 - - 4 4 4 7 1 (Balochistan) 2 1 - 350"}
+      - {inst_id: PB-MED-008, on_list: yes, line: "8 Quaid-e-Azam Medical College, Bahawalpur 297 2 - 6 4 - 4 8 1 (Balochistan) 2 1 - 325"}
+      - {inst_id: PB-MED-009, on_list: yes, line: "9 Sheikh Zayed Medical College, Rahim Yar Khan 130 2 1 15 3 - 2 3 - 2 2 - 160 (name wrapped over two lines)"}
+      - {inst_id: PB-MED-010, on_list: yes, line: "10 Sargodha Medical College, Sargodha 95 1 - - 5 - 2 3 - 2 2 10 120"}
+      - {inst_id: PB-MED-011, on_list: yes, line: "11 Nawaz Sharif Medical College, Gujrat 49 - - - 2 - 1 1 - - 2 6 61"}
+      - {inst_id: PB-MED-012, on_list: yes, line: "12 Sahiwal Medical College, Sahiwal 91 - - - 5 4 2 4 - 2 2 10 120"}
+      - {inst_id: PB-MED-013, on_list: yes, line: "13 Gujranwala Medical College, Gujranwala 91 - - - 5 4 2 4 - 2 2 10 120"}
+      - {inst_id: PB-MED-014, on_list: yes, line: "14 D.G. Khan Medical College, Dera Ghazi Khan 85 - - 5 5 5 3 3 - 2 2 10 120"}
+      - {inst_id: PB-MED-015, on_list: yes, line: "15 Khawaja Muhammad Safdar Medical College, Sialkot 95 - - - 5 - 3 3 - 2 2 10 120 (name wrapped over two lines)"}
+      - {inst_id: PB-MED-016, on_list: yes, line: "16 Ameer-ud-Din Medical College, Lahore 104 - - - 2 - 1 2 - - 1 - 110"}
+      - {inst_id: PB-MED-017, on_list: yes, line: "17 Narowal Medical College, Narowal 99 - - - - - - - - - 1 - 100"}
+      - {inst_id: PB-MED-018, on_list: yes, line: "1 de’Montmorency College of Dentistry, Lahore 96 1 - 6 2 - 1 2 - - 2 - 110"}
+      - {inst_id: PB-MED-019, on_list: yes, line: "2 Nishtar Institute of Dentistry, Multan 40 - - 6 1 4 1 2 - - 1 10 65"}
+      - {inst_id: PB-MED-020, on_list: yes, line: "3 Dental Institute, Punjab Medical College, Faisalabad 49 - - - 1 2 1 1 - - 1 10 65 (name wrapped over two lines)"}
+      - {inst_id: PB-MED-021, on_list: yes, line: "4 * Fatima Jinnah Institute of Dental Sciences, Lahore 50 - - - - - - - - - - - 50* (* subject to the approval by the PM&DC)"}
+    notes: >-
+      Cover says Public Sector prospectus, but the reproduced Govt of Punjab admission policy notification
+      (image pages) carries Annex-C/D private seat tables, so the PDF lists 71 institutions in all.
+      All 21 cited rows found; cited seat numbers (open merit column) match. All 21 also appear in the
+      2026-27 prospectus (next URL) with changed seat numbers (e.g. KEMC 338 open merit there).
+
+  - url: https://www.uhs.edu.pk/images/Prospectus26.pdf
+    is_official_list: yes
+    publisher: University of Health Sciences (UHS) Lahore, admitting university for Punjab; annexes are Govt of Punjab SHC&ME Department notification NO.SO(ME-II)2-1/2026
+    name_on_document: "Prospectus MBBS & BDS Programme, Public Sector Medical and Dental Colleges in Punjab, Session 2026-2027"
+    row_count: 75   # 24 public + 51 private
+    count_method: >-
+      Counted serial-numbered college lines: "Seat Allocation for Session 2026-2027" (text layer, printed p.38)
+      Medical Colleges 1-19 + Dental Colleges (BDS Seats) 1-5 = 24 public (matches the 24-item alphabetical
+      list i.-xxiv. in clause 3); Annex-III PRIVATE SECTOR MBBS SEATS serials 1-33 (Total 4400) and Annex-IV
+      PRIAVTE BDS SEATS serials 1-18 (Total 1100), image pages = PDF pages 77-78 = 51 private. Dental sections
+      of private colleges counted as separate BDS lines. Public-only count = 24.
+    date: 2026-10-14   # printed: "notified vide SO(ME-II)2-1/2026, dated 14th October, 2026" (policy notification). PDF metadata: ModDate 2026-10-19, no CreationDate.
+    read_method: "public tables: curl + pdftotext -layout (text layer); private Annex-III/IV: pdftoppm 150 dpi + tesseract (garbled by watermark) + visual reading of PNG with Read tool"
+    rows:
+      - {inst_id: PB-MED-022, on_list: yes, line: "18 *Maryam Nawaz Sharif Medical College, Mianwali *100 - - - - - - - - - - - - 100* (name wrapped); clause 3: \"xi. *Maryam Nawaz Sharif Medical College, Mianwali\""}
+      - {inst_id: PB-MED-023, on_list: yes, line: "19 *Medical College, University of Rasul, Mandi Bahauddin *100 100* (name wrapped); clause 3: \"xii. *Medical College, University of Rasul, Mandi Mandi Bahauddin\""}
+      - {inst_id: PB-MED-024, on_list: yes, line: "5 *Quaid-e-Azam Medical & Dental College Bahawalpur 50 - - - - - - - - - - - - 50*; clause 3 names it \"xviii. *Quaid-e-Azam Dental College, Bahawalpur\""}
+      - {inst_id: PB-MED-025, on_list: yes, line: "1 Akhtar Saeed Medical College, Rawalpindi 100"}
+      - {inst_id: PB-MED-026, on_list: yes, line: "2 Shalamar Medical & Dental College, Lahore 150"}
+      - {inst_id: PB-MED-027, on_list: yes, line: "3 Sharif Medical & Dental College, Lahore 150"}
+      - {inst_id: PB-MED-028, on_list: yes, line: "4 Lahore Medical & Dental College, Lahore 150"}
+      - {inst_id: PB-MED-029, on_list: yes, line: "5 Rashid Latif Medical College, Lahore 150"}
+      - {inst_id: PB-MED-030, on_list: yes, line: "6 Akhtar Saeed Medical & Dental College, Lahore 150"}
+      - {inst_id: PB-MED-031, on_list: yes, line: "7 FMH College of Medicine & Dentistry, Lahore 150"}
+      - {inst_id: PB-MED-032, on_list: yes, line: "8 Al-Aleem Medical College, Lahore 150"}
+      - {inst_id: PB-MED-033, on_list: yes, line: "9 RLKU Medical & Dental College, Lahore 100"}
+      - {inst_id: PB-MED-034, on_list: yes, line: "10 Central Park Medical College, Lahore 150"}
+      - {inst_id: PB-MED-035, on_list: yes, line: "11 Rahbar Medical & Dental College, Lahore 150"}
+      - {inst_id: PB-MED-036, on_list: yes, line: "12 University College of Medicine & Dentistry, Lahore (University of Lahore) 150"}
+      - {inst_id: PB-MED-037, on_list: yes, line: "13 Azra Naheed Medical College (Superior University), Lahore 150"}
+      - {inst_id: PB-MED-038, on_list: yes, line: "14 Continental Medical College, Lahore 100"}
+      - {inst_id: PB-MED-039, on_list: yes, line: "15 Abu Umara Medical & Dental College, Lahore 100"}
+      - {inst_id: PB-MED-040, on_list: yes, line: "16 Avicenna Medical College, Lahore 150"}
+      - {inst_id: PB-MED-041, on_list: yes, line: "17 Bakhtawar Amin Medical & Dental College, Multan 150"}
+      - {inst_id: PB-MED-042, on_list: yes, line: "18 M. Islam Medical College, Gujranwala 150"}
+      - {inst_id: PB-MED-043, on_list: yes, line: "19 Aziz Fatima Medical & Dental College, Faisalabad 150"}
+      - {inst_id: PB-MED-044, on_list: yes, line: "20 Sialkot Medical College, Sialkot 100"}
+      - {inst_id: PB-MED-045, on_list: yes, line: "21 University Medical & Dental College, Faisalabad (For Women Only) (University of Faisalabad) 150"}
+      - {inst_id: PB-MED-046, on_list: yes, line: "22 Multan Medical & Dental College, Multan 150"}
+      - {inst_id: PB-MED-047, on_list: yes, line: "23 Niazi Medical & Dental College, Sargodha 150"}
+      - {inst_id: PB-MED-048, on_list: yes, line: "24 Pak Red Crescent Medical & Dental College, Kasur 100"}
+      - {inst_id: PB-MED-049, on_list: yes, line: "25 Rai Medical College, Sargodha 100"}
+      - {inst_id: PB-MED-050, on_list: yes, line: "26 Sahara Medical College, Narowal 150"}
+      - {inst_id: PB-MED-051, on_list: yes, line: "27 Shahida Islam Medical College, Lodhran 150"}
+      - {inst_id: PB-MED-052, on_list: yes, line: "28 Independent Medical College, Faisalabad 100"}
+      - {inst_id: PB-MED-053, on_list: yes, line: "29 Islam Medical College, Sialkot 150"}
+      - {inst_id: PB-MED-054, on_list: yes, line: "30 Amna Inayat Medical College, Sheikhupura 100"}
+      - {inst_id: PB-MED-055, on_list: yes, line: "31 Abwa Medical College, Faisalabad 150"}
+      - {inst_id: PB-MED-056, on_list: yes, line: "32 Watim Medical College, Rawalpindi 100*"}
+      - {inst_id: PB-MED-057, on_list: yes, line: "33 Queens Medical Colleges (For Girls only), Kasur 100"}
+      - {inst_id: PB-MED-058, on_list: yes, line: "1 Avicenna Dental College, Lahore 50"}
+      - {inst_id: PB-MED-059, on_list: yes, line: "2 Azra Naheed Dental College, Lahore 50"}
+      - {inst_id: PB-MED-060, on_list: yes, line: "3 Dental College, Bakhtawar Amin Medical & Dental College, Multan 75"}
+      - {inst_id: PB-MED-061, on_list: yes, line: "4 Dental College, Niazi Medical & Dental College, Sargodha 50"}
+      - {inst_id: PB-MED-062, on_list: yes, line: "5 Dental College, University College of Medicine & Dentistry, Lahore 75"}
+      - {inst_id: PB-MED-063, on_list: yes, line: "6 Dental Section, Akhtar Saeed Medical & Dental College, Lahore 75"}
+      - {inst_id: PB-MED-064, on_list: yes, line: "7 Dental Section, FMH College of Medicine & Dentistry, Lahore 75"}
+      - {inst_id: PB-MED-065, on_list: yes, line: "8 Dental Section, Lahore Medical & Dental College, Lahore 75"}
+      - {inst_id: PB-MED-066, on_list: yes, line: "9 Dental Section, Multan Medical & Dental College, Multan 50"}
+      - {inst_id: PB-MED-067, on_list: yes, line: "10 Dental Section, Sharif Medical & Dental College, Lahore 50"}
+      - {inst_id: PB-MED-068, on_list: yes, line: "11 Dental Section, University Medical & Dental College, Faisalabad (Female Only) 50"}
+      - {inst_id: PB-MED-069, on_list: yes, line: "12 Faryal Dental College, Sheikhupura 50"}
+      - {inst_id: PB-MED-070, on_list: yes, line: "13 Islam Dental College, Sialkot 50"}
+      - {inst_id: PB-MED-071, on_list: yes, line: "14 Margalla Institute of Health Sciences, Rawalpindi 75"}
+      - {inst_id: PB-MED-072, on_list: yes, line: "15 Rahbar College of Dentistry, Lahore 50"}
+      - {inst_id: PB-MED-073, on_list: yes, line: "16 Rashid Latif Dental College, Lahore 75"}
+      - {inst_id: PB-MED-074, on_list: yes, line: "17 Shahida Islam Dental College, Lodhran 75"}
+      - {inst_id: PB-MED-075, on_list: yes, line: "18 Watim Dental College, Rawalpindi 50"}
+    notes: >-
+      All 54 cited rows found. Private tables are scanned images (watermark "Downloaded from
+      https://hmmshealth.punjab.gov.pk/weborders.aspx"); lines were transcribed by eye, not OCR.
+      PB-MED-024 is printed under two names in this PDF (seat table vs clause 3 list).
+      Same PDF also contains the 21 public colleges cited against the 2025-26 URL.
+
+  - url: https://admissions.smbbmu.edu.pk/download/ProspectusMBBS-BDS2026-27.pdf
+    is_official_list: yes
+    publisher: Shaheed Mohtarma Benazir Bhutto Medical University (SMBBMU) Larkana, hosting the joint MBBS & BDS admissions prospectus of Public Sector Universities/Colleges, Sindh
+    name_on_document: "MBBS & BDS Admissions Prospectus, Academic Session 2026-27"
+    row_count: 9
+    count_method: >-
+      Counted the institution lines in the TABLE OF CONTENTS (Code / University / College / Pages / Website):
+      codes 01-09 are institutions; code 10 "Admission Procedure" is not an institution and is excluded.
+      Constituent/affiliated colleges mentioned inside each section (e.g. Bilawal Medical College) are not
+      separate list lines and were not counted.
+    date: 2026-10-07   # PDF metadata CreationDate; no issue date printed. Schedule in PDF: "Availability of Prospectus and Application Form MBBS & BDS 12th October 2026".
+    read_method: curl + pdftotext -layout (text layer)
+    rows:
+      - {inst_id: SD-MED-01, on_list: yes, line: "01 Jinnah Sindh Medical University, Karachi 06–19 www.jsmu.edu.pk"}
+      - {inst_id: SD-MED-02, on_list: yes, line: "02 Dow University of Health Sciences, Karachi 20–35 www.duhs.edu.pk"}
+      - {inst_id: SD-MED-03, on_list: yes, line: "03 Liaquat University of Medical & Health Sciences, Jamshoro 36–45 www.lumhs.edu.pk"}
+      - {inst_id: SD-MED-04, on_list: yes, line: "04 Peoples University of Medical & Health Sciences for Women, SBA 46–54 www.pumhs.edu.pk"}
+      - {inst_id: SD-MED-05, on_list: yes, line: "05 Shaheed Mohtarma Benazir Bhutto Medical University, Larkana 55–66 www.smbbmu.edu.pk"}
+      - {inst_id: SD-MED-06, on_list: yes, line: "06 Karachi Metropolitan University (KMDC) 67–77 www.kmdc.edu.pk"}
+      - {inst_id: SD-MED-07, on_list: yes, line: "07 Gambat Medical College, Gambat 78–89 www.gmc.edu.pk"}
+      - {inst_id: SD-MED-08, on_list: yes, line: "08 Khairpur Medical College, Khairpur Mirs 90–95 www.khprkmc.edu.pk"}
+      - {inst_id: SD-MED-09, on_list: yes, line: "09 Shaheed Mohtarma Benazir Bhutto Medical College, Lyari 96–105 www.smbbmcl.edu.pk"}
+    notes: >-
+      The list is a prospectus table of contents of participating universities/colleges, not a
+      standalone register. All 9 cited rows found. KMU section text says Karachi Metropolitan
+      University is a general university with KMDC as its medical/dental college.
+
+  - url: https://cas.kmu.edu.pk/
+    is_official_list: no
+    publisher: Khyber Medical University (KMU), Centralize Admission System portal
+    row_count: null
+    count_method: null
+    date: null   # page shows admission schedule dates (form availability 01.10.2026, last date 21.10.2026), no publication date
+    read_method: curl + HTML tag strip
+    rows:
+      - {inst_id: KP-ADM-001, on_list: yes, line: "Khyber Medical University (KMU) being the admitting university of Khyber Pakhtunkhwa invites applications from the candidates desirous for admission in MBBS/BDS in the following Public Sector Medical and Dental Colleges (Click Here For ALL Colleges) of the Khyber Pakhtunkhwa and for reciprocal seats in AJK & other provinces."}
+    notes: >-
+      Admission portal home page; it names KMU as admitting university but lists no institutions.
+      The college list sits behind a link (href "colleges.php", i.e. https://cas.kmu.edu.pk/colleges.php),
+      which was not part of this task and was not checked.
+
+  - url: https://bmc.edu.pk/wp-content/uploads/2025/12/Prospectus-2025-261.pdf
+    is_official_list: yes
+    publisher: Bolan Medical College Quetta (prospectus for the Government Medical & Dental Institutions of Balochistan; foreword by Principal BMC / Chairman Academic Council)
+    name_on_document: "Prospectus for the Government Medical & Dental Institutions of Balochistan, Academic Session 2025-2026, for MBBS & BDS programs of studies (BMC, Quetta JMC, Khuzdar LMC, Loralai & MMC, Turbat)"
+    row_count: 4
+    count_method: >-
+      Counted institution items in clause 4 ("The admission policy contained in the prospectus shall be
+      applicable to following medical and dental institutions"): items a-d are colleges; item e
+      "Government of Balochistan (Goodwill & Reciprocal) seats in other sister provinces" is not an
+      institution and is excluded. Same 4 appear in the contents under "INTRODUCTION MEDICAL COLLEGES OF
+      BALOCHISTAN IN ALPHABETICAL ORDER". Bolan Dental Section is part of BMC, not a separate line.
+    date: 2025-12-17   # PDF metadata CreationDate; no issue date printed
+    read_method: curl + pdftotext -layout (text layer)
+    rows:
+      - {inst_id: BL-MED-01, on_list: yes, line: "a. Bolan Medical College, Quetta. | contents: BOLAN MEDICAL COLLEGE, QUETTA .... 8"}
+      - {inst_id: BL-MED-02, on_list: yes, line: "b. Jhalawan Medical College, Khuzdar. | contents: JHALAWAN MEDICAL COLLEGE (JMC), KHUZDAR .... 9"}
+      - {inst_id: BL-MED-03, on_list: yes, line: "c. Loralai Medical College, Loralai. | contents: LORALAI MEDICAL COLLEGE (LMC), LORALAI .... 10"}
+      - {inst_id: BL-MED-04, on_list: yes, line: "d. Mekran Medical College, Turbat. | contents: MEKRAN MEDICAL COLLEGE (MMC), TURBAT .... 11"}
+    notes: All 4 cited rows found.
+
+  - url: https://www.szabmu.edu.pk/content/images/news/1791769754-admission-notie-ad-2026-27.jpg
+    is_official_list: yes
+    publisher: Shaheed Zulfiqar Ali Bhutto Medical University (SZABMU) Islamabad, admitting university for federal public sector medical and dental colleges (signed Chairman Admission Committee ICT / Vice Chancellor SZABMU)
+    name_on_document: "ADMISSION NOTICE Public Sector Medical and Dental Colleges Session 2026-27"
+    row_count: 3
+    count_method: >-
+      Counted entries in the two-column table "Medical Institutes" (1-, 2-) and "Dental Institute" (1-):
+      2 medical + 1 dental = 3. SZABMU itself is named in the text as admitting university, not as a table entry.
+    date: null   # no issue date printed; schedule shows online registration start 11-10-2026, last date 30-10-2026
+    read_method: curl; viewed image with Read tool; tesseract OCR as cross-check (OCR agrees on all three names)
+    rows:
+      - {inst_id: IC-ADM-001, on_list: yes, line: "Shaheed Zulfiqar Ali Bhutto Medical University, Islamabad being the Admitting University invites application for admission ... in the following Public Sector Medical and Dental Colleges under the Administrative Control of Federal Government."}
+      - {inst_id: IC-MED-01, on_list: yes, line: "1- Federal Medical College, Islamabad"}
+      - {inst_id: IC-MED-02, on_list: yes, line: "2- Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College, Lahore"}
+      - {inst_id: IC-MED-03, on_list: yes, line: "1- School of Dentistry, Islamabad"}
+    notes: >-
+      IC-ADM-001 is on the document as the issuing/admitting university, not as a list entry.
+      IC-MED-03 is printed under "Dental Institute" while the row's type is public_medical_college.
+      Notice is a newspaper advert ("Half Page").
+
+  - url: https://www.imcgf72.edu.pk/Admissin_Policy.aspx
+    is_official_list: no
+    publisher: Islamabad Model College for Girls (Post Graduate) F-7/2, Islamabad (college's own website; policy under Federal Directorate of Education)
+    row_count: null
+    count_method: null
+    date: null   # page shows fee schedule "August 20 to August 24, 2026", no publication date
+    read_method: curl + HTML tag strip
+    rows:
+      - {inst_id: IC-COL-001, on_list: yes, line: "The number of seats available in IMCG (PG) F-7/2, Islamabad in different faculties is given below: | footer: Islamabad Model College for Girls(Post Graduate) F-7/2, Islamabad"}
+    notes: The college's own HSSC admission policy page; describes one institution, not a list.
+
+  - url: https://dapr.kiu.edu.pk/semester-rule/mission-procedure-bs-4-years/
+    is_official_list: no
+    publisher: Directorate of Academics, Karakoram International University (KIU)
+    row_count: null
+    count_method: null
+    date: null
+    read_method: curl + HTML tag strip
+    rows:
+      - {inst_id: GB-UNI-001, on_list: yes, line: "Directorate of Academics Karakoram International University | ADMISSION PROCEDURE (BS 4 YEARS) | From Gilgit Baltistan 80% of total seats in each discipline in each department."}
+    notes: The university's own BS admission procedure page; describes one institution, not a list. The page does not print "Gilgit" in KIU's name.

@@ -236,7 +236,8 @@ class RoadmapEngine:
     def build(self, workspace_id: str, today: date | None = None) -> dict:
         """The page. `today` is the request day (routers pass date.today());
         every card's steps and time estimate are read against it."""
-        from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys, serialize
+        from app.pai_c.roadmap import plan_adapter
+        from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys
         from app.pai_c.roadmap.steps import route_steps
         from app.pai_c.roadmap.timeline import estimate
         today = today or date.today()
@@ -250,9 +251,7 @@ class RoadmapEngine:
         decision = RouteDecisionService(self.db).active(workspace_id)
         order = roadmap_policy()["status_order"]
         cards = []
-        for row in PossibilityService(self.db).list(workspace_id):
-            if row.status == "dismissed":
-                continue
+        for row in PossibilityService(self.db).current(workspace_id):
             field_key = (row.study_field or {}).get("key")
             study = study_fields().get(field_key) if field_key else None
             result = verdict(field_key, standing)
@@ -272,4 +271,4 @@ class RoadmapEngine:
         return {"education_line": education_line(standing), "standing": asdict(standing),
                 "counts": counts, "fields": cards, "rules_as_of": rules_as_of(),
                 "calendar_as_of": calendar_as_of(),
-                "chosen": serialize(decision, cards) if decision is not None else None}
+                "chosen": plan_adapter.chosen(decision, cards) if decision is not None else None}

@@ -19,15 +19,19 @@ export type OsReplanOp =
 export interface OsProposal {
   id: number;
   plan_id: number;
-  status: 'applied' | 'pending' | 'accepted' | 'declined' | 'expired' | 'refused';
+  status: 'applied' | 'pending' | 'accepted' | 'declined' | 'expired' | 'refused' | 'requested';
   big: boolean;
-  source: 'rules' | 'supervisor';
+  source: 'rules' | 'supervisor' | 'student';
   ops: OsReplanOp[];
   reasons: string[];
   revision: number | null;
   expires_at: string | null;
   created_at: string;
   answered_at: string | null;
+  /** P1-T6: the fixed sentence for a request to the Counsellor; absent unless the server sends it. */
+  status_note?: string | null;
+  /** The Counsellor's answer to a request: written | duplicate | stale | refused. */
+  request_outcome?: string | null;
 }
 
 export interface OsChange extends OsProposal {

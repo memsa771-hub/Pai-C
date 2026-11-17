@@ -1,0 +1,92 @@
+inst_id,check2_result,check2_note
+PB-MED-001,n/a,unmatched row
+PB-MED-002,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-003,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-004,n/a,unmatched row
+PB-MED-005,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-006,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-007,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-008,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-009,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-010,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-011,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-012,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-013,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-014,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-015,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-016,n/a,unmatched row
+PB-MED-017,n/a,unmatched row
+PB-MED-018,correct,entry text starts with name: True; name rule (other): True
+PB-MED-019,n/a,unmatched row
+PB-MED-020,n/a,unmatched row
+PB-MED-021,n/a,unmatched row
+PB-MED-022,n/a,unmatched row
+PB-MED-023,n/a,unmatched row
+PB-MED-024,n/a,unmatched row
+PB-MED-025,n/a,unmatched row
+PB-MED-026,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-027,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-028,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-029,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-030,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-031,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-032,correct,entry text starts with name: True; name rule (other): True
+PB-MED-033,n/a,unmatched row
+PB-MED-034,correct,entry text starts with name: True; name rule (other): True
+PB-MED-035,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-036,n/a,unmatched row
+PB-MED-037,n/a,unmatched row
+PB-MED-038,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-039,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-040,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-041,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-042,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-043,wrong,entry text starts with name: True; name rule (other): False
+PB-MED-044,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-045,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-046,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-047,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-048,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-049,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-050,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-051,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-052,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-053,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-054,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-055,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-056,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-057,n/a,unmatched row
+PB-MED-058,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-059,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-060,n/a,unmatched row
+PB-MED-061,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-062,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-063,n/a,unmatched row
+PB-MED-064,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-065,n/a,unmatched row
+PB-MED-066,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-067,n/a,unmatched row
+PB-MED-068,n/a,unmatched row
+PB-MED-069,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-070,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-071,n/a,unmatched row
+PB-MED-072,correct,entry text starts with name: True; name rule (exact): True
+PB-MED-073,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-074,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+PB-MED-075,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+SD-MED-01,n/a,unmatched row
+SD-MED-02,n/a,unmatched row
+SD-MED-03,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+SD-MED-04,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+SD-MED-05,n/a,unmatched row
+SD-MED-06,n/a,unmatched row
+SD-MED-07,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+SD-MED-08,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+SD-MED-09,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+BL-MED-01,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+BL-MED-02,n/a,unmatched row
+BL-MED-03,n/a,unmatched row
+BL-MED-04,n/a,unmatched row
+IC-MED-01,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+IC-MED-02,correct,entry text starts with name: True; name rule (city_suffix_dropped): True
+IC-MED-03,n/a,unmatched row

@@ -1,0 +1,30 @@
+{
+  "schema": "pai.programme_facts.v1",
+  "programme_ref": "prog-alpha-bs-cs",
+  "route_key": "fake_bs",
+  "intake": {"term": "fall", "year": 2027},
+  "facts": [
+    {"field": "deadline_close", "fact_class": "deadline", "high_stakes": true, "level": "verified",
+     "value": {"date": "2027-08-01", "tz": "UTC"},
+     "source": {"url": "https://admissions.alpha-university.test/notice", "quote": "Applications close on 1 August 2027.",
+                "checked_at": "2027-05-02T10:00:00+00:00"},
+     "fact_intake": {"term": "fall", "year": 2027}, "other_intake": false, "owner_ref": null,
+     "read_method": "fetch", "language": "en"},
+    {"field": "closing_merit", "fact_class": "closing_merit", "high_stakes": true, "level": "verified",
+     "value": 71.5,
+     "source": {"url": "https://admissions.alpha-university.test/merit-2026", "quote": "Last admitted aggregate: 71.5",
+                "checked_at": "2026-10-01T10:00:00+00:00"},
+     "fact_intake": {"term": "fall", "year": 2026}, "other_intake": true, "owner_ref": "inst:alpha-university",
+     "read_method": "ocr", "language": "ur"},
+    {"field": "fee", "fact_class": "fee", "high_stakes": true, "level": "not_confirmed", "value": null,
+     "source": {"url": "https://admissions.alpha-university.test/fees", "quote": "Fee per semester: 1000 units",
+                "checked_at": "2027-05-02T10:00:00+00:00"},
+     "fact_intake": {"term": "fall", "year": 2027}, "other_intake": false},
+    {"field": "required_documents", "fact_class": "document_list", "high_stakes": false, "level": "confirmed",
+     "value": ["transcript", "photo"],
+     "source": {"url": "https://admissions.alpha-university.test/apply", "quote": "Attach your transcript and a photo.",
+                "checked_at": "2027-05-02T10:00:00+00:00"},
+     "fact_intake": {"term": "fall", "year": 2027}, "other_intake": false},
+    {"field": "test_date", "fact_class": "test_date", "high_stakes": true, "level": "missing"}
+  ]
+}

@@ -4,20 +4,26 @@ from .contract import CapabilityContract
 
 def load_system_capabilities(registry):
     from app.pai_c.deep import analysis
-    from app.pai_c.paths import analyzer as paths
+    from app.pai_c.paths import analyzer as paths, exclusions
     from app.pai_c import sessions, opening, myths, checkins, reliability
     from app.memory import handlers as memory
     from app.research import jobs as research
     from app.documents import handlers as documents
     from app.services.operator import run_operator_job
     from app.pai_c.mirror import text_job as mirror_text
+    from app.memory.profile_issues import register_close_hook
     from app.memory.reconciler import register_accept_hook
+    from app.pai_c.connect import vault_version
 
     # After Mirror-relevant Vault writes the reconciler moves the journey to
     # MIRROR when the card is ready and queues the Mirror text.
     register_accept_hook(mirror_text.after_accept)
     # A path-relevant Vault write queues the Path engine (reason vault).
     register_accept_hook(paths.after_accept)
+    # An accepted write that touches a StudentFacts key raises the student's Vault version (P1-T4, flag-gated).
+    register_accept_hook(vault_version.after_accept)
+    # A closed education or test card (keep current writes nothing, so no accept hook fires) is heard the same way (P1-T8).
+    register_close_hook(vault_version.after_issue_closed)
 
     string = {"type": "string"}
     array = {"type": "array"}
@@ -31,6 +37,7 @@ def load_system_capabilities(registry):
         (analysis.JOB_ANALYZE, analysis.analyze_job, {"user_event_id": string, "assistant_event_id": string, "source_timestamp": {"type": "number"}}),
         (mirror_text.JOB_MIRROR_TEXT, mirror_text.mirror_text_job, {"workspace_id": string, "card_version": string}),
         (paths.JOB_ANALYZE_PATHS, paths.path_analysis_job, {"notebook_version": {"type": "integer"}, "source_event_id": string, "channel": string, "reason": string}),
+        (exclusions.JOB_PATHS_EXCLUDED, exclusions.paths_excluded_job, {"possibility_ids": array, "source_event_id": string}),
         (memory.JOB_EXTRACT, memory.extract_memory, {"source_type": string, "channel": string, "user_event_id": string, "assistant_event_id": string, "agent_name": string, "candidates": array}),
         (memory.JOB_RECONCILE, memory.reconcile_memory, {"candidate_ids": array}),
         (memory.JOB_EMBED, memory.embed_memory, {"memory_ids": array, "episode_ids": array, "fact_ids": array, "record_refs": array}),

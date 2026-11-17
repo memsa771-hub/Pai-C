@@ -1,0 +1,4 @@
+# Fake-route display data (test data), joined on (key, version).
+pages:
+  - {key: inbox, label: Inbox, title: "Your next steps"}
+  - {key: documents, label: Documents, title: "Your documents"}

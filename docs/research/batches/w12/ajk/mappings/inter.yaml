@@ -1,0 +1,5 @@
+id_prefix: AJ-HEDCOL-INT-
+type: public_college
+region: list
+read_method: "curl + HTML text strip"
+retrieved: 2026-11-15

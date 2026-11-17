@@ -1,0 +1,117 @@
+# Reviewed allow-list, region khyber_pakhtunkhwa, family bachelor (P2-D10, spec 4.2; R-24, R-71).
+# From the W13 allow-list review, 2026-11-14: drafted by check 1 (claude-allowlist-check-1), every entry
+# re-fetched and approved 'yes' by an independent check 2 (claude-allowlist-check-2). Owner ruling 2026-11-14:
+# both AI checks are enough review for allow-list files. body_ref stays '' until the body is in the registry.
+# inst_id, name, evidence and check2_evidence are the proof (link text and href as fetched); the loader
+# ignores them. A listed domain covers its subdomains. See docs/research/batches/README.md, 'Allow-lists'.
+# Entries reviewed by claude-allowlist-check-1b and claude-allowlist-check-2b (W13 round b, 2026-11-14) say so in
+# reviewed_by; the same owner ruling covers them.
+region: khyber_pakhtunkhwa
+family: bachelor
+bodies:
+- body_ref: ''
+  tier: institution
+  domains:
+  - giki.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-GIKI
+  name: Ghulam Ishaq Khan Institute of Engineering Sciences and Technology (GIKI)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx
+    quote: Visit Website http://www.giki.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Ghulam-Ishaq-Khan-Institute-of-Engineering-Sciences--Technology.aspx
+    quote: HEC profile "Ghulam Ishaq Khan Institute of Engineering Sciences & Technology"; Visit Website href "http://www.giki.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - hec.gov.pk
+  list_ref: https://www.mofept.gov.pk/
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: ''
+  name: Higher Education Commission (HEC)
+  evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'Higher Education Commission: https://hec.gov.pk/english/pages/home.aspx'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.mofept.gov.pk/
+    quote: 'MoFEPT page (header "Ministry of Federal Education and Professional Training", "Government of Pakistan"): link
+      "Higher Education Commission" href "https://hec.gov.pk/english/pages/home.aspx"'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - kmu.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: KP-ADM-001
+  name: Khyber Medical University (KMU)
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+    quote: Visit Website http://www.kmu.edu.pk
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx
+    quote: HEC profile "Khyber Medical University" (Peshawar); Visit Website href "http://www.kmu.edu.pk"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: institution
+  domains:
+  - uetpeshawar.edu.pk
+  list_ref: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
+  reviewed_by: claude-allowlist-check-1, claude-allowlist-check-2
+  inst_id: UNI-UETP
+  name: University of Engineering & Technology, Peshawar
+  evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
+    quote: Visit Website http://www.uetpeshawar.edu.pk/
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://www.hec.gov.pk/english/universities/Pages/KPK/University-of-Engineering-and-Technology.aspx
+    quote: HEC profile "University of Engineering & Technology" (Peshawar); Visit Website href "http://www.uetpeshawar.edu.pk/"
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: admission_body
+  domains:
+  - etea.edu.pk
+  list_ref: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+  reviewed_by: claude-allowlist-check-1b, claude-allowlist-check-2b
+  inst_id: PK-TST-005
+  name: Educational Testing and Evaluation Agency (ETEA), Khyber Pakhtunkhwa
+  evidence:
+    url: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+    quote: '"Interested candidates may first visit ETEA website, www.etea.edu.pk and apply for the posts online." and "Online
+      Application Form will be available on www.etea.edu.pk on 11th February 2022." (pdftotext of the PDF)'
+    retrieved: '2026-11-14'
+  check2_evidence:
+    url: https://kptevta.gov.pk/wp-content/uploads/2022/02/Minority-Disable-Quota-posts-advertisement.pdf
+    quote: 'pdftotext of the live PDF: header "...TECHNICAL EDUCATION & VOCATIONAL ... Web: www.kptevta.gov.pk"; "1. Interested
+      candidates may first visit ETEA website, www.etea.edu.pk and apply for the posts online."; "6. Online Application
+      Form will be available on www.etea.edu.pk on 11th February 2022."'
+    retrieved: '2026-11-14'
+- body_ref: ''
+  tier: regulator
+  domains:
+  - pmdc.pk
+  list_ref: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+  reviewed_by: claude-allow-kp-pmdc-check-1, claude-allow-kp-pmdc-check-2
+  inst_id: PK-REG-003
+  name: Pakistan Medical & Dental Council (PMDC)
+  evidence:
+    url: https://www.hec.gov.pk/english/services/universities/QAA/Pages/Accreditation-Councils.aspx
+    quote: '<li><a href="https&#58;//pmdc.pk/">Pakistan Medical &amp; Dental Council (PMDC)</a><br></li>'
+    retrieved: '2026-11-15'
+  check2_evidence:
+    url: https://nhsrc.gov.pk/
+    quote: '<li><a href="https://pmdc.pk/"><i class="fa fa-angle-right" aria-hidden="true"></i>Pakistan Medical and
+      Dental Council (PMDC)</a></li>'
+    retrieved: '2026-11-15'
+  notes:
+  - 'Region basis (W12 ALLOW-KP checks 1 and 2, 2026-11-15): no PMDC address states the province; 28 PMDC list rows
+    are placed in this region by the PBS 2023 census district table (docs/research/batches/w12/pmdc/district-regions.yaml,
+    KP Table 1 sha256 8924fb1b927751c0df902272f70e422ce88a7d5b5857cbb2daadf540232c3b24): Peshawar, Abbottabad, Kohat,
+    Mardan, Swat, Bannu, Swabi, Nowshera. Rests on the FU-15 district rule (for the owner to confirm).'

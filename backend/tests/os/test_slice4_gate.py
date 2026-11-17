@@ -23,6 +23,8 @@ from app.os.settings import load_settings
 from tests.os.test_api_documents import FakeClient, confirm_body, jpeg, simulate_read, upload
 from tests.os.test_api import TEST_TERMS, agree
 
+pytestmark = pytest.mark.standalone
+
 FAKE = Path(__file__).parent / "playbooks"
 CHECKED = datetime(2026, 10, 17, tzinfo=timezone.utc)
 P = "/v1/os"

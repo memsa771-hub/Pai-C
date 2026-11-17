@@ -2,10 +2,12 @@
 
 import { use, useCallback, useState } from 'react';
 import { notFound } from 'next/navigation';
+import { ConsistencyCases } from '@/components/os/consistency-cases';
 import { SupportList } from '@/components/os/support-list';
 import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { OS_UI_ENABLED } from '@/lib/config';
+import { isMissingEndpoint, type OsConsistencyCase } from '@/lib/os-consistency';
 import type { OsSupportCase } from '@/lib/os-replan';
 
 /**
@@ -17,6 +19,7 @@ export default function OsSupportPage({ params }: { params: Promise<{ workspaceI
   const { workspaceId } = use(params);
   const [token, setToken] = useState('');
   const [cases, setCases] = useState<OsSupportCase[] | null>(null);
+  const [checks, setChecks] = useState<OsConsistencyCase[] | null>(null);  // null: hidden (no endpoint)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,7 +30,15 @@ export default function OsSupportPage({ params }: { params: Promise<{ workspaceI
       setError(null);
     } catch {
       setCases(null);
+      setChecks(null);
       setError('Could not load the cases. Check the admin token and try again.');
+      return;
+    }
+    try {
+      setChecks(await workspaceApi.getOsConsistencyCases(adminToken, 'open'));
+    } catch (e) {
+      setChecks(null);  // a 404 hides the list, so the page is as it was; any other failure is said
+      if (!isMissingEndpoint(e)) setError('Could not load the consistency checks.');
     }
   }, [workspaceId]);
 
@@ -45,6 +56,18 @@ export default function OsSupportPage({ params }: { params: Promise<{ workspaceI
     }
   }
 
+  async function resolveCheck(id: number, note: string) {
+    setBusy(true);
+    try {
+      await workspaceApi.resolveOsConsistencyCase(token, id, note);
+      await load(token);
+    } catch {
+      setError('Could not resolve the check. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
       <h1 className="mb-4 text-lg font-semibold">Support inbox</h1>
@@ -56,6 +79,7 @@ export default function OsSupportPage({ params }: { params: Promise<{ workspaceI
       </form>
       {error && <p role="alert" className="mb-3 break-words text-sm text-destructive">{error}</p>}
       {cases !== null && <SupportList cases={cases} busy={busy} onResolve={resolve} />}
+      {cases !== null && checks !== null && <ConsistencyCases cases={checks} busy={busy} onResolve={resolveCheck} />}
     </main>
   );
 }

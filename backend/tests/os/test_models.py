@@ -46,6 +46,30 @@ def test_os_tables_present():
         "os_rehearsal_clock",
         # Slice 9a (os_0015)
         "os_consents",
+        # P1-T4 (os_0020)
+        "os_vault_events",
+        # P1-T6 (os_0021)
+        "os_plan_adoptions",
+        # P1-T8 (os_0023)
+        "os_student_requests",
+        # P1-T10 (os_0024)
+        "os_consistency_cases", "os_consistency_runs",
+        # P2-T1 (os_0025)
+        "os_fact_revisions",
+        # P2-T2 (os_0027)
+        "os_registry", "os_registry_revisions", "os_registry_links",
+        # P2-T3 (os_0028)
+        "os_source_domains", "os_page_snapshots", "os_source_files",
+        # P2-T5 (os_0026)
+        "os_reviewers", "os_review_items", "os_review_files", "os_fact_reviews", "os_review_attestations",
+        # P2-T7 (os_0032)
+        "os_fact_reports", "os_monitor_runs", "os_monitor_seen",
+        # P2-T6 (os_0031)
+        "os_imports",
+        # P2-T4 (os_0030)
+        "os_not_readable",
+        # P2-T8 (os_0029)
+        "os_intakes", "os_fact_slots",
     }
 
 
@@ -76,7 +100,8 @@ def test_task_state_check_rejects_unknown_state(engine, clean):
             ))
 
 
-def test_downgrade_then_upgrade_slice2(os_db):
+def test_downgrade_then_upgrade_slice2(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     """os_0003 can be taken back and re-applied; the models still match afterwards."""
     from sqlalchemy import create_engine, inspect
 

@@ -1,0 +1,18 @@
+{
+  "schema": "pai.merit_check.v1",
+  "student_ref": "ws-fictional-2",
+  "programme_ref": "prog-beta-bs-bio",
+  "intake": {"term": "fall", "year": 2027},
+  "category": null,
+  "status": "not_confirmed",
+  "formula": {
+    "parts": [{"name": "school", "marks_part": "full_marks", "weight": 1.0}],
+    "total": 100, "owner_ref": null, "level": "not_confirmed",
+    "source": {"url": "https://beta-college.test/admissions", "quote": "Merit is based on school marks",
+               "checked_at": "2027-04-01T10:00:00+00:00"}
+  },
+  "aggregate": null,
+  "marks_used": [{"key": "full_marks", "value": null, "out_of": null, "evidence": "unknown"}],
+  "parts": [{"name": "school", "status": "not_confirmed"}],
+  "closing_merits": []
+}

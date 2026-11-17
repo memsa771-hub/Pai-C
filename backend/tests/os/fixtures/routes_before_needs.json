@@ -1,0 +1,1 @@
+{"routes":[{"key":"germany_master","version":1,"origin":"PK","destination":"DE","level":"master"},{"key":"ireland_master","version":1,"origin":"PK","destination":"IE","level":"master"},{"key":"pakistan_bs","version":1,"origin":"PK","destination":"PK","level":"bachelor"},{"key":"pakistan_inter","version":1,"origin":"PK","destination":"PK","level":"intermediate"}]}

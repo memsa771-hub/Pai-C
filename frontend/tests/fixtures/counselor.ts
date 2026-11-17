@@ -5,7 +5,7 @@ import type {
 } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
-import type { ChosenRoute, FieldCard, RoadmapPage, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
+import type { ChoiceOptions, ChosenRoute, FieldCard, OfferedPlace, RoadmapPage, RouteChoice, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
 import type { MirrorCard } from "@/lib/mirror";
 export const possibilities: Possibility[] = [
   {
@@ -330,6 +330,56 @@ export const chosenRoute: ChosenRoute = {
   snapshot_steps: eeSteps.map(({ key, label_key, values, status }) => ({ key, label_key, values, status })),
   steps_done: [], snapshot_verdict: roadmapCards[0].verdict, live_status: "open",
 };
+
+/** choice-options with the hand-off off: today's one-click choose. */
+export const choiceOptionsOff: ChoiceOptions = { handoff: false };
+/** choice-options with the hand-off on. Countries are ISO codes only; the text is what the API sends. */
+export const choiceOptionsOn: Extract<ChoiceOptions, { handoff: true }> = {
+  handoff: true, origin: "PK", level: "bachelor",
+  destinations: [
+    { code: "PK", supported: false, route_key: null },
+    { code: "DE", supported: true, route_key: "pk-de-bachelor" },
+  ],
+  preselected_destination: null,
+  intake_terms: { PK: ["fall"], DE: ["winter", "summer"] },
+  years: [2027, 2028],
+  consent_text: { title: "Share your choice with your plan", body: ["PAI will share your choice with your plan.", "You can withdraw at any time."] },
+  consent_version: "v1",
+  needs_dob: false,
+  under_18: false,
+};
+export const offeredPlaces: OfferedPlace[] = [
+  { ref: "p1", name: "Alpha University" }, { ref: "p2", name: "Beta Institute" }, { ref: "p3", name: "Gamma College" },
+  { ref: "p4", name: "Delta University" }, { ref: "p5", name: "Epsilon School" }, { ref: "p6", name: "Zeta Academy" },
+];
+export const routeChoice = (over: Partial<RouteChoice> = {}): RouteChoice => ({
+  version: 2, places: [{ programme_ref: "p1", rank: 1 }], intake: { term: "winter", year: 2027 }, destination: "DE", level: "bachelor",
+  os_supported: true, consent: { student: "given", guardian: "not_needed" }, ...over,
+});
+
+/** A chosen route PAI OS runs (plan view on): OS steps with their own titles, owners and due dates (backend plan_adapter). */
+const osStep = (key: string, title: string, over: Partial<RouteStep> = {}): RouteStep => ({
+  key, kind: "os", label_key: "", values: {}, status: "half", evidence: null, rule: null, manual_done: false, colour: "yellow",
+  tickable: false, title, owner: "pai", due_at: null, due_tz: null, provisional: false, estimated: false, ...over,
+});
+export const osPlanRoute: ChosenRoute = {
+  ...chosenRoute, time: null,
+  steps: [
+    osStep("collect-transcripts", "Collect your transcripts", { owner: "student", tickable: true, due_at: "2027-03-12T18:59:59Z", due_tz: "Asia/Karachi" }),
+    osStep("check-deadline", "Check the application deadline", { status: "done", colour: "green" }),
+    osStep("draft-statement", "Draft the statement of purpose", { status: "not", colour: "red" }),
+  ],
+  steps_done: ["check-deadline"],
+  plan: { state: "needs_student", state_reason: null, revision: 2, decision_version: 2, proposals_waiting: 0, changes: [] },
+  choice: routeChoice(),
+};
+
+/** A request step (P1-T8): waits for the student's data, so it has no tick; the text is the backend's (request_texts.yaml). */
+export const osRequestStep: RouteStep = osStep("provide@fact:education.matric.marks_obtained:stated", "Your matric marks", {
+  owner: "student", tickable: false, status: "not", colour: "red",
+  request: { kind: "provide", evidence: "stated", text: "PAI needs this from you. Tell PAI in the chat or on your profile page." },
+});
+
 export const roadmapPage: RoadmapPage = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
   counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
@@ -384,4 +434,37 @@ export const mirrorEmpty: MirrorCard = {
     area: key, label: mirrorCard.areas.find((a) => a.key === key)!.label, question_key: `topic_text.${key}`, priority: i + 2 })),
   text: null,
   ready: false,
+};
+
+// My plan (P1-T9). Fictional route data in the shape of GET /v1/os/plan. Germany's pages are today's words.
+const pg = (key: string, label: string, title: string, noun: string | null = null) => ({ key, label, title, noun });
+export const myPlanGermany = {
+  state: 'active', source: 'self_serve', plan_id: 1, route_key: 'germany_master', abroad: true,
+  pages: [pg('start', 'Start', 'Start your plan'), pg('inbox', 'Inbox', 'Your next steps'),
+    pg('documents', 'Documents', 'Your documents'), pg('programmes', 'Programmes', 'Your programmes'),
+    pg('statements', 'Statements', 'Your statement and CV'), pg('pack', 'Pack', 'Your application packs', 'pack'),
+    pg('visa', 'Visa', 'Your visa file', 'visa file')],
+  sources: {},
+};
+export const myPlanPkBs = {
+  state: 'active', source: 'self_serve', plan_id: 2, route_key: 'pakistan_bs', abroad: false,
+  pages: [pg('inbox', 'Inbox', 'Your next steps'), pg('documents', 'Documents', 'Your documents'),
+    pg('programmes', 'Places', 'Your places')],
+  sources: {},
+};
+export const myPlanEmpty = { state: 'empty', source: null, plan_id: null, route_key: null, abroad: null, pages: [], sources: {} };
+
+/** GET /v1/uploads/options with the one upload on (P1-T7); the sentences are the approved ones. */
+export const uploadOptionsOn = {
+  one_upload: true as const,
+  doc_types: [{ key: "passport", label: "Passport" }, { key: "transcript", label: "Transcript" }],
+  text: {
+    type_label: "What is this document?", type_none: "Something else",
+    registered: "Saved. PAI will read it and ask you to check what it found.",
+    consent_needed: "Saved. To let PAI read it, first agree to the pilot terms on your study documents page.",
+    duplicate: "Saved. This file is already in your study documents.",
+    unknown_type: "Saved. PAI cannot read this kind of document yet.",
+    not_readable: "Saved. PAI can read PDF, JPEG, PNG or WebP files only.",
+    not_now: "Saved. PAI cannot read it right now.",
+  },
 };

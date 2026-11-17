@@ -1,0 +1,24 @@
+# P3-T1 fixture (ADR-001 D1, D14): a fictional route family on a fictional route, for tests only. It uses only the
+# units the compiler already runs, so a plan can be made and pinned to it; its release flag is CONNECT_FAMILY_ALPHAFAM.
+key: fam_inter
+version: 1
+family: alphafam
+route: {origin: ZZ, destination: ZZ, level: intermediate}
+default_timezone: UTC
+intake_terms: [winter]
+tasks:
+  - template_key: apply_form
+    task_type: student.act
+    title: Submit the application form
+    kind: student
+    inbox_kind: act
+    duration_days: 1
+  - template_key: offer
+    task_type: student.choose
+    title: Choose from the offers
+    kind: student
+    inbox_kind: choose
+    fan_out: programme
+    depends_on: [{key: apply_form}]
+    anchor: {fact: offer_date}
+    duration_days: 2

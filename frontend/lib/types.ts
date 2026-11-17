@@ -96,6 +96,8 @@ export interface WorkspaceFile {
   channelName: string | null;
   status: string;
   createdAt: string | null;
+  /** Only on an upload that named a document type with the one upload on (P1-T7). */
+  os_document?: import('./os-documents').OsDocumentResult;
 }
 
 /** A file held by a trash entry — a preview of what a restore brings back. */

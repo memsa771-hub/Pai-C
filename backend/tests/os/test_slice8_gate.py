@@ -91,6 +91,7 @@ def test_end_to_end_module_on(gate):
     assert os_escalation.pending_counsellor_escalations() == []
 
 
+@pytest.mark.standalone
 def test_standalone_suite_module_off(gate):
     svc, client = gate
     plan_id = svc.plans.start_plan(TEST_STUDENT).plan_id  # self-serve, as in Slice 7

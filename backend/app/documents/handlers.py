@@ -187,6 +187,34 @@ async def parse_document_job(job, db) -> dict:
     # redone because an LLM call failed.
     from app.runtime.task_runtime import enqueue
 
+    if payload.get("extract") is False:
+        # An OS document reads this file (P1-T7, D-y4): its facts reach the Vault after the student confirms them
+        # there. The index job is the extractor's last step, so it is queued here instead.
+        from app.config import config
+        from datetime import datetime, timezone
+
+        from .progress import OS_DOCUMENT_VERSION
+
+        # Nothing else will classify it: mark it understood so the chat reports it done like any finished document.
+        artifact.classification = artifact.document_type or "document"
+        artifact.extractor_version = OS_DOCUMENT_VERSION
+        artifact.updated_at = datetime.now(timezone.utc)
+        db.flush()
+        if config.PAI_SEMANTIC_RECALL_ENABLED:
+            enqueue(db,
+                job_type=JOB_DOCUMENT_INDEX,
+                workspace_id=workspace_id,
+                payload={"file_id": file_id},
+                idempotency_key=f"document.index:{file_id}:{artifact.content_sha256}",
+            )
+        return {
+            "parsed": True,
+            "pages": parsed.page_count,
+            "chars": parsed.char_count,
+            "ocr_used": parsed.ocr_used,
+            "partial": parsed.partial,
+        }
+
     enqueue(db,
         job_type=JOB_DOCUMENT_EXTRACT,
         workspace_id=workspace_id,

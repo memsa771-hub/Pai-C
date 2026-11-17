@@ -1,0 +1,20 @@
+# Aliases for PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx (import --aliases; see docs/research/batches/README.md, 'Alias files').
+# Each `from` id of the returned file is the same entity as the batch 1 `to` id (same official domain and city on
+# the HEC profile page). Check 1 and an independent check 2 (own fetches, without seeing check 1) agree on every
+# alias. Both are AI checks (owner ruling, P2 spec §11.2); they count only after both reviewers attest the batch
+# ref `aliases-<sha256 of this file>`.
+file: PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx
+sha256: 9410984a619eaeda85b2847be35122a764ab6a00a257cbb35fe9c7229987cc3f
+aliases:
+  - from: KP-ADM-001
+    to: PK-UNI-066
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx", quote: "<a href=\"http://www.kmu.edu.pk\">http://www.kmu.edu.pk</a>"}
+    check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/KPK/Khyber-Medical-University.aspx", quote: "Visit Website | http://www.kmu.edu.pk | PDA building Block-4 Phase-5 Hayatabad Peshawar"}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}
+  - from: GB-UNI-001
+    to: PK-UNI-021
+    evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Gilgit%20Baltistan/Karakurum-International-University.aspx", quote: "<a href=\"http://www.kiu.edu.pk/\">http://www.kiu.edu.pk/</a>"}
+    check2_evidence: {url: "https://www.hec.gov.pk/english/universities/Pages/Gilgit%20Baltistan/Karakurum-International-University.aspx", quote: "Visit Website | http://www.kiu.edu.pk/ | University Road Gilgit, Gilgit Baltistan."}
+    check1: {result: correct, name: "claude-local-check-1", date: "2026-11-13"}
+    check2: {approved: "yes", name: "claude-local-check-2", date: "2026-11-13"}

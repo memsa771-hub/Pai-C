@@ -67,3 +67,13 @@ def test_second_route_has_its_own_questions():
     de = load_statement_configs()["germany_master"]
     assert {q.id for q in ie.questions}.isdisjoint({q.id for q in de.questions} - {"other"})
     check_config(ie, KEYS, BOOKS)
+
+
+def test_documents_task_is_checked_on_every_version():
+    cfg = load_statement_configs()["germany_master"]
+    books = dict(BOOKS)
+    older = books[("germany_master", 1)]
+    books[("germany_master", 1)] = older.model_copy(update={"tasks": [
+        t for t in older.tasks if t.template_key != cfg.documents_task]})  # only the older version lacks it
+    with pytest.raises(StatementConfigError, match=r"application_documents.*version 1"):
+        check_config(cfg, KEYS, books)

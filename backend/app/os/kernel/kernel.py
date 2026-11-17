@@ -13,15 +13,20 @@ from typing import Any, Literal
 
 from sqlalchemy import Connection, Engine, and_, delete, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from app.os import models
 from app.os import clock as shared_clock
 from app.os.compiler import CONFIRM_TYPE, DraftTask, PlanDraft
 from app.os.contracts.route_contract import RouteContract
+from app.os.contracts.route_contract_v2 import RouteContractV2
 from app.os.kernel.revisions import CANCELLED_MARK, DONE_MARK, NOTICE_PREFIX, diff
+from app.os.ports import os_events
 from app.os.replan import events as replan_events
+from app.os.requests import keys as request_keys, store as request_store
 from app.os.kernel.states import (
     PLAN_CLOSED,
+    PLAN_OPEN,
     SATISFIES_DEPENDENCY,
     TERMINAL,
     IllegalTransition,
@@ -33,7 +38,18 @@ from app.os.kernel.states import (
 P, T, E = models.plans, models.tasks, models.task_edges
 S = TaskState
 NOTICE_TYPE = "student.act"
+# kernel event type -> os_event.v1 kind; a task_state change maps by its target state (R-45)
+_EVENT_KINDS = {"plan_created": "plan_created", "plan_revised": "plan_revised", "plan_paused": "plan_paused",
+                "plan_closed": "plan_stopped", "plan_finished": "plan_finished"}
+_STEP_KINDS = {"done": "step_done", "waiting_student": "student_needed"}
+_QUIET = "os_event_quiet"  # conn.info flag: set while a new plan is first promoted
+_ANSWERABLE = frozenset({S.PENDING, S.BLOCKED, S.READY, S.WAITING_STUDENT})  # unstarted or open student steps
+_MUTE = "os_event_mute"  # conn.info flag: the event is recorded but the student is told nothing
 REPLAN_CAUSE = "replan:"  # a replan revision's cause: "replan:<proposal id>" (Slice 7)
+
+
+class PlanIdentityTaken(RuntimeError):
+    """Another plan already holds the (tenant, source, external_ref) an adoption would take (uq_os_plans_identity)."""
 
 
 class StaleDraft(RuntimeError):
@@ -59,7 +75,7 @@ _OUTCOME_STATE = {
 }
 
 
-def contract_sha256(contract: RouteContract) -> str:
+def contract_sha256(contract: RouteContract | RouteContractV2) -> str:
     canonical = json.dumps(contract.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -72,12 +88,18 @@ class Kernel:
 
     # ---------------------------------------------------------------- plans
 
-    def create_plan(self, contract: RouteContract, draft: PlanDraft) -> PlanRef:
+    def create_plan(self, contract: RouteContract | RouteContractV2, draft: PlanDraft) -> PlanRef:
         payload = contract.model_dump(mode="json")
         sha = contract_sha256(contract)
         identity = and_(P.c.tenant_id == self.tenant_id, P.c.source == contract.source,
                         P.c.external_ref == contract.external_ref)
         with self.engine.begin() as conn:
+            # The student lock comes before any plan row lock (store.lock_student): lock both students, in order, when
+            # a contract revision moves an existing plan to another student.
+            held = conn.execute(select(P.c.student_ref).where(identity)).scalar_one_or_none()
+            students = sorted({contract.student_ref, *([held] if held else [])})
+            for student in students:
+                request_store.lock_student(conn, self.tenant_id, student)
             plan_id = conn.execute(
                 pg_insert(P).values(
                     tenant_id=self.tenant_id, source=contract.source, external_ref=contract.external_ref,
@@ -104,7 +126,12 @@ class Kernel:
             self._event(conn, plan_id, None, "plan_created",
                         {"playbook": draft.playbook_key, "version": draft.playbook_version, "tasks": len(keys)})
             self._set_risk(conn, plan_id, draft.at_risk)
-            self._promote(conn, plan_id)
+            conn.info[_QUIET] = True
+            try:
+                self._promote(conn, plan_id)
+            finally:
+                conn.info.pop(_QUIET, None)
+            request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())  # P1-T8, D-w7
             return PlanRef(plan_id, 1, True)
 
     def revise(self, plan_id: int, cause: str, draft: PlanDraft, based_on: str | None = None) -> int | None:
@@ -118,7 +145,7 @@ class Kernel:
             self._check_current(conn, plan_id, based_on)
             return self._revise(conn, plan_id, cause, draft)
 
-    def change_contract(self, plan_id: int, contract: RouteContract, draft: PlanDraft, cause: str,
+    def change_contract(self, plan_id: int, contract: RouteContract | RouteContractV2, draft: PlanDraft, cause: str,
                         based_on: str) -> int | None:
         """Stores a new contract for the plan (e.g. the student swapped a programme, Slice 4) and applies its draft
         as a revision, in one transaction under the plan lock. `based_on` is the contract_sha256 the change was
@@ -129,6 +156,33 @@ class Kernel:
             return self._revise(conn, plan_id, cause, draft, contract_update={
                 "contract": contract.model_dump(mode="json"), "contract_sha256": contract_sha256(contract),
                 "student_ref": contract.student_ref})
+
+    def adopt_plan(self, plan_id: int, external_ref: str, contract: RouteContract | RouteContractV2,
+                   based_on: str) -> bool:
+        """Turns an open self-serve plan into the Counsellor's plan in place (R-08): source `counsellor`, the decision's
+        external_ref and contract, in one transaction under the plan lock. No revision and no task change: the plan the
+        student has been working on stays as it is. One `plan_adopted` event. `based_on` is the contract_sha256 the
+        student agreed to. False, and nothing changes, when the plan is not open, not `self_serve`, or its contract is no
+        longer `based_on`. PlanIdentityTaken when another plan already holds the new identity."""
+        if external_ref != contract.external_ref:
+            raise ValueError("adopt_plan: external_ref must be the contract's own")
+        try:
+            with self.engine.begin() as conn:
+                self._lock_plan(conn, plan_id)
+                status, source, sha = conn.execute(select(P.c.status, P.c.source, P.c.contract_sha256).where(
+                    P.c.id == plan_id)).one()
+                if source != "self_serve" or status not in PLAN_OPEN or sha != based_on:
+                    return False
+                conn.execute(update(P).where(P.c.id == plan_id).values(
+                    source="counsellor", external_ref=external_ref, contract=contract.model_dump(mode="json"),
+                    contract_sha256=contract_sha256(contract), updated_at=self.clock()))
+                self._event(conn, plan_id, None, "plan_adopted", {"source": "counsellor"})
+                return True
+        except IntegrityError as exc:
+            name = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            if name == "uq_os_plans_identity" or (name is None and "uq_os_plans_identity" in str(exc)):
+                raise PlanIdentityTaken(f"plan {plan_id}") from None
+            raise
 
     def upgrade_playbook(self, plan_id: int, draft: PlanDraft, based_on: str | None = None) -> int:
         with self.engine.begin() as conn:
@@ -175,7 +229,54 @@ class Kernel:
             conn.execute(update(PR).where(PR.c.plan_id == plan_id, PR.c.status == "pending").values(
                 status="expired", answered_at=self.clock()))
             self._event(conn, plan_id, None, "plan_closed", {"number": number, "cause": cause})
+            request_store.sync(conn, self.tenant_id, plan_id, now=self.clock())  # P1-T8: its requests are cancelled
             return number
+
+    def pause_plan(self, plan_id: int, reason: str) -> bool:
+        """Pauses an active or at-risk plan (P1-D11): no task is promoted and no reminder is sent until it resumes.
+        `reason` is a code (e.g. `consent_missing`), kept in the `plan_paused` event. False, and nothing changes,
+        when the plan is already paused or is closed or done."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            status = conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one()
+            if status not in ("active", "at_risk"):
+                return False
+            conn.execute(update(P).where(P.c.id == plan_id).values(status="paused", updated_at=self.clock()))
+            self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            return True
+
+    def set_pause_reason(self, plan_id: int, reason: str) -> bool:
+        """A plan that is already paused gets a new reason code (a `plan_paused` event; the status stays). It is how
+        an escalation takes the place of a missing consent. False, and nothing changes, when the plan is not paused or
+        already carries this reason."""
+        E = models.events
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() != "paused":
+                return False
+            newest = conn.execute(select(E.c.payload).where(
+                E.c.tenant_id == self.tenant_id, E.c.plan_id == plan_id, E.c.type == "plan_paused")
+                .order_by(E.c.id.desc()).limit(1)).scalar()
+            if (newest or {}).get("reason") == reason:
+                return False
+            conn.info[_MUTE] = True  # the plan is already paused and the student was told: a new reason is no new notice
+            try:
+                self._event(conn, plan_id, None, "plan_paused", {"reason": reason})
+            finally:
+                conn.info.pop(_MUTE, None)
+            return True
+
+    def resume_plan(self, plan_id: int) -> bool:
+        """Resumes a paused plan as active (the deadline engine marks it at risk again if it is) and promotes what
+        became ready meanwhile. False, and nothing changes, when the plan is not paused."""
+        with self.engine.begin() as conn:
+            self._lock_plan(conn, plan_id)
+            if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() != "paused":
+                return False
+            conn.execute(update(P).where(P.c.id == plan_id).values(status="active", updated_at=self.clock()))
+            self._event(conn, plan_id, None, "plan_resumed", {})
+            self._promote(conn, plan_id)
+            return True
 
     def set_changes_paused(self, plan_id: int, paused: bool) -> None:
         """Pauses or resumes replanning for a plan (S7-D9). Student-driven changes are not affected."""
@@ -270,7 +371,11 @@ class Kernel:
                 replan_events.record(conn, self.tenant_id, row.plan_id, "admission_rejected",
                                      {"programme_ref": row.programme_ref, "instance_key": row.instance_key},
                                      f"task:{task_id}", task_id)
-            self._promote(conn, row.plan_id)
+            conn.info[_QUIET] = True  # the student's own tick: the next student step is not announced as "needed"
+            try:
+                self._promote(conn, row.plan_id)
+            finally:
+                conn.info.pop(_QUIET, None)
             return True
 
     def complete_review(self, task_id: int, result: dict, *, only_if_waiting: bool = False) -> bool:
@@ -301,16 +406,62 @@ class Kernel:
 
     # ---------------------------------------------------------------- internals
 
-    def _event(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict) -> None:
-        conn.execute(insert(models.events).values(
+    def _event(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict) -> int:
+        at = self.clock()
+        event_id = conn.execute(insert(models.events).values(
             tenant_id=self.tenant_id, plan_id=plan_id, task_id=task_id, type=type_, payload=payload,
-            at=self.clock()))
+            at=at).returning(models.events.c.id)).scalar_one()
+        self._notify(conn, plan_id, task_id, type_, payload, event_id, at)
+        return event_id
+
+    def _notify(self, conn: Connection, plan_id: int | None, task_id: int | None, type_: str, payload: dict,
+                event_id: int, at: datetime) -> None:
+        """The one choke point for `os_event.v1` (R-45): the same transaction writes the notice for the Counsellor,
+        keyed on this event's id so a repeat is skipped. A hidden step (the "plan updated" notice) is never announced."""
+        kind = _EVENT_KINDS.get(type_)
+        if conn.info.get(_MUTE):
+            return
+        if type_ == "task_state":
+            kind = _STEP_KINDS.get(payload.get("to"))
+        if kind is None or plan_id is None:
+            return
+        key = None
+        if task_id is not None:
+            row = conn.execute(select(T.c.instance_key, T.c.kind).where(T.c.id == task_id)).first()
+            if row is None or row.instance_key.startswith(NOTICE_PREFIX) or CANCELLED_MARK in row.instance_key \
+                    or DONE_MARK in row.instance_key:
+                return
+            key = row.instance_key
+            # Tell the student only what needs them or informs them: a step PAI finished (work), or a step that
+            # now waits for the student. Never the student's own tick. When a plan is created, `plan_created`
+            # stands for that revision, so the steps that open with it are not announced again.
+            if kind == "step_done" and row.kind != "work":
+                return
+            if kind == "student_needed" and (row.kind != "student" or conn.info.get(_QUIET)):
+                return
+        os_events.emit(conn, self.tenant_id, plan_id, kind, event_id, at, key)
 
     def _lock_plan(self, conn: Connection, plan_id: int) -> None:
-        found = conn.execute(select(P.c.id).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
-                             .with_for_update()).first()
-        if found is None:
+        """The student's request lock first, then the plan row (`store.lock_student`: a sync under that lock may write
+        a row for another plan, which needs that plan's row, so no transaction may hold a plan row and wait for it)."""
+        student = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
+                               ).scalar_one_or_none()
+        if student is None:
             raise KeyError(f"plan {plan_id}")
+        while True:
+            request_store.lock_student(conn, self.tenant_id, student)
+            # The row lock is taken in a savepoint: if the plan moved to another student meanwhile (rare), rolling the
+            # savepoint back releases the row before that student's lock is taken, so the order above always holds.
+            savepoint = conn.begin_nested()
+            found = conn.execute(select(P.c.student_ref).where(P.c.id == plan_id, P.c.tenant_id == self.tenant_id)
+                                 .with_for_update()).scalar_one_or_none()
+            if found == student:
+                savepoint.commit()
+                return
+            savepoint.rollback()
+            if found is None:
+                raise KeyError(f"plan {plan_id}")
+            student = found
 
     def _lock_task(self, conn: Connection, task_id: int):
         plan_id = conn.execute(select(T.c.plan_id).where(T.c.id == task_id, T.c.tenant_id == self.tenant_id)
@@ -391,17 +542,34 @@ class Kernel:
                     citations=list(t.citations), fact_refs=[list(f) for f in t.fact_refs]))
         if d.empty and pin_version is None:
             self._set_risk(conn, plan_id, draft.at_risk)
+            request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())
             return None
         number = conn.execute(select(P.c.current_revision).where(P.c.id == plan_id)).scalar_one() + 1
         for key in d.rechecked:  # the finished check stays as history; its key goes to the fresh task below
             conn.execute(update(T).where(T.c.id == ids.pop(key)).values(instance_key=f"{key}{DONE_MARK}{number}"))
         for key in d.added:
             ids[key] = self._insert_task(conn, plan_id, new[key], draft.playbook_version)
+        answered = set(draft.answered)
         for key in d.removed:  # unstarted, including open inbox items: all may move to cancelled
             row = conn.execute(select(T).where(T.c.id == ids[key])).one()
             # Renamed so the key is free: if the task comes back later it is a fresh task (review C2).
-            self._transition(conn, row, S.CANCELLED, cause=cause,
-                             instance_key=f"{key}{CANCELLED_MARK}{number}")
+            if key in answered and row.kind == "student" and row.state in _ANSWERABLE:
+                # P1-T8: the student gave what it asked for, so the request is done, not cancelled. A step still
+                # pending (behind a "result expected" step) has not been asked yet: it takes the short way through
+                # ready and waiting, under its new key so no "student needed" notice is written for it.
+                renamed = f"{key}{DONE_MARK}{number}"
+                if row.state != S.WAITING_STUDENT:
+                    if row.state != S.READY:
+                        row = self._transition(conn, row, S.READY, cause=cause, instance_key=renamed)
+                        row = self._transition(conn, row, S.WAITING_STUDENT, cause=cause)
+                    else:
+                        row = self._transition(conn, row, S.WAITING_STUDENT, cause=cause, instance_key=renamed)
+                    self._transition(conn, row, S.DONE, cause="request_answered")
+                else:
+                    self._transition(conn, row, S.DONE, cause="request_answered", instance_key=renamed)
+            else:
+                self._transition(conn, row, S.CANCELLED, cause=cause,
+                                 instance_key=f"{key}{CANCELLED_MARK}{number}")
             del ids[key]
         for key, token in d.tokens.items():  # report each started/protected difference only once (C1)
             conn.execute(update(T).where(T.c.id == ids[key]).values(skipped_draft=token))
@@ -411,6 +579,12 @@ class Kernel:
             conn.execute(update(T).where(T.c.id == row.id).values(**values, updated_at=self.clock()))
             if new[key].blocked_reason and row.state == S.READY:
                 row = conn.execute(select(T).where(T.c.id == row.id)).one()
+                self._transition(conn, row, S.BLOCKED, cause=cause)
+            elif row.state == S.WAITING_STUDENT and row.kind == "student" and new[key].blocked_reason \
+                    and new[key].blocked_reason.partition(":")[0] in request_keys.BLOCK_CODES:
+                # P1-T8: an open inbox item whose data went missing or doubtful is blocked, not left asking (only
+                # these codes: any other keeps the rule above, so a plan without needs is revised as before)
+                row = self._transition(conn, row, S.READY, cause=cause)
                 self._transition(conn, row, S.BLOCKED, cause=cause)
         live = {k: v for k, v in ids.items() if k in new}
         self._rebuild_edges(conn, plan_id, draft.tasks, live)
@@ -431,9 +605,15 @@ class Kernel:
         self._event(conn, plan_id, None, "plan_revised", {"number": number, "cause": cause, "diff": d.as_json()})
         self._set_risk(conn, plan_id, draft.at_risk)
         self._promote(conn, plan_id)
+        # P1-T8, D-w7. Called on every revision on purpose: the student lock is already held by `_lock_plan`, and what it reads
+        # (this plan's request steps, the student's open rows) is what a skip would have to read too; a skip could also miss
+        # another plan's live step that needs a row.
+        request_store.sync(conn, self.tenant_id, plan_id, draft.answered or (), now=self.clock())
         return number
 
     def _promote(self, conn: Connection, plan_id: int) -> None:
+        if conn.execute(select(P.c.status).where(P.c.id == plan_id)).scalar_one() == "paused":
+            return  # a paused plan readies nothing and is not marked done; `resume_plan` promotes again
         rows = conn.execute(select(T).where(T.c.plan_id == plan_id).order_by(T.c.id)).all()
         state = {r.id: S(r.state) for r in rows}
         hard_preds: dict[int, list[int]] = {}
@@ -453,5 +633,7 @@ class Kernel:
                     self._request(conn, r.id, attempt)
         states = conn.execute(select(T.c.state).where(T.c.plan_id == plan_id)).scalars().all()
         if states and all(S(s) in TERMINAL for s in states):
-            conn.execute(update(P).where(P.c.id == plan_id, P.c.status != PLAN_CLOSED).values(
-                status="done", updated_at=self.clock()))
+            finished = conn.execute(update(P).where(P.c.id == plan_id, P.c.status.not_in((PLAN_CLOSED, "done")))
+                                    .values(status="done", updated_at=self.clock()))
+            if finished.rowcount:  # the plan has just finished: say so once (R-45)
+                self._event(conn, plan_id, None, "plan_finished", {})

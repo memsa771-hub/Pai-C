@@ -28,7 +28,8 @@ def add_fact(engine, ref, year=2027):
         value="english", quote="", url=URL, checked_at=NOW, intake_year=year, status="unconfirmed"), "research")
 
 
-def test_migration_up_down(os_db):
+def test_migration_up_down(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     from tests.os.conftest import run_alembic
 
     run_alembic(["downgrade", "os_0005"], os_db)

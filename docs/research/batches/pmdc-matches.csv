@@ -1,0 +1,92 @@
+inst_id,batch,pmdc_serial,pmdc_name_as_written,match_type,note
+PB-MED-001,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 145 is ""King Edward Medical University"", not ""Medical College"""
+PB-MED-002,PAI-Research-Batch2-Punjab-v4.xlsx,137,Allama Iqbal Medical College,city_suffix_dropped,
+PB-MED-003,PAI-Research-Batch2-Punjab-v4.xlsx,148,Nishtar Medical College,city_suffix_dropped,
+PB-MED-004,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 141 is ""Fatima Jinnah Medical College for Women (Fatima Jinnah Medical University)"""
+PB-MED-005,PAI-Research-Batch2-Punjab-v4.xlsx,154,Services Institute of Medical Sciences,city_suffix_dropped,
+PB-MED-006,PAI-Research-Batch2-Punjab-v4.xlsx,149,Punjab Medical College,city_suffix_dropped,
+PB-MED-007,PAI-Research-Batch2-Punjab-v4.xlsx,151,Rawalpindi Medical College,city_suffix_dropped,
+PB-MED-008,PAI-Research-Batch2-Punjab-v4.xlsx,150,Quaid-e-Azam Medical College,city_suffix_dropped,
+PB-MED-009,PAI-Research-Batch2-Punjab-v4.xlsx,156,Sheikh Zayed Medical College,city_suffix_dropped,"PMDC writes the city as "",Rahim Yar Khan"" (no space, wrapped over two lines)"
+PB-MED-010,PAI-Research-Batch2-Punjab-v4.xlsx,153,Sargodha Medical College,city_suffix_dropped,
+PB-MED-011,PAI-Research-Batch2-Punjab-v4.xlsx,147,Nawaz Sharif Medical College,city_suffix_dropped,
+PB-MED-012,PAI-Research-Batch2-Punjab-v4.xlsx,152,Sahiwal Medical College,city_suffix_dropped,
+PB-MED-013,PAI-Research-Batch2-Punjab-v4.xlsx,143,Gujranwala Medical College,city_suffix_dropped,
+PB-MED-014,PAI-Research-Batch2-Punjab-v4.xlsx,140,D.G. Khan Medical College,city_suffix_dropped,
+PB-MED-015,PAI-Research-Batch2-Punjab-v4.xlsx,144,Khawaja Muhammad Safdar Medical College,city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-016,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 138 reads ""Ameer-ud-Din (PGMI) Medical College"" (extra ""(PGMI)"", not a spelling difference)"
+PB-MED-017,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 146 reads ""Narowal M.C"" (abbreviation)"
+PB-MED-018,PAI-Research-Batch2-Punjab-v4.xlsx,178,De'montmorency College of Dentistry,other,"spelling: batch ""de' Montmorency"" vs PMDC ""De'montmorency"" (capital D, no space after the apostrophe, lower-case m)"
+PB-MED-019,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 181 is ""Institute of Dentistry, Nishtar Medical College"" (different wording)"
+PB-MED-020,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 180 is ""Dental Section, Punjab Medical College"" (batch: ""Dental Institute"")"
+PB-MED-021,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-022,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-023,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-024,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-025,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 75 reads ""Akhtar Saeed Medical College, Rawalpindi Campus""; whether ""Rawalpindi Campus"" is part of the name is unclear"
+PB-MED-026,PAI-Research-Batch2-Punjab-v4.xlsx,48,Shalamar Medical & Dental College,city_suffix_dropped,
+PB-MED-027,PAI-Research-Batch2-Punjab-v4.xlsx,49,Sharif Medical & Dental College,city_suffix_dropped,
+PB-MED-028,PAI-Research-Batch2-Punjab-v4.xlsx,38,Lahore Medical & Dental College,city_suffix_dropped,
+PB-MED-029,PAI-Research-Batch2-Punjab-v4.xlsx,44,Rashid Latif Medical College,city_suffix_dropped,
+PB-MED-030,PAI-Research-Batch2-Punjab-v4.xlsx,15,Akhtar Saeed Medical & Dental College,city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-031,PAI-Research-Batch2-Punjab-v4.xlsx,30,FMH College of Medicine & Dentistry,city_suffix_dropped,
+PB-MED-032,PAI-Research-Batch2-Punjab-v4.xlsx,16,Al Aleem Medical College,other,"spelling: batch ""Al-Aleem"" (hyphen) vs PMDC ""Al Aleem"" (space)"
+PB-MED-033,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-034,PAI-Research-Batch2-Punjab-v4.xlsx,23,Central Parks Medical College,other,"spelling: batch ""Central Park"" vs PMDC ""Central Parks"""
+PB-MED-035,PAI-Research-Batch2-Punjab-v4.xlsx,42,Rahbar Medical & Dental College,city_suffix_dropped,
+PB-MED-036,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"batch suffix "", Lahore (University of Lahore)"" is not a plain city; PMDC 52 ""University College of Medicine & Dentistry"" is a candidate"
+PB-MED-037,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 21 reads ""Azra Naheed Medical College, Superior University"" (comma, not parentheses)"
+PB-MED-038,PAI-Research-Batch2-Punjab-v4.xlsx,28,Continental Medical College,city_suffix_dropped,
+PB-MED-039,PAI-Research-Batch2-Punjab-v4.xlsx,74,Abu Umara Medical & Dental College,city_suffix_dropped,
+PB-MED-040,PAI-Research-Batch2-Punjab-v4.xlsx,19,Avicenna Medical College,city_suffix_dropped,
+PB-MED-041,PAI-Research-Batch2-Punjab-v4.xlsx,22,Bakhtawar Amin Medical & Dental College,city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-042,PAI-Research-Batch2-Punjab-v4.xlsx,39,M. Islam Medical College,city_suffix_dropped,
+PB-MED-043,PAI-Research-Batch2-Punjab-v4.xlsx,20,Aziz Fatimah Medical & Dental College,other,"spelling: batch ""Aziz Fatima"" vs PMDC ""Aziz Fatimah"""
+PB-MED-044,PAI-Research-Batch2-Punjab-v4.xlsx,51,Sialkot Medical College,city_suffix_dropped,
+PB-MED-045,PAI-Research-Batch2-Punjab-v4.xlsx,53,University Medical & Dental College,city_suffix_dropped,
+PB-MED-046,PAI-Research-Batch2-Punjab-v4.xlsx,40,Multan Medical & Dental College,city_suffix_dropped,
+PB-MED-047,PAI-Research-Batch2-Punjab-v4.xlsx,41,Niazi Medical & Dental College,city_suffix_dropped,
+PB-MED-048,PAI-Research-Batch2-Punjab-v4.xlsx,56,Pak Red Crescent Medical & Dental College,city_suffix_dropped,"PMDC name wraps over two lines; batch city is Kasur, PMDC address line reads Lahore - a checker should confirm the campus"
+PB-MED-049,PAI-Research-Batch2-Punjab-v4.xlsx,43,Rai Medical College,city_suffix_dropped,
+PB-MED-050,PAI-Research-Batch2-Punjab-v4.xlsx,46,Sahara Medical College,city_suffix_dropped,
+PB-MED-051,PAI-Research-Batch2-Punjab-v4.xlsx,47,Shahida Islam Medical College,city_suffix_dropped,
+PB-MED-052,PAI-Research-Batch2-Punjab-v4.xlsx,34,Independent Medical College,city_suffix_dropped,
+PB-MED-053,PAI-Research-Batch2-Punjab-v4.xlsx,35,Islam Medical College,city_suffix_dropped,
+PB-MED-054,PAI-Research-Batch2-Punjab-v4.xlsx,18,Amna Inayat Medical College,city_suffix_dropped,
+PB-MED-055,PAI-Research-Batch2-Punjab-v4.xlsx,14,Abwa Medical College,city_suffix_dropped,
+PB-MED-056,PAI-Research-Batch2-Punjab-v4.xlsx,55,Watim Medical College,city_suffix_dropped,
+PB-MED-057,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-058,PAI-Research-Batch2-Punjab-v4.xlsx,84,Avicenna Dental College,city_suffix_dropped,
+PB-MED-059,PAI-Research-Batch2-Punjab-v4.xlsx,108,Azra Naheed Dental College,city_suffix_dropped,
+PB-MED-060,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 85 is ""College of Dentistry, Bakhtawar Amin Medical & Dental College"" (batch: ""Dental College, ..."")"
+PB-MED-061,PAI-Research-Batch2-Punjab-v4.xlsx,92,"Dental College, Niazi Medical & Dental College",city_suffix_dropped,"PMDC name wraps; PMDC writes the city without a comma (""College Sargodha"")"
+PB-MED-062,PAI-Research-Batch2-Punjab-v4.xlsx,94,"Dental College, University College of Medicine & Dentistry",city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-063,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 87 is ""Dental College, Akhtar Saeed Medical & Dental College"" (batch: ""Dental Section, ..."")"
+PB-MED-064,PAI-Research-Batch2-Punjab-v4.xlsx,88,"Dental Section, FMH College of Medicine & Dentistry",city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-065,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 91 is ""Dental College, Lahore Medical & Dental College"" (batch: ""Dental Section, ..."")"
+PB-MED-066,PAI-Research-Batch2-Punjab-v4.xlsx,96,"Dental Section, Multan Medical & Dental College",city_suffix_dropped,PMDC name wraps over two lines
+PB-MED-067,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,"PMDC 86 is ""College of Dentistry, Sharif Medical & Dental College"" (batch: ""Dental Section, ..."")"
+PB-MED-068,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-069,PAI-Research-Batch2-Punjab-v4.xlsx,97,Faryal Dental College,city_suffix_dropped,
+PB-MED-070,PAI-Research-Batch2-Punjab-v4.xlsx,102,Islam Dental College,city_suffix_dropped,
+PB-MED-071,PAI-Research-Batch2-Punjab-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+PB-MED-072,PAI-Research-Batch2-Punjab-v4.xlsx,122,"Rahbar College of Dentistry, Lahore",exact,
+PB-MED-073,PAI-Research-Batch2-Punjab-v4.xlsx,105,Rashid Latif Dental College,city_suffix_dropped,
+PB-MED-074,PAI-Research-Batch2-Punjab-v4.xlsx,107,Shahida Islam Dental College,city_suffix_dropped,
+PB-MED-075,PAI-Research-Batch2-Punjab-v4.xlsx,106,Watim Dental College,city_suffix_dropped,
+SD-MED-01,PAI-Research-Batch3-Sindh-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+SD-MED-02,PAI-Research-Batch3-Sindh-v4.xlsx,,,unmatched,"PMDC lists Dow Medical College (160), Dow International Medical College (159), Dow Dental College (188), not the university"
+SD-MED-03,PAI-Research-Batch3-Sindh-v4.xlsx,164,Liaquat University of Medical & Health Sciences,city_suffix_dropped,PMDC name wraps over two lines
+SD-MED-04,PAI-Research-Batch3-Sindh-v4.xlsx,166,Peoples University of Medical & Health Sciences for Women,city_suffix_dropped,"batch suffix "", SBA"" dropped; PMDC name wraps over two lines"
+SD-MED-05,PAI-Research-Batch3-Sindh-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+SD-MED-06,PAI-Research-Batch3-Sindh-v4.xlsx,,,unmatched,no PMDC entry with the same name found
+SD-MED-07,PAI-Research-Batch3-Sindh-v4.xlsx,161,Gambat Medical College,city_suffix_dropped,
+SD-MED-08,PAI-Research-Batch3-Sindh-v4.xlsx,169,Khairpur Medical College,city_suffix_dropped,
+SD-MED-09,PAI-Research-Batch3-Sindh-v4.xlsx,167,Shaheed Mohtarma Benazir Bhutto Medical College,city_suffix_dropped,"batch suffix "", Lyari"" (a town) dropped; PMDC continues ""Behind Lyari General Hospital"" as the address"
+BL-MED-01,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,126,Bolan Medical College,city_suffix_dropped,
+BL-MED-02,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,,,unmatched,"PMDC 170 reads ""Jhalawan Medical College, Khuzdar""; batch adds ""(JMC)"" - not a spelling difference"
+BL-MED-03,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,,,unmatched,"PMDC 171 reads ""Loralai Medical College, Loralai""; batch adds ""(LMC)"""
+BL-MED-04,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,,,unmatched,"PMDC 172 reads ""Makran Medical College, Turbat""; batch ""Mekran ... (MMC)"" differs in spelling and adds an acronym"
+IC-MED-01,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,142,Federal Medical College,city_suffix_dropped,
+IC-MED-02,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,155,Shaikh Khalifa Bin Zayed Al-Nahyan Medical & Dental College,city_suffix_dropped,PMDC name wraps over two lines
+IC-MED-03,PAI-Research-Batch4-KP-Bal-ICT-AJK-GB-v4.xlsx,,,unmatched,"PMDC 189 continues ""School of Dentistry, Shaheed Zulfiqar Ali Bhutto Medical ..."" - the batch name is shorter"

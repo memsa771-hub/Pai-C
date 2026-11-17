@@ -138,3 +138,29 @@ async def test_combined_guards_keep_one_language_retry_for_the_whole_turn():
         assert model.await_count == 2
         assert result.reply == 'What did you enjoy doing?'
         assert result.guard_violations == ['repeated_question']
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_second_greeting_in_a_conversation_is_dropped():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=answer('Wa alaikum assalam, Ayesha! Kya aap MBBS ke baare mein sochti hain?'))
+        with patch('app.pai_c.deep.turn.chat_completion', model):
+            result = await run_deep_turn(db, _turn(student),
+                history=[{'role': 'assistant', 'content': 'Assalam o alaikum Ayesha! Main PAI hoon.'},
+                         {'role': 'user', 'content': 'Walaikum assalam'}])
+        assert model.await_count == 1
+        assert result.reply == 'Kya aap MBBS ke baare mein sochti hain?'
+        assert 'greeting_removed' in result.guard_violations
+
+
+@pytest.mark.req("R-47")
+@pytest.mark.asyncio
+async def test_salaam_is_returned_when_the_student_greets_again():
+    with StudentSession() as student, student.factory() as db:
+        model = AsyncMock(return_value=answer('Wa alaikum assalam! Aaj kya baat karein?'))
+        with patch('app.pai_c.deep.turn.chat_completion', model):
+            result = await run_deep_turn(db, _turn(student, text='Assalam o alaikum'),
+                history=[{'role': 'assistant', 'content': 'Assalam o alaikum Ayesha! Main PAI hoon.'}])
+        assert result.reply == 'Wa alaikum assalam! Aaj kya baat karein?'
+        assert 'greeting_removed' not in result.guard_violations

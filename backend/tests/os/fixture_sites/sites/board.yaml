@@ -1,0 +1,8 @@
+# Fictional examination board (results calendar). Invented for tests.
+host: www.north-exam-board.test
+pages:
+  /robots.txt: {content_type: text/plain, body: "User-agent: *\nAllow: /\n"}
+  /results:
+    body: |
+      <html><body><h1>Result announcements</h1>
+      <p>The intermediate Part-II result will be announced on 15 September 2027.</p></body></html>

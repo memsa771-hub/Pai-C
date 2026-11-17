@@ -9,7 +9,13 @@ import { I18nProvider } from '@/lib/i18n';
 import type { WorkspaceMessage } from '@/lib/types';
 
 vi.mock('./chat-message', () => ({ ChatMessage: ({ message }: { message: WorkspaceMessage }) => <p>{message.content}</p> }));
-afterEach(cleanup);
+// A scroll starts the virtualizer's scroll-end timer (isScrollingResetDelay, 150 ms in chat-messages.tsx), which it
+// does not clear on unmount. Let it run while the test page still exists; otherwise, when this file finishes first,
+// it fires after jsdom is torn down ("window is not defined") and fails the whole run.
+afterEach(async () => {
+  await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+  cleanup();
+});
 
 const message = (id: string, messageType = 'chat'): WorkspaceMessage => ({
   messageId: id, sessionId: 'pai-counselor', senderType: 'agent', senderName: 'pai', messageType,

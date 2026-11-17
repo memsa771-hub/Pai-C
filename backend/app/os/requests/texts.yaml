@@ -1,0 +1,22 @@
+# P1-T8 (D-w16): student sentences for the requests the plan makes (R-18, R-19, R-21, R-22). Approved by the owner
+# (chat: "just update it directly"). Copy lives here, never in code.
+version: 1
+approved: true
+texts:
+  how_stated: "Tell PAI in the chat or on your profile page. This step closes by itself when PAI has it."
+  how_shown: "Upload it on the Documents page and check what PAI read. This step closes by itself when you confirm it."
+  how_confirmed: "Check it on your profile page. This step closes by itself when you confirm it."
+  how_document: "Upload it on the Documents page and check what PAI read. This step closes by itself when you confirm it."
+  how_which_is_right: "Two places say different things. Choose the one that is right, or type the right value."
+  how_which_is_right_documents: "Two of your documents say different things. Choose the one that is right."
+  how_impossible: "This value is higher than its total. Type the right value."
+  answer_required: "This step closes by itself when PAI has what it needs."
+  current_label: "Saved in PAI"
+  proposed_label: "From your document"
+  proposed_said_label: "What you told PAI"
+  new_label: "Neither: I will type the right value"
+  unanswered_swap: "A step of this place is still waiting for information from you: a close match is suggested instead."
+  unanswered_drop: "A step of this place is still waiting for information from you: removing this place is suggested."
+  unanswered_all: "Information your plan needs has not arrived, and every place on it depends on it. A person will look at your plan with you. Your plan stays as it is."
+  unanswered_proposed: "PAI has suggested a change to your plan because information it needs has not arrived. A person will also look at your plan with you."
+  answer_changed: "This question changed while you were looking at it. Look at it again and choose once more."

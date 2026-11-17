@@ -229,3 +229,45 @@ class TestOcrFallback:
         assert result["parsed"] is True
         artifact = DocumentArtifactService(db).get(workspace_id, record.id)
         assert artifact.status == "partial"
+
+
+@pytest.mark.req("R-01")
+class TestParseJobForAnOsDocument:
+    """P1-T7 (D-y4): a file an OS document reads is parsed and indexed, but not extracted by the Counsellor."""
+
+    @staticmethod
+    def _queued(db, workspace_id, **register):
+        data = make_pdf(TRANSCRIPT_PAGES)
+        record = make_file(db, workspace_id, "transcript.pdf", data, "application/pdf")
+        DocumentArtifactService(db).register_and_enqueue(
+            workspace_id, record.id, data, "transcript.pdf", "application/pdf", **register)
+        payload = db.execute(select(BackgroundJob).where(BackgroundJob.job_type == "document.parse")
+                             ).scalars().one().payload
+        return record, _StubStore({record.storage_key: data}), payload
+
+    @staticmethod
+    def _run_with(db, workspace_id, file_id, store, payload):
+        job = SimpleNamespace(id="job-1", workspace_id=workspace_id, payload=payload, job_type="document.parse")
+        with patch("app.documents.handlers.get_file_store", return_value=store):
+            return asyncio.run(parse_document_job(job, db))
+
+    def test_the_payload_has_the_key_only_when_extraction_is_off(self, db, workspace_id):
+        _, _, payload = self._queued(db, workspace_id)
+        assert "extract" not in payload
+
+    def test_no_extract_job_but_the_index_job_when_recall_is_on(self, db, workspace_id):
+        record, store, payload = self._queued(db, workspace_id, extract=False)
+        assert payload["extract"] is False
+        with patch("app.config.config.PAI_SEMANTIC_RECALL_ENABLED", True):
+            result = self._run_with(db, workspace_id, record.id, store, payload)
+        assert result["parsed"] is True
+        assert DocumentArtifactService(db).get(workspace_id, record.id).status == "ready"
+        kinds = [j.job_type for j in db.execute(select(BackgroundJob)).scalars().all()]
+        assert JOB_DOCUMENT_EXTRACT not in kinds and kinds.count("document.index") == 1
+
+    def test_no_extract_and_no_index_job_when_recall_is_off(self, db, workspace_id):
+        record, store, payload = self._queued(db, workspace_id, extract=False)
+        with patch("app.config.config.PAI_SEMANTIC_RECALL_ENABLED", False):
+            self._run_with(db, workspace_id, record.id, store, payload)
+        kinds = [j.job_type for j in db.execute(select(BackgroundJob)).scalars().all()]
+        assert kinds == ["document.parse"]

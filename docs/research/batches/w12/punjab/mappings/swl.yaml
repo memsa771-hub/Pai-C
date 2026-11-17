@@ -1,0 +1,6 @@
+id_prefix: PB-HEDCOL-SWL-
+type: public_college
+region: list
+city_column: city
+read_method: "curl + pdftotext (PDF text layer)"
+retrieved: 2026-11-14

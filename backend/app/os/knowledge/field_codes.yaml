@@ -1,0 +1,10 @@
+# Study-field codes of OS programmes (master R-15, P2-T24). A programme's `field` (os_programmes.field, filled by the
+# import's Programmes `field` column) is compared with the student's excluded fields, which the Vault hands over in
+# StudentFacts (`constraint.excluded_fields`) as the Counsellor's study-field codes (for example `pharm_d`).
+#
+# A `field` that already is a Counsellor code needs no entry: it is used as it is. `aliases` maps any other value the
+# registry holds to the Counsellor code it means. Add an entry only for a value a sheet really uses, checked against
+# the Counsellor's study-field list; never guess one. A programme with an empty `field` is never matched (rule 8 of
+# the consistency job keeps opening a case for it).
+version: 1
+aliases: {}

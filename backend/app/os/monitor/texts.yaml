@@ -1,0 +1,19 @@
+# P2-T7: the sentences a student sees about a fact that is being checked again (P2-D20, P2-D22; R-27, R-28). Copy lives
+# here, never in code. No country, institution, date or figure appears in them.
+# Approved by the owner's standing approval of student sentences (chat: "you dont need to open PRs for such silly student
+# sentences just update it directly"). The PR lists all twelve for the owner to read.
+version: 1
+approved: true
+texts:
+  fact_rechecking_waiting: "PAI is checking this date again with the official site. This step waits until it is confirmed."
+  report_link: "Report as wrong"
+  report_title: "What looks wrong?"
+  reason_wrong_date: "The date is wrong"
+  reason_wrong_amount: "The amount is wrong"
+  reason_page_changed: "The official page now says something else"
+  reason_other: "Something else"
+  report_detail_label: "Tell us more (optional). Only the person who checks it will read this."
+  report_submit: "Send report"
+  report_thanks: "Thank you. PAI will check this again. Until then it shows as not confirmed."
+  report_limit: "You have sent several reports today. Please try again tomorrow."
+  report_failed: "The report could not be sent. Please try again."

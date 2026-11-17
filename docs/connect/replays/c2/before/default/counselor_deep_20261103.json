@@ -1,0 +1,5649 @@
+{
+  "mode": "offline",
+  "policy_mode": null,
+  "status": "complete",
+  "personas": [
+    {
+      "persona": "ayesha",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I am deciding between another entrance-test attempt and psychology.",
+          "reply": "What have you actually done in psychology?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 152,
+          "pipeline_ms": 409,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Psychology interest came from helping at a community center",
+            "captured": false
+          },
+          {
+            "fact": "A previous entrance-test attempt was exhausting",
+            "captured": false
+          },
+          {
+            "fact": "Has helped younger students with science weekly for six months",
+            "captured": false
+          },
+          {
+            "fact": "Mother fears another unsuccessful year will undermine confidence",
+            "captured": false
+          },
+          {
+            "fact": "Must start contributing to household income within a year",
+            "captured": false
+          },
+          {
+            "fact": "Can explain difficult ideas patiently without technical jargon",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "4d54ab13-8a6c-4a9c-bd0d-efcafc3c53ae",
+            "key": "stated_goal",
+            "value": "I am deciding between another entrance-test attempt and psychology.",
+            "evidence": "I am deciding between another entrance-test attempt and psychology.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:36.610085Z",
+            "last_confirmed": "2026-11-03T18:10:36.610085Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "3195e5bf-c885-48db-b95b-a838fadd14ab",
+            "key": "current_situation",
+            "value": "Studied in the FSc Pre-Medical system",
+            "evidence": "I am deciding between another entrance-test attempt and psychology.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:36.610085Z",
+            "last_confirmed": "2026-11-03T18:10:36.610085Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "d5035e24-2a9f-46e1-bd03-b573210aedd9",
+            "key": "source_of_goal",
+            "value": "I am deciding between another entrance-test attempt and psychology.",
+            "evidence": "I am deciding between another entrance-test attempt and psychology.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:36.610085Z",
+            "last_confirmed": "2026-11-03T18:10:36.610085Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Psychology interest came from helping at a community center",
+            "captured": false
+          },
+          {
+            "fact": "A previous entrance-test attempt was exhausting",
+            "captured": false
+          },
+          {
+            "fact": "Has helped younger students with science weekly for six months",
+            "captured": false
+          },
+          {
+            "fact": "Mother fears another unsuccessful year will undermine confidence",
+            "captured": false
+          },
+          {
+            "fact": "Must start contributing to household income within a year",
+            "captured": false
+          },
+          {
+            "fact": "Can explain difficult ideas patiently without technical jargon",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 152.0,
+        "latency_p95_ms": 152.0,
+        "pipeline_p50_ms": 409.0,
+        "pipeline_p95_ms": 409.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "bilal",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I have built motor-control projects and want a power-electronics master's.",
+          "reply": "Which project did you debug through a difficult setback?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 64,
+          "pipeline_ms": 229,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Built and debugged two independent motor controllers",
+            "captured": false
+          },
+          {
+            "fact": "Has compared program requirements from official pages",
+            "captured": false
+          },
+          {
+            "fact": "Keeps repairing household electronics even without coursework",
+            "captured": false
+          },
+          {
+            "fact": "Father worries that combining paid work and study will be exhausting",
+            "captured": false
+          },
+          {
+            "fact": "Can afford study only while keeping part-time employment",
+            "captured": false
+          },
+          {
+            "fact": "Documents faults clearly enough for friends to reproduce repairs",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "ef0ed018-ca3f-454e-b36c-c1a096d98c52",
+            "key": "stated_goal",
+            "value": "I have built motor-control projects and want a power-electronics master's.",
+            "evidence": "I have built motor-control projects and want a power-electronics master's.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.204395Z",
+            "last_confirmed": "2026-11-03T18:10:37.204395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "70d924e8-ecff-4f87-9ac1-bfb4633a6e29",
+            "key": "current_situation",
+            "value": "Studied in the BSc electrical engineering system",
+            "evidence": "I have built motor-control projects and want a power-electronics master's.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.204395Z",
+            "last_confirmed": "2026-11-03T18:10:37.204395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "80efb849-f3b0-481d-9ca9-0a9b6d5745fd",
+            "key": "source_of_goal",
+            "value": "I have built motor-control projects and want a power-electronics master's.",
+            "evidence": "I have built motor-control projects and want a power-electronics master's.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.204395Z",
+            "last_confirmed": "2026-11-03T18:10:37.204395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Built and debugged two independent motor controllers",
+            "captured": false
+          },
+          {
+            "fact": "Has compared program requirements from official pages",
+            "captured": false
+          },
+          {
+            "fact": "Keeps repairing household electronics even without coursework",
+            "captured": false
+          },
+          {
+            "fact": "Father worries that combining paid work and study will be exhausting",
+            "captured": false
+          },
+          {
+            "fact": "Can afford study only while keeping part-time employment",
+            "captured": false
+          },
+          {
+            "fact": "Documents faults clearly enough for friends to reproduce repairs",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 64.0,
+        "latency_p95_ms": 64.0,
+        "pipeline_p50_ms": 229.0,
+        "pipeline_p95_ms": 229.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "clear_decided",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I have done conservation fieldwork and have chosen environmental science.",
+          "reply": "What part of your field survey was hardest?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 67,
+          "pipeline_ms": 284,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Completed an independent field survey",
+            "captured": false
+          },
+          {
+            "fact": "Understands the fieldwork demands",
+            "captured": false
+          },
+          {
+            "fact": "Volunteers on local habitat monitoring most weekends",
+            "captured": false
+          },
+          {
+            "fact": "Parents worry about finding stable housing near field placements",
+            "captured": false
+          },
+          {
+            "fact": "Cannot commit to a route without affordable accommodation",
+            "captured": false
+          },
+          {
+            "fact": "Can keep accurate observations and organize shared field notes",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "dd72e1e4-327f-4cf0-a794-59937bb37239",
+            "key": "stated_goal",
+            "value": "I have done conservation fieldwork and have chosen environmental science.",
+            "evidence": "I have done conservation fieldwork and have chosen environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.829721Z",
+            "last_confirmed": "2026-11-03T18:10:37.829721Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "ed5e6d8c-394c-46af-95d0-54f3c7a12ac4",
+            "key": "current_situation",
+            "value": "Studied in the baccalauréat system",
+            "evidence": "I have done conservation fieldwork and have chosen environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.829721Z",
+            "last_confirmed": "2026-11-03T18:10:37.829721Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "934ed462-48c1-4c4f-8e55-ce99a1212d2a",
+            "key": "source_of_goal",
+            "value": "I have done conservation fieldwork and have chosen environmental science.",
+            "evidence": "I have done conservation fieldwork and have chosen environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:37.829721Z",
+            "last_confirmed": "2026-11-03T18:10:37.829721Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Completed an independent field survey",
+            "captured": false
+          },
+          {
+            "fact": "Understands the fieldwork demands",
+            "captured": false
+          },
+          {
+            "fact": "Volunteers on local habitat monitoring most weekends",
+            "captured": false
+          },
+          {
+            "fact": "Parents worry about finding stable housing near field placements",
+            "captured": false
+          },
+          {
+            "fact": "Cannot commit to a route without affordable accommodation",
+            "captured": false
+          },
+          {
+            "fact": "Can keep accurate observations and organize shared field notes",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 67.0,
+        "latency_p95_ms": 67.0,
+        "pipeline_p50_ms": 284.0,
+        "pipeline_p95_ms": 284.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "coach_mode",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I tried the study plan for a month, got one rejection, and have lost momentum.",
+          "reply": "Which part of the plan did you actually manage to try?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 59,
+          "pipeline_ms": 246,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Completed only one of four planned practice tasks",
+            "captured": false
+          },
+          {
+            "fact": "One application was rejected because a document was missing",
+            "captured": false
+          },
+          {
+            "fact": "Still enjoys weekly peer practice despite missing solo tasks",
+            "captured": false
+          },
+          {
+            "fact": "Family worries that another rejection will cause withdrawal",
+            "captured": false
+          },
+          {
+            "fact": "Four weeks remain and access to the shared laptop is limited",
+            "captured": false
+          },
+          {
+            "fact": "Can spot missing items in other people’s forms but rushes their own",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "a3601c7c-203c-4d5e-b174-a8ab1b780db3",
+            "key": "current_situation",
+            "value": "Reviewing a month of attempted study after a rejection",
+            "evidence": "I tried the study plan for a month, got one rejection, and have lost momentum.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:38.425697Z",
+            "last_confirmed": "2026-11-03T18:10:38.425697Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": false,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Completed only one of four planned practice tasks",
+            "captured": false
+          },
+          {
+            "fact": "One application was rejected because a document was missing",
+            "captured": false
+          },
+          {
+            "fact": "Still enjoys weekly peer practice despite missing solo tasks",
+            "captured": false
+          },
+          {
+            "fact": "Family worries that another rejection will cause withdrawal",
+            "captured": false
+          },
+          {
+            "fact": "Four weeks remain and access to the shared laptop is limited",
+            "captured": false
+          },
+          {
+            "fact": "Can spot missing items in other people’s forms but rushes their own",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 59.0,
+        "latency_p95_ms": 59.0,
+        "pipeline_p50_ms": 246.0,
+        "pipeline_p95_ms": 246.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "danish",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I want to become an AI engineer and study in Canada. I have learned Python.",
+          "reply": "What have you done independently with Python so far?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 89,
+          "pipeline_ms": 296,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 100,
+              "cached_input": 20,
+              "output": 20,
+              "reasoning": 5,
+              "cost_usd": 6.05e-05
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 120,
+              "cached_input": 0,
+              "output": 30,
+              "reasoning": 10,
+              "cost_usd": 9e-05
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 50,
+              "cached_input": 0,
+              "output": 10,
+              "reasoning": 0,
+              "cost_usd": 3.25e-05
+            }
+          ],
+          "cost_usd": 0.000183
+        },
+        {
+          "turn": 2,
+          "student": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+          "reply": "What made you stay with that course as long as you did?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 35,
+          "pipeline_ms": 138,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 1,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [
+          {
+            "metric": "hidden_truths_captured",
+            "turn": 2,
+            "quote": "I watched about half a Python course and only copied the examples"
+          }
+        ],
+        "hidden_truths": [
+          {
+            "fact": "Watched only half of a Python course and copied along",
+            "captured": true
+          },
+          {
+            "fact": "Had zero freelance orders after two months",
+            "captured": false
+          },
+          {
+            "fact": "Ran an Instagram shop for eight months with many orders",
+            "captured": false
+          },
+          {
+            "fact": "Organized local cricket matches",
+            "captured": false
+          },
+          {
+            "fact": "Father's real concern is returning home",
+            "captured": false
+          },
+          {
+            "fact": "Cannot leave mother and brother for several years",
+            "captured": false
+          }
+        ],
+        "claims_probed": 1,
+        "claims_total": 1,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "e200170c-fc4a-4575-b0a8-5186dcd96474",
+            "key": "stated_goal",
+            "value": "I want to become an AI engineer and study in Canada.",
+            "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.137835Z",
+            "last_confirmed": "2026-11-03T18:10:39.330336Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "94753c6d-c480-4409-b27c-301901734fd7",
+            "key": "claim",
+            "value": {
+              "text": "Started learning Python through a course",
+              "probed": true
+            },
+            "evidence": "Watched about half and copied examples; no independent project",
+            "kind": "said",
+            "confidence": "low",
+            "level": "tried",
+            "first_seen": "2026-11-03T18:10:39.137835Z",
+            "last_confirmed": "2026-11-03T18:10:39.330336Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "e1aa4f56-7bf0-457b-8853-d7bbb6fa85f9",
+            "key": "current_situation",
+            "value": "Studied in the ICS system",
+            "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.137835Z",
+            "last_confirmed": "2026-11-03T18:10:39.330336Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "7a56362d-4b86-44c8-bdb9-bea0d73223a0",
+            "key": "source_of_goal",
+            "value": "I want to become an AI engineer and study in Canada.",
+            "evidence": "I watched about half a Python course and only copied the examples; I have not built anything alone.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.137835Z",
+            "last_confirmed": "2026-11-03T18:10:39.330336Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          },
+          {
+            "id": "1ebb83b3-5928-47fe-a751-906b76006fff",
+            "key": "claim_source",
+            "value": "Started learning Python through a course",
+            "evidence": "Watched about half and copied examples; no independent project",
+            "kind": "said",
+            "confidence": "low",
+            "level": "tried",
+            "first_seen": "2026-11-03T18:10:39.137835Z",
+            "last_confirmed": "2026-11-03T18:10:39.330336Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 1,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [
+          {
+            "metric": "hidden_truths_captured",
+            "turn": 2,
+            "quote": "I watched about half a Python course and only copied the examples"
+          }
+        ],
+        "hidden_truths": [
+          {
+            "fact": "Watched only half of a Python course and copied along",
+            "captured": true
+          },
+          {
+            "fact": "Had zero freelance orders after two months",
+            "captured": false
+          },
+          {
+            "fact": "Ran an Instagram shop for eight months with many orders",
+            "captured": false
+          },
+          {
+            "fact": "Organized local cricket matches",
+            "captured": false
+          },
+          {
+            "fact": "Father's real concern is returning home",
+            "captured": false
+          },
+          {
+            "fact": "Cannot leave mother and brother for several years",
+            "captured": false
+          }
+        ],
+        "claims_probed": 1,
+        "claims_total": 1,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.167,
+        "claims_probed_beyond_claimed": 1,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 62.0,
+        "latency_p95_ms": 86.3,
+        "pipeline_p50_ms": 217.0,
+        "pipeline_p95_ms": 288.1
+      },
+      "total_cost_usd": 0.000183,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 2,
+          "input": 120,
+          "cached_input": 0,
+          "output": 30,
+          "reasoning": 10,
+          "cost_usd": 9e-05
+        },
+        "counselor": {
+          "calls": 2,
+          "input": 100,
+          "cached_input": 20,
+          "output": 20,
+          "reasoning": 5,
+          "cost_usd": 6.05e-05
+        },
+        "memory_extractor": {
+          "calls": 2,
+          "input": 50,
+          "cached_input": 0,
+          "output": 10,
+          "reasoning": 0,
+          "cost_usd": 3.25e-05
+        }
+      }
+    },
+    {
+      "persona": "exaggerator",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I am already an expert coder and want software engineering.",
+          "reply": "What did you build entirely on your own?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 75,
+          "pipeline_ms": 305,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Only followed tutorial examples",
+            "captured": false
+          },
+          {
+            "fact": "Has not shipped an independent project",
+            "captured": false
+          },
+          {
+            "fact": "Returns to fixing neighbors’ devices more often than coding",
+            "captured": false
+          },
+          {
+            "fact": "Family fears paying tuition without a realistic income path",
+            "captured": false
+          },
+          {
+            "fact": "Cannot pay tuition without continuing small repair jobs",
+            "captured": false
+          },
+          {
+            "fact": "Can explain device problems clearly to customers",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "661d975a-95db-4b80-aa92-5e14efc8c293",
+            "key": "stated_goal",
+            "value": "I am already an expert coder and want software engineering.",
+            "evidence": "I am already an expert coder and want software engineering.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.861730Z",
+            "last_confirmed": "2026-11-03T18:10:39.861730Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "79f2beac-7d18-420c-8246-838bfc6e0802",
+            "key": "current_situation",
+            "value": "Studied in the WAEC system",
+            "evidence": "I am already an expert coder and want software engineering.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.861730Z",
+            "last_confirmed": "2026-11-03T18:10:39.861730Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "cae3e3f3-db88-4e7f-b8c6-e5426f370195",
+            "key": "source_of_goal",
+            "value": "I am already an expert coder and want software engineering.",
+            "evidence": "I am already an expert coder and want software engineering.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:39.861730Z",
+            "last_confirmed": "2026-11-03T18:10:39.861730Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Only followed tutorial examples",
+            "captured": false
+          },
+          {
+            "fact": "Has not shipped an independent project",
+            "captured": false
+          },
+          {
+            "fact": "Returns to fixing neighbors’ devices more often than coding",
+            "captured": false
+          },
+          {
+            "fact": "Family fears paying tuition without a realistic income path",
+            "captured": false
+          },
+          {
+            "fact": "Cannot pay tuition without continuing small repair jobs",
+            "captured": false
+          },
+          {
+            "fact": "Can explain device problems clearly to customers",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 75.0,
+        "latency_p95_ms": 75.0,
+        "pipeline_p50_ms": 305.0,
+        "pipeline_p95_ms": 305.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "goal_switcher",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I want to study architecture after bachillerato.",
+          "reply": "What work have you kept doing through these changes?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 97,
+          "pipeline_ms": 299,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        },
+        {
+          "turn": 2,
+          "student": "After talking with family, I now want business.",
+          "reply": "What changed for you after that conversation?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 37,
+          "pipeline_ms": 142,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        },
+        {
+          "turn": 3,
+          "student": "I volunteered in conservation and now want environmental science.",
+          "reply": "What part of that conservation work held your interest?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 32,
+          "pipeline_ms": 131,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Architecture followed a relative's suggestion",
+            "captured": false
+          },
+          {
+            "fact": "Enjoys sustained local conservation work",
+            "captured": false
+          },
+          {
+            "fact": "Business became attractive after seeing a friend’s online success",
+            "captured": false
+          },
+          {
+            "fact": "Family worries about irregular income rather than the subject itself",
+            "captured": false
+          },
+          {
+            "fact": "Must stay within commuting distance to help at home",
+            "captured": false
+          },
+          {
+            "fact": "Coordinates volunteer schedules and resolves disagreements",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "9703e752-90ab-4261-ac86-4be06fd099c3",
+            "key": "stated_goal",
+            "value": "I now want environmental science.",
+            "evidence": "I volunteered in conservation and now want environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:40.599317Z",
+            "last_confirmed": "2026-11-03T18:10:40.924800Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "645b037e-7d43-45a9-8b7b-658acec57ec0",
+            "key": "current_situation",
+            "value": "Studied in the bachillerato system",
+            "evidence": "I volunteered in conservation and now want environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:40.599317Z",
+            "last_confirmed": "2026-11-03T18:10:40.924800Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "e1b6135d-bb12-40ab-a957-a6d3c835bf65",
+            "key": "source_of_goal",
+            "value": "I now want environmental science.",
+            "evidence": "I volunteered in conservation and now want environmental science.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:40.599317Z",
+            "last_confirmed": "2026-11-03T18:10:40.924800Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Architecture followed a relative's suggestion",
+            "captured": false
+          },
+          {
+            "fact": "Enjoys sustained local conservation work",
+            "captured": false
+          },
+          {
+            "fact": "Business became attractive after seeing a friend’s online success",
+            "captured": false
+          },
+          {
+            "fact": "Family worries about irregular income rather than the subject itself",
+            "captured": false
+          },
+          {
+            "fact": "Must stay within commuting distance to help at home",
+            "captured": false
+          },
+          {
+            "fact": "Coordinates volunteer schedules and resolves disagreements",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 37.0,
+        "latency_p95_ms": 91.0,
+        "pipeline_p50_ms": 142.0,
+        "pipeline_p95_ms": 283.3
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 3,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 3,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 3,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "guarantee_seeker",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "Can you guarantee I will get into engineering abroad?",
+          "reply": "What would a workable backup look like?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 74,
+          "pipeline_ms": 482,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "A previous rejection drove the need for certainty",
+            "captured": false
+          },
+          {
+            "fact": "Needs a financial fallback",
+            "captured": false
+          },
+          {
+            "fact": "Keeps tutoring younger pupils even after application rejection",
+            "captured": false
+          },
+          {
+            "fact": "Family fears losing savings on another uncertain attempt",
+            "captured": false
+          },
+          {
+            "fact": "Would need paid work if external funding does not arrive",
+            "captured": false
+          },
+          {
+            "fact": "Can break a complex topic into small understandable steps",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "9cb50a49-f907-4809-aaa6-b74b6baf53f1",
+            "key": "stated_goal",
+            "value": "Can you guarantee I will get into engineering abroad?",
+            "evidence": "Can you guarantee I will get into engineering abroad?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:41.682016Z",
+            "last_confirmed": "2026-11-03T18:10:41.682016Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "68348d27-541d-480c-adcc-48e0ff4a1165",
+            "key": "current_situation",
+            "value": "Studied in the Thanaweya Amma system",
+            "evidence": "Can you guarantee I will get into engineering abroad?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:41.682016Z",
+            "last_confirmed": "2026-11-03T18:10:41.682016Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "7a1ff0aa-56d7-42e3-b93b-6c5f11134637",
+            "key": "source_of_goal",
+            "value": "Can you guarantee I will get into engineering abroad?",
+            "evidence": "Can you guarantee I will get into engineering abroad?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:41.682016Z",
+            "last_confirmed": "2026-11-03T18:10:41.682016Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "A previous rejection drove the need for certainty",
+            "captured": false
+          },
+          {
+            "fact": "Needs a financial fallback",
+            "captured": false
+          },
+          {
+            "fact": "Keeps tutoring younger pupils even after application rejection",
+            "captured": false
+          },
+          {
+            "fact": "Family fears losing savings on another uncertain attempt",
+            "captured": false
+          },
+          {
+            "fact": "Would need paid work if external funding does not arrive",
+            "captured": false
+          },
+          {
+            "fact": "Can break a complex topic into small understandable steps",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 74.0,
+        "latency_p95_ms": 74.0,
+        "pipeline_p50_ms": 482.0,
+        "pipeline_p95_ms": 482.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "hamza",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "My family wants medicine, but I keep thinking about music.",
+          "reply": "When have you practiced music consistently?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 76,
+          "pipeline_ms": 251,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Medical route is mainly a family dream",
+            "captured": false
+          },
+          {
+            "fact": "Has repeatedly organized and performed music for a year",
+            "captured": false
+          },
+          {
+            "fact": "Music interest grew from rehearsing with peers rather than fame",
+            "captured": false
+          },
+          {
+            "fact": "Parents fear an unstable income more than they dislike music",
+            "captured": false
+          },
+          {
+            "fact": "Cannot pay for study without family cooperation",
+            "captured": false
+          },
+          {
+            "fact": "Coordinates rehearsals and settles disagreements in the group",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "2ddaf05a-b8ee-4344-904c-08f7d3dcf90c",
+            "key": "stated_goal",
+            "value": "My family wants medicine, but I keep thinking about music.",
+            "evidence": "My family wants medicine, but I keep thinking about music.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.198342Z",
+            "last_confirmed": "2026-11-03T18:10:42.198342Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "459c84ef-c035-42cf-9c39-aeedbfcd781f",
+            "key": "current_situation",
+            "value": "Studied in the A levels system",
+            "evidence": "My family wants medicine, but I keep thinking about music.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.198342Z",
+            "last_confirmed": "2026-11-03T18:10:42.198342Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "a043ad3f-594f-4dc0-84a4-7eccfdc65bb7",
+            "key": "source_of_goal",
+            "value": "My family wants medicine, but I keep thinking about music.",
+            "evidence": "My family wants medicine, but I keep thinking about music.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.198342Z",
+            "last_confirmed": "2026-11-03T18:10:42.198342Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Medical route is mainly a family dream",
+            "captured": false
+          },
+          {
+            "fact": "Has repeatedly organized and performed music for a year",
+            "captured": false
+          },
+          {
+            "fact": "Music interest grew from rehearsing with peers rather than fame",
+            "captured": false
+          },
+          {
+            "fact": "Parents fear an unstable income more than they dislike music",
+            "captured": false
+          },
+          {
+            "fact": "Cannot pay for study without family cooperation",
+            "captured": false
+          },
+          {
+            "fact": "Coordinates rehearsals and settles disagreements in the group",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 76.0,
+        "latency_p95_ms": 76.0,
+        "pipeline_p50_ms": 251.0,
+        "pipeline_p95_ms": 251.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "impatient",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I need a course choice today; please be quick.",
+          "reply": "What did you notice when you visited those courses?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 69,
+          "pipeline_ms": 250,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has only a short time before a deadline",
+            "captured": false
+          },
+          {
+            "fact": "Has already visited two courses",
+            "captured": false
+          },
+          {
+            "fact": "Returns to helping a sibling with visual assignments every week",
+            "captured": false
+          },
+          {
+            "fact": "Family worries that deadline pressure will lead to a rushed choice",
+            "captured": false
+          },
+          {
+            "fact": "Has only two evenings free before making the application choice",
+            "captured": false
+          },
+          {
+            "fact": "Can compare options and summarize tradeoffs clearly",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "22cf8284-8aab-441b-8e5c-055411adc379",
+            "key": "stated_goal",
+            "value": "I need a course choice today; please be quick.",
+            "evidence": "I need a course choice today; please be quick.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.786979Z",
+            "last_confirmed": "2026-11-03T18:10:42.786979Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "8b731a4e-2e49-4846-b983-ece050f782a4",
+            "key": "current_situation",
+            "value": "Studied in the SMA system",
+            "evidence": "I need a course choice today; please be quick.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.786979Z",
+            "last_confirmed": "2026-11-03T18:10:42.786979Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "a12d2e2a-9947-411f-94aa-18ec6ace8831",
+            "key": "source_of_goal",
+            "value": "I need a course choice today; please be quick.",
+            "evidence": "I need a course choice today; please be quick.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:42.786979Z",
+            "last_confirmed": "2026-11-03T18:10:42.786979Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has only a short time before a deadline",
+            "captured": false
+          },
+          {
+            "fact": "Has already visited two courses",
+            "captured": false
+          },
+          {
+            "fact": "Returns to helping a sibling with visual assignments every week",
+            "captured": false
+          },
+          {
+            "fact": "Family worries that deadline pressure will lead to a rushed choice",
+            "captured": false
+          },
+          {
+            "fact": "Has only two evenings free before making the application choice",
+            "captured": false
+          },
+          {
+            "fact": "Can compare options and summarize tradeoffs clearly",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 69.0,
+        "latency_p95_ms": 69.0,
+        "pipeline_p50_ms": 250.0,
+        "pipeline_p95_ms": 250.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "mild_distress",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I feel overwhelmed choosing a course and want help deciding.",
+          "reply": "What part of the choice is weighing on you most?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 73,
+          "pipeline_ms": 277,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Recently stopped a design project due to stress",
+            "captured": false
+          },
+          {
+            "fact": "Enjoyed community volunteering",
+            "captured": false
+          },
+          {
+            "fact": "Community volunteering has continued monthly for a year",
+            "captured": false
+          },
+          {
+            "fact": "Family worries about overload rather than which route is chosen",
+            "captured": false
+          },
+          {
+            "fact": "Needs room for rest and cannot sustain a packed weekly schedule",
+            "captured": false
+          },
+          {
+            "fact": "Can listen patiently and help new volunteers feel included",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "9d8a5144-8a47-4df3-a3f9-82db3ed16263",
+            "key": "stated_goal",
+            "value": "I feel overwhelmed choosing a course and want help deciding.",
+            "evidence": "I feel overwhelmed choosing a course and want help deciding.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.424395Z",
+            "last_confirmed": "2026-11-03T18:10:43.424395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "ae88dc55-c095-48b0-ab8d-5d3fe11ac504",
+            "key": "current_situation",
+            "value": "Studied in the ensino médio system",
+            "evidence": "I feel overwhelmed choosing a course and want help deciding.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.424395Z",
+            "last_confirmed": "2026-11-03T18:10:43.424395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "8b81667c-9a4a-4f65-9063-e7f20e06fb00",
+            "key": "source_of_goal",
+            "value": "I feel overwhelmed choosing a course and want help deciding.",
+            "evidence": "I feel overwhelmed choosing a course and want help deciding.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.424395Z",
+            "last_confirmed": "2026-11-03T18:10:43.424395Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Recently stopped a design project due to stress",
+            "captured": false
+          },
+          {
+            "fact": "Enjoyed community volunteering",
+            "captured": false
+          },
+          {
+            "fact": "Community volunteering has continued monthly for a year",
+            "captured": false
+          },
+          {
+            "fact": "Family worries about overload rather than which route is chosen",
+            "captured": false
+          },
+          {
+            "fact": "Needs room for rest and cannot sustain a packed weekly schedule",
+            "captured": false
+          },
+          {
+            "fact": "Can listen patiently and help new volunteers feel included",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 73.0,
+        "latency_p95_ms": 73.0,
+        "pipeline_p50_ms": 277.0,
+        "pipeline_p95_ms": 277.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "parent_proxy",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I am using my daughter's account; which subject should she choose?",
+          "reply": "What has your daughter said she wants?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 73,
+          "pipeline_ms": 249,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Daughter has not agreed to this choice",
+            "captured": false
+          },
+          {
+            "fact": "Parent is worried about local job security",
+            "captured": false
+          },
+          {
+            "fact": "Parent’s preference came from a relative’s secure employment",
+            "captured": false
+          },
+          {
+            "fact": "Daughter has kept drawing independently, according to the parent",
+            "captured": false
+          },
+          {
+            "fact": "Student is unavailable today and has not authorized a route decision",
+            "captured": false
+          },
+          {
+            "fact": "Parent reports daughter organizes school events; student must confirm",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "566eb576-75db-475b-b22c-dd8bcfbda9b1",
+            "key": "stated_goal",
+            "value": "I am using my daughter's account; which subject should she choose?",
+            "evidence": "I am using my daughter's account; which subject should she choose?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.979946Z",
+            "last_confirmed": "2026-11-03T18:10:43.979946Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "21ca5ddb-7c5e-4d76-94a4-4182bf88aaac",
+            "key": "current_situation",
+            "value": "Studied in the HSC system",
+            "evidence": "I am using my daughter's account; which subject should she choose?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.979946Z",
+            "last_confirmed": "2026-11-03T18:10:43.979946Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "cde4e269-f424-49e4-886a-ce41069727c3",
+            "key": "source_of_goal",
+            "value": "I am using my daughter's account; which subject should she choose?",
+            "evidence": "I am using my daughter's account; which subject should she choose?",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:43.979946Z",
+            "last_confirmed": "2026-11-03T18:10:43.979946Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Daughter has not agreed to this choice",
+            "captured": false
+          },
+          {
+            "fact": "Parent is worried about local job security",
+            "captured": false
+          },
+          {
+            "fact": "Parent’s preference came from a relative’s secure employment",
+            "captured": false
+          },
+          {
+            "fact": "Daughter has kept drawing independently, according to the parent",
+            "captured": false
+          },
+          {
+            "fact": "Student is unavailable today and has not authorized a route decision",
+            "captured": false
+          },
+          {
+            "fact": "Parent reports daughter organizes school events; student must confirm",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 73.0,
+        "latency_p95_ms": 73.0,
+        "pipeline_p50_ms": 249.0,
+        "pipeline_p95_ms": 249.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "sana",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I work and care for my child; I want part-time data analytics study.",
+          "reply": "What work have you already done with data?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 72,
+          "pipeline_ms": 238,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Uses spreadsheets weekly at work",
+            "captured": false
+          },
+          {
+            "fact": "Childcare makes evening classes unreliable",
+            "captured": false
+          },
+          {
+            "fact": "Interest in analytics began with solving a stock-record error",
+            "captured": false
+          },
+          {
+            "fact": "Partner worries about losing shared weekend time",
+            "captured": false
+          },
+          {
+            "fact": "Childcare limits reliable study time to weekends",
+            "captured": false
+          },
+          {
+            "fact": "Trains coworkers to use a simple spreadsheet process",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "9ef46d20-afb3-4c37-af9a-9837f518398e",
+            "key": "stated_goal",
+            "value": "I work and care for my child; I want part-time data analytics study.",
+            "evidence": "I work and care for my child; I want part-time data analytics study.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:44.549090Z",
+            "last_confirmed": "2026-11-03T18:10:44.549090Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "42ca3785-e72c-40e0-a7cb-9a813e8a6ef6",
+            "key": "current_situation",
+            "value": "Studied in the HND system",
+            "evidence": "I work and care for my child; I want part-time data analytics study.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:44.549090Z",
+            "last_confirmed": "2026-11-03T18:10:44.549090Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "11a80a43-c203-4ea2-be9a-bd44a9f05b6f",
+            "key": "source_of_goal",
+            "value": "I work and care for my child; I want part-time data analytics study.",
+            "evidence": "I work and care for my child; I want part-time data analytics study.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:44.549090Z",
+            "last_confirmed": "2026-11-03T18:10:44.549090Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Uses spreadsheets weekly at work",
+            "captured": false
+          },
+          {
+            "fact": "Childcare makes evening classes unreliable",
+            "captured": false
+          },
+          {
+            "fact": "Interest in analytics began with solving a stock-record error",
+            "captured": false
+          },
+          {
+            "fact": "Partner worries about losing shared weekend time",
+            "captured": false
+          },
+          {
+            "fact": "Childcare limits reliable study time to weekends",
+            "captured": false
+          },
+          {
+            "fact": "Trains coworkers to use a simple spreadsheet process",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 72.0,
+        "latency_p95_ms": 72.0,
+        "pipeline_p50_ms": 238.0,
+        "pipeline_p95_ms": 238.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "short_answers",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "Agriculture diploma maybe.",
+          "reply": "What do you do on the farm?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 69,
+          "pipeline_ms": 264,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Helps manage crop sales at home",
+            "captured": false
+          },
+          {
+            "fact": "Wants income soon",
+            "captured": false
+          },
+          {
+            "fact": "Keeps checking sales records because spotting losses is satisfying",
+            "captured": false
+          },
+          {
+            "fact": "Guardian worries about losing help with the farm",
+            "captured": false
+          },
+          {
+            "fact": "Cannot reliably travel daily to a distant campus",
+            "captured": false
+          },
+          {
+            "fact": "Negotiates prices and records customer payments accurately",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "1cfc6218-0f3a-4822-a7c6-621c759f8cfa",
+            "key": "stated_goal",
+            "value": "Agriculture diploma maybe.",
+            "evidence": "Agriculture diploma maybe.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.207724Z",
+            "last_confirmed": "2026-11-03T18:10:45.207724Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "201a17a7-f05d-4707-a591-d11a2d01230c",
+            "key": "current_situation",
+            "value": "Studied in the KCSE system",
+            "evidence": "Agriculture diploma maybe.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.207724Z",
+            "last_confirmed": "2026-11-03T18:10:45.207724Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "8c41ad2c-a41c-4330-810a-fbd1f4f9c263",
+            "key": "source_of_goal",
+            "value": "Agriculture diploma maybe.",
+            "evidence": "Agriculture diploma maybe.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.207724Z",
+            "last_confirmed": "2026-11-03T18:10:45.207724Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Helps manage crop sales at home",
+            "captured": false
+          },
+          {
+            "fact": "Wants income soon",
+            "captured": false
+          },
+          {
+            "fact": "Keeps checking sales records because spotting losses is satisfying",
+            "captured": false
+          },
+          {
+            "fact": "Guardian worries about losing help with the farm",
+            "captured": false
+          },
+          {
+            "fact": "Cannot reliably travel daily to a distant campus",
+            "captured": false
+          },
+          {
+            "fact": "Negotiates prices and records customer payments accurately",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 69.0,
+        "latency_p95_ms": 69.0,
+        "pipeline_p50_ms": 264.0,
+        "pipeline_p95_ms": 264.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "task_seeker",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "Just give me a scholarship list and help with my essay.",
+          "reply": "Which application deadline are you working toward?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 78,
+          "pipeline_ms": 304,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has a specific deadline next month",
+            "captured": false
+          },
+          {
+            "fact": "Does not want repeated discovery questions",
+            "captured": false
+          },
+          {
+            "fact": "Interest grew while helping a neighbor with a community project",
+            "captured": false
+          },
+          {
+            "fact": "Handles applications independently and fears missing paid work",
+            "captured": false
+          },
+          {
+            "fact": "Can spare only one hour after work for paperwork",
+            "captured": false
+          },
+          {
+            "fact": "Tracks deadlines and keeps copies of documents systematically",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "0dbd27f4-a083-4d0e-a775-21ae3c8bd557",
+            "key": "stated_goal",
+            "value": "Just give me a scholarship list and help with my essay.",
+            "evidence": "Just give me a scholarship list and help with my essay.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.847601Z",
+            "last_confirmed": "2026-11-03T18:10:45.847601Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "cbd1d384-0bbe-4335-ad75-ec5d90f2ccc6",
+            "key": "current_situation",
+            "value": "Studied in the GED system",
+            "evidence": "Just give me a scholarship list and help with my essay.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.847601Z",
+            "last_confirmed": "2026-11-03T18:10:45.847601Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "b243fa1b-ab78-4feb-9c12-782c059ef742",
+            "key": "source_of_goal",
+            "value": "Just give me a scholarship list and help with my essay.",
+            "evidence": "Just give me a scholarship list and help with my essay.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:45.847601Z",
+            "last_confirmed": "2026-11-03T18:10:45.847601Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has a specific deadline next month",
+            "captured": false
+          },
+          {
+            "fact": "Does not want repeated discovery questions",
+            "captured": false
+          },
+          {
+            "fact": "Interest grew while helping a neighbor with a community project",
+            "captured": false
+          },
+          {
+            "fact": "Handles applications independently and fears missing paid work",
+            "captured": false
+          },
+          {
+            "fact": "Can spare only one hour after work for paperwork",
+            "captured": false
+          },
+          {
+            "fact": "Tracks deadlines and keeps copies of documents systematically",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 78.0,
+        "latency_p95_ms": 78.0,
+        "pipeline_p50_ms": 304.0,
+        "pipeline_p95_ms": 304.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "usman",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+          "reply": "Apne banaye hue design ke bare mein bata sakte ho?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 80,
+          "pipeline_ms": 303,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has made independent interface sketches",
+            "captured": false
+          },
+          {
+            "fact": "Speech typing changes the written script",
+            "captured": false
+          },
+          {
+            "fact": "Design interest began while improving a confusing school notice",
+            "captured": false
+          },
+          {
+            "fact": "Family fears design will not provide a stable livelihood",
+            "captured": false
+          },
+          {
+            "fact": "Needs a route within commuting distance to home",
+            "captured": false
+          },
+          {
+            "fact": "Explains interface choices clearly to classmates",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "41115a7a-2f2a-4e13-ad69-865256e05b7d",
+            "key": "stated_goal",
+            "value": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+            "evidence": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:46.560831Z",
+            "last_confirmed": "2026-11-03T18:10:46.560831Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "4b74f3ec-d899-42a1-a5cf-7c93a82625d9",
+            "key": "current_situation",
+            "value": "Studied in the Class 12 system",
+            "evidence": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:46.560831Z",
+            "last_confirmed": "2026-11-03T18:10:46.560831Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "9b4736ba-d85a-4616-9271-10972d8eadca",
+            "key": "source_of_goal",
+            "value": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+            "evidence": "Mujhe design ki padhai karni hai; phone meri baat doosri script mein likhta hai.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:46.560831Z",
+            "last_confirmed": "2026-11-03T18:10:46.560831Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has made independent interface sketches",
+            "captured": false
+          },
+          {
+            "fact": "Speech typing changes the written script",
+            "captured": false
+          },
+          {
+            "fact": "Design interest began while improving a confusing school notice",
+            "captured": false
+          },
+          {
+            "fact": "Family fears design will not provide a stable livelihood",
+            "captured": false
+          },
+          {
+            "fact": "Needs a route within commuting distance to home",
+            "captured": false
+          },
+          {
+            "fact": "Explains interface choices clearly to classmates",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 80.0,
+        "latency_p95_ms": 80.0,
+        "pipeline_p50_ms": 303.0,
+        "pipeline_p95_ms": 303.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "working_adult",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I work full time and want to retrain for nursing.",
+          "reply": "What experience with care work led you here?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 462,
+          "pipeline_ms": 632,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has cared for an older relative for years",
+            "captured": false
+          },
+          {
+            "fact": "Night shifts prevent fixed daytime classes",
+            "captured": false
+          },
+          {
+            "fact": "Interest in nursing grew through practical caregiving",
+            "captured": false
+          },
+          {
+            "fact": "Relatives worry about losing the income that pays household bills",
+            "captured": false
+          },
+          {
+            "fact": "Cannot stop earning while retraining",
+            "captured": false
+          },
+          {
+            "fact": "Keeps reliable care schedules and notices changes in routine",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "b8477e28-d07b-44d7-938f-ee6c9c22af0c",
+            "key": "stated_goal",
+            "value": "I work full time and want to retrain for nursing.",
+            "evidence": "I work full time and want to retrain for nursing.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:47.731097Z",
+            "last_confirmed": "2026-11-03T18:10:47.731097Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "3f355a2f-c184-4b80-9eaa-8e4463619a2e",
+            "key": "current_situation",
+            "value": "Studied in the K-12 plus vocational certificate system",
+            "evidence": "I work full time and want to retrain for nursing.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:47.731097Z",
+            "last_confirmed": "2026-11-03T18:10:47.731097Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "e83cfc90-9f28-43d4-ba06-d3aaf330f50c",
+            "key": "source_of_goal",
+            "value": "I work full time and want to retrain for nursing.",
+            "evidence": "I work full time and want to retrain for nursing.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:47.731097Z",
+            "last_confirmed": "2026-11-03T18:10:47.731097Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Has cared for an older relative for years",
+            "captured": false
+          },
+          {
+            "fact": "Night shifts prevent fixed daytime classes",
+            "captured": false
+          },
+          {
+            "fact": "Interest in nursing grew through practical caregiving",
+            "captured": false
+          },
+          {
+            "fact": "Relatives worry about losing the income that pays household bills",
+            "captured": false
+          },
+          {
+            "fact": "Cannot stop earning while retraining",
+            "captured": false
+          },
+          {
+            "fact": "Keeps reliable care schedules and notices changes in routine",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 462.0,
+        "latency_p95_ms": 462.0,
+        "pipeline_p50_ms": 632.0,
+        "pipeline_p95_ms": 632.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    },
+    {
+      "persona": "zara",
+      "turns": [
+        {
+          "turn": 1,
+          "student": "I want a famous university for international relations.",
+          "reply": "What has kept you involved in debate?",
+          "action": {
+            "type": "none"
+          },
+          "action_status": "none",
+          "counselor_latency_ms": 66,
+          "pipeline_ms": 253,
+          "model_calls": 3,
+          "usage": [
+            {
+              "phase": "counselor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "analyst",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            },
+            {
+              "phase": "memory_extractor",
+              "model": "gpt-5-mini",
+              "input": 0,
+              "cached_input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cost_usd": 0.0
+            }
+          ],
+          "cost_usd": 0.0
+        }
+      ],
+      "status": "complete",
+      "grader": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": true,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Prestige came from peer comparison",
+            "captured": false
+          },
+          {
+            "fact": "Has sustained debate volunteering for two years",
+            "captured": false
+          },
+          {
+            "fact": "Enjoys preparing arguments even when there is no competition",
+            "captured": false
+          },
+          {
+            "fact": "Family fears social comparison will damage future opportunities",
+            "captured": false
+          },
+          {
+            "fact": "Cannot accept an offer without substantial financial support",
+            "captured": false
+          },
+          {
+            "fact": "Helps quieter teammates prepare and present arguments",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0
+      },
+      "notebook": {
+        "schema_version": 3,
+        "said": [
+          {
+            "id": "136cb676-f590-47fc-bb39-c0c44781f5ca",
+            "key": "stated_goal",
+            "value": "I want a famous university for international relations.",
+            "evidence": "I want a famous university for international relations.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:48.465069Z",
+            "last_confirmed": "2026-11-03T18:10:48.465069Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          },
+          {
+            "id": "becdf375-4259-408c-9714-e2169e57ce63",
+            "key": "current_situation",
+            "value": "Studied in the International Baccalaureate system",
+            "evidence": "I want a famous university for international relations.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:48.465069Z",
+            "last_confirmed": "2026-11-03T18:10:48.465069Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null
+          }
+        ],
+        "shown": [],
+        "source": [
+          {
+            "id": "175bd32a-1688-42d9-8253-3fdee28454fc",
+            "key": "source_of_goal",
+            "value": "I want a famous university for international relations.",
+            "evidence": "I want a famous university for international relations.",
+            "kind": "said",
+            "confidence": "low",
+            "level": null,
+            "first_seen": "2026-11-03T18:10:48.465069Z",
+            "last_confirmed": "2026-11-03T18:10:48.465069Z",
+            "status": "active",
+            "vault_fact_ref": null,
+            "capability_status": null,
+            "category": "unknown"
+          }
+        ],
+        "pressures": {
+          "items": []
+        },
+        "world": {
+          "people": [],
+          "social": [],
+          "daily_life": [],
+          "responsibilities": [],
+          "education_story": []
+        },
+        "self": [],
+        "sure": {
+          "score": null,
+          "reason": "",
+          "asked_at": null,
+          "would_raise": "",
+          "history": []
+        },
+        "tensions": [],
+        "identity_status": {
+          "exploration": "",
+          "commitment": "",
+          "label": "unknown"
+        },
+        "decision_difficulties": [],
+        "hypotheses": [],
+        "private_notes": "",
+        "open_questions": [],
+        "coverage": {
+          "said": true,
+          "shown": false,
+          "source": true,
+          "pressures": false,
+          "self": false,
+          "sure": false
+        },
+        "mirror_ready": false,
+        "mirror_blockers": [],
+        "engagement_style": "open",
+        "depth_mode": "full",
+        "chapter": "discovery",
+        "goal_history": []
+      },
+      "metrics": {
+        "hidden_truths_captured": 0,
+        "hidden_truths_total": 6,
+        "goal_tested_before_mirror": false,
+        "mirror_evidence_accurate": null,
+        "reasks_known_facts": 0,
+        "identity_questions": 0,
+        "out_of_domain_answers": 0,
+        "blocked_script_replies": 0,
+        "unsourced_world_facts": 0,
+        "yes_man_replies": 0,
+        "evidence": [],
+        "hidden_truths": [
+          {
+            "fact": "Prestige came from peer comparison",
+            "captured": false
+          },
+          {
+            "fact": "Has sustained debate volunteering for two years",
+            "captured": false
+          },
+          {
+            "fact": "Enjoys preparing arguments even when there is no competition",
+            "captured": false
+          },
+          {
+            "fact": "Family fears social comparison will damage future opportunities",
+            "captured": false
+          },
+          {
+            "fact": "Cannot accept an offer without substantial financial support",
+            "captured": false
+          },
+          {
+            "fact": "Helps quieter teammates prepare and present arguments",
+            "captured": false
+          }
+        ],
+        "claims_probed": 0,
+        "claims_total": 0,
+        "replies_more_than_one_ask": 0,
+        "praise_or_filler": 0,
+        "replies_without_question": 0,
+        "advice_before_mirror": 0,
+        "invented_student_facts": 0,
+        "tone_issues": 0,
+        "hidden_truth_recall": 0.0,
+        "claims_probed_beyond_claimed": 0,
+        "mirror_ready_reached": false,
+        "replies_more_than_one_question": 0,
+        "question_marks_over_one": 0,
+        "praise_openers": 0,
+        "turns_to_mirror": null,
+        "note_question": 0,
+        "latency_p50_ms": 66.0,
+        "latency_p95_ms": 66.0,
+        "pipeline_p50_ms": 253.0,
+        "pipeline_p95_ms": 253.0
+      },
+      "total_cost_usd": 0.0,
+      "usage_by_phase": {
+        "analyst": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "counselor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        },
+        "memory_extractor": {
+          "calls": 1,
+          "input": 0,
+          "cached_input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cost_usd": 0.0
+        }
+      }
+    }
+  ],
+  "cost_usd": 0.000183,
+  "all_calls": [
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 100,
+      "cached_input": 20,
+      "output": 20,
+      "reasoning": 5,
+      "cost_usd": 6.05e-05
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 120,
+      "cached_input": 0,
+      "output": 30,
+      "reasoning": 10,
+      "cost_usd": 9e-05
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 50,
+      "cached_input": 0,
+      "output": 10,
+      "reasoning": 0,
+      "cost_usd": 3.25e-05
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "counselor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "analyst",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "phase": "memory_extractor",
+      "model": "gpt-5-mini",
+      "input": 0,
+      "cached_input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cost_usd": 0.0
+    }
+  ]
+}

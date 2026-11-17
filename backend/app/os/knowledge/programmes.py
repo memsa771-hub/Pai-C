@@ -35,6 +35,14 @@ class Programme:
     # Start URLs no other programme of the tenant uses: pages about this programme (the trust rules' scope
     # check). Filled by `with_own_pages` / the store; a shared start page (a university-wide page) is not one.
     own_pages: tuple[str, ...] = ()
+    # P2-T2 (P2 spec §4.1): the programme's place in the registry. Written by `RegistryStore.link_programme`, never by
+    # `ProgrammeStore.upsert`, so re-seeding a programme leaves them alone.
+    institution_id: str | None = None
+    campus_id: str | None = None
+    level: str | None = None
+    field: str | None = None
+    family: str | None = None
+    region: str | None = None
 
 
 def with_own_pages(programmes: list[Programme]) -> list[Programme]:
@@ -82,7 +90,9 @@ class _Seed(BaseModel):
 def _programme(row) -> Programme:
     return Programme(ref=row.ref, route_key=row.route_key, university=row.university, name=row.name,
                      aliases=tuple(row.aliases), start_urls=tuple(row.start_urls),
-                     official_domains=tuple(row.official_domains), status=row.status, notes=row.notes)
+                     official_domains=tuple(row.official_domains), status=row.status, notes=row.notes,
+                     institution_id=row.institution_id, campus_id=row.campus_id, level=row.level, field=row.field,
+                     family=row.family, region=row.region)
 
 
 class ProgrammeStore:
@@ -103,6 +113,10 @@ class ProgrammeStore:
         with self.engine.connect() as conn:
             rows = conn.execute(select(T).where(T.c.tenant_id == self.tenant_id).order_by(T.c.ref)).all()
         return with_own_pages([_programme(r) for r in rows])
+
+    def all(self) -> list[Programme]:
+        """Every programme of the tenant, with its own pages."""
+        return self._all()
 
     def get(self, ref: str) -> Programme | None:
         """The programme with its own pages (start URLs no other programme of the tenant uses)."""

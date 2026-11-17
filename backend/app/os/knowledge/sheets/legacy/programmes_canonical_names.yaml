@@ -1,0 +1,6 @@
+# Batch 1 layout: the canonical Programmes columns, except `programme_name` for `programme`.
+layout: programmes_batch1
+sheet: Programmes
+detect: [programme_name, campus, level]
+emit:
+  - set: {programme: programme_name}

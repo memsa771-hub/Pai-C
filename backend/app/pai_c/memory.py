@@ -3,8 +3,14 @@
 from app.memory.student_snapshot import StudentSnapshotService
 from app.memory.episodic import EpisodicMemoryService
 from app.memory.permissions import capabilities_for_agent
+from app.memory.candidates import MemoryCandidateService  # noqa: F401  re-exported for PAI C (P1-T7 fact proposals)
 from app.memory.catalog import vault_catalog  # noqa: F401  re-exported for PAI C
 from app.memory.vault_view import entry_ref  # noqa: F401  re-exported for PAI C
+from app.memory.vault_view import VaultView  # noqa: F401  re-exported for PAI C (P1-T8 fact conflicts)
+from app.memory import issue_answers  # noqa: F401  re-exported for PAI C (P1-T8: per-value answers on a card)
+from app.memory.errors import MemoryDataError  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.profile_issues import ProfileIssueService  # noqa: F401  re-exported for PAI C (P1-T8)
+from app.memory.reconciler import MemoryReconciler  # noqa: F401  re-exported for PAI C (P1-T8)
 from app.memory.vault_view import _result_text as result_text, display_text  # noqa: F401  re-exported for PAI C
 from app.memory.student_schema import RECORD_SPECS  # noqa: F401  re-exported for PAI C
 from app.memory.completeness import relevance_version  # noqa: F401  re-exported for PAI C
@@ -32,6 +38,13 @@ PROFILE_RECORD_KINDS = (
     "skill", "certification", "research", "achievement", "goal", "financial_sponsor",
     "scholarship_application", "application", "visa", "document",
 )
+
+
+def reconcile_job_type() -> str:
+    """The durable job that reconciles Vault candidates (loaded late: the handlers register on import)."""
+    from app.memory.handlers import JOB_RECONCILE
+
+    return JOB_RECONCILE
 
 
 def labelled_value(type_key, value):
@@ -70,6 +83,19 @@ class MemoryService:
             input_channel="profile", evidence=evidence)
         result = MemoryReconciler(self.db).reconcile(candidate)
         return {"saved": result.accepted, "id": result.result_id, "candidate_id": candidate.id}
+
+    def put_option(self, workspace_id, text, status, evidence):
+        """Write one Vault `option` in the student's own name (a button press
+        is as explicit as a typed answer). Identity is the text, so a later
+        write with another status replaces the earlier one. Returns whether
+        the Vault accepted it. The caller commits."""
+        from app.memory.candidates import MemoryCandidateService
+        from app.memory.reconciler import MemoryReconciler
+        candidate = MemoryCandidateService(self.db).propose(workspace_id=workspace_id,
+            candidate_type="vault_item", key="option", proposed_value={"text": text, "status": status},
+            source_type="user_explicit", allow_user_explicit=True, confidence=1,
+            input_channel="profile", evidence=evidence)
+        return MemoryReconciler(self.db).reconcile(candidate).accepted
 
     def profile_cards(self, workspace_id):
         """The student's facts, records and Vault items with their evidence
@@ -115,6 +141,27 @@ class MemoryService:
                 "source": {name: evidence[name] for name in evidence_policy()["source_fields"] if name in evidence},
                 "source_type": item.source_type, "updated_at": item.updated_at or item.observed_at})
         return cards
+
+    def vault_items(self, workspace_id, types):
+        """The student's active Vault items of the given types, oldest first (the one reader for connect code)."""
+        from app.memory.vault_items import VaultItemService
+        return VaultItemService(self.db).active(workspace_id, list(types))
+
+    def ruled_out_options(self, workspace_id):
+        """The options the student ruled out themselves (said, shown or
+        confirmed; never PAI's guess), with their own words: the quote on the
+        entry, else the latest sighting's, else the entry's text."""
+        from app.memory.vault_items import VaultItemService
+        options = []
+        for item in VaultItemService(self.db).active(workspace_id, ["option"]):
+            value = item.value or {}
+            if value.get("status") != "ruled_out" or item.level == "inferred" or not value.get("text"):
+                continue
+            evidence = item.evidence or {}
+            sightings = [c.get("quote") for c in evidence.get("corroborations") or [] if c.get("quote")]
+            quote = evidence.get("quote") or (sightings[-1] if sightings else None) or value["text"]
+            options.append({"item_id": item.id, "text": value["text"], "quote": quote, "level": item.level})
+        return options
 
     def recent_turns(self, turn, owner_id, *, limit=24):
         return shared_history(self.db, turn, owner_id, limit=limit)

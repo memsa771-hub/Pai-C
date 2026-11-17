@@ -8,7 +8,7 @@ import {
   Sprout, Stethoscope, Users, Wrench, type LucideIcon,
 } from "lucide-react";
 import { workspaceApi } from "@/lib/api";
-import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus, RouteStep } from "@/lib/roadmap";
+import type { ChosenRoute, EducationLine, FieldCard, RoadmapStatus, RouteChoice, RoutePlan, RouteStep } from "@/lib/roadmap";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -23,6 +23,7 @@ import {
   testsText, tickable, uncertain, yearsText,
 } from "./roadmap-text";
 import { RouteSteps, StepBar, StepDot, StepMeta, TimeLine } from "./roadmap-steps";
+import { ConsentPanel } from "./choice-consent";
 import { FamilyTalk } from "./family-talk";
 import familyCopy from "./family-talk.json";
 import copy from "./copy.json";
@@ -291,6 +292,31 @@ export function CompareDialog({ cards, open, onOpenChange }: {
   );
 }
 
+/** What the OS plan is doing, in words: preparing, waiting for the student, paused, stopped or finished.
+ * An active plan needs no banner. Nothing shows when the plan view is off (no `plan`). */
+function PlanBanner({ plan, onChange }: { plan: RoutePlan | undefined; onChange?: () => void }) {
+  const words = t.plan as Record<string, string>;
+  // The server's own sentence for a paused plan wins (P1-T6, only sent once approved); else the reason's words when
+  // copy.json has them (`<state>_<reason>`); else the neutral line for the state.
+  const text = plan && (plan.reason_text || (plan.state_reason && words[`${plan.state}_${plan.state_reason}`]) || words[plan.state]);
+  if (!text) return null;
+  // One button, only with the server's sentence: it opens the same "Change route" confirm the route card has.
+  const action = plan.reason_text && plan.reason_action && onChange ? plan.reason_action : null;
+  if (!action) {  // no button: the banner is exactly what it was
+    return (
+      <p role="status" data-plan-state={plan.state} className="mb-3 flex items-start gap-2 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+        <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{text}
+      </p>
+    );
+  }
+  return (
+    <div role="status" data-plan-state={plan.state} className="mb-3 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+      <p className="flex items-start gap-2"><Info aria-hidden className="mt-0.5 size-4 shrink-0" />{text}</p>
+      <Button size="tap" variant="soft" className="mt-2" onClick={onChange}>{action}</Button>
+    </div>
+  );
+}
+
 /** The chosen route: its coloured steps (green from the Vault, or ticked by
  * the student only where the backend marks the step tickable: a tickable kind
  * the Vault is silent on, with no evidence behind it), progress by status, the time to entry, "Change route" behind one confirm,
@@ -303,10 +329,13 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
   onChat?: (topic?: string) => void;
 }) {
   const [steps, setSteps] = useState<RouteStep[]>(route.steps);
+  const [choice, setChoice] = useState<RouteChoice | null>(route.choice ?? null);
   const [error, setError] = useState(false), [confirming, setConfirming] = useState(false), [busy, setBusy] = useState(false),
     [savingView, setSavingView] = useState(false), [familyOpen, setFamilyOpen] = useState(false);
   const saving = useRef(false);
-  useEffect(() => { setSteps(route.steps); }, [route]);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const [osSaving, setOsSaving] = useState<string | null>(null);
+  useEffect(() => { setSteps(route.steps); setChoice(route.choice ?? null); }, [route]);
   // One save at a time: the ticks are disabled while one is saving, so a
   // double click cannot send (key, true) then (key, false) and replies never
   // arrive out of order. A failure undoes only the step that failed.
@@ -315,7 +344,9 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
     saving.current = true;
     setSavingView(true);
     const put = (next: RouteStep) => setSteps((list) => list.map((s) => (s.key === step.key ? next : s)));
-    put({ ...step, status: value ? "done" : "not", manual_done: value });
+    // An OS step keeps its (disabled) checkbox while the save runs; the optimistic done only shows once it returns.
+    const os = step.kind === "os";
+    if (os) setOsSaving(step.key); else put({ ...step, status: value ? "done" : "not", manual_done: value });
     setError(false);
     try {
       const saved = await workspaceApi.setRouteStep(step.key, value);
@@ -325,6 +356,7 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
       put(step);
       setError(true);
     } finally {
+      setOsSaving(null);
       saving.current = false;
       setSavingView(false);
     }
@@ -360,6 +392,12 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
             <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{fill(t.route.changed, { status: t.statusNow[route.live_status] })}
           </p>
         )}
+        {choice && !choice.os_supported && (
+          <p role="status" data-unsupported className="mb-3 flex items-start gap-2 rounded-2xl bg-info-soft px-4 py-3 text-sm text-info-ink">
+            <Info aria-hidden className="mt-0.5 size-4 shrink-0" />{t.route.unsupported}
+          </p>
+        )}
+        <PlanBanner plan={route.plan} onChange={() => { setConfirming(true); setTimeout(() => { confirmRef.current?.focus(); confirmRef.current?.scrollIntoView?.({ block: "center" }); }, 0); }} />
         <ul aria-label={t.steps.title} className="divide-y divide-border/70">
           {steps.map((step) => {
             const label = stepLabel(step);
@@ -370,9 +408,9 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
                   <p className="break-words text-sm font-medium leading-snug">{label}</p>
                   <StepMeta step={step} time={route.time} />
                 </div>
-                {tickable(step) && (
+                {tickable(step) && step.owner !== "pai" && !(step.kind === "os" && step.status === "done") && (
                   <label title={t.steps.tick} className="-my-1.5 -me-2 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-accent">
-                    <input type="checkbox" aria-label={label} checked={step.status === "done"} disabled={savingView}
+                    <input type="checkbox" aria-label={label} checked={step.status === "done" || osSaving === step.key} disabled={savingView}
                       onChange={(e) => tick(step, e.target.checked)} className="size-[18px] cursor-[inherit] accent-[var(--brand)]" />
                   </label>
                 )}
@@ -381,8 +419,9 @@ export function YourRoute({ route, onWithdrawn, onTicked, onChat }: {
           })}
         </ul>
         {error && <p role="alert" className="mt-2 text-sm font-medium text-danger-ink">{t.error}</p>}
+        {choice && <ConsentPanel choice={choice} onChange={setChoice} />}
         {confirming ? (
-          <div className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
+          <div ref={confirmRef} tabIndex={-1} className="mt-4 rounded-2xl bg-background p-4 ring-1 ring-border">
             <p className="text-sm">{fill(t.route.changeConfirm, { title: route.title })}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="tap" variant="destructive" disabled={busy} onClick={withdraw}>{t.route.changeYes}</Button>

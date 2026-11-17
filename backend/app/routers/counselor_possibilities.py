@@ -18,6 +18,15 @@ def list_possibilities(network: str = Query(...), db=Depends(get_db),
     return success_response({"possibilities": [service.serialize(row) for row in service.list(str(workspace.id))]})
 
 
+@router.get("/current")
+def current_possibilities(network: str = Query(...), db=Depends(get_db),
+                          x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    """The student's current paths (not dismissed): the list Roadmaps shows."""
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    service = PossibilityService(db)
+    return success_response({"possibilities": [service.serialize(row) for row in service.current(str(workspace.id))]})
+
+
 class OwnPath(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1, max_length=120)
@@ -73,12 +82,23 @@ async def change_possibility(possibility_id: str, action: str, network: str = Qu
     service = PossibilityService(db)
     previous_status = None
     try:
+        from app.pai_c.paths import exclusions
+        before = service.get(workspace_id, possibility_id)
+        was = before.status
+        if was == "dismissed" and action in {"save", "explore"}:
+            # Before the action: the explore gateway commits, so the Vault
+            # option must already be in that transaction (R-78).
+            exclusions.record_restore(db, before)
         if action == "explore":
             from app.routers.counselor_paths import explore
             await explore(possibility_id, network, db, x_workspace_token, authorization)
             row = service.get(workspace_id, possibility_id)
         else:
             row, _ = service.transition(workspace_id, possibility_id, action)
+        # The Vault is the one source of an excluded field (R-78): the button
+        # writes it before the request commits.
+        if action == "dismiss" and was != "dismissed" and row.status == "dismissed":
+            exclusions.record_button_exclusion(db, row)
         db.commit()
         return success_response(service.serialize(row))
     except PossibilityError as exc:

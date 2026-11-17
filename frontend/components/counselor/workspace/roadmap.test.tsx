@@ -6,13 +6,20 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { Roadmap } from "./roadmap";
 import { render as renderItem } from "./roadmap-text";
 import { workspaceApi } from "@/lib/api";
-import { chosenRoute, roadmapCards, roadmapPage } from "@/tests/fixtures/counselor";
+import { chosenRoute, choiceOptionsOff, choiceOptionsOn, offeredPlaces, osPlanRoute, osRequestStep, roadmapCards, roadmapPage, routeChoice } from "@/tests/fixtures/counselor";
+import { I18nProvider } from "@/lib/i18n";
 import copy from "./copy.json";
 
+vi.mock("next/navigation", async (original) => ({ ...(await original<typeof import("next/navigation")>()), useParams: () => ({ workspaceId: "ws1" }) }));
 vi.mock("@/lib/api", () => ({
   workspaceApi: {
     getRoadmapPage: vi.fn(),
     chooseRoute: vi.fn(),
+    choiceOptions: vi.fn(),
+    places: vi.fn(),
+    withdrawConsent: vi.fn(),
+    giveConsent: vi.fn(),
+    resendGuardian: vi.fn(),
     setRouteStep: vi.fn(),
     withdrawRoute: vi.fn(),
     getFamilyTalk: vi.fn(),
@@ -25,6 +32,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(roadmapPage);
+  vi.mocked(workspaceApi.choiceOptions).mockResolvedValue(choiceOptionsOff);
 });
 const card = async (title: string) => (await screen.findByRole("heading", { name: title })).closest("article")!;
 
@@ -319,4 +327,316 @@ it("fits a 375px phone: the route list and the sheet wrap instead of overflowing
   const widths = [...baseElement.querySelectorAll("[class]")].flatMap((el) =>
     [...String(el.getAttribute("class")).matchAll(/\b(?:min-)?w-\[(\d+)px\]/g)].map((m) => +m[1]));
   expect(widths.every((w) => w <= 343)).toBe(true);
+});
+
+// req: R-79
+it("with the hand-off off, Choose is one click: no choice screens, chooseRoute with the field key only", async () => {
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  await waitFor(() => expect(workspaceApi.chooseRoute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(workspaceApi.chooseRoute).mock.calls[0]).toEqual(["electrical_engineering"]);
+  expect(workspaceApi.choiceOptions).toHaveBeenCalledWith("electrical_engineering");
+  expect(screen.queryByTestId("choice-step")).toBeNull();
+});
+
+// req: R-79
+it("with the hand-off on, Choose opens the choice screens and saves nothing yet", async () => {
+  vi.mocked(workspaceApi.choiceOptions).mockResolvedValue(choiceOptionsOn);
+  vi.mocked(workspaceApi.places).mockResolvedValue({ handoff: true, places: offeredPlaces });
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue({ ...chosenRoute, choice: routeChoice() });
+  const changed = vi.fn();
+  render(<I18nProvider><Roadmap onNavigate={vi.fn()} onChanged={changed} /></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Choose this route" }));
+  expect((await screen.findByTestId("choice-step")).textContent).toBe("Step 1 of 4: Country");
+  expect(workspaceApi.chooseRoute).not.toHaveBeenCalled();
+  // Through to the end: the page reloads and the shell is told.
+  const c = copy.roadmap.choice;
+  fireEvent.click(screen.getAllByRole("radio")[1]);
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.change(screen.getByLabelText(c.intake.term), { target: { value: "winter" } });
+  fireEvent.change(screen.getByLabelText(c.intake.year), { target: { value: "2027" } });
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Alpha University" }));
+  fireEvent.click(screen.getByRole("button", { name: c.next }));
+  fireEvent.click(screen.getByRole("checkbox", { name: c.consent.agree }));
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: { ...chosenRoute, choice: routeChoice() } });
+  fireEvent.click(screen.getByRole("button", { name: c.submit }));
+  await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+  expect(await screen.findByRole("region", { name: "Your route" })).toBeTruthy();
+});
+
+const cs = copy.roadmap.choice.consentState;
+const chosenWith = (choice: ReturnType<typeof routeChoice>) => ({ ...roadmapPage, chosen: { ...chosenRoute, choice } });
+
+// req: R-10
+it("shows who has agreed on the chosen route, in words", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "missing" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  expect(within(panel).getByText(cs.studentGiven)).toBeTruthy();
+  expect(within(panel).getByText(cs.guardianMissing)).toBeTruthy();
+  expect(within(panel).getByText(cs.waiting)).toBeTruthy();
+});
+
+// req: R-10
+it("shows no consent block when the hand-off is off (no choice on the route)", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("region", { name: "Your route" });
+  expect(screen.queryByRole("region", { name: cs.title })).toBeNull();
+});
+
+// req: R-10
+it("withdraws consent behind one confirm, then gives it again and asks for the guardian link to be resent", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "missing" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdraw }));
+  expect(workspaceApi.withdrawConsent).not.toHaveBeenCalled(); // asks first
+  vi.mocked(workspaceApi.withdrawConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "missing", guardian: "missing" },
+    consent_version: null, consent_offer: { text: choiceOptionsOn.consent_text, version: "1" } }) });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawYes }));
+  expect(await within(panel).findByText(cs.studentMissing)).toBeTruthy();
+  expect(within(panel).getByText(cs.pausedNote)).toBeTruthy();
+  // Give it again: the text is shown first and its version is sent (I2). The old guardian link no longer counts,
+  // so the student is then asked to send a new one.
+  vi.mocked(workspaceApi.giveConsent).mockResolvedValue({ choice: routeChoice({ consent: { student: "given", guardian: "missing" } }) });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.give }));
+  expect(workspaceApi.giveConsent).not.toHaveBeenCalled();
+  expect(within(panel).getByText(choiceOptionsOn.consent_text!.title)).toBeTruthy();
+  fireEvent.click(within(panel).getByRole("button", { name: cs.giveYes }));
+  await waitFor(() => expect(workspaceApi.giveConsent).toHaveBeenCalledWith("1"));
+  expect(await within(panel).findByText(cs.resendPrompt)).toBeTruthy();
+  // The address is asked again: it is not kept for a resend.
+  vi.mocked(workspaceApi.resendGuardian).mockResolvedValue({ sent: true });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.resendSend }));
+  expect(within(panel).getByRole("alert").textContent).toContain(cs.resendRequired);
+  expect(workspaceApi.resendGuardian).not.toHaveBeenCalled();
+  fireEvent.change(within(panel).getByLabelText(cs.resendLabel), { target: { value: "parent@example.com" } });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.resendSend }));
+  await waitFor(() => expect(workspaceApi.resendGuardian).toHaveBeenCalledWith("parent@example.com"));
+  expect(await within(panel).findByText(cs.resendSent)).toBeTruthy();
+});
+
+// req: R-10
+it("keeps consent as it was and says so when withdrawing fails", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice()));
+  vi.mocked(workspaceApi.withdrawConsent).mockRejectedValue(new Error("API 500: x"));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdraw }));
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawYes }));
+  expect((await within(panel).findByRole("alert")).textContent).toContain(cs.error);
+  expect(within(panel).getByText(cs.studentGiven)).toBeTruthy();
+});
+
+// req: R-79
+it("chooses nothing and shows an error when the choice options cannot be read", async () => {
+  // Rule change (final review I4): this test used to assert a one-click fallback on failure. A choose without
+  // details could close a plan PAI OS runs, so only an answer of `handoff: false` allows the one-click choose.
+  vi.mocked(workspaceApi.choiceOptions).mockRejectedValue(new Error("API 500: x"));
+  vi.mocked(workspaceApi.chooseRoute).mockResolvedValue(chosenRoute);
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "See route for Electrical Engineering" }));
+  const sheet = await screen.findByRole("dialog");
+  fireEvent.click(within(sheet).getByRole("button", { name: "Choose this route" }));
+  expect((await within(sheet).findByRole("alert")).textContent).toContain(copy.roadmap.error);
+  expect(workspaceApi.chooseRoute).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("choice-step")).toBeNull();
+});
+
+// req: R-10
+it("shows the text before giving consent and says so when it is not approved", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({
+    consent: { student: "missing", guardian: "not_needed" }, consent_offer: { text: null, version: "1" } })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.give }));
+  expect(within(panel).getByRole("alert").textContent).toContain(cs.textNotReady);
+  expect(within(panel).queryByRole("button", { name: cs.giveYes })).toBeNull();
+  expect(workspaceApi.giveConsent).not.toHaveBeenCalled();
+});
+
+// req: R-10
+it("sends the guardian a new withdraw link once they have agreed", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ consent: { student: "given", guardian: "given" } })));
+  vi.mocked(workspaceApi.resendGuardian).mockResolvedValue({ sent: true, kind: "withdraw" });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  const panel = await screen.findByRole("region", { name: cs.title });
+  fireEvent.click(within(panel).getByRole("button", { name: cs.withdrawLink }));
+  await waitFor(() => expect(workspaceApi.resendGuardian).toHaveBeenCalledWith());
+  expect(await within(panel).findByText(cs.withdrawLinkSent)).toBeTruthy();
+});
+
+// req: R-44, R-04 (the OS plan on the roadmap screen)
+const osPage = (over: Partial<typeof osPlanRoute> = {}) => ({ ...roadmapPage, chosen: { ...osPlanRoute, ...over } });
+
+it("shows OS plan steps by title with owner, due date and the plan state banner", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("Collect your transcripts")).toBeTruthy();
+  expect(screen.getByText("Draft the statement of purpose")).toBeTruthy();
+  expect(screen.getByText("Due March 12, 2027")).toBeTruthy();
+  expect(screen.getByText(copy.roadmap.plan.needs_student)).toBeTruthy();
+  expect(screen.getAllByText(copy.roadmap.plan.owner_pai).length).toBe(2);
+  expect(screen.queryByText(copy.roadmap.route.unsupported)).toBeNull();
+});
+
+it.each(["empty", "paused", "stopped", "finished"] as const)("shows the %s plan banner", async (state) => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan[state])).toBeTruthy();
+});
+
+it("shows no plan banner for an active plan", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "active" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(document.querySelector("[data-plan-state]")).toBeNull();
+});
+
+it("ticks an OS step through setRouteStep and then offers no untick", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  const route = osPage().chosen;
+  vi.mocked(workspaceApi.setRouteStep).mockResolvedValueOnce({ ...route, steps: route.steps.map((s) => s.key === "collect-transcripts"
+    ? { ...s, status: "done", tickable: false } : s) });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Collect your transcripts" }));
+  await waitFor(() => expect(workspaceApi.setRouteStep).toHaveBeenCalledWith("collect-transcripts", true));
+  await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Collect your transcripts" })).toBeNull());
+  expect(screen.queryByRole("checkbox", { name: /transcripts|deadline|statement/ })).toBeNull();
+});
+
+it("never offers a tick on a PAI-owned or done OS step", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.queryByRole("checkbox", { name: "Check the application deadline" })).toBeNull();
+  expect(screen.queryByRole("checkbox", { name: "Draft the statement of purpose" })).toBeNull();
+});
+
+it("says PAI can't run the plan yet only when the choice is not OS supported", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ os_supported: false })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.route.unsupported)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(chosenWith(routeChoice({ os_supported: true })));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" });
+  expect(screen.queryByText(copy.roadmap.route.unsupported)).toBeNull();
+});
+
+it("renders a flag-off route (no plan, no OS steps) with no plan banner or owner", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue({ ...roadmapPage, chosen: chosenRoute });
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByRole("checkbox", { name: "Take ECAT / NET (pass 33%)" });
+  expect(document.querySelector("[data-plan-state],[data-owner],[data-unsupported]")).toBeNull();
+});
+
+// req: R-44, R-04 (fix round 1)
+it("words a paused plan by its reason when copy.json has one, else neutrally", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "consent_missing" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused_consent_missing)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "some_new_reason" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused)).toBeTruthy();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "stopped", state_reason: "route_changed" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.stopped)).toBeTruthy();
+});
+
+it("never renders a tick for a PAI-owned step even when tickable is true", async () => {
+  const route = osPage().chosen;
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ steps: route.steps.map((s) =>
+    s.key === "draft-statement" ? { ...s, tickable: true, owner: "pai" as const } : s) }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Draft the statement of purpose");
+  expect(screen.queryByRole("checkbox", { name: "Draft the statement of purpose" })).toBeNull();
+});
+
+it("keeps an OS step's checkbox (disabled) while it saves, and reverts with the alert when the save fails", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  let fail!: (error: Error) => void;
+  vi.mocked(workspaceApi.setRouteStep).mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Collect your transcripts" }));
+  const box = screen.getByRole("checkbox", { name: "Collect your transcripts" }) as HTMLInputElement;
+  expect(box.disabled).toBe(true);
+  fail(new Error("503"));
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  const back = screen.getByRole("checkbox", { name: "Collect your transcripts" }) as HTMLInputElement;
+  expect(back.checked).toBe(false);
+  expect(back.disabled).toBe(false);
+  expect(screen.getByText("Collect your transcripts").closest("li")!.getAttribute("data-status")).toBe("half");
+});
+
+// req: R-11
+it("PlanBanner shows reason_text and one action that opens change route", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", state_reason: "all_rejected",
+    reason_text: "None of your places took you.", reason_action: "Choose again" } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("None of your places took you.")).toBeTruthy();
+  expect(screen.queryByText(copy.roadmap.plan.paused)).toBeNull();
+  const banner = document.querySelector("[data-plan-state]") as HTMLElement;
+  const buttons = within(banner).getAllByRole("button");
+  expect(buttons.length).toBe(1);
+  fireEvent.click(buttons[0]);
+  const yes = await screen.findByRole("button", { name: copy.roadmap.route.changeYes });
+  await waitFor(() => expect(document.activeElement).toBe(yes.parentElement?.parentElement));  // focus moves to the confirm
+});
+
+// req: R-11
+it("PlanBanner shows reason_text with no button when there is no reason_action, and nothing new when both are null", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", reason_text: "None of your places took you." } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText("None of your places took you.")).toBeTruthy();
+  expect(within(document.querySelector("[data-plan-state]") as HTMLElement).queryByRole("button")).toBeNull();
+  cleanup();
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ plan: { state: "paused", reason_text: null, reason_action: null } }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(copy.roadmap.plan.paused)).toBeTruthy();
+  expect(within(document.querySelector("[data-plan-state]") as HTMLElement).queryByRole("button")).toBeNull();
+});
+
+// req: R-54
+it("with My plan on, a dated OS step shows its level and links to the inbox; a firm date shows no level", async () => {
+  const { MyPlanContext } = await import("@/components/os/my-plan-context");
+  const steps = osPlanRoute.steps.map((s) => s.key === "collect-transcripts" ? { ...s, estimated: true } : s);
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ steps }));
+  const plan = { state: "active", source: null, plan_id: 1, route_key: "r", abroad: true, pages: [], sources: {} };
+  render(<MyPlanContext.Provider value={{ on: true, plan, refresh: () => {} }}><Roadmap onNavigate={vi.fn()} /></MyPlanContext.Provider>);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.getAllByText(copy.connect.myPlan.levels.estimated).length).toBe(1);
+  expect(screen.queryByText(copy.connect.myPlan.levels.not_confirmed)).toBeNull();
+  const link = screen.getByRole("link", { name: copy.connect.myPlan.dateSource });
+  expect(link.getAttribute("href")).toBe("/ws1/os-inbox");
+  cleanup();
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(screen.queryByText(copy.connect.myPlan.levels.estimated)).toBeNull();
+  expect(screen.queryByRole("link", { name: copy.connect.myPlan.dateSource })).toBeNull();
+});
+
+// req: R-19 (P1-T8 Task 6: a step that waits for the student's data shows its request line and no tick)
+it("roadmap shows the request line and no tick", async () => {
+  const steps = [...osPlanRoute.steps, osRequestStep];
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage({ steps }));
+  render(<Roadmap onNavigate={vi.fn()} />);
+  expect(await screen.findByText(osRequestStep.request!.text)).toBeTruthy();
+  expect(screen.getByRole("checkbox", { name: "Collect your transcripts" })).toBeTruthy();  // an ordinary student step keeps its tick
+  expect(screen.queryByRole("checkbox", { name: "Your matric marks" })).toBeNull();
+  expect(document.querySelectorAll("[data-request]").length).toBe(1);
+});
+
+it("a plan with no request step shows no request line", async () => {
+  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(osPage());
+  render(<Roadmap onNavigate={vi.fn()} />);
+  await screen.findByText("Collect your transcripts");
+  expect(document.querySelector("[data-request]")).toBeNull();
 });

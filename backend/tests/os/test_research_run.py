@@ -305,7 +305,8 @@ def test_conflict_keeps_confirmed_value(research):
     assert "2027-07-01" in (row.conflict_note or "")
     conflicts = [e for e in events(research.engine, "fact_conflict") if e["ref"] == "ovgu-eeit"]
     assert len(conflicts) == 1 and conflicts[0]["field"] == "deadline_close"
-    assert confirm_tasks(research.engine, plan_id)["confirm_fact@ovgu-eeit:application_route"]["state"] == "done"
+    # concurrent runs can recompile the plan and re-key the check (`<key>#d<n>` / `#c<n>`): read it by its base key
+    assert confirm_states(confirm_tasks(research.engine, plan_id), "confirm_fact@ovgu-eeit:application_route") == ["done"]
 
 
 def test_budget_exceeded_skips_run(research):

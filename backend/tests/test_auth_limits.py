@@ -27,6 +27,10 @@ def test_the_limits_are_the_agreed_ones():
                             {"per": "ip", "limit": 10, "window_seconds": 3600}],
         "reset_password": [{"per": "ip", "limit": 10, "window_seconds": 3600}],
         "session": [{"per": "user", "limit": 30, "window_seconds": 3600}],
+        "guardian_request": [{"per": "email", "limit": 1, "window_seconds": 60},
+                             {"per": "email", "limit": 3, "window_seconds": 3600},
+                             {"per": "user", "limit": 5, "window_seconds": 3600}],
+        "guardian_open": [{"per": "ip", "limit": 30, "window_seconds": 3600}],
     }
 
 

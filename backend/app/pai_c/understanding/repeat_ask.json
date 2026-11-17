@@ -1,0 +1,6 @@
+{
+  "_note": "R-47 R2-4. An area chosen by `action` on each of the last `asks_without_gain` turns, whose entry count has not grown since the first of them, is not chosen for `cooldown_turns` turns. Read by pai_c/policy/state.py; the guided table and areas_policy.json stay as they are.",
+  "action": "explore_area",
+  "asks_without_gain": 2,
+  "cooldown_turns": 1
+}

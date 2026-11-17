@@ -5,6 +5,8 @@ deterministic (spec docs/counselor/ROADMAP_ENGINE_SPEC.md §2 and §5)."""
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from app.journey import JourneyService
 from app.memory.student_records import StudentRecordService
 from app.pai_c.paths.fields import study_fields
@@ -278,3 +280,32 @@ def test_o_level_line_names_no_group():
     record = {"qualification_name": "o_level", "academic_status": "current",
               "details": {"subjects": ["physics", "chemistry", "mathematics"]}}
     assert education_line(standing_of(record))["groups"] == []
+
+
+@pytest.mark.req("R-47")
+def test_roadmap_and_current_paths_read_one_list():
+    keys = list(study_fields())[:6]
+    with StudentSession() as student, student.factory() as db:
+        add_education(student, db, fsc("pre_engineering", 80))
+        for key in keys[:3]:  # kept from earlier runs
+            add_path(student, db, field_title(key), key, source="analyzer")
+        for key in keys[3:5]:  # the latest run
+            add_path(student, db, field_title(key), key, source="analyzer")
+        add_path(student, db, field_title(keys[5]), keys[5], status="dismissed")
+        current = PossibilityService(db).current(student.workspace_id)
+        fields = RoadmapEngine(db).build(student.workspace_id)["fields"]
+        assert sorted(c["possibility_id"] for c in fields) == sorted(r.id for r in current)
+        assert len(fields) == 5
+
+
+@pytest.mark.req("R-78", "R-15")
+def test_roadmap_drops_a_field_the_vault_rules_out():
+    from app.models import VaultItem
+    keys = list(study_fields())[:2]
+    with StudentSession() as student, student.factory() as db:
+        kept = add_path(student, db, field_title(keys[0]), keys[0])
+        add_path(student, db, field_title(keys[1]), keys[1])
+        db.add(VaultItem(workspace_id=student.workspace_id, item_type="option", level="stated",
+                         source_type="user_explicit", evidence={}, value={"text": field_title(keys[1]), "status": "ruled_out"}))
+        db.commit()
+        assert [c["possibility_id"] for c in RoadmapEngine(db).build(student.workspace_id)["fields"]] == [kept.id]

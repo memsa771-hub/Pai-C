@@ -1,0 +1,361 @@
+{
+  "$defs": {
+    "ClosingMerit": {
+      "additionalProperties": false,
+      "properties": {
+        "intake": {
+          "$ref": "#/$defs/IntakeRef"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "list_number": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "List Number"
+        },
+        "list_complete": {
+          "title": "List Complete",
+          "type": "boolean"
+        },
+        "level": {
+          "enum": [
+            "verified",
+            "confirmed",
+            "not_confirmed"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "intake",
+        "list_complete",
+        "level",
+        "source"
+      ],
+      "title": "ClosingMerit",
+      "type": "object"
+    },
+    "Formula": {
+      "additionalProperties": false,
+      "properties": {
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/FormulaPart"
+          },
+          "minItems": 1,
+          "title": "Parts",
+          "type": "array"
+        },
+        "total": {
+          "exclusiveMinimum": 0,
+          "title": "Total",
+          "type": "number"
+        },
+        "owner_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Ref"
+        },
+        "level": {
+          "enum": [
+            "verified",
+            "confirmed",
+            "not_confirmed"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "parts",
+        "total",
+        "level",
+        "source"
+      ],
+      "title": "Formula",
+      "type": "object"
+    },
+    "FormulaPart": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "marks_part": {
+          "minLength": 1,
+          "title": "Marks Part",
+          "type": "string"
+        },
+        "weight": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "marks_part",
+        "weight"
+      ],
+      "title": "FormulaPart",
+      "type": "object"
+    },
+    "IntakeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "pattern": "^[a-z_]+$",
+          "title": "Term",
+          "type": "string"
+        },
+        "year": {
+          "maximum": 2100,
+          "minimum": 2025,
+          "title": "Year",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term",
+        "year"
+      ],
+      "title": "IntakeRef",
+      "type": "object"
+    },
+    "MarkUsed": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "out_of": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Of"
+        },
+        "evidence": {
+          "enum": [
+            "stated",
+            "shown",
+            "confirmed",
+            "unknown"
+          ],
+          "title": "Evidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "evidence"
+      ],
+      "title": "MarkUsed",
+      "type": "object"
+    },
+    "PartStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "missing",
+            "not_confirmed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "PartStatus",
+      "type": "object"
+    },
+    "SourceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "checked_at": {
+          "format": "date-time",
+          "title": "Checked At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "quote",
+        "checked_at"
+      ],
+      "title": "SourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "pai.merit_check.v1",
+      "default": "pai.merit_check.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "student_ref": {
+      "minLength": 1,
+      "title": "Student Ref",
+      "type": "string"
+    },
+    "programme_ref": {
+      "minLength": 1,
+      "title": "Programme Ref",
+      "type": "string"
+    },
+    "intake": {
+      "$ref": "#/$defs/IntakeRef"
+    },
+    "category": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Category"
+    },
+    "status": {
+      "enum": [
+        "computed",
+        "not_confirmed",
+        "missing"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "formula": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Formula"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "aggregate": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Aggregate"
+    },
+    "marks_used": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MarkUsed"
+      },
+      "title": "Marks Used",
+      "type": "array"
+    },
+    "parts": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PartStatus"
+      },
+      "title": "Parts",
+      "type": "array"
+    },
+    "closing_merits": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ClosingMerit"
+      },
+      "title": "Closing Merits",
+      "type": "array"
+    }
+  },
+  "required": [
+    "student_ref",
+    "programme_ref",
+    "intake",
+    "status"
+  ],
+  "title": "MeritCheckV1",
+  "type": "object"
+}

@@ -22,7 +22,7 @@ def _ie() -> dict:
 
 def test_fake_playbooks_load():
     books = load_playbook_dir(FAKE_DIR)
-    assert set(books) == {("ireland_master", 1), ("pakistan_bs", 1)}
+    assert set(books) == {("ireland_master", 1), ("pakistan_bs", 1), ("pakistan_inter", 1)}
     assert books[("ireland_master", 1)].tasks[0].fan_out == "programme"
 
 

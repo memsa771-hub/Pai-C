@@ -7,39 +7,73 @@ from dataclasses import asdict, dataclass
 from sqlalchemy import exists, select
 
 from app.os.kernel.states import PLAN_OPEN
+from app.os.playbooks import newest_plain
 from app.os import models
 from app.os.api.queries import plan_out, removed_programmes
 from app.os.eligibility.evaluate import Card
 from app.os.eligibility.notes import profile_of, programme_cards
 from app.os.eligibility.swaps import suggest
 from app.os.knowledge.programmes import _programme
+from app.os.knowledge.fields import excluded_for, is_excluded
 from app.os.knowledge.requests import requested_without_facts, visible_programmes
 
 G, F, RQ, P = models.programmes, models.knowledge_facts, models.programme_requests, models.plans
 
 
 def newest_books(plans) -> dict:
-    out = {}
-    for (key, _), book in plans.playbooks.items():
-        if key not in out or book.version > out[key].version:
-            out[key] = book
-    return out
+    return newest_plain(plans.playbooks.values())  # a needs playbook is not listed (P1-T8): the bytes stay the same
+
+
+def requestable(plans, student_ref: str, route_key: str) -> bool:
+    """A student may ask for a new programme on a route they can start a plan on (D14): any route without a family,
+    a family route while its flag is on, or a family route the student already has an open plan pinned to. A route
+    key nobody loaded is never requestable. No family playbook loaded: no query, exactly as before."""
+    from app.os.playbooks import offered
+    from app.os.settings import released_families
+
+    book = newest_books(plans).get(route_key)
+    if book is None:
+        return False
+    if offered(book, released_families(plans.settings)):
+        return True
+    pins = models.playbook_pins
+    with plans.engine.connect() as conn:
+        return conn.execute(select(P.c.id).join(pins, pins.c.plan_id == P.c.id).where(
+            P.c.tenant_id == plans.kernel.tenant_id, P.c.student_ref == student_ref, P.c.status.in_(PLAN_OPEN),
+            pins.c.playbook_key == route_key).limit(1)).first() is not None
 
 
 def routes_out(plans) -> list[dict]:
+    """The routes a student can start a plan on: a family playbook only while its release flag is on (D14)."""
+    from app.os.settings import released_families
+
+    offered = newest_plain(plans.playbooks.values(), released=released_families(plans.settings))
     return [{"key": b.key, "version": b.version, "origin": b.route.origin, "destination": b.route.destination,
-             "level": b.route.level} for _, b in sorted(newest_books(plans).items())]
+             "level": b.route.level} for _, b in sorted(offered.items())]
 
 
 def card_out(card: Card | None) -> dict | None:
     return None if card is None else asdict(card)
 
 
-def _requested_by(plans, student_ref: str, route_key: str, year: int) -> list:
+def _term(book) -> str | None:
+    """The intake term the route offers when it offers exactly one (P2-T8, R-62); None when it offers several or none,
+    which reads facts of any term, as before."""
+    terms = list(getattr(book, "intake_terms", None) or [])
+    return terms[0] if len(terms) == 1 else None
+
+
+def _term_rule(term: str | None):
+    """Facts of the term, and facts whose term was never recorded (T8's rule for the raw-SQL readers)."""
+    return F.c.intake_term.in_([term, ""]) if term is not None else True
+
+
+def _requested_by(plans, student_ref: str, route_key: str, year: int, term: str | None = None) -> list:
     """Programmes this student asked for that research has found nothing for yet (they see them as being researched)."""
     tenant = plans.kernel.tenant_id
     has_facts = exists(select(F.c.id).where(F.c.tenant_id == tenant, F.c.scope == "programme", F.c.ref == G.c.ref,
-                                            F.c.intake_year == year))
+                                            F.c.intake_year == year, F.c.owner_ref == "",
+                                            _term_rule(term)))
     asked = select(RQ.c.programme_ref).where(RQ.c.tenant_id == tenant, RQ.c.student_ref == student_ref)
     with plans.engine.connect() as conn:
         rows = conn.execute(select(G).where(G.c.tenant_id == tenant, G.c.route_key == route_key,
@@ -48,19 +82,26 @@ def _requested_by(plans, student_ref: str, route_key: str, year: int) -> list:
     return [_programme(r) for r in rows]
 
 
+def _excluded(plans, student_ref: str) -> frozenset[str]:
+    """The student's excluded field codes, read now through StudentFacts (R-15); never stored."""
+    return excluded_for(student_ref, engine=plans.engine, tenant_id=plans.kernel.tenant_id)
+
+
 def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list[dict] | None:
     """None if the route is unknown."""
     book = newest_books(plans).get(route_key)
     if book is None:
         return None
-    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year)
+    term = _term(book)
+    excluded = _excluded(plans, student_ref)
+    visible = visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, term, excluded)
     rules = book.eligibility
     cards = (programme_cards(plans, rules, [p.ref for p in visible], year, profile_of(plans, student_ref))
              if rules is not None else {})
     with plans.engine.connect() as conn:
         researched = set(conn.execute(select(F.c.ref).distinct().where(
             F.c.tenant_id == plans.kernel.tenant_id, F.c.scope == "programme", F.c.intake_year == year,
-            F.c.ref.in_([p.ref for p in visible]))).scalars())
+            F.c.owner_ref == "", _term_rule(term), F.c.ref.in_([p.ref for p in visible]))).scalars())
     out = []
     for p in visible:
         card, confirmed = cards.get(p.ref, (None, 0))
@@ -68,7 +109,9 @@ def route_programmes(plans, student_ref: str, route_key: str, year: int) -> list
                     "research_state": "researched" if p.ref in researched else "being_researched",
                     "requested_by_student": p.status == "requested", "confirmed_facts": confirmed,
                     "card": card_out(card) if p.ref in researched else None})
-    for p in _requested_by(plans, student_ref, route_key, year):
+    for p in _requested_by(plans, student_ref, route_key, year, term):
+        if is_excluded(p.field, excluded):
+            continue
         out.append({"ref": p.ref, "university": p.university, "name": p.name, "research_state": "being_researched",
                     "requested_by_student": True, "confirmed_facts": 0, "card": None})
     return out
@@ -91,14 +134,19 @@ def eligibility(plans, student_ref: str, programme_ref: str, route_key: str, yea
     book = newest_books(plans).get(route_key)
     if book is None:
         return None
-    visible = {p.ref: p for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year)}
+    visible = {p.ref: p for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year,
+                                                    _term(book))}
     if programme_ref not in visible:
         return None
     if book.eligibility is None:
         return {"card": None, "suggestions": []}
     cards = programme_cards(plans, book.eligibility, list(visible), year, profile_of(plans, student_ref))
     card = cards[programme_ref][0]
-    picks = suggest(card, list(cards.values()), _chosen(plans, student_ref, route_key, year))
+    # R-15: the asked programme keeps its card, but a suggestion is never in a field the student excluded
+    allowed = {p.ref for p in visible_programmes(plans.engine, plans.kernel.tenant_id, route_key, year, _term(book),
+                                                 _excluded(plans, student_ref))}
+    picks = suggest(card, [c for c in cards.values() if c[0].programme_ref in allowed],
+                    _chosen(plans, student_ref, route_key, year))
     return {"card": card_out(card), "suggestions": [
         {"programme_ref": s.programme_ref, "university": visible[s.programme_ref].university,
          "name": visible[s.programme_ref].name, "confirmed_facts": s.confirmed_facts} for s in picks]}

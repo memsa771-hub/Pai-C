@@ -5,10 +5,11 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, Engine, exists, func, insert, select
 
-from app.os import models
+from app.os import clock, models
+from app.os.ports import os_events
 
 EVENT_TYPES = ("admission_rejected", "deadline_at_risk", "document_missing", "task_failed", "playbook_newer",
-               "escalate", "approved_changed", "route_invalid")
+               "escalate", "approved_changed", "route_invalid", "student_fact_changed")
 ADMISSION_TEMPLATE = "admission_result"  # its result {"choice": "rejected"} is a rejection (the Slice 6b inbox)
 REVIEW_TEMPLATES = {"review_pack": "pack", "review_visa_file": "visa"}  # review step -> the artifact kind it approves
 
@@ -67,9 +68,12 @@ def detect_at_risk(engine: Engine, tenant_id: str, plan_id: int) -> int:
         found = 0
         for r in rows:
             day = r.latest_finish.date().isoformat() if r.latest_finish else "none"
-            found += record(conn, tenant_id, plan_id, "deadline_at_risk",
-                            {"instance_key": r.instance_key, "slack_days": r.slack_days},
-                            f"{r.instance_key}:{day}", r.id) is not None
+            event_id = record(conn, tenant_id, plan_id, "deadline_at_risk",
+                              {"instance_key": r.instance_key, "slack_days": r.slack_days},
+                              f"{r.instance_key}:{day}", r.id)
+            if event_id is not None:  # the same transaction tells the Counsellor (R-45)
+                os_events.emit(conn, tenant_id, plan_id, "deadline_at_risk", event_id, clock.now(), r.instance_key)
+                found += 1
     return found
 
 

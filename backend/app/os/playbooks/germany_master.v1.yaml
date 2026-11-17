@@ -6,6 +6,7 @@ key: germany_master
 version: 1
 route: {origin: PK, destination: DE, level: master}
 default_timezone: Europe/Berlin
+intake_terms: [winter]
 require_citations: true
 
 # Slice 4 (spec S4-D9): the route builder completes this task with the student's programmes.

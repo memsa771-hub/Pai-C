@@ -29,7 +29,7 @@ class FeeRow:
 
 def _confirmed(inp: PackInputs, name: str):
     f = inp.facts.get(name)
-    return f if f is not None and f.status == "confirmed" else None
+    return f if f is not None and f.status in ("confirmed", "verified") else None
 
 
 def _url(inp: PackInputs, source: str) -> str | None:

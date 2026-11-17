@@ -20,7 +20,8 @@ def export(decision: str, student: str = "ws-1", chosen_at: datetime = T0, journ
             "student_ref": student, "chosen_at": chosen_at.isoformat()}
 
 
-def test_migration_up_down_up(os_db):
+def test_migration_up_down_up(os_db, engine, clean):
+    # `clean` first: a test that started a worker leaves the synced allow-lists (P2-T20), and a downgrade refuses rows
     from tests.os.conftest import run_alembic
 
     run_alembic(["downgrade", "os_0012"], os_db)

@@ -346,6 +346,23 @@ class Config:
     PAI_RESEARCH_MAX_FETCHES: int = int(os.environ.get("PAI_RESEARCH_MAX_FETCHES", "12"))
     PAI_RESEARCH_MAX_SECONDS: int = int(os.environ.get("PAI_RESEARCH_MAX_SECONDS", "240"))
     PAI_OS_SERVICE_TOKEN: str = os.environ.get("PAI_OS_SERVICE_TOKEN", "")
+    # Counsellor/PAI OS connection parts (P1-D9): each is off by default and counts only while the OS `counsellor`
+    # module is also on (see app.pai_c.connect.flags.part_on).
+    CONNECT_HANDOFF: bool = os.environ.get("CONNECT_HANDOFF", "false").lower() in ("true", "1", "yes")
+    CONNECT_ROADMAP_FROM_PLANVIEW: bool = os.environ.get("CONNECT_ROADMAP_FROM_PLANVIEW", "false").lower() in ("true", "1", "yes")
+    CONNECT_CHECKINS_FROM_PLANVIEW: bool = os.environ.get("CONNECT_CHECKINS_FROM_PLANVIEW", "false").lower() in ("true", "1", "yes")
+    CONNECT_STUDENT_FACTS: bool = os.environ.get("CONNECT_STUDENT_FACTS", "false").lower() in ("true", "1", "yes")
+    CONNECT_ONE_UPLOAD: bool = os.environ.get("CONNECT_ONE_UPLOAD", "false").lower() in ("true", "1", "yes")
+    CONNECT_MY_PLAN: bool = os.environ.get("CONNECT_MY_PLAN", "false").lower() in ("true", "1", "yes")
+    # P2 freeze exception 2 (R-48): merit items in the chosen path come from PAI OS MeritCheck.
+    CONNECT_MERIT_ANSWERS: bool = os.environ.get("CONNECT_MERIT_ANSWERS", "false").lower() in ("true", "1", "yes")
+    # Freeze exception 3 (P2-D28): the academic calendar and admission rules read through Knowledge (linked values only).
+    CONNECT_CALENDAR_FROM_KNOWLEDGE: bool = os.environ.get("CONNECT_CALENDAR_FROM_KNOWLEDGE", "false").lower() in ("true", "1", "yes")
+    # The hour (UTC, 0-23) at which the nightly Counsellor/PAI OS consistency job runs (P1-T10, R-05). Not a flag: the job
+    # runs only while the OS is mounted, the `counsellor` module is on and CONNECT_HANDOFF is on.
+    CONNECT_CONSISTENCY_HOUR_UTC: int = int(os.environ.get("CONNECT_CONSISTENCY_HOUR_UTC", "21")) % 24
+    # Lets unapproved consent texts be used (rehearsal only). Off: consent.ensure_usable() refuses them.
+    CONNECT_CONSENT_DRAFT: bool = os.environ.get("CONNECT_CONSENT_DRAFT", "false").lower() in ("true", "1", "yes")
 
     # Transactional email. Delivery goes through Resend when a key is
     # configured (otherwise sends are logged no-ops).

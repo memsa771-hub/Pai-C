@@ -5,13 +5,15 @@ from app.os.compiler.compile import (
     CompileError,
     DraftTask,
     PlanDraft,
+    SystemsNotResolved,
     compile_plan,
     date_of,
+    needed_calendars,
     needed_fields,
 )
 from app.os.compiler.schedule import end_of_day, start_of_day
 
 __all__ = [
-    "CONFIRM_TYPE", "CompileError", "DraftTask", "PlanDraft", "compile_plan", "date_of", "end_of_day",
-    "needed_fields", "start_of_day",
+    "CONFIRM_TYPE", "CompileError", "DraftTask", "PlanDraft", "compile_plan", "date_of", "end_of_day", "needed_calendars",
+    "needed_fields", "start_of_day", "SystemsNotResolved",
 ]

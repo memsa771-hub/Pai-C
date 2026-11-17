@@ -1,0 +1,19 @@
+# Fictional allow-list for tests (invented bodies and .test domains; nothing from memory).
+region: north_region
+family: university
+bodies:
+  - body_ref: body-regulator
+    tier: regulator
+    domains: [higher-ed-regulator.test]
+    list_ref: "https://www.higher-ed-regulator.test/"
+    reviewed_by: tester-1
+  - body_ref: body-alpha
+    tier: institution
+    domains: [alpha-university.test]
+    list_ref: "https://www.higher-ed-regulator.test/recognised-institutions"
+    reviewed_by: tester-1
+  - body_ref: body-beta
+    tier: institution
+    domains: [beta-college.test]
+    list_ref: "https://www.higher-ed-regulator.test/recognised-institutions"
+    reviewed_by: tester-1

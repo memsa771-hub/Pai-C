@@ -1,0 +1,26 @@
+# Aliases for PAI-Research-W12-biek-affiliated-private-colleges.xlsx (import --aliases; docs/research/batches/README.md, 'Alias files').
+# Made by w12/biek/make_aliases.py. Verdicts: w12/biek/checks/alias-check1.yaml (check 1) and
+# alias-check2.yaml (check 2, independent). Controller ruling 2026-11-15: an alias is accepted only
+# where both checks say same. Every alias is required: one not accepted rejects its row, so no
+# duplicate entity is loaded. Check 2 `unclear` has no value in format.yaml check2_values, so
+# `approved` is left empty and the verdict is kept in a comment on that alias.
+file: PAI-Research-W12-biek-affiliated-private-colleges.xlsx
+sha256: 7f8cf2edb323c7f9bd66260398be97520a757ae6256c360e56698039b984977f
+aliases:
+  - from: SD-BIEK-PVT-42
+    # check 1: same; check 2: same -> accepted
+    to: SD-BIEK-PVT-34
+    evidence: {url: "https://www.biek.edu.pk/PMaleCol.asp", quote: "42. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi"}
+    target_evidence: {url: "https://www.biek.edu.pk/PMaleCol.asp", quote: "34. College of Accounting and Management Science PECHS Campus 175-P Block -2 PECHS Karachi Ph: 37238551"}
+    check1: {result: correct, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    check2: {approved: "yes", name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true
+  - from: SD-BIEK-PVT-50
+    # check 1: unclear; check 2: unclear -> not accepted (held)
+    to: SD-BIEK-PVT-48
+    evidence: {url: "https://www.biek.edu.pk/PMaleCol.asp", quote: "50. DHACSS Intermediate College Khayaban-e-Rahat, Phase-VI, Defence Housing Society, Karachi Ph: 35845970-35342844-45 Fax: 5846584 0300-9243104"}
+    target_evidence: {url: "https://www.biek.edu.pk/PMaleCol.asp", quote: "48. DHA College & School System SKBZ Campus Khayaban-e-Rahat, Phase-VI, D.H.A., Karachi. Ph: 35845871 & 35341531-2"}
+    check1: {result: unclear, name: "claude-w12-biek-alias-check-1", date: "2026-11-15"}
+    # check 2 verdict: unclear (recorded in alias-check2.yaml); approved left empty
+    check2: {name: "claude-w12-biek-alias-check-2", date: "2026-11-15"}
+    required: true

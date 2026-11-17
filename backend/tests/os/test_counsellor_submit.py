@@ -74,6 +74,7 @@ def test_concurrent_submit_one_row(mounted):
     assert sorted(got) == ["duplicate", "stored"] and rows(mounted) == 1  # review focus 2
 
 
+@pytest.mark.standalone
 def test_module_off_keeps_pending(mounted):
     assert submit_counsellor_decision(sample()) == "module_off"  # stored anyway, for when it is switched on
     assert IntakeStore(mounted, "pai").get("d-sample-1").status == "pending"

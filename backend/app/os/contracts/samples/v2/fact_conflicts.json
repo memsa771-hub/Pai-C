@@ -1,0 +1,19 @@
+{
+  "schema": "pai.fact_conflicts.v1",
+  "student_ref": "ws-sample-1",
+  "vault_version": 4,
+  "built_at": "2027-01-10T09:30:00+00:00",
+  "conflicts": [
+    {
+      "ref": "profile_issue:7c1f6e2a-0b3d-4a58-9a41-5d2e8f9b0c11",
+      "key": "education.bachelor.gpa",
+      "values": [
+        {"side": "current", "value": 3.4, "evidence": "stated", "document_ref": null,
+         "as_of": "2026-12-01T10:00:00+00:00"},
+        {"side": "proposed", "value": 3.2, "evidence": "shown", "document_ref": "11111111-2222-3333-4444-555555555555",
+         "as_of": "2027-01-10T09:00:00+00:00"}
+      ],
+      "answers": ["keep_current", "accept_proposed", "provide_new"]
+    }
+  ]
+}
